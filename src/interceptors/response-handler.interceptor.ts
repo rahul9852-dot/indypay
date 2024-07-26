@@ -1,0 +1,33 @@
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from "@nestjs/common";
+import { Observable } from "rxjs";
+import { map } from "rxjs/operators";
+import { successMessages } from "constants/messages";
+
+export interface Response<T> {
+  statusCode: number;
+  message: string;
+  data: T;
+}
+
+@Injectable()
+export class ResponseHandlerInterceptor<T>
+  implements NestInterceptor<T, Response<T>>
+{
+  intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<Response<T>> {
+    return next.handle().pipe(
+      map((data) => ({
+        statusCode: context.switchToHttp().getResponse().statusCode,
+        message: successMessages.dataReceived,
+        data,
+      })),
+    );
+  }
+}
