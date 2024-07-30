@@ -1,24 +1,3 @@
-import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsString } from "class-validator";
+import { CreateUserDto } from "modules/users/users.dto";
 
-export class GenerateTokenDto {
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  token: string;
-}
-
-export class VerifyTokenDto extends GenerateTokenDto {}
-
-export class VerifyTokenResponse {
-  @ApiResponseProperty()
-  isValidToken: boolean;
-
-  @ApiResponseProperty()
-  merchantId: number;
-}
-
-export class MessageResponse {
-  @ApiResponseProperty()
-  message: string;
-}
+export class RegisterUserDto extends CreateUserDto {}

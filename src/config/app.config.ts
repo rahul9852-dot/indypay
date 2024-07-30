@@ -10,4 +10,10 @@ export const appConfig = registerAs("appConfig", () => ({
   nodeEnv: getOsEnv("NODE_ENV"),
   allowedOrigins: getOsEnv("ALLOWED_ORIGINS").split(","),
   isProduction: getOsEnv("NODE_ENV") === NodeEnv.Production,
+  jwtConfig: {
+    accessTokenSecret: getOsEnv("JWT_ACCESS_TOKEN_SECRET"),
+    refreshTokenSecret: getOsEnv("JWT_REFRESH_TOKEN_SECRET"),
+    accessTokenExpiresIn: getOsEnv("JWT_ACCESS_TOKEN_EXPIRES_IN"),
+    refreshTokenExpiresIn: getOsEnv("JWT_REFRESH_TOKEN_EXPIRES_IN"),
+  },
 }));

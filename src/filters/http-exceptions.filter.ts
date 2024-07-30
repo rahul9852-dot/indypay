@@ -35,9 +35,7 @@ export class HttpExceptionsFilter extends BaseExceptionFilter {
       });
     }
 
-    response.status(status).json({
-      statusCode: status,
-      timestamp: new Date(),
+    return response.status(status).json({
       message: exception.message || errorMessages.internalServerError,
     });
   }

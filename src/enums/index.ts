@@ -9,9 +9,20 @@ export enum CookieKeys {
 }
 
 export enum Roles {
-  Admin = "admin",
-  Merchant = "merchant",
-  User = "user",
+  Merchant = 1,
+  Ops,
+  SuperAdmin,
+}
+
+export enum Status {
+  Inactive = 1,
+  Active,
+}
+
+export enum PaymentStatus {
+  Pending = 1,
+  Failed,
+  Success,
 }
 
 export const DateFormat = {
