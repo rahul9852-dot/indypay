@@ -6,7 +6,7 @@ export const dbConfig: TypeOrmModuleOptions = {
   port: 5433,
   username: "postgres",
   password: "Vivek@123",
-  database: "paybolt_pg_db",
+  database: "paybolt_pg_db_demo",
   entities: [__dirname + "/../**/*.entity{.ts,.js}"],
   synchronize: true,
 };

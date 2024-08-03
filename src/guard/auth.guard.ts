@@ -4,12 +4,11 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
-import { Reflector } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 import { Request } from "express";
 import { appConfig } from "config/app.config";
-import { IS_PUBLIC_KEY } from "decorators/public.decorator";
-import { CookieKeys } from "enums";
+import { COOKIE_KEYS } from "enums";
+import { IAccessTokenPayload } from "interface/common.interface";
 
 const {
   jwtConfig: { accessTokenSecret },
@@ -17,30 +16,19 @@ const {
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(
-    private jwtService: JwtService,
-    private reflector: Reflector,
-  ) {}
+  constructor(private jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (isPublic) {
-      // 💡 See this condition
-      return true;
-    }
-
     const request = context.switchToHttp().getRequest();
-    const token = this.extractTokenFromHeader(request);
-    if (!token) {
+    const accessToken = this.extractTokenFromHeader(request);
+
+    if (!accessToken) {
       throw new UnauthorizedException();
     }
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
+      const payload = (await this.jwtService.verifyAsync(accessToken, {
         secret: accessTokenSecret,
-      });
+      })) as IAccessTokenPayload;
       // 💡 We're assigning the payload to the request object here
       // so that we can access it in our route handlers
       request["user"] = payload;
@@ -52,7 +40,7 @@ export class AuthGuard implements CanActivate {
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
-    const accessToken = request.cookies[CookieKeys.AccessToken];
+    const accessToken = request.cookies[COOKIE_KEYS.ACCESS_TOKEN];
 
     return accessToken;
   }

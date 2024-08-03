@@ -1,4 +1,6 @@
 export interface IAccessTokenPayload {
-  id: number;
+  id: string;
   email: string;
 }
+
+export type IRefreshTokenPayload = IAccessTokenPayload;

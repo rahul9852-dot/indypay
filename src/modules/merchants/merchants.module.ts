@@ -3,14 +3,13 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtService } from "@nestjs/jwt";
 
 import { MerchantsEntity } from "entities/merchants.entity";
-import { MerchantsService } from "modules/merchants/merchants.service";
 import { BcryptService } from "shared/bcrypt/bcrypt.service";
-import { AuthService } from "./auth.service";
-import { AuthController } from "./auth.controller";
+import { MerchantsController } from "./merchants.controller";
+import { MerchantsService } from "./merchants.service";
 
 @Module({
   imports: [TypeOrmModule.forFeature([MerchantsEntity])],
-  providers: [AuthService, MerchantsService, BcryptService, JwtService],
-  controllers: [AuthController],
+  controllers: [MerchantsController],
+  providers: [MerchantsService, BcryptService, JwtService],
 })
-export class AuthModule {}
+export class MerchantsModule {}

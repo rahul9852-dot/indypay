@@ -1,17 +1,19 @@
-import { Roles, Status } from "enums";
+import { STATUS } from "enums";
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
   Index,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
+import { getUlidId } from "utils/helperFunctions.utils";
 
-@Entity("users")
-export class UsersEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity("ops")
+export class OpsEntity {
+  @PrimaryColumn()
+  id: string;
 
   @Column()
   name: string;
@@ -23,19 +25,16 @@ export class UsersEntity {
   @Column()
   password: string;
 
-  @Column()
+  @Column({ nullable: true })
   contactNo: string;
 
   @Column({ default: false })
-  isOTPVerified: boolean;
+  isPhoneVerified: boolean;
 
   @Column({ default: false })
-  isKycVerified: boolean;
+  isEmailVerified: boolean;
 
-  @Column({ enum: Roles, default: Roles.Merchant })
-  role: number;
-
-  @Column({ enum: Status, default: Status.Active })
+  @Column({ enum: STATUS, default: STATUS.ACTIVE })
   status: number;
 
   @Column({ nullable: true })
@@ -46,4 +45,9 @@ export class UsersEntity {
 
   @UpdateDateColumn({ type: "timestamp" })
   updatedAt: Date;
+
+  @BeforeInsert()
+  beforeInsertHook() {
+    this.id = getUlidId("ops");
+  }
 }

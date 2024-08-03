@@ -2,19 +2,21 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
 } from "class-validator";
+import { ROLES } from "enums";
 import { trimString } from "utils/string.utils";
 
-export class CreateUserDto {
+export class CreateMerchantDto {
   @ApiProperty({ example: "John Doe" })
   @IsString()
   @IsNotEmpty()
   @Transform(trimString)
-  name: string;
+  fullName: string;
 
   @ApiProperty({ example: "john@example.com" })
   @IsEmail()
@@ -33,7 +35,7 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   @Transform(trimString)
-  contactNo: string;
+  mobile: string;
 
   @ApiPropertyOptional({ example: "image.png" })
   @IsString()
@@ -41,9 +43,9 @@ export class CreateUserDto {
   image?: string;
 }
 
-export class UpdateUserDto extends PartialType(CreateUserDto) {}
+export class UpdateMerchantDto extends PartialType(CreateMerchantDto) {}
 
-export class LoginUserDto {
+export class LoginMerchantDto {
   @ApiProperty({ example: "john@example.com" })
   @IsEmail()
   @IsNotEmpty()
@@ -55,4 +57,11 @@ export class LoginUserDto {
   @IsNotEmpty()
   @Transform(trimString)
   password: string;
+}
+
+export class RolesDto {
+  @ApiProperty({ example: 1 })
+  @IsEnum(ROLES)
+  @IsNotEmpty()
+  role: ROLES;
 }

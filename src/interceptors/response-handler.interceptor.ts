@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
-import { successMessages } from "constants/messages";
+import { SUCCESS_MESSAGES } from "constants/messages.constant";
 
 export interface Response<T> {
   statusCode: number;
@@ -25,7 +25,7 @@ export class ResponseHandlerInterceptor<T>
     return next.handle().pipe(
       map((data) => ({
         statusCode: context.switchToHttp().getResponse().statusCode,
-        message: successMessages.dataReceived,
+        message: SUCCESS_MESSAGES.DATA_RECEIVED,
         data,
       })),
     );

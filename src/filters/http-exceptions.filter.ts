@@ -5,7 +5,7 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { BaseExceptionFilter } from "@nestjs/core";
-import { errorMessages } from "constants/messages";
+import { ERROR_MESSAGES } from "constants/messages.constant";
 
 @Catch()
 export class HttpExceptionsFilter extends BaseExceptionFilter {
@@ -31,12 +31,12 @@ export class HttpExceptionsFilter extends BaseExceptionFilter {
 
       return response.status(status).json({
         ...responseBody,
-        message: exception.message || errorMessages.internalServerError,
+        message: exception.message || ERROR_MESSAGES.INTERNAL_SERVER_ERROR,
       });
     }
 
     return response.status(status).json({
-      message: exception.message || errorMessages.internalServerError,
+      message: exception.message || ERROR_MESSAGES.INTERNAL_SERVER_ERROR,
     });
   }
 }

@@ -1,30 +1,39 @@
-export enum NodeEnv {
-  Development = "development",
-  Production = "production",
+export enum NODE_ENV {
+  DEVELOPMENT = "development",
+  PRODUCTION = "production",
 }
 
-export enum CookieKeys {
-  AccessToken = "atk",
-  RefreshToken = "rtk",
+export enum COOKIE_KEYS {
+  ACCESS_TOKEN = "atk",
+  REFRESH_TOKEN = "rtk",
 }
 
-export enum Roles {
-  Merchant = 1,
-  Ops,
-  SuperAdmin,
+export enum ROLES {
+  MERCHANT = 1,
+  OPS,
+  ADMIN,
+  SUPER_ADMIN,
 }
 
-export enum Status {
-  Inactive = 1,
-  Active,
+export enum STATUS {
+  INACTIVE = 1,
+  ACTIVE,
 }
 
-export enum PaymentStatus {
-  Pending = 1,
-  Failed,
-  Success,
+export enum PAYMENT_STATUS {
+  PENDING = 1,
+  FAILED,
+  SUCCESS,
 }
 
-export const DateFormat = {
-  DD_MM_YYYY_HH_MM_SS_A: "DD/MM/YYYY HH:mm:ss A",
-};
+export enum BUSINESS_TYPES {
+  INDIVIDUAL = 1,
+  SOLE_PROPRIETORSHIP = 2,
+  PARTNERSHIP = 3,
+  PUBLIC_PRIVATE_LTD = 4,
+  TRUST_NGO_SOCIETIES = 5,
+  LLP = 6,
+  OTHERS = 7,
+  UNREGISTERED = 8,
+  FREELANCE = 9,
+}

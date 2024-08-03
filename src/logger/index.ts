@@ -1,7 +1,7 @@
 import { sep } from "path";
 import { format, createLogger, transports } from "winston";
 import { appConfig } from "config/app.config";
-import { DateFormat } from "enums";
+import { DATE_FORMATS } from "constants/dates.constant";
 
 const { combine, printf, timestamp, colorize, splat, prettyPrint } = format;
 const { isProduction } = appConfig();
@@ -34,7 +34,7 @@ const colors = {
 
 const formatLogger = combine(
   colorize({ all: true, colors }),
-  timestamp({ format: DateFormat.DD_MM_YYYY_HH_MM_SS_A }),
+  timestamp({ format: DATE_FORMATS.DD_MM_YYYY_HH_MM_SS_A }),
   splat(),
   prettyPrint(),
   printf((info) => `${info.timestamp} ${info.level}: ${info.message}`),

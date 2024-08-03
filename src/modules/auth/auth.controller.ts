@@ -1,6 +1,6 @@
 import { Body, Controller, Post, Res } from "@nestjs/common";
 import { Response } from "express";
-import { LoginUserDto } from "modules/users/users.dto";
+import { LoginMerchantDto } from "modules/merchants/merchants.dto";
 import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
@@ -9,82 +9,37 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { MessageResponseDto } from "dtos/common.dto";
-import { JwtService } from "@nestjs/jwt";
-import { Public } from "decorators/public.decorator";
-import { appConfig } from "config/app.config";
-import { CookieKeys } from "enums";
-import { accessCookieOptions, refreshCookieOptions } from "utils/cookies.utils";
 import { AuthService } from "./auth.service";
-import { RegisterUserDto } from "./auth.dto";
+import { RegisterMerchantDto } from "./auth.dto";
 
-const {
-  jwtConfig: {
-    accessTokenExpiresIn,
-    refreshTokenExpiresIn,
-    accessTokenSecret,
-    refreshTokenSecret,
-  },
-} = appConfig();
-@Public()
 @ApiTags("Authentication")
 @Controller("auth")
 export class AuthController {
-  constructor(
-    private readonly _authService: AuthService,
-    private readonly _jwtService: JwtService,
-  ) {}
+  constructor(private readonly _authService: AuthService) {}
 
-  @ApiOperation({ summary: "Register new user" })
+  @ApiOperation({ summary: "Register new merchant" })
   @ApiCreatedResponse({ type: MessageResponseDto })
   @ApiBadRequestResponse({ type: MessageResponseDto })
   @Post("register")
-  async register(@Body() registerUserDto: RegisterUserDto) {
-    return this._authService.register(registerUserDto);
+  async register(@Body() registerMerchantDto: RegisterMerchantDto) {
+    return this._authService.register(registerMerchantDto);
   }
 
-  @ApiOperation({ summary: "Login user" })
+  @ApiOperation({ summary: "Login merchant" })
   @ApiOkResponse({ type: MessageResponseDto })
   @ApiBadRequestResponse({ type: MessageResponseDto })
   @Post("login")
-  async login(@Body() loginUserDto: LoginUserDto, @Res() res: Response) {
-    const user = await this._authService.login(loginUserDto);
-
-    const accessToken = await this._jwtService.signAsync(
-      {
-        userId: user.id,
-        email: user.email,
-      },
-      {
-        expiresIn: accessTokenExpiresIn,
-        secret: accessTokenSecret,
-      },
-    );
-
-    const refreshToken = await this._jwtService.signAsync(
-      {
-        userId: user.id,
-        email: user.email,
-      },
-      {
-        expiresIn: refreshTokenExpiresIn,
-        secret: refreshTokenSecret,
-      },
-    );
-
-    res.cookie(CookieKeys.AccessToken, accessToken, accessCookieOptions);
-
-    res.cookie(CookieKeys.RefreshToken, refreshToken, refreshCookieOptions);
-
-    return res.status(200).json(new MessageResponseDto("Login successful"));
+  async login(
+    @Body() loginMerchantDto: LoginMerchantDto,
+    @Res() res: Response,
+  ) {
+    return this._authService.login(loginMerchantDto, res);
   }
 
-  @ApiOperation({ summary: "Logout user" })
+  @ApiOperation({ summary: "Logout merchant" })
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("logout")
   async logout(@Res() res: Response) {
-    res.clearCookie(CookieKeys.AccessToken, accessCookieOptions);
-    res.clearCookie(CookieKeys.RefreshToken, refreshCookieOptions);
-
-    return res.status(200).json(new MessageResponseDto("Logout successful"));
+    return this._authService.logout(res);
   }
 }

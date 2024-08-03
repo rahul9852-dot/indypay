@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "modules/auth/auth.module";
-import { UsersModule } from "modules/users/users.module";
+import { MerchantsModule } from "modules/merchants/merchants.module";
 import { appConfig } from "config/app.config";
 import { dbConfig } from "config/db.config";
 import { AppController } from "./app.controller";
@@ -15,7 +15,7 @@ import { AppController } from "./app.controller";
       envFilePath: ".env",
     }),
     TypeOrmModule.forRoot(dbConfig),
-    UsersModule,
+    MerchantsModule,
     AuthModule,
   ],
   controllers: [AppController],

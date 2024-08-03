@@ -1,45 +1,111 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { LoginUserDto } from "modules/users/users.dto";
-import { UsersService } from "modules/users/users.service";
+import { Response } from "express";
+import { JwtService } from "@nestjs/jwt";
+
+import { LoginMerchantDto } from "modules/merchants/merchants.dto";
+import {
+  IAccessTokenPayload,
+  IRefreshTokenPayload,
+} from "interface/common.interface";
+import { MerchantsService } from "modules/merchants/merchants.service";
 import { BcryptService } from "shared/bcrypt/bcrypt.service";
 import { MessageResponseDto } from "dtos/common.dto";
-import { RegisterUserDto } from "./auth.dto";
+import { COOKIE_KEYS } from "enums";
+import { appConfig } from "config/app.config";
+import { accessCookieOptions, refreshCookieOptions } from "utils/cookies.utils";
+import { RegisterMerchantDto } from "./auth.dto";
+
+const {
+  jwtConfig: {
+    accessTokenExpiresIn,
+    accessTokenSecret,
+    refreshTokenExpiresIn,
+    refreshTokenSecret,
+  },
+} = appConfig();
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly _userService: UsersService,
+    private readonly _merchantsService: MerchantsService,
     private readonly _bcryptService: BcryptService,
+    private readonly _jwtService: JwtService,
   ) {}
 
-  async register(registerUserDto: RegisterUserDto) {
-    return this._userService.create(registerUserDto);
+  async register(registerMerchantDto: RegisterMerchantDto) {
+    return this._merchantsService.createMerchant(registerMerchantDto);
   }
 
-  async login(loginUserDto: LoginUserDto) {
-    const user = await this._userService.findActiveUser(loginUserDto.email);
+  async login(loginMerchantDto: LoginMerchantDto, response: Response) {
+    const merchant = await this._merchantsService.findActiveMerchant(
+      loginMerchantDto.email,
+    );
 
-    if (!user) {
+    if (!merchant) {
       throw new BadRequestException(
-        new MessageResponseDto("User or password is incorrect"),
+        new MessageResponseDto("Merchant or password is incorrect"),
       );
     }
 
     const isMatch = await this._bcryptService.comparePassword(
-      loginUserDto.password,
-      user.password,
+      loginMerchantDto.password,
+      merchant.password,
     );
 
     if (!isMatch) {
       throw new BadRequestException(
-        new MessageResponseDto("User or password is incorrect"),
+        new MessageResponseDto("Merchant or password is incorrect"),
       );
     }
 
-    const { password: _, ...rest } = user;
+    const accessToken = await this.generateAccessToken({
+      id: merchant.id,
+      email: merchant.email,
+    });
 
-    return {
-      ...rest,
-    };
+    const refreshToken = await this.generateRefreshToken({
+      id: merchant.id,
+      email: merchant.email,
+    });
+
+    return response
+      .status(201)
+      .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
+      .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
+      .json(new MessageResponseDto("Merchant login successful"));
+  }
+
+  async logout(response: Response) {
+    return response
+      .status(200)
+      .clearCookie(COOKIE_KEYS.REFRESH_TOKEN, refreshCookieOptions)
+      .clearCookie(COOKIE_KEYS.ACCESS_TOKEN, accessCookieOptions)
+      .json(new MessageResponseDto("Merchant logout successful"));
+  }
+
+  async generateAccessToken(merchant: IAccessTokenPayload) {
+    return this._jwtService.signAsync(
+      {
+        id: merchant.id,
+        email: merchant.email,
+      },
+      {
+        expiresIn: accessTokenExpiresIn,
+        secret: accessTokenSecret,
+      },
+    );
+  }
+
+  async generateRefreshToken(merchant: IRefreshTokenPayload) {
+    return this._jwtService.signAsync(
+      {
+        id: merchant.id,
+        email: merchant.email,
+      },
+      {
+        expiresIn: refreshTokenExpiresIn,
+        secret: refreshTokenSecret,
+      },
+    );
   }
 }

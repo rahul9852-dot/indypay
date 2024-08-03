@@ -1,6 +1,6 @@
 import { Controller, Get, VERSION_NEUTRAL } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { successMessages } from "constants/messages";
+import { SUCCESS_MESSAGES } from "constants/messages.constant";
 
 @ApiTags("Health Check")
 @Controller({
@@ -10,6 +10,6 @@ export class AppController {
   @ApiOperation({ summary: "Health Check" })
   @Get("health-check")
   healthCheck(): string {
-    return successMessages.healthy;
+    return SUCCESS_MESSAGES.HEALTHY;
   }
 }
