@@ -12,7 +12,11 @@ import { BcryptService } from "shared/bcrypt/bcrypt.service";
 import { MessageResponseDto } from "dtos/common.dto";
 import { COOKIE_KEYS } from "enums";
 import { appConfig } from "config/app.config";
-import { accessCookieOptions, refreshCookieOptions } from "utils/cookies.utils";
+import {
+  accessCookieOptions,
+  pendingSignUpCookieOptions,
+  refreshCookieOptions,
+} from "utils/cookies.utils";
 import { RegisterMerchantDto } from "./auth.dto";
 
 const {
@@ -21,6 +25,8 @@ const {
     accessTokenSecret,
     refreshTokenExpiresIn,
     refreshTokenSecret,
+    pendingSignUpTokenExpiresIn,
+    pendingSignUpTokenSecret,
   },
 } = appConfig();
 
@@ -32,8 +38,30 @@ export class AuthService {
     private readonly _jwtService: JwtService,
   ) {}
 
-  async register(registerMerchantDto: RegisterMerchantDto) {
-    return this._merchantsService.createMerchant(registerMerchantDto);
+  async register(registerMerchantDto: RegisterMerchantDto, response: Response) {
+    const merchant =
+      await this._merchantsService.createMerchant(registerMerchantDto);
+
+    const pendingSignUpToken = await this._jwtService.signAsync(
+      {
+        id: merchant.id,
+        email: merchant.email,
+        onboardingStatus: merchant.onboardingStatus,
+      },
+      {
+        expiresIn: pendingSignUpTokenExpiresIn,
+        secret: pendingSignUpTokenSecret,
+      },
+    );
+
+    return response
+      .status(201)
+      .cookie(
+        COOKIE_KEYS.PENDING_SIGN_UP,
+        pendingSignUpToken,
+        pendingSignUpCookieOptions,
+      )
+      .json(new MessageResponseDto("Merchant created successfully"));
   }
 
   async login(loginMerchantDto: LoginMerchantDto, response: Response) {

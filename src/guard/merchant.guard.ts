@@ -1,13 +1,14 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Request } from "express";
 import { appConfig } from "config/app.config";
-import { COOKIE_KEYS } from "enums";
+import { COOKIE_KEYS, ID_TYPE } from "enums";
 import { IAccessTokenPayload } from "interface/common.interface";
 
 const {
@@ -15,7 +16,7 @@ const {
 } = appConfig();
 
 @Injectable()
-export class AuthGuard implements CanActivate {
+export class MerchantGuard implements CanActivate {
   constructor(private jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -30,8 +31,17 @@ export class AuthGuard implements CanActivate {
         secret: accessTokenSecret,
       })) as IAccessTokenPayload;
 
+      const [idType] = payload.id.split("_");
+
+      if (idType !== ID_TYPE.MERCHANT) {
+        throw new ForbiddenException();
+      }
+
       request["user"] = payload;
-    } catch {
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
       throw new UnauthorizedException();
     }
 

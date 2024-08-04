@@ -21,8 +21,11 @@ export class AuthController {
   @ApiCreatedResponse({ type: MessageResponseDto })
   @ApiBadRequestResponse({ type: MessageResponseDto })
   @Post("register")
-  async register(@Body() registerMerchantDto: RegisterMerchantDto) {
-    return this._authService.register(registerMerchantDto);
+  async register(
+    @Body() registerMerchantDto: RegisterMerchantDto,
+    @Res() res: Response,
+  ) {
+    return this._authService.register(registerMerchantDto, res);
   }
 
   @ApiOperation({ summary: "Login merchant" })

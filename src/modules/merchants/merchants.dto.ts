@@ -1,14 +1,17 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   MinLength,
 } from "class-validator";
-import { ROLES } from "enums";
+import { BUSINESS_TYPES, ROLES } from "enums";
 import { trimString } from "utils/string.utils";
 
 export class CreateMerchantDto {
@@ -37,6 +40,11 @@ export class CreateMerchantDto {
   @Transform(trimString)
   mobile: string;
 
+  @ApiPropertyOptional({ example: "true" })
+  @IsBoolean()
+  @IsOptional()
+  isWhatsAppAlertsEnabled?: boolean;
+
   @ApiPropertyOptional({ example: "image.png" })
   @IsString()
   @IsOptional()
@@ -64,4 +72,33 @@ export class RolesDto {
   @IsEnum(ROLES)
   @IsNotEmpty()
   role: ROLES;
+}
+
+export class VerifyOtpDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  emailOtp: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  mobileOtp: string;
+}
+
+export class BusinessDetailsDto {
+  @ApiProperty()
+  @IsEnum(BUSINESS_TYPES)
+  @IsNotEmpty()
+  businessType: BUSINESS_TYPES;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  businessName: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  currentAccount: number;
 }

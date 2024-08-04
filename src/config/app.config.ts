@@ -15,5 +15,9 @@ export const appConfig = registerAs("appConfig", () => ({
     refreshTokenSecret: getOsEnv("JWT_REFRESH_TOKEN_SECRET"),
     accessTokenExpiresIn: getOsEnv("JWT_ACCESS_TOKEN_EXPIRES_IN"),
     refreshTokenExpiresIn: getOsEnv("JWT_REFRESH_TOKEN_EXPIRES_IN"),
+    pendingSignUpTokenSecret: getOsEnv("JWT_PENDING_SIGN_UP_TOKEN_SECRET"),
+    pendingSignUpTokenExpiresIn: getOsEnv(
+      "JWT_PENDING_SIGN_UP_TOKEN_EXPIRES_IN",
+    ),
   },
 }));

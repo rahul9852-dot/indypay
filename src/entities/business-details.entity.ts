@@ -4,13 +4,11 @@ import {
   CreateDateColumn,
   Entity,
   Index,
-  OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
 import { getUlidId } from "utils/helperFunctions.utils";
 import { BUSINESS_TYPES } from "enums";
-import { MerchantsEntity } from "./merchants.entity";
 
 @Entity("business_details")
 export class BusinessDetailsEntity {
@@ -29,9 +27,6 @@ export class BusinessDetailsEntity {
 
   @Column()
   currentAccount: number;
-
-  @OneToOne(() => MerchantsEntity, ({ businessDetails }) => businessDetails)
-  merchant: MerchantsEntity;
 
   @CreateDateColumn({ type: "timestamp" })
   createdAt: Date;

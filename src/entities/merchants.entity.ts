@@ -1,16 +1,19 @@
-import { STATUS } from "enums";
+import { ONBOARDING_STATUS, STATUS } from "enums";
 import {
   BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  OneToMany,
   OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
 import { getUlidId } from "utils/helperFunctions.utils";
 import { BusinessDetailsEntity } from "./business-details.entity";
+import { OtpEntity } from "./otp.entity";
 
 @Entity("merchants")
 export class MerchantsEntity {
@@ -42,6 +45,9 @@ export class MerchantsEntity {
   @Column({ enum: STATUS, default: STATUS.ACTIVE })
   status: number;
 
+  @Column({ enum: ONBOARDING_STATUS })
+  onboardingStatus: number;
+
   @Column({ default: false })
   isWhatsAppAlertsEnabled: boolean;
 
@@ -66,8 +72,13 @@ export class MerchantsEntity {
   @Column({ nullable: true })
   image?: string;
 
-  @OneToOne(() => BusinessDetailsEntity, ({ merchant }) => merchant)
+  // Relations
+  @OneToOne(() => BusinessDetailsEntity)
   businessDetails: BusinessDetailsEntity;
+
+  @OneToMany(() => OtpEntity, ({ merchant }) => merchant)
+  @JoinColumn()
+  otp: OtpEntity[];
 
   @CreateDateColumn({ type: "timestamp" })
   createdAt: Date;

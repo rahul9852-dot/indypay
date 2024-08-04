@@ -15,5 +15,10 @@ export const refreshCookieOptions: CookieOptions = {
 
 export const accessCookieOptions: CookieOptions = {
   ...cookieOptions,
-  maxAge: 1 * 60 * 1000, // 1 minutes
+  maxAge: 5 * 60 * 1000, // 5 minutes
+};
+
+export const pendingSignUpCookieOptions: CookieOptions = {
+  ...cookieOptions,
+  maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
 };
