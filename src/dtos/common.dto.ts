@@ -1,4 +1,5 @@
-import { ApiResponseProperty } from "@nestjs/swagger";
+import { ApiPropertyOptional, ApiResponseProperty } from "@nestjs/swagger";
+import { IsNumber, IsOptional, IsString } from "class-validator";
 
 export class ValidationErrorDto {
   @ApiResponseProperty({ example: ["email must be an email"] })
@@ -17,4 +18,31 @@ export class MessageResponseDto {
   }
   @ApiResponseProperty()
   message: string;
+}
+
+export class PaginationDto {
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  page?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  limit?: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  sort?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  order?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  search?: string;
 }

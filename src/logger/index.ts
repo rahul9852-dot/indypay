@@ -1,7 +1,7 @@
 import { sep } from "path";
 import { format, createLogger, transports } from "winston";
-import { appConfig } from "config/app.config";
-import { DATE_FORMATS } from "constants/dates.constant";
+import { appConfig } from "@/config/app.config";
+import { DATE_FORMATS } from "@/constants/dates.constant";
 
 const { combine, printf, timestamp, colorize, splat, prettyPrint } = format;
 const { isProduction } = appConfig();

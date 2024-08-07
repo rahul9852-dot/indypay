@@ -1,4 +1,3 @@
-import { STATUS } from "enums";
 import {
   BeforeInsert,
   Column,
@@ -8,34 +7,32 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
-import { getUlidId } from "utils/helperFunctions.utils";
+import { INTERNALS_ROLE, ACCOUNT_STATUS, ID_TYPE } from "@/enums";
+import { getUlidId } from "@/utils/helperFunctions.utils";
 
-@Entity("ops")
-export class OpsEntity {
+@Entity("internal_users")
+export class InternalUsersEntity {
   @PrimaryColumn()
   id: string;
 
   @Column()
-  name: string;
+  fullName: string;
 
   @Index({ unique: true })
   @Column({ unique: true })
   email: string;
 
-  @Column()
+  @Column({ nullable: true })
   password: string;
 
-  @Column({ nullable: true })
-  contactNo: string;
+  @Column({ unique: true })
+  mobile: string;
 
-  @Column({ default: false })
-  isPhoneVerified: boolean;
-
-  @Column({ default: false })
-  isEmailVerified: boolean;
-
-  @Column({ enum: STATUS, default: STATUS.ACTIVE })
+  @Column({ enum: ACCOUNT_STATUS, default: ACCOUNT_STATUS.ACTIVE })
   status: number;
+
+  @Column({ enum: INTERNALS_ROLE, default: INTERNALS_ROLE.GUEST })
+  role: number;
 
   @Column({ nullable: true })
   image?: string;
@@ -48,6 +45,6 @@ export class OpsEntity {
 
   @BeforeInsert()
   beforeInsertHook() {
-    this.id = getUlidId("ops");
+    this.id = getUlidId(ID_TYPE.INTERNAL_USER);
   }
 }

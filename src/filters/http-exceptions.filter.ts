@@ -5,7 +5,7 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { BaseExceptionFilter } from "@nestjs/core";
-import { ERROR_MESSAGES } from "constants/messages.constant";
+import { ERROR_MESSAGES } from "@/constants/messages.constant";
 
 @Catch()
 export class HttpExceptionsFilter extends BaseExceptionFilter {

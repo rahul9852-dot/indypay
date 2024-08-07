@@ -3,12 +3,12 @@ import { ValidationPipe, VersioningType } from "@nestjs/common";
 import * as cookieParser from "cookie-parser";
 import helmet from "helmet";
 
-import { CustomLogger, LoggerPlaceHolder } from "logger";
-import { appConfig } from "config/app.config";
-import { loadSwaggerConfigs } from "config/swagger.config";
-import { helmetConfigs } from "config/helmet.config";
-import { HttpExceptionsFilter } from "filters/http-exceptions.filter";
 import { AppModule } from "./app.module";
+import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+import { appConfig } from "@//config/app.config";
+import { loadSwaggerConfigs } from "@/config/swagger.config";
+import { helmetConfigs } from "@/config/helmet.config";
+import { HttpExceptionsFilter } from "@/filters/http-exceptions.filter";
 
 const { port, isProduction, allowedOrigins } = appConfig();
 

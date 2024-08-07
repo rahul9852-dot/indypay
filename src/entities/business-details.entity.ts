@@ -3,30 +3,43 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
+  OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
-import { getUlidId } from "utils/helperFunctions.utils";
-import { BUSINESS_TYPES } from "enums";
+import { UsersEntity } from "./users.entity";
+import { getUlidId } from "@/utils/helperFunctions.utils";
+import {
+  BUSINESS_ENTITY_TYPE,
+  DESIGNATION,
+  ID_TYPE,
+  TURNOVER_TYPE,
+} from "@/enums";
+import { BUSINESS_INDUSTRIES } from "@/constants/business-industries.constant";
 
 @Entity("business_details")
 export class BusinessDetailsEntity {
   @PrimaryColumn()
   id: string;
 
-  @Index({ unique: true })
-  @Column({ unique: true })
-  merchantId: string;
+  @Column({ enum: BUSINESS_ENTITY_TYPE, nullable: true })
+  businessEntityType: number;
 
-  @Column({ enum: BUSINESS_TYPES })
-  businessType: number;
-
-  @Column()
+  @Column({ nullable: true })
   businessName: string;
 
-  @Column()
-  currentAccount: number;
+  @Column({ enum: DESIGNATION, nullable: true })
+  designation: string;
+
+  @Column({ enum: TURNOVER_TYPE, nullable: true })
+  turnover: number;
+
+  @Column({ enum: BUSINESS_INDUSTRIES, nullable: true })
+  industry: number;
+
+  // Relations
+  @OneToOne(() => UsersEntity, ({ businessDetails }) => businessDetails)
+  user: UsersEntity;
 
   @CreateDateColumn({ type: "timestamp" })
   createdAt: Date;
@@ -36,6 +49,6 @@ export class BusinessDetailsEntity {
 
   @BeforeInsert()
   beforeInsertHook() {
-    this.id = getUlidId("bus");
+    this.id = getUlidId(ID_TYPE.BUSINESS_DETAILS);
   }
 }

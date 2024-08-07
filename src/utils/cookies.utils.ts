@@ -1,5 +1,5 @@
 import { CookieOptions } from "express";
-import { appConfig } from "config/app.config";
+import { appConfig } from "@/config/app.config";
 
 const { isProduction } = appConfig();
 
@@ -8,14 +8,14 @@ export const cookieOptions: CookieOptions = {
   secure: isProduction, // only send cookie over https
 };
 
-export const refreshCookieOptions: CookieOptions = {
+export const accessCookieOptions: CookieOptions = {
   ...cookieOptions,
   maxAge: 5 * 60 * 1000, // 5 minutes
 };
 
-export const accessCookieOptions: CookieOptions = {
+export const refreshCookieOptions: CookieOptions = {
   ...cookieOptions,
-  maxAge: 5 * 60 * 1000, // 5 minutes
+  maxAge: 60 * 60 * 1000, // 60 minutes
 };
 
 export const pendingSignUpCookieOptions: CookieOptions = {

@@ -7,16 +7,16 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Request } from "express";
-import { appConfig } from "config/app.config";
-import { COOKIE_KEYS, ID_TYPE } from "enums";
-import { IPendingSignUpPayload } from "interface/common.interface";
+import { appConfig } from "@/config/app.config";
+import { COOKIE_KEYS, ID_TYPE } from "@/enums";
+import { IAccessTokenPayload } from "@/interface/common.interface";
 
 const {
-  jwtConfig: { pendingSignUpTokenSecret },
+  jwtConfig: { accessTokenSecret },
 } = appConfig();
 
 @Injectable()
-export class PendingSignupGuard implements CanActivate {
+export class UserGuard implements CanActivate {
   constructor(private jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -28,12 +28,12 @@ export class PendingSignupGuard implements CanActivate {
     }
     try {
       const payload = (await this.jwtService.verifyAsync(accessToken, {
-        secret: pendingSignUpTokenSecret,
-      })) as IPendingSignUpPayload;
+        secret: accessTokenSecret,
+      })) as IAccessTokenPayload;
 
       const [idType] = payload.id.split("_");
 
-      if (idType !== ID_TYPE.MERCHANT) {
+      if (idType !== ID_TYPE.USER) {
         throw new ForbiddenException();
       }
 
@@ -49,7 +49,7 @@ export class PendingSignupGuard implements CanActivate {
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
-    const accessToken = request.cookies[COOKIE_KEYS.PENDING_SIGN_UP];
+    const accessToken = request.cookies[COOKIE_KEYS.ACCESS_TOKEN];
 
     return accessToken;
   }

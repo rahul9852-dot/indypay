@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
-import { SUCCESS_MESSAGES } from "constants/messages.constant";
+import { SUCCESS_MESSAGES } from "@/constants/messages.constant";
 
 export interface Response<T> {
   statusCode: number;

@@ -2,23 +2,31 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtService } from "@nestjs/jwt";
 
-import { MerchantsEntity } from "entities/merchants.entity";
-import { OtpEntity } from "entities/otp.entity";
-import { BusinessDetailsEntity } from "entities/business-details.entity";
-import { MerchantsService } from "modules/merchants/merchants.service";
-import { BcryptService } from "shared/bcrypt/bcrypt.service";
 import { AuthService } from "./auth.service";
-import { AuthController } from "./auth.controller";
+import { UsersAuthController } from "./users-auth.controller";
+import { InternalsAuthController } from "./internals-auth.controller";
+import { UsersEntity } from "@/entities/users.entity";
+import { BusinessDetailsEntity } from "@/entities/business-details.entity";
+import { InternalUsersEntity } from "@/entities/internal-users.entity";
+import { UsersService } from "@/modules/users/users.service";
+import { NotificationService } from "@/shared/notification/notification.service";
+import { VerificationGateway } from "@/modules/gateway/verification.gateway";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      MerchantsEntity,
-      OtpEntity,
+      UsersEntity,
+      InternalUsersEntity,
       BusinessDetailsEntity,
     ]),
   ],
-  providers: [AuthService, MerchantsService, BcryptService, JwtService],
-  controllers: [AuthController],
+  providers: [
+    AuthService,
+    UsersService,
+    JwtService,
+    NotificationService,
+    VerificationGateway,
+  ],
+  controllers: [UsersAuthController, InternalsAuthController],
 })
 export class AuthModule {}

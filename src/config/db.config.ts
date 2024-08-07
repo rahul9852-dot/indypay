@@ -13,5 +13,5 @@ export const dbConfig: TypeOrmModuleOptions = {
   password,
   database: name,
   entities: [__dirname + "/../**/*.entity{.ts,.js}"],
-  synchronize: true,
+  synchronize: false,
 };

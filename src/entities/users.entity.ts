@@ -1,4 +1,3 @@
-import { ONBOARDING_STATUS, STATUS } from "enums";
 import {
   BeforeInsert,
   Column,
@@ -6,17 +5,21 @@ import {
   Entity,
   Index,
   JoinColumn,
-  OneToMany,
   OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
-import { getUlidId } from "utils/helperFunctions.utils";
 import { BusinessDetailsEntity } from "./business-details.entity";
-import { OtpEntity } from "./otp.entity";
+import { getUlidId } from "@/utils/helperFunctions.utils";
+import {
+  ONBOARDING_STATUS,
+  ACCOUNT_STATUS,
+  USERS_ROLE,
+  ID_TYPE,
+} from "@/enums";
 
-@Entity("merchants")
-export class MerchantsEntity {
+@Entity("users")
+export class UsersEntity {
   @PrimaryColumn()
   id: string;
 
@@ -27,29 +30,33 @@ export class MerchantsEntity {
   @Column({ unique: true })
   email: string;
 
-  @Column()
+  @Column({ nullable: true, select: false })
   password: string;
 
-  @Column()
+  @Index({ unique: true })
+  @Column({ unique: true })
   mobile: string;
 
-  @Column({ default: false, comment: "it will verify by OTP" })
-  isMobileVerified: boolean;
-
-  @Column({ default: false, comment: "it will verify by OTP" })
-  isEmailVerified: boolean;
-
-  @Column({ default: false })
+  @Column({
+    default: false,
+    comment: "kyc will verify on verify.paybolt.in with aadhar & pan",
+  })
   isKycVerified: boolean;
 
-  @Column({ enum: STATUS, default: STATUS.ACTIVE })
+  @Column({ default: false, comment: "2FA" })
+  is2FAEnabled: boolean;
+
+  @Column({ enum: ACCOUNT_STATUS, default: ACCOUNT_STATUS.ACTIVE })
   status: number;
 
-  @Column({ enum: ONBOARDING_STATUS })
+  @Column({ enum: USERS_ROLE, default: USERS_ROLE.MERCHANT })
+  role: number;
+
+  @Column({ enum: ONBOARDING_STATUS, default: ONBOARDING_STATUS.SIGN_UP })
   onboardingStatus: number;
 
-  @Column({ default: false })
-  isWhatsAppAlertsEnabled: boolean;
+  @Column()
+  businessDetailsId: string;
 
   @Column({ nullable: true })
   address?: string;
@@ -73,12 +80,9 @@ export class MerchantsEntity {
   image?: string;
 
   // Relations
-  @OneToOne(() => BusinessDetailsEntity)
+  @OneToOne(() => BusinessDetailsEntity, ({ user }) => user, { cascade: true })
+  @JoinColumn({ name: "businessDetailsId" })
   businessDetails: BusinessDetailsEntity;
-
-  @OneToMany(() => OtpEntity, ({ merchant }) => merchant)
-  @JoinColumn()
-  otp: OtpEntity[];
 
   @CreateDateColumn({ type: "timestamp" })
   createdAt: Date;
@@ -88,6 +92,6 @@ export class MerchantsEntity {
 
   @BeforeInsert()
   beforeInsertHook() {
-    this.id = getUlidId("mer");
+    this.id = getUlidId(ID_TYPE.USER);
   }
 }

@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from "@nestjs/common";
-import { IAccessTokenPayload } from "interface/common.interface";
+import { IAccessTokenPayload } from "@/interface/common.interface";
 
 export const User = createParamDecorator(
   (_: unknown, ctx: ExecutionContext): IAccessTokenPayload => {

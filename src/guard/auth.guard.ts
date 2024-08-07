@@ -6,9 +6,9 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Request } from "express";
-import { appConfig } from "config/app.config";
-import { COOKIE_KEYS } from "enums";
-import { IAccessTokenPayload } from "interface/common.interface";
+import { appConfig } from "@/config/app.config";
+import { COOKIE_KEYS } from "@/enums";
+import { IAccessTokenPayload } from "@/interface/common.interface";
 
 const {
   jwtConfig: { accessTokenSecret },

@@ -7,16 +7,16 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Request } from "express";
-import { appConfig } from "config/app.config";
-import { COOKIE_KEYS, ID_TYPE } from "enums";
-import { IAccessTokenPayload } from "interface/common.interface";
+import { appConfig } from "@/config/app.config";
+import { COOKIE_KEYS, ID_TYPE } from "@/enums";
+import { IAccessTokenPayload } from "@/interface/common.interface";
 
 const {
   jwtConfig: { accessTokenSecret },
 } = appConfig();
 
 @Injectable()
-export class MerchantGuard implements CanActivate {
+export class InternalUserGuard implements CanActivate {
   constructor(private jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -33,7 +33,7 @@ export class MerchantGuard implements CanActivate {
 
       const [idType] = payload.id.split("_");
 
-      if (idType !== ID_TYPE.MERCHANT) {
+      if (idType !== ID_TYPE.INTERNAL_USER) {
         throw new ForbiddenException();
       }
 

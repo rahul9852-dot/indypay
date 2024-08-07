@@ -5,20 +5,26 @@ export enum NODE_ENV {
 
 export enum COOKIE_KEYS {
   ACCESS_TOKEN = "atk",
-  PENDING_SIGN_UP = "psu",
   REFRESH_TOKEN = "rtk",
 }
 
-export enum ROLES {
-  MERCHANT = 1,
-  OPS,
-  ADMIN,
-  SUPER_ADMIN = 4,
+export enum INTERNALS_ROLE {
+  GUEST = 1,
+  OPS = 2,
+  ADMIN = 3,
+  OWNER = 4,
 }
 
-export enum STATUS {
-  INACTIVE = 1,
-  ACTIVE = 2,
+export enum USERS_ROLE {
+  SALE = 1,
+  MERCHANT = 2,
+}
+
+export enum ACCOUNT_STATUS {
+  ACTIVE = 1,
+  INACTIVE = 2,
+  SUSPENDED = 3,
+  BLOCKED = 5,
 }
 
 export enum PAYMENT_STATUS {
@@ -27,7 +33,7 @@ export enum PAYMENT_STATUS {
   SUCCESS = 3,
 }
 
-export enum BUSINESS_TYPES {
+export enum BUSINESS_ENTITY_TYPE {
   INDIVIDUAL = 1,
   SOLE_PROPRIETORSHIP = 2,
   PARTNERSHIP = 3,
@@ -39,26 +45,98 @@ export enum BUSINESS_TYPES {
   FREELANCE = 9,
 }
 
-export enum OTP_TYPE {
-  EMAIL = 1,
-  MOBILE = 2,
+export enum TURNOVER_TYPE {
+  ZERO_TO_TWENTY_FIVE_LAC = 1,
+  TWENTY_FIVE_TO_FIFTY_LAC = 2,
+  FIFTY_LAC_TO_TWO_CR = 3,
+  TWO_CR_TO_TEN_CR = 4,
+  TEN_CR_PLUS = 5,
+}
+
+export enum DESIGNATION {
+  ACCOUNTANT = "accountant",
+  DIRECTOR = "director",
+  FOUNDER_CXO = "founder/cxo",
+  MANAGER = "manager",
+  OTHER = "other",
+  OWNER = "owner",
+  SVP_EVP_VP = "svp/evp/vp",
 }
 
 export enum ID_TYPE {
-  ADMIN = "adm",
-  MERCHANT = "mer",
-  OPS = "ops",
+  BUSINESS_DETAILS = "bsd",
+  INTERNAL_USER = "itu",
+  USER = "usr",
 }
 
 export enum ONBOARDING_STATUS {
-  SIGN_UP = 1, // once the user signs up
-  MOBILE_EMAIL_VERIFIED = 2, // verified email and mobile
-  FILLED_PERSONAL_BUSINESS_DETAILS = 3, // filled up personal and business details
-  PENDING_KYC_VERIFICATION = 4, // pending kyc verification - land on dashboard
-  KYC_ON_HOLD = 5,
-  KYC_VERIFIED = 6,
-  ACTIVE = 7,
-  SUSPENDED = 8,
-  BLOCKED = 9,
-  KYC_REJECTED = 10,
+  SIGN_UP = 1, // signs up user with verified mobile and email
+  FILLED_BUSINESS_DETAILS = 2, // filled up personal and business details
+  KYC_VERIFIED = 3,
+  KYC_ON_HOLD = 4,
+  KYC_REJECTED = 5,
+}
+
+export enum BUSINESS_INDUSTRIES {
+  AGRICULTURE = 1,
+  ARCHITECT_INTERIORS = 2,
+  AUTOMOBILE_REPAIRS = 3,
+  CONSTRUCTION_BUILDERS = 4,
+  CONSULTANCY = 5,
+  CREATIVE_ART = 6,
+  DEALER = 7,
+  "E-COMMERCE" = 8,
+  EDUCATIONAL_INSTITUTION = 9,
+  ELECTRONICS_HARDWARE = 10,
+  ENTERTAINMENT = 11,
+  EVENT_MANAGEMENT = 12,
+  FINANCIAL_SERVICES = 13,
+  FOOD_AND_BEVERAGES = 14,
+  FREELANCER = 15,
+  HEALTH = 16,
+  HOSPITALITY = 17,
+  IMPORT_EXPORT = 18,
+  INSURANCE = 19,
+  IT_SOFTWARE = 20,
+  JEWELLERY = 21,
+  MANPOWER_HR = 22,
+  MANUFACTURER = 23,
+  MARKETING_AGENCY = 24,
+  MISCELLANEOUS = 25,
+  MOBILE_COMPUTER_ACCESSORIES = 26,
+  NGO = 27,
+  ONLINE_SERVICES = 28,
+  PET_SHOP = 29,
+  PHOTOGRAPHY_STUDIO = 30,
+  PRINTING = 31,
+  PROVISIONAL_STORE = 32,
+  ENGINEERING_SERVICES = 33,
+  REAL_ESTATE = 34,
+  RETAILER_SUPPLIER = 35,
+  SALOON_LIFESTYLE = 36,
+  MEDIA_ADVT = 37,
+  TOURS_AND_TRAVELS = 38,
+  TRADING = 39,
+  TRANSPORTATION_LOGISTICS = 40,
+  WHOLESALER = 41,
+  DISTRIBUTORS = 42,
+  GAMBLING_CASINO = 43,
+  MULTI_LEVEL_MARKETING = 44,
+  DROP_SHIPPING = 45,
+  BPO = 46,
+  LIVE_STOCK = 47,
+  CROWD_FUNDING = 48,
+  TOBACCO = 49,
+  WINE_SHOP = 50,
+  UNLICENSED_FINANCE_SERVICES = 51,
+}
+
+export enum OAUTH_PROVIDER {
+  GOOGLE = "google",
+  MICROSOFT = "microsoft",
+}
+
+export enum VERIFICATION_GATEWAY_EVENT {
+  MOBILE_VERIFY = "mobileVerify",
+  ON_MOBILE_VERIFY = "onMobileVerify",
 }

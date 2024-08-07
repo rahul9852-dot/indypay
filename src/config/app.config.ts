@@ -1,7 +1,7 @@
 import { registerAs } from "@nestjs/config";
 import { config } from "dotenv";
-import { NODE_ENV } from "enums";
-import { getOsEnv, getOsEnvOptional } from "./config.util";
+import { NODE_ENV } from "@/enums";
+import { getOsEnv, getOsEnvOptional } from "@/config/config.util";
 
 config();
 
@@ -22,9 +22,16 @@ export const appConfig = registerAs("appConfig", () => ({
     refreshTokenSecret: getOsEnv("JWT_REFRESH_TOKEN_SECRET"),
     accessTokenExpiresIn: getOsEnv("JWT_ACCESS_TOKEN_EXPIRES_IN"),
     refreshTokenExpiresIn: getOsEnv("JWT_REFRESH_TOKEN_EXPIRES_IN"),
-    pendingSignUpTokenSecret: getOsEnv("JWT_PENDING_SIGN_UP_TOKEN_SECRET"),
-    pendingSignUpTokenExpiresIn: getOsEnv(
-      "JWT_PENDING_SIGN_UP_TOKEN_EXPIRES_IN",
-    ),
+  },
+  oauthGoogle: {
+    clientId: getOsEnv("OAUTH_GOOGLE_CLIENT_ID"),
+    clientSecret: getOsEnv("OAUTH_GOOGLE_CLIENT_SECRET"),
+    redirectUrl: getOsEnv("OAUTH_GOOGLE_REDIRECT_URL"),
+    feRedirectUrl: getOsEnv("OAUTH_GOOGLE_FE_REDIRECT_URL"), // with id token
+  },
+  otpless: {
+    clientId: getOsEnv("OTPLESS_CLIENT_ID"),
+    clientSecret: getOsEnv("OTPLESS_CLIENT_SECRET"),
+    redirectUri: getOsEnv("OTPLESS_REDIRECT_URI"),
   },
 }));
