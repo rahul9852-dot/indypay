@@ -62,8 +62,15 @@ export class AuthService {
   ) {}
 
   async sendMagicLinkOnWhatsapp(registerUserDto: RegisterUserDto) {
-    const onboardingUser =
-      this._onboardingUsersRepository.create(registerUserDto);
+    const existingOnboardingUser =
+      await this._onboardingUsersRepository.findOne({
+        where: { mobile: registerUserDto.mobile },
+      });
+
+    const onboardingUser = this._onboardingUsersRepository.create({
+      ...registerUserDto,
+      ...(existingOnboardingUser && { id: existingOnboardingUser.id }),
+    });
 
     await this._onboardingUsersRepository.save(onboardingUser);
 
@@ -328,5 +335,9 @@ export class AuthService {
       secret: refreshTokenSecret,
       expiresIn: refreshTokenExpiresIn,
     });
+  }
+
+  async deleteOnboardingUser(email: string) {
+    return this._onboardingUsersRepository.delete({ email });
   }
 }

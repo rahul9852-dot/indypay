@@ -72,6 +72,13 @@ export class UsersAuthController {
     return this._authService.registerUser(registerUserDto);
   }
 
+  @ApiExcludeEndpoint()
+  // @ApiOperation({ summary: "Delete onboarding user" })
+  @Post("users/onboarding-user")
+  async deleteOnboardingUser(@Body() { email }: { email: string }) {
+    return this._authService.deleteOnboardingUser(email);
+  }
+
   @ApiOperation({ summary: "Login user" })
   @ApiOkResponse({ type: MessageResponseDto })
   @ApiBadRequestResponse({ type: MessageResponseDto })

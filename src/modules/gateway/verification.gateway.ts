@@ -10,9 +10,9 @@ import { Server } from "socket.io";
 import { CustomLogger } from "@/logger";
 import { appConfig } from "@/config/app.config";
 import { OnboardingUsersEntity } from "@/entities/onboarding-user.entity";
-import { AxiosService } from "@/shared/axios/axios.service";
+import { ManageUsers } from "@/utils/api-call.utils";
 
-const { allowedOrigins, beBaseUrl } = appConfig();
+const { allowedOrigins } = appConfig();
 
 @WebSocketGateway({
   cors: {
@@ -22,9 +22,9 @@ const { allowedOrigins, beBaseUrl } = appConfig();
 export class VerificationGateway implements OnModuleInit {
   logger = new CustomLogger(VerificationGateway.name);
 
-  private axiosInstance = new AxiosService(beBaseUrl);
+  private manageUsers = new ManageUsers();
 
-  // constructor(private readonly _authService: AuthService) {}
+  // constructor(private readonly _authService: AuthService) {} // TODO
 
   @WebSocketServer()
   server: Server;
@@ -37,13 +37,8 @@ export class VerificationGateway implements OnModuleInit {
 
   @SubscribeMessage("mobileVerify")
   async handleMobileVerify(@MessageBody() body: OnboardingUsersEntity) {
-    await this.axiosInstance.postRequest("/api/v1/auth/users/register", {
-      businessName: body.businessName,
-      designation: body.designation,
-      email: body.email,
-      fullName: body.fullName,
-      mobile: body.mobile,
-    });
+    await this.manageUsers.registerUser(body);
+    await this.manageUsers.deleteOnboardingUser(body.email);
 
     return this.server.emit("onMobileVerify", {
       mobile: body.mobile,

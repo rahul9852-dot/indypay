@@ -80,7 +80,11 @@ export class AxiosService {
     }
   }
 
-  async deleteRequest<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  async deleteRequest<T>(
+    url: string,
+    data?: any,
+    config?: AxiosRequestConfig,
+  ): Promise<T> {
     try {
       this.logger.debug(`deleteRequest - url: ${this.baseUrl}/${url}`);
 
