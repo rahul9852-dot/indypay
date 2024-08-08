@@ -34,6 +34,12 @@ export class InternalUsersEntity {
   @Column({ enum: INTERNALS_ROLE, default: INTERNALS_ROLE.GUEST })
   role: number;
 
+  @Column({ default: false, comment: "2FA" })
+  is2FAEnabled: boolean;
+
+  @Column({ nullable: true, comment: "2FA secret" })
+  secret2FA: string;
+
   @Column({ nullable: true })
   image?: string;
 

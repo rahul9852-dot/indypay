@@ -66,6 +66,7 @@ export enum DESIGNATION {
 export enum ID_TYPE {
   BUSINESS_DETAILS = "bsd",
   INTERNAL_USER = "itu",
+  ONBOARDING_USER = "onu",
   USER = "usr",
 }
 

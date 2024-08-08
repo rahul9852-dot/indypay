@@ -140,16 +140,26 @@ export class UsersService {
     return this._usersRepository.remove(user);
   }
 
-  async update2FA(userId: string, is2FAEnabled: boolean) {
-    if (!userId.startsWith(ID_TYPE.USER)) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
+  async update2FA({
+    email,
+    is2FAEnabled,
+    secret2FA,
+  }: {
+    email: string;
+    is2FAEnabled: boolean;
+    secret2FA?: string;
+  }) {
+    if (is2FAEnabled && !secret2FA) {
+      throw new BadRequestException(
+        new MessageResponseDto("2FA secret is required to enable 2FA"),
+      );
     }
-
     const newUser = this._usersRepository.create({
       is2FAEnabled,
+      secret2FA,
     });
 
-    return this._usersRepository.update(userId, newUser);
+    return this._usersRepository.update({ email }, newUser);
   }
 
   async getAll({

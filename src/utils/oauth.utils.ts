@@ -1,18 +1,15 @@
 import { appConfig } from "@/config/app.config";
+import { OAUTH_GOOGLE_REDIRECT_URL } from "@/constants/callback-routes.conatant";
 import { AxiosService } from "@/shared/axios/axios.service";
 
 const {
-  oauthGoogle: {
-    clientId: clientIdGoogle,
-    redirectUrl: redirectUrlGoogle,
-    clientSecret: clientSecretGoogle,
-  },
+  oauthGoogle: { clientId: clientIdGoogle, clientSecret: clientSecretGoogle },
 } = appConfig();
 
 export const getGoogleOAuthUrl = () => {
   const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
   const options = {
-    redirect_uri: redirectUrlGoogle,
+    redirect_uri: OAUTH_GOOGLE_REDIRECT_URL,
     client_id: clientIdGoogle,
     access_type: "offline",
     response_type: "code",
@@ -47,7 +44,7 @@ export const getGoogleOAuthTokens = async ({
     code,
     client_id: clientIdGoogle,
     client_secret: clientSecretGoogle,
-    redirect_uri: redirectUrlGoogle,
+    redirect_uri: OAUTH_GOOGLE_REDIRECT_URL,
     grant_type: "authorization_code",
   };
 

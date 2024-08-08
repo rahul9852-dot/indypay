@@ -24,13 +24,10 @@ import {
   OAuthProviderDto,
   OAuthVerifyTokenDto,
   RegisterUserDto,
-  RegisterUserResponseDto,
-  SendMagicLinkOnWhatsappDto,
 } from "./auth.dto";
 import { OAUTH_PROVIDER } from "@/enums";
 import { MessageResponseDto } from "@/dtos/common.dto";
 import { appConfig } from "@/config/app.config";
-import { NotificationService } from "@/shared/notification/notification.service";
 
 const {
   oauthGoogle: { feRedirectUrl },
@@ -39,10 +36,7 @@ const {
 @ApiTags("Authentication - Users")
 @Controller("auth")
 export class UsersAuthController {
-  constructor(
-    private readonly _authService: AuthService,
-    private readonly _notificationService: NotificationService,
-  ) {}
+  constructor(private readonly _authService: AuthService) {}
 
   @ApiOperation({ summary: "OAuth2 Verify Token" })
   @ApiOkResponse({ type: OAuthGoogleTokenDataResponseDto })
@@ -68,15 +62,11 @@ export class UsersAuthController {
   @ApiOkResponse({ type: MessageResponseDto })
   @ApiBadRequestResponse({ type: MessageResponseDto })
   @Post("users/send-magic-link")
-  async sendMagicLinkOnWhatsapp(
-    @Body() { mobile }: SendMagicLinkOnWhatsappDto,
-  ) {
-    return this._notificationService.sendMagicLinkOnWhatsapp(mobile);
+  async sendMagicLinkOnWhatsapp(@Body() registerUserDto: RegisterUserDto) {
+    return this._authService.sendMagicLinkOnWhatsapp(registerUserDto);
   }
 
-  @ApiOperation({ summary: "Register user" })
-  @ApiOkResponse({ type: RegisterUserResponseDto })
-  @ApiBadRequestResponse({ type: MessageResponseDto })
+  @ApiExcludeEndpoint()
   @Post("users/register")
   async register(@Body() registerUserDto: RegisterUserDto) {
     return this._authService.registerUser(registerUserDto);
@@ -90,16 +80,16 @@ export class UsersAuthController {
     return this._authService.loginUser(loginUserDto, res);
   }
 
-  @ApiOperation({ summary: "Enable 2FA and login user" })
-  @ApiOkResponse({ type: MessageResponseDto })
-  @ApiBadRequestResponse({ type: MessageResponseDto })
-  @Post("users/enable-2fa-login")
-  async enable2FAAndLogin(
-    @Body() loginUserDto: LoginUserDto,
-    @Res() res: Response,
-  ) {
-    return this._authService.enable2FAAndLogin(loginUserDto, res);
-  }
+  // @ApiOperation({ summary: "Enable 2FA and login user" })
+  // @ApiOkResponse({ type: MessageResponseDto })
+  // @ApiBadRequestResponse({ type: MessageResponseDto })
+  // @Post("users/enable-2fa-login")
+  // async enable2FAAndLogin(
+  //   @Body() loginUserDto: LoginUserDto,
+  //   @Res() res: Response,
+  // ) {
+  //   return this._authService.enable2FAAndLogin(loginUserDto, res);
+  // }
 
   @ApiOperation({ summary: "Logout user" })
   @ApiOkResponse({ type: MessageResponseDto })
@@ -113,11 +103,12 @@ export class UsersAuthController {
     summary: "OAuth2 Generate Url",
     description: `Success: ${feRedirectUrl}?token={token}, Error: ${feRedirectUrl}?error={error}`,
   })
+  @ApiOkResponse({ type: String })
   @ApiBadRequestResponse({ type: MessageResponseDto })
   @Get("users/:provider")
-  async oauth2(@Param() { provider }: OAuthProviderDto, @Res() res: Response) {
+  async oauth2(@Param() { provider }: OAuthProviderDto) {
     if (provider === OAUTH_PROVIDER.GOOGLE) {
-      return this._authService.oauth2Google(res);
+      return this._authService.oauth2Google();
     }
     if (provider === OAUTH_PROVIDER.MICROSOFT) {
       return this._authService.oauth2Microsoft();

@@ -9,8 +9,10 @@ import { Server } from "socket.io";
 
 import { CustomLogger } from "@/logger";
 import { appConfig } from "@/config/app.config";
+import { OnboardingUsersEntity } from "@/entities/onboarding-user.entity";
+import { AxiosService } from "@/shared/axios/axios.service";
 
-const { allowedOrigins } = appConfig();
+const { allowedOrigins, beBaseUrl } = appConfig();
 
 @WebSocketGateway({
   cors: {
@@ -19,6 +21,10 @@ const { allowedOrigins } = appConfig();
 })
 export class VerificationGateway implements OnModuleInit {
   logger = new CustomLogger(VerificationGateway.name);
+
+  private axiosInstance = new AxiosService(beBaseUrl);
+
+  // constructor(private readonly _authService: AuthService) {}
 
   @WebSocketServer()
   server: Server;
@@ -30,12 +36,18 @@ export class VerificationGateway implements OnModuleInit {
   }
 
   @SubscribeMessage("mobileVerify")
-  handleMobileVerify(
-    @MessageBody() body: { mobile: string; isVerified: boolean },
-  ) {
+  async handleMobileVerify(@MessageBody() body: OnboardingUsersEntity) {
+    await this.axiosInstance.postRequest("/api/v1/auth/users/register", {
+      businessName: body.businessName,
+      designation: body.designation,
+      email: body.email,
+      fullName: body.fullName,
+      mobile: body.mobile,
+    });
+
     return this.server.emit("onMobileVerify", {
       mobile: body.mobile,
-      isVerified: body.isVerified,
+      isVerified: true,
     });
   }
 }

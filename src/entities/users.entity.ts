@@ -46,6 +46,9 @@ export class UsersEntity {
   @Column({ default: false, comment: "2FA" })
   is2FAEnabled: boolean;
 
+  @Column({ nullable: true, comment: "2FA secret" })
+  secret2FA: string;
+
   @Column({ enum: ACCOUNT_STATUS, default: ACCOUNT_STATUS.ACTIVE })
   status: number;
 

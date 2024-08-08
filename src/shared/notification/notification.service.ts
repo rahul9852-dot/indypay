@@ -3,9 +3,10 @@ import { appConfig } from "@/config/app.config";
 import { MessageResponseDto } from "@/dtos/common.dto";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
+import { OTPLESS_REDIRECT_URI } from "@/constants/callback-routes.conatant";
 
 const {
-  otpless: { clientId, clientSecret, redirectUri },
+  otpless: { clientId, clientSecret },
 } = appConfig();
 
 export class NotificationService {
@@ -53,7 +54,7 @@ export class NotificationService {
     const res = await this.axiosInstance.getRequest("authorize", {
       params: {
         mobile_number: mobile,
-        redirect_uri: redirectUri,
+        redirect_uri: OTPLESS_REDIRECT_URI,
         client_id: clientId,
         client_secret: clientSecret,
       },
@@ -64,6 +65,6 @@ export class NotificationService {
       res,
     );
 
-    return new MessageResponseDto("Sent verification link on whatsapp");
+    return res;
   }
 }

@@ -11,6 +11,8 @@ import { InternalUsersEntity } from "@/entities/internal-users.entity";
 import { UsersService } from "@/modules/users/users.service";
 import { NotificationService } from "@/shared/notification/notification.service";
 import { VerificationGateway } from "@/modules/gateway/verification.gateway";
+import { MfAuthService } from "@/modules/mf-auth/mf-auth.service";
+import { OnboardingUsersEntity } from "@/entities/onboarding-user.entity";
 
 @Module({
   imports: [
@@ -18,6 +20,7 @@ import { VerificationGateway } from "@/modules/gateway/verification.gateway";
       UsersEntity,
       InternalUsersEntity,
       BusinessDetailsEntity,
+      OnboardingUsersEntity,
     ]),
   ],
   providers: [
@@ -26,7 +29,9 @@ import { VerificationGateway } from "@/modules/gateway/verification.gateway";
     JwtService,
     NotificationService,
     VerificationGateway,
+    MfAuthService,
   ],
   controllers: [UsersAuthController, InternalsAuthController],
+  exports: [AuthService, VerificationGateway],
 })
 export class AuthModule {}

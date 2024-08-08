@@ -9,6 +9,7 @@ export const appConfig = registerAs("appConfig", () => ({
   port: getOsEnvOptional("PORT") || 4000,
   nodeEnv: getOsEnv("NODE_ENV"),
   allowedOrigins: getOsEnv("ALLOWED_ORIGINS").split(","),
+  beBaseUrl: getOsEnv("BE_BASE_URL"),
   isProduction: getOsEnv("NODE_ENV") === NODE_ENV.PRODUCTION,
   database: {
     host: getOsEnv("DB_HOST"),
@@ -26,12 +27,10 @@ export const appConfig = registerAs("appConfig", () => ({
   oauthGoogle: {
     clientId: getOsEnv("OAUTH_GOOGLE_CLIENT_ID"),
     clientSecret: getOsEnv("OAUTH_GOOGLE_CLIENT_SECRET"),
-    redirectUrl: getOsEnv("OAUTH_GOOGLE_REDIRECT_URL"),
     feRedirectUrl: getOsEnv("OAUTH_GOOGLE_FE_REDIRECT_URL"), // with id token
   },
   otpless: {
     clientId: getOsEnv("OTPLESS_CLIENT_ID"),
     clientSecret: getOsEnv("OTPLESS_CLIENT_SECRET"),
-    redirectUri: getOsEnv("OTPLESS_REDIRECT_URI"),
   },
 }));

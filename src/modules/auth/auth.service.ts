@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -28,6 +29,8 @@ import {
 } from "@/utils/cookies.utils";
 import { NotificationService } from "@/shared/notification/notification.service";
 import { VerificationGateway } from "@/modules/gateway/verification.gateway";
+import { MfAuthService } from "@/modules/mf-auth/mf-auth.service";
+import { OnboardingUsersEntity } from "@/entities/onboarding-user.entity";
 
 const {
   oauthGoogle: { feRedirectUrl: feRedirectUrlGoogle, clientId: clientIdGoogle },
@@ -48,17 +51,31 @@ export class AuthService {
     @InjectRepository(BusinessDetailsEntity)
     private readonly _businessDetailsRepository: Repository<BusinessDetailsEntity>,
 
+    @InjectRepository(OnboardingUsersEntity)
+    private readonly _onboardingUsersRepository: Repository<OnboardingUsersEntity>,
+
     private readonly _usersService: UsersService,
     private readonly _jwtService: JwtService,
     private readonly _notificationService: NotificationService,
     private readonly _verificationGateway: VerificationGateway,
+    private readonly _mFAuthService: MfAuthService,
   ) {}
 
-  async oauth2Google(response: Response) {
-    const authUrl = getGoogleOAuthUrl();
-    this.logger.debug(`oauth2Google - authUrl: ${authUrl}`);
+  async sendMagicLinkOnWhatsapp(registerUserDto: RegisterUserDto) {
+    const onboardingUser =
+      this._onboardingUsersRepository.create(registerUserDto);
 
-    response.redirect(authUrl);
+    await this._onboardingUsersRepository.save(onboardingUser);
+
+    await this._notificationService.sendMagicLinkOnWhatsapp(
+      registerUserDto.mobile,
+    );
+
+    return new MessageResponseDto("Magic link sent successfully");
+  }
+
+  async oauth2Google() {
+    return getGoogleOAuthUrl();
   }
 
   async oauth2Microsoft() {
@@ -183,10 +200,17 @@ export class AuthService {
 
     const user = await this._notificationService.getUserWithCode(code);
 
-    return this._verificationGateway.handleMobileVerify({
-      mobile: user.phone_number,
-      isVerified: true,
+    if (!user) {
+      throw new BadRequestException(new MessageResponseDto("Invalid code"));
+    }
+
+    const { phone_number } = user;
+
+    const onboardingUser = await this._onboardingUsersRepository.findOne({
+      where: { mobile: phone_number.replaceAll("+", "") },
     });
+
+    return this._verificationGateway.handleMobileVerify(onboardingUser);
   }
 
   async registerUser(registerUserDto: RegisterUserDto) {
@@ -220,32 +244,32 @@ export class AuthService {
     };
   }
 
-  async enable2FAAndLogin(loginUserDto: LoginUserDto, res: Response) {
-    const { email, code2FA } = loginUserDto;
-    // search user
-    const user = await this._usersService.findByEmail(email);
+  // async enable2FAAndLogin(loginUserDto: LoginUserDto, res: Response) {
+  //   const { email, code2FA } = loginUserDto;
+  //   // search user
+  //   const user = await this._usersService.findByEmail(email);
 
-    if (!user) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
+  //   if (!user) {
+  //     throw new NotFoundException(new MessageResponseDto("User not found"));
+  //   }
 
-    // TODO: setup and verify 2FA code
+  //   // TODO: setup and verify 2FA code
 
-    await this._usersService.update2FA(user.id, true);
+  //   await this._usersService.update2FA();
 
-    // set access and refresh token
-    const payload = {
-      id: user.id,
-      email: user.email,
-    };
-    const accessToken = this.generateAccessToken(payload);
-    const refreshToken = this.generateRefreshToken(payload);
+  //   // set access and refresh token
+  //   const payload = {
+  //     id: user.id,
+  //     email: user.email,
+  //   };
+  //   const accessToken = this.generateAccessToken(payload);
+  //   const refreshToken = this.generateRefreshToken(payload);
 
-    res
-      .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
-      .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
-      .json(new MessageResponseDto("User logged in successfully"));
-  }
+  //   res
+  //     .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
+  //     .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
+  //     .json(new MessageResponseDto("User logged in successfully"));
+  // }
 
   async loginUser(loginUserDto: LoginUserDto, res: Response) {
     this.logger.debug(
@@ -254,13 +278,21 @@ export class AuthService {
 
     const { email, code2FA } = loginUserDto;
 
-    // TODO: verify 2FA code
-
     // search user
     const user = await this._usersService.findByEmail(email);
 
     if (!user) {
       throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    // verify 2FA code
+    const isVerify = await this._mFAuthService.verifyCode({
+      secret: user.secret2FA,
+      token: code2FA,
+    });
+
+    if (!isVerify) {
+      throw new BadRequestException(new MessageResponseDto("Invalid code"));
     }
 
     // set access and refresh token

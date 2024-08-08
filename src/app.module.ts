@@ -9,6 +9,7 @@ import { appConfig } from "@/config/app.config";
 import { dbConfig } from "@/config/db.config";
 import { UsersModule } from "@/modules/users/users.module";
 import { GatewayModule } from "@/modules/gateway/gateway.module";
+import { MfAuthModule } from "@/modules/mf-auth/mf-auth.module";
 
 @Module({
   imports: [
@@ -22,7 +23,9 @@ import { GatewayModule } from "@/modules/gateway/gateway.module";
     AuthModule,
     UsersModule,
     GatewayModule,
+    MfAuthModule,
   ],
   controllers: [AppController],
+  providers: [],
 })
 export class AppModule {}
