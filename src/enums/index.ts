@@ -141,8 +141,3 @@ export enum VERIFICATION_GATEWAY_EVENT {
   MOBILE_VERIFY = "mobileVerify",
   ON_MOBILE_VERIFY = "onMobileVerify",
 }
-
-export enum CALLBACK_FOR {
-  SIGN_UP = 1,
-  LOGIN = 11,
-}
