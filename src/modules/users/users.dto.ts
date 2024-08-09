@@ -110,10 +110,11 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
 }
 
 export class UpdateBusinessDetailsDto {
-  @ApiProperty({ example: "usr_12345" })
-  @IsString()
+  @ApiProperty({ example: "test@gmail.com" })
+  @IsEmail()
   @IsNotEmpty()
-  userId: string;
+  @MaxLength(50)
+  email: string;
 
   @ApiProperty({ example: BUSINESS_ENTITY_TYPE.FREELANCE })
   @IsEnum(BUSINESS_ENTITY_TYPE)

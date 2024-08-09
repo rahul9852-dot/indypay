@@ -105,26 +105,26 @@ export class AuthService {
     const { code } = param ?? {};
 
     if (!code) {
-      res.redirect(`${feRedirectUrlGoogle}?error=code_not_found`);
+      return res.redirect(`${feRedirectUrlGoogle}?error=code_not_found`);
     }
 
     const { id_token } = (await getGoogleOAuthTokens({ code })) ?? {};
 
     if (!id_token) {
-      res.redirect(`${feRedirectUrlGoogle}?error=id_token_not_found`);
+      return res.redirect(`${feRedirectUrlGoogle}?error=id_token_not_found`);
     }
 
     const { email } = this._jwtService.decode(id_token) ?? {};
 
     if (!email) {
-      res.redirect(`${feRedirectUrlGoogle}?error=email_not_found`);
+      return res.redirect(`${feRedirectUrlGoogle}?error=email_not_found`);
     }
 
     // check if user exists
     const user = await this._usersService.findByEmail(email);
 
     if (user) {
-      res.redirect(`${feRedirectUrlGoogle}?error=user_already_exists`);
+      return res.redirect(`${feRedirectUrlGoogle}?error=user_already_exists`);
     }
 
     const url = `${feRedirectUrlGoogle}?token=${id_token}`;

@@ -190,15 +190,11 @@ export class UsersService {
     businessDetailsDto: UpdateBusinessDetailsDto,
     response: Response,
   ) {
-    const { userId } = businessDetailsDto;
-
-    if (!userId.startsWith(ID_TYPE.USER)) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
+    const { email } = businessDetailsDto;
 
     const oldBusinessDetails = await this._businessDetailsRepository.findOneBy({
       user: {
-        id: userId,
+        email,
       },
     });
 
@@ -219,11 +215,13 @@ export class UsersService {
     );
 
     const accessToken = this.generateAccessToken({
-      id: userId,
+      id: oldBusinessDetails.id,
+      email,
     });
 
     const refreshToken = this.generateRefreshToken({
-      id: userId,
+      id: oldBusinessDetails.id,
+      email,
     });
 
     response
