@@ -22,7 +22,7 @@ import { AxiosService } from "@/shared/axios/axios.service";
 import { MessageResponseDto } from "@/dtos/common.dto";
 import { UsersService } from "@/modules/users/users.service";
 import { BusinessDetailsEntity } from "@/entities/business-details.entity";
-import { COOKIE_KEYS } from "@/enums";
+import { CALLBACK_FOR, COOKIE_KEYS } from "@/enums";
 import {
   accessCookieOptions,
   refreshCookieOptions,
@@ -123,11 +123,7 @@ export class AuthService {
     // check if user exists
     const user = await this._usersService.findByEmail(email);
 
-    if (user) {
-      return res.redirect(`${feRedirectUrlGoogle}?error=user_already_exists`);
-    }
-
-    const url = `${feRedirectUrlGoogle}?token=${id_token}`;
+    const url = `${feRedirectUrlGoogle}?token=${id_token}&?x=${user ? CALLBACK_FOR.LOGIN : CALLBACK_FOR.SIGN_UP}`;
 
     res.redirect(url);
   }

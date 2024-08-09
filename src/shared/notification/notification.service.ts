@@ -3,7 +3,7 @@ import { appConfig } from "@/config/app.config";
 import { MessageResponseDto } from "@/dtos/common.dto";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
-import { OTPLESS_REDIRECT_URI } from "@/constants/callback-routes.conatant";
+import { OTPLESS_REDIRECT_URI } from "@/constants/callback-routes.constant";
 
 const {
   otpless: { clientId, clientSecret },

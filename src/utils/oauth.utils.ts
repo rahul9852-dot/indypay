@@ -1,5 +1,5 @@
 import { appConfig } from "@/config/app.config";
-import { OAUTH_GOOGLE_REDIRECT_URL } from "@/constants/callback-routes.conatant";
+import { OAUTH_GOOGLE_REDIRECT_URL } from "@/constants/callback-routes.constant";
 import { AxiosService } from "@/shared/axios/axios.service";
 
 const {
