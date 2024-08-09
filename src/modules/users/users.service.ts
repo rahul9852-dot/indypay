@@ -14,7 +14,7 @@ import {
   UpdateUserDto,
 } from "./users.dto";
 import { UsersEntity } from "@/entities/users.entity";
-import { COOKIE_KEYS, ID_TYPE } from "@/enums";
+import { COOKIE_KEYS, ID_TYPE, ONBOARDING_STATUS } from "@/enums";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { BusinessDetailsEntity } from "@/entities/business-details.entity";
 import {
@@ -192,6 +192,12 @@ export class UsersService {
   ) {
     const { email } = businessDetailsDto;
 
+    const user = await this.findByEmail(email);
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
     const oldBusinessDetails = await this._businessDetailsRepository.findOneBy({
       user: {
         email,
@@ -213,6 +219,13 @@ export class UsersService {
       oldBusinessDetails.id,
       createBusinessDetails,
     );
+
+    const createdUser = this._usersRepository.create({
+      id: user.id,
+      onboardingStatus: ONBOARDING_STATUS.FILLED_BUSINESS_DETAILS,
+    });
+
+    await this._usersRepository.update(user.id, createdUser);
 
     const accessToken = this.generateAccessToken({
       id: oldBusinessDetails.id,
