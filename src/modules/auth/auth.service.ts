@@ -123,7 +123,7 @@ export class AuthService {
     // check if user exists
     const user = await this._usersService.findByEmail(email);
 
-    const url = `${feRedirectUrlGoogle}?token=${id_token}&?x=${user ? CALLBACK_FOR.LOGIN : CALLBACK_FOR.SIGN_UP}`;
+    const url = `${feRedirectUrlGoogle}?token=${id_token}&x=${user ? CALLBACK_FOR.LOGIN : CALLBACK_FOR.SIGN_UP}`;
 
     res.redirect(url);
   }
