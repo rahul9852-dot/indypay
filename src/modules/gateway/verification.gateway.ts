@@ -10,7 +10,6 @@ import { Server } from "socket.io";
 import { CustomLogger } from "@/logger";
 import { appConfig } from "@/config/app.config";
 import { OnboardingUsersEntity } from "@/entities/onboarding-user.entity";
-import { ManageUsers } from "@/utils/api-call.utils";
 
 const { allowedOrigins } = appConfig();
 
@@ -21,10 +20,6 @@ const { allowedOrigins } = appConfig();
 })
 export class VerificationGateway implements OnModuleInit {
   logger = new CustomLogger(VerificationGateway.name);
-
-  private manageUsers = new ManageUsers();
-
-  // constructor(private readonly _authService: AuthService) {} // TODO
 
   @WebSocketServer()
   server: Server;
@@ -37,9 +32,6 @@ export class VerificationGateway implements OnModuleInit {
 
   @SubscribeMessage("mobileVerify")
   async handleMobileVerify(@MessageBody() body: OnboardingUsersEntity) {
-    await this.manageUsers.registerUser(body);
-    await this.manageUsers.deleteOnboardingUser(body.email);
-
     return this.server.emit("onMobileVerify", {
       mobile: body.mobile,
       isVerified: true,

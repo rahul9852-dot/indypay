@@ -62,6 +62,14 @@ export class AuthService {
   ) {}
 
   async sendMagicLinkOnWhatsapp(registerUserDto: RegisterUserDto) {
+    const user = await this._usersService.findByEmail(registerUserDto.email);
+
+    if (user) {
+      throw new BadRequestException(
+        new MessageResponseDto("User already exists"),
+      );
+    }
+
     const existingOnboardingUser =
       await this._onboardingUsersRepository.findOne({
         where: { mobile: registerUserDto.mobile },
@@ -104,6 +112,19 @@ export class AuthService {
 
     if (!id_token) {
       res.redirect(`${feRedirectUrlGoogle}?error=id_token_not_found`);
+    }
+
+    const { email } = this._jwtService.decode(id_token) ?? {};
+
+    if (!email) {
+      res.redirect(`${feRedirectUrlGoogle}?error=email_not_found`);
+    }
+
+    // check if user exists
+    const user = await this._usersService.findByEmail(email);
+
+    if (user) {
+      res.redirect(`${feRedirectUrlGoogle}?error=user_already_exists`);
     }
 
     const url = `${feRedirectUrlGoogle}?token=${id_token}`;
@@ -196,7 +217,10 @@ export class AuthService {
     return oauthVerifyTokenDto.token;
   }
 
-  async otplessCallback(otpLessCallbackParam: OtpLessCallbackParam) {
+  async otplessCallback(
+    otpLessCallbackParam: OtpLessCallbackParam,
+    res: Response,
+  ) {
     this.logger.debug(
       `otplessCallback - otpLessCallbackParam: ${JSON.stringify(
         otpLessCallbackParam,
@@ -217,7 +241,38 @@ export class AuthService {
       where: { mobile: phone_number.replaceAll("+", "") },
     });
 
-    return this._verificationGateway.handleMobileVerify(onboardingUser);
+    const isVerified =
+      await this._verificationGateway.handleMobileVerify(onboardingUser);
+
+    if (!isVerified) {
+      res.send(`
+                <html>
+                  <body>
+                    <h1>Verification failed</h1>
+                    <p>Verification failed please try again</p>
+                  </body>
+                </html>
+              `);
+    }
+
+    await this.registerUser(onboardingUser);
+    await this.deleteOnboardingUser(onboardingUser.email);
+
+    return res.send(`
+                <html>
+                  <body>
+                    <h1>Verification success</h1>
+                    <p>Verification success, window will be closed in 5 seconds</p>
+                  </body>
+                  <script>
+                    if(window) {
+                      setTimeout(() => {
+                        window.close();
+                      }, 5000);
+                    }
+                  </script>
+                </html>
+              `);
   }
 
   async registerUser(registerUserDto: RegisterUserDto) {

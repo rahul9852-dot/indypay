@@ -66,19 +66,6 @@ export class UsersAuthController {
     return this._authService.sendMagicLinkOnWhatsapp(registerUserDto);
   }
 
-  @ApiExcludeEndpoint()
-  @Post("users/register")
-  async register(@Body() registerUserDto: RegisterUserDto) {
-    return this._authService.registerUser(registerUserDto);
-  }
-
-  @ApiExcludeEndpoint()
-  // @ApiOperation({ summary: "Delete onboarding user" })
-  @Post("users/onboarding-user")
-  async deleteOnboardingUser(@Body() { email }: { email: string }) {
-    return this._authService.deleteOnboardingUser(email);
-  }
-
   @ApiOperation({ summary: "Login user" })
   @ApiOkResponse({ type: MessageResponseDto })
   @ApiBadRequestResponse({ type: MessageResponseDto })
@@ -126,8 +113,11 @@ export class UsersAuthController {
 
   @ApiExcludeEndpoint()
   @Get("otpless/callback")
-  async otplessCallback(@Query() param: OtpLessCallbackParam) {
-    return this._authService.otplessCallback(param);
+  async otplessCallback(
+    @Query() param: OtpLessCallbackParam,
+    @Res() res: Response,
+  ) {
+    return this._authService.otplessCallback(param, res);
   }
 
   // handle callback
