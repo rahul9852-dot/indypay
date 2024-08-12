@@ -5,14 +5,14 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { GenerateQRcodeDto, VerifyCodeDto } from "./mf-auth.dto";
 import { UsersService } from "@/modules/users/users.service";
 import { MessageResponseDto } from "@/dtos/common.dto";
+import { appConfig } from "@/config/app.config";
 
-const secret = "KVKFKRCPNZQUYMLXOVYDSQKJKZDTSRLX";
+const {
+  twoFactorConfig: { issuer, secretBites },
+} = appConfig();
 
 @Injectable()
 export class MfAuthService {
-  private readonly issuer = "PayBolt Demo";
-  private readonly numberOfBytes = 20;
-
   constructor(private readonly _userService: UsersService) {}
 
   async verifyCode({ token, secret }: VerifyCodeDto) {
@@ -26,7 +26,7 @@ export class MfAuthService {
       throw new BadRequestException(new MessageResponseDto("User not found"));
     }
     // generate secret
-    const secret: string = authenticator.generateSecret(this.numberOfBytes);
+    const secret: string = authenticator.generateSecret(secretBites);
 
     // save in database
     await this._userService.update2FA({
@@ -36,7 +36,7 @@ export class MfAuthService {
     });
 
     // generate QRcode
-    const qrUri: string = authenticator.keyuri(email, this.issuer, secret);
+    const qrUri: string = authenticator.keyuri(email, issuer, secret);
     const qrCode: string = await toDataURL(qrUri);
 
     return {

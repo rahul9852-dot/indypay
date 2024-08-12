@@ -33,4 +33,8 @@ export const appConfig = registerAs("appConfig", () => ({
     clientId: getOsEnv("OTPLESS_CLIENT_ID"),
     clientSecret: getOsEnv("OTPLESS_CLIENT_SECRET"),
   },
+  twoFactorConfig: {
+    issuer: getOsEnv("ISSUER"),
+    secretBites: +getOsEnv("SECRET_BITES") || 20,
+  },
 }));

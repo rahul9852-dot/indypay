@@ -343,6 +343,12 @@ export class AuthService {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
 
+    if (!user.secret2FA) {
+      throw new BadRequestException(
+        new MessageResponseDto("2FA is not enabled"),
+      );
+    }
+
     // verify 2FA code
     const isVerify = await this._mFAuthService.verifyCode({
       secret: user.secret2FA,
