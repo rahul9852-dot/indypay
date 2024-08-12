@@ -5,11 +5,11 @@ declare interface OAuthCallbackParam {
 declare interface OtpLessCallbackParam extends OAuthCallbackParam {}
 
 declare interface OtpLessTokenData {
-  id_token: "jwt_token";
-  access_token: "access_token";
-  token_type: "Bearer";
-  expires_in: 3600;
-  user_id: "user123";
+  id_token: string;
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  user_id: string;
 }
 
 declare interface OtpLessUserData {
