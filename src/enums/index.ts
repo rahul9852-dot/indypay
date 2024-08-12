@@ -71,6 +71,7 @@ export enum ID_TYPE {
 }
 
 export enum ONBOARDING_STATUS {
+  NOT_STARTED = 0,
   SIGN_UP = 1, // signs up user with verified mobile and email
   FILLED_BUSINESS_DETAILS = 2, // filled up personal and business details
   KYC_VERIFIED = 3,

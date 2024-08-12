@@ -59,24 +59,23 @@ export class OAuthVerifyTokenDto {
 }
 
 export class OAuthGoogleTokenDataResponseDto {
-  @ApiResponseProperty()
-  @IsString()
+  @ApiResponseProperty({ example: "jahn@gmail.com" })
   email: string;
 
-  @ApiResponseProperty()
-  @IsString()
+  @ApiResponseProperty({ example: true })
   emailVerified: string;
 
-  @ApiResponseProperty()
-  @IsString()
+  @ApiResponseProperty({ example: "John Doe" })
   fullName: string;
 
-  @ApiResponseProperty()
-  @IsString()
-  image: string;
+  @ApiResponseProperty({ example: "https://example.com/image.png" })
+  image?: string;
 
-  @ApiResponseProperty()
+  @ApiResponseProperty({ example: false })
   is2FAEnabled: boolean;
+
+  @ApiResponseProperty({ example: 1 })
+  onboardingStatus: number;
 }
 
 export class RegisterUserResponseDto {

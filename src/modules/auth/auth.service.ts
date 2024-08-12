@@ -120,10 +120,7 @@ export class AuthService {
       return res.redirect(`${feRedirectUrlGoogle}?error=email_not_found`);
     }
 
-    // check if user exists
-    const user = await this._usersService.findByEmail(email);
-
-    const url = `${feRedirectUrlGoogle}?token=${id_token}&x=${user?.onboardingStatus || ONBOARDING_STATUS.SIGN_UP}`;
+    const url = `${feRedirectUrlGoogle}?token=${id_token}`;
 
     res.redirect(url);
   }
@@ -178,9 +175,10 @@ export class AuthService {
       throw new UnauthorizedException(new MessageResponseDto("Token expired"));
     }
 
-    let is2FAEnabled = true;
+    let is2FAEnabled = false;
     let image = tokenInfo.picture;
     let fullName = tokenInfo.name;
+    let onboardingStatus = ONBOARDING_STATUS.NOT_STARTED;
 
     if (isInternalUser) {
       // TODO: get internal user
@@ -191,6 +189,7 @@ export class AuthService {
         is2FAEnabled = user.is2FAEnabled;
         image = user.image;
         fullName = user.fullName;
+        onboardingStatus = user.onboardingStatus;
       }
     }
 
@@ -200,6 +199,7 @@ export class AuthService {
       image,
       fullName,
       is2FAEnabled,
+      onboardingStatus,
     };
   }
 
