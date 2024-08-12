@@ -170,6 +170,12 @@ export class AuthService {
       );
     }
 
+    if (!tokenInfo.email_verified) {
+      throw new UnauthorizedException(
+        new MessageResponseDto("Email not verified"),
+      );
+    }
+
     // Verify expiration
     if (parseInt(tokenInfo.exp) < Math.floor(Date.now() / 1000)) {
       throw new UnauthorizedException(new MessageResponseDto("Token expired"));
