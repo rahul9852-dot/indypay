@@ -1,24 +1,22 @@
-# First Stage : To install and build dependencies
+# First Stage: To install and build dependencies
 
 # Use the latest Node.js Alpine image
 FROM node:20.12.2-alpine AS builder
 WORKDIR /app
 
-COPY package.json yarn.lock ./
+COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
 # Download dependencies as a separate step to take advantage of Docker's caching.
-# Leverage a cache mount to /root/.yarn to speed up subsequent builds.
-# Leverage a bind mounts to package.json and yarn.lock to avoid having to copy them into
-# into this layer.
-RUN --mount=type=cache,target=/root/.yarn \
-    yarn install --frozen-lockfile
+# Leverage a cache mount to /root/.pnpm-store to speed up subsequent builds.
+RUN --mount=type=cache,target=/root/.pnpm-store \
+    pnpm install --frozen-lockfile
 
 COPY . .
 
-RUN yarn build
+RUN pnpm build
 
-# Second Stage : Setup command to run your app using lightweight node image
+# Second Stage: Setup command to run your app using lightweight node image
 
 FROM node:20.12.2-alpine
 WORKDIR /app
@@ -39,4 +37,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
     CMD curl --fail "http://localhost:$PORT/api/health-check" || exit 1
 
 # Command to run your app using Nest CLI
-CMD ["yarn", "start:prod"]
+CMD ["pnpm", "start:migration:prod"]
