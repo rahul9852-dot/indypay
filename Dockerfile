@@ -4,7 +4,10 @@
 FROM node:20.12.2-alpine AS builder
 WORKDIR /app
 
+
 COPY package.json pnpm-lock.yaml ./
+
+RUN npm install -g pnpm
 
 # Install dependencies
 # Download dependencies as a separate step to take advantage of Docker's caching.
