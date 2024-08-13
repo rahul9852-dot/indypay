@@ -14,7 +14,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
-    "start:migration:prod": "pnpm migration:run && pnpm start:prod",
+    "start:migration:prod": "npm run migration:run && npm run start:prod",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "prettier:fix": "prettier --write \"src/**/*.+(md|js|ts)\"",
