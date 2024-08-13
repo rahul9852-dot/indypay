@@ -39,4 +39,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
     CMD curl --fail "http://localhost:$PORT/api/health-check" || exit 1
 
 # Command to run your app using Nest CLI
-CMD ["yarn", "start:migration:prod"]
+CMD ["yarn", "start:prod"]
