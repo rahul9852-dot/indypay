@@ -25,6 +25,11 @@ export class MfAuthService {
     if (!user) {
       throw new BadRequestException(new MessageResponseDto("User not found"));
     }
+    if (user.is2FAEnabled) {
+      throw new BadRequestException(
+        new MessageResponseDto("2FA already enabled"),
+      );
+    }
     // generate secret
     const secret: string = authenticator.generateSecret(secretBites);
 
