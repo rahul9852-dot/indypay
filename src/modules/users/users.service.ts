@@ -156,6 +156,10 @@ export class UsersService {
       where: { user: { id: userId } },
     });
 
+    if (!userApiKeys) {
+      throw new NotFoundException(new MessageResponseDto("ApiKey not found"));
+    }
+
     userApiKeys.clientSecret = await decryptData(userApiKeys.clientSecret);
 
     return userApiKeys;
