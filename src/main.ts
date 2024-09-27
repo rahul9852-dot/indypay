@@ -4,6 +4,7 @@ import * as cookieParser from "cookie-parser";
 import helmet from "helmet";
 
 import { AppModule } from "./app.module";
+import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { appConfig } from "@//config/app.config";
 import { loadSwaggerConfigs } from "@/config/swagger.config";
@@ -17,8 +18,8 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const { httpAdapter } = app.get(HttpAdapterHost);
 
-  // Add security headers
-  app.use(helmet(helmetConfigs));
+  // Add cookie parser
+  app.use(cookieParser());
 
   // Enable cors
   app.enableCors({
@@ -27,9 +28,8 @@ async function bootstrap() {
     allowedHeaders: ["X-Requested-With", "Content-Type"],
     credentials: true,
   });
-
-  // Add cookie parser
-  app.use(cookieParser());
+  // Add security headers
+  app.use(helmet(helmetConfigs));
 
   // Set global prefix
   app.setGlobalPrefix("api");
@@ -44,7 +44,7 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
 
   // Add global interceptors
-  // app.useGlobalInterceptors(new ResponseHandlerInterceptor());
+  app.useGlobalInterceptors(new ResponseHandlerInterceptor());
 
   // Add global filters
   app.useGlobalFilters(new HttpExceptionsFilter(httpAdapter));

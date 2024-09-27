@@ -83,8 +83,22 @@ export const upiqr = async ({
       .then((base64Data: string) =>
         resolve({ qr: base64Data, intent } as IQRResult),
       )
-      .catch((err) =>
+      .catch((err: any) =>
         reject(new Error("Unable to generate UPI QR Code.\n" + err)),
+      );
+  });
+};
+
+export const generateQrCode = async (
+  upiIntentUrl: string,
+): Promise<Base64<"png">> => {
+  const QRCode = await require("qrcode");
+
+  return new Promise((resolve, reject) => {
+    QRCode.toDataURL(upiIntentUrl)
+      .then((base64Data: Base64<"png">) => resolve(base64Data))
+      .catch((err: any) =>
+        reject(new Error("Unable to generate QR Code.\n" + err)),
       );
   });
 };

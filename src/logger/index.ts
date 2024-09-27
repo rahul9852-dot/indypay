@@ -21,7 +21,7 @@ export enum LoggerPlaceHolder {
 }
 
 const level = () => {
-  return isProduction ? "warn" : "debug";
+  return isProduction ? "info" : "debug";
 };
 
 const colors = {

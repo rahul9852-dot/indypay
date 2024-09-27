@@ -24,17 +24,28 @@ export const appConfig = registerAs("appConfig", () => ({
     accessTokenExpiresIn: getOsEnv("JWT_ACCESS_TOKEN_EXPIRES_IN"),
     refreshTokenExpiresIn: getOsEnv("JWT_REFRESH_TOKEN_EXPIRES_IN"),
   },
-  oauthGoogle: {
-    clientId: getOsEnv("OAUTH_GOOGLE_CLIENT_ID"),
-    clientSecret: getOsEnv("OAUTH_GOOGLE_CLIENT_SECRET"),
-    feRedirectUrl: getOsEnv("OAUTH_GOOGLE_FE_REDIRECT_URL"), // with id token
-  },
-  otpless: {
-    clientId: getOsEnv("OTPLESS_CLIENT_ID"),
-    clientSecret: getOsEnv("OTPLESS_CLIENT_SECRET"),
-  },
+  // oauthGoogle: {
+  //   clientId: getOsEnv("OAUTH_GOOGLE_CLIENT_ID"),
+  //   clientSecret: getOsEnv("OAUTH_GOOGLE_CLIENT_SECRET"),
+  //   feRedirectUrl: getOsEnv("OAUTH_GOOGLE_FE_REDIRECT_URL"), // with id token
+  // },
+  // otpless: {
+  //   clientId: getOsEnv("OTPLESS_CLIENT_ID"),
+  //   clientSecret: getOsEnv("OTPLESS_CLIENT_SECRET"),
+  // },
   twoFactorConfig: {
     issuer: getOsEnv("ISSUER"),
     secretBites: +getOsEnv("SECRET_BITES") || 20,
+  },
+
+  externalPaymentConfig: {
+    baseUrl: getOsEnv("EXTERNAL_PAYMENT_BASE_URL"),
+    clientId: getOsEnv("EXTERNAL_PAYMENT_CLIENT_ID"),
+    clientSecret: getOsEnv("EXTERNAL_PAYMENT_CLIENT_SECRET"),
+    webhookIps: getOsEnv("EXTERNAL_PAYMENT_WEBHOOK_IPS").split(","),
+  },
+  transactionConfig: {
+    commissionInPercentage: +getOsEnv("COMMISSION_IN_PERCENTAGE") || 4.5,
+    gstInPercentage: +getOsEnv("GST_IN_PERCENTAGE") || 18,
   },
 }));

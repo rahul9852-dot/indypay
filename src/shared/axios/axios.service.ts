@@ -21,9 +21,13 @@ export class AxiosService {
       error?.response?.data,
     );
 
-    const status: number = error?.response?.status || 500;
+    const status: number =
+      error?.response?.status || error?.response?.data?.status || 500;
 
-    const message = error?.response?.data?.error || "Something went wrong";
+    const message =
+      error?.response?.data?.error ||
+      error?.response?.data?.message ||
+      "Something went wrong";
 
     if (status === 401) {
       throw new UnauthorizedException(message);

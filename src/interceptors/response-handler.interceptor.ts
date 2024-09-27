@@ -11,6 +11,7 @@ import { SUCCESS_MESSAGES } from "@/constants/messages.constant";
 export interface Response<T> {
   statusCode: number;
   message: string;
+  success: boolean;
   data: T;
 }
 
@@ -26,6 +27,7 @@ export class ResponseHandlerInterceptor<T>
       map((data) => ({
         statusCode: context.switchToHttp().getResponse().statusCode,
         message: SUCCESS_MESSAGES.DATA_RECEIVED,
+        success: true,
         data,
       })),
     );

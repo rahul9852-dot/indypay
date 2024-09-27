@@ -17,6 +17,7 @@ export const migrationConfig: DataSourceOptions = {
   migrations: [__dirname + "/../migrations/*{.ts,.js}"],
   migrationsTableName: "migrations",
   synchronize: false,
+  migrationsRun: false,
   logging: !isProduction,
 };
 

@@ -1,259 +1,302 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { FindManyOptions, ILike, Repository } from "typeorm";
-import { InjectRepository } from "@nestjs/typeorm";
-import { JwtService } from "@nestjs/jwt";
 import { Response } from "express";
-
-import {
-  CreateUserDto,
-  UpdateBusinessDetailsDto,
-  UpdateUserDto,
-} from "./users.dto";
-import { UsersEntity } from "@/entities/users.entity";
-import { COOKIE_KEYS, ID_TYPE, ONBOARDING_STATUS } from "@/enums";
+import { InjectRepository } from "@nestjs/typeorm";
+import { ILike, Repository } from "typeorm";
+import { ChangePasswordDto } from "./dto/change-password.dto";
+import { AddBusinessDetailsDto } from "./dto/add-business-details.dto";
+import { WebhookUrlDto } from "./dto/webhook.dto";
+import { ChangeStatusDto } from "./dto/change-status.dto";
+import { ChangeRoleDto } from "./dto/change-role.dto";
+import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
-import { BusinessDetailsEntity } from "@/entities/business-details.entity";
+import { IAccessTokenPayload } from "@/interface/common.interface";
+import {
+  ACCOUNT_STATUS,
+  COOKIE_KEYS,
+  ONBOARDING_STATUS,
+  USERS_ROLE,
+} from "@/enums";
 import {
   accessCookieOptions,
   refreshCookieOptions,
 } from "@/utils/cookies.utils";
-import { appConfig } from "@/config/app.config";
-
-const {
-  jwtConfig: {
-    accessTokenExpiresIn,
-    accessTokenSecret,
-    refreshTokenExpiresIn,
-    refreshTokenSecret,
-  },
-} = appConfig();
+import { AuthService } from "@/modules/auth/auth.service";
+import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
+import { getUlidId } from "@/utils/helperFunctions.utils";
+import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(UsersEntity)
-    private readonly _usersRepository: Repository<UsersEntity>,
-    @InjectRepository(BusinessDetailsEntity)
-    private readonly _businessDetailsRepository: Repository<BusinessDetailsEntity>,
-
-    private readonly _jwtService: JwtService,
+    private readonly usersRepository: Repository<UsersEntity>,
+    @InjectRepository(UserApiKeysEntity)
+    private readonly userApiKeysRepository: Repository<UserApiKeysEntity>,
+    private readonly authService: AuthService,
+    private readonly bcryptService: BcryptService,
   ) {}
 
-  async create(createUserDto: CreateUserDto, businessDetailsId: string) {
-    const userExists = await this.findByEmail(createUserDto.email);
-    const mobileExists = await this.findByMobile(createUserDto.mobile);
-    if (userExists || mobileExists) {
+  async changePassword(
+    user: IAccessTokenPayload,
+    changePasswordDto: ChangePasswordDto,
+  ) {
+    if (changePasswordDto.newPassword !== changePasswordDto.confirmPassword) {
       throw new BadRequestException(
-        new MessageResponseDto("User already exists"),
+        new MessageResponseDto("Passwords do not match"),
       );
     }
 
-    const user = this._usersRepository.create({
-      ...createUserDto,
-      businessDetailsId,
+    const existingUser = await this.usersRepository.findOne({
+      where: {
+        id: user.id,
+        accountStatus: ACCOUNT_STATUS.ACTIVE,
+      },
+      select: {
+        password: true,
+      },
     });
 
-    return this._usersRepository.save(user);
-  }
-
-  async findById(userId: string) {
-    if (!userId.startsWith(ID_TYPE.USER)) {
-      return null;
-    }
-
-    return this._usersRepository.findOne({
-      where: { id: userId },
-      relations: ["businessDetails"],
-    });
-  }
-
-  async findByEmail(userEmail: string) {
-    return this._usersRepository.findOne({
-      where: { email: userEmail },
-      relations: ["businessDetails"],
-    });
-  }
-
-  async findByMobile(userMobile: string) {
-    return this._usersRepository.findOne({
-      where: { mobile: userMobile },
-      relations: ["businessDetails"],
-    });
-  }
-
-  async update(userId: string, updateUserDto: UpdateUserDto) {
-    if (!userId.startsWith(ID_TYPE.USER)) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    const user = this._usersRepository.create({ id: userId, ...updateUserDto });
-
-    const savedUser = await this._usersRepository.save(user);
-
-    if (!savedUser) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    return new MessageResponseDto("User updated successfully");
-  }
-
-  async softDelete(userId: string) {
-    if (!userId.startsWith(ID_TYPE.USER)) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    const user = await this._usersRepository.findOneBy({ id: userId });
-    if (!user) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    return this._usersRepository.softRemove(user);
-  }
-
-  async restore(userId: string) {
-    if (!userId.startsWith(ID_TYPE.USER)) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    const user = await this._usersRepository.findOneBy({ id: userId });
-    if (!user) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    return this._usersRepository.restore(user.id);
-  }
-
-  async delete(userId: string) {
-    if (!userId.startsWith(ID_TYPE.USER)) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    const user = await this._usersRepository.findOneBy({ id: userId });
-    if (!user) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    return this._usersRepository.remove(user);
-  }
-
-  async update2FA({
-    email,
-    is2FAEnabled,
-    secret2FA,
-  }: {
-    email: string;
-    is2FAEnabled: boolean;
-    secret2FA?: string;
-  }) {
-    if (is2FAEnabled && !secret2FA) {
-      throw new BadRequestException(
-        new MessageResponseDto("2FA secret is required to enable 2FA"),
+    if (!existingUser) {
+      throw new NotFoundException(
+        new MessageResponseDto(
+          "User not found or deactivated. Please contact support",
+        ),
       );
     }
-    const newUser = this._usersRepository.create({
-      is2FAEnabled,
-      secret2FA,
+
+    const isPasswordValid = await this.bcryptService.compare(
+      changePasswordDto.oldPassword,
+      existingUser.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new BadRequestException(
+        new MessageResponseDto("Incorrect old password"),
+      );
+    }
+
+    const hashedPassword = await this.bcryptService.hash(
+      changePasswordDto.newPassword,
+    );
+
+    const updatedUser = this.usersRepository.create({
+      password: hashedPassword,
     });
 
-    return this._usersRepository.update({ email }, newUser);
+    await this.usersRepository.update({ id: user.id }, updatedUser);
+
+    return new MessageResponseDto("Password changed successfully");
   }
 
-  async getAll({
-    limit = 10,
-    order = "ASC",
+  async deleteApiKey(apiKeyId: string, user: UsersEntity) {
+    const userApiKey = await this.userApiKeysRepository.findOne({
+      where: { id: apiKeyId },
+      relations: ["user"],
+    });
+
+    if (!userApiKey) {
+      throw new NotFoundException(new MessageResponseDto("ApiKey not found"));
+    }
+    if (
+      [USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role) ||
+      userApiKey.user.id === user.id
+    ) {
+      {
+        await this.userApiKeysRepository.delete(userApiKey.id);
+      }
+    } else {
+      throw new ForbiddenException(new MessageResponseDto("Forbidden"));
+    }
+  }
+
+  async generateClientIdAndClientSecret(mobile: string) {
+    const user = await this.usersRepository.findOne({
+      where: { mobile },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const clientId = getUlidId("key");
+    const clientSecret = getUlidId("sc");
+
+    // const hashedClientSecret = await this.bcryptService.hash(clientSecret);
+
+    const userApiKey = this.userApiKeysRepository.create({
+      user,
+      clientId,
+      clientSecret,
+    });
+
+    const savedUserApiKey = await this.userApiKeysRepository.save(userApiKey);
+
+    return {
+      id: savedUserApiKey.id,
+      mobile: user.mobile,
+      clientId,
+      clientSecret,
+    };
+  }
+
+  async getAllApiKeysMerchant(userId: string) {
+    return this.userApiKeysRepository.find({
+      where: { user: { id: userId } },
+    });
+  }
+
+  async findAll({
     page = 1,
+    limit = 10,
     search = "",
     sort = "id",
+    order = "DESC",
   }: PaginationDto) {
-    const options: FindManyOptions<UsersEntity> = {
+    return this.usersRepository.find({
       where: {
-        ...(search && {
-          fullName: ILike(`%${search}%`),
-        }),
+        fullName: ILike(`%${search}%`),
       },
+      skip: (page - 1) * limit,
       take: limit,
-      skip: limit * (page - 1),
       order: {
         [sort]: order,
       },
-      relations: ["businessDetails"],
-    };
-
-    return this._usersRepository.find(options);
+    });
   }
 
-  async updateBusinessDetails(
-    businessDetailsDto: UpdateBusinessDetailsDto,
-    response: Response,
-  ) {
-    const { email } = businessDetailsDto;
+  async findOne(userId: string) {
+    return this.usersRepository.findOne({
+      where: { id: userId },
+      relations: ["businessDetails", "kyc"],
+    });
+  }
 
-    const user = await this.findByEmail(email);
+  async addBusinessDetailsDto(
+    addBusinessDetailsDto: AddBusinessDetailsDto,
+    reqUser: UsersEntity,
+    res: Response,
+  ) {
+    const user = await this.usersRepository.findOne({
+      where: {
+        id: reqUser.id,
+      },
+      relations: ["businessDetails"],
+    });
 
     if (!user) {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
 
-    const oldBusinessDetails = await this._businessDetailsRepository.findOneBy({
-      user: {
-        email,
-      },
-    });
-
-    if (!oldBusinessDetails) {
-      throw new NotFoundException(
-        new MessageResponseDto("Business details not found"),
+    if (user.businessDetails) {
+      throw new ConflictException(
+        new MessageResponseDto("Business details already exists"),
       );
     }
 
-    const createBusinessDetails = this._businessDetailsRepository.create({
-      ...businessDetailsDto,
-      id: oldBusinessDetails.id,
-    });
-
-    await this._businessDetailsRepository.update(
-      oldBusinessDetails.id,
-      createBusinessDetails,
-    );
-
-    const createdUser = this._usersRepository.create({
-      id: user.id,
+    const userDetails = this.usersRepository.create({
       onboardingStatus: ONBOARDING_STATUS.FILLED_BUSINESS_DETAILS,
+      businessDetails: addBusinessDetailsDto,
     });
 
-    await this._usersRepository.update(user.id, createdUser);
-
-    const accessToken = this.generateAccessToken({
-      id: oldBusinessDetails.id,
-      email,
+    const savedUser = await this.usersRepository.save({
+      ...userDetails,
+      id: user.id,
     });
 
-    const refreshToken = this.generateRefreshToken({
-      id: oldBusinessDetails.id,
-      email,
-    });
+    const payload: IAccessTokenPayload = {
+      id: user.id,
+      mobile: user.mobile,
+      onboardingStatus: savedUser.onboardingStatus,
+      role: user.role,
+      email: user.email,
+    };
+    const accessToken = this.authService.generateAccessToken(payload);
+    const refreshToken = this.authService.generateRefreshToken(payload);
 
-    response
+    res
       .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
       .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
-      .json(new MessageResponseDto("Business details updated successfully"));
+      .json(new MessageResponseDto("Business details added successfully"));
   }
 
-  generateAccessToken(payload: Record<string, any>) {
-    return this._jwtService.sign(payload, {
-      secret: accessTokenSecret,
-      expiresIn: accessTokenExpiresIn,
+  async updateUser() {}
+
+  async deleteUser(id: string) {
+    const user = this.usersRepository.create({
+      accountStatus: ACCOUNT_STATUS.DELETED,
     });
+
+    await this.usersRepository.update({ id }, user);
   }
 
-  generateRefreshToken(payload: Record<string, any>) {
-    return this._jwtService.sign(payload, {
-      secret: refreshTokenSecret,
-      expiresIn: refreshTokenExpiresIn,
+  async changeAccountStatus(changeStatusDto: ChangeStatusDto) {
+    const { status: accountStatus, userId: id } = changeStatusDto;
+
+    const dbUser = await this.usersRepository.findOne({
+      where: { id },
     });
+
+    if (!dbUser) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const user = this.usersRepository.create({
+      accountStatus,
+    });
+
+    await this.usersRepository.update({ id }, user);
+
+    return new MessageResponseDto("Account status updated successfully");
+  }
+
+  async changeRole({ userId, role }: ChangeRoleDto) {
+    const dbUser = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!dbUser) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const user = this.usersRepository.create({
+      role,
+    });
+
+    await this.usersRepository.update({ id: userId }, user);
+
+    return new MessageResponseDto("Role updated successfully");
+  }
+
+  async findByMobile(mobile: string) {
+    return this.usersRepository.findOneBy({ mobile });
+  }
+
+  async updateWebhookUrl({ id }: UsersEntity, webhookUrlDto: WebhookUrlDto) {
+    const user = await this.usersRepository.findOne({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const updatedUser = this.usersRepository.create({
+      ...(webhookUrlDto.payInWebhookUrl && {
+        payInWebhookUrl: webhookUrlDto.payInWebhookUrl,
+      }),
+      ...(webhookUrlDto.payOutWebhookUrl && {
+        payOutWebhookUrl: webhookUrlDto.payOutWebhookUrl,
+      }),
+    });
+
+    await this.usersRepository.update({ id }, updatedUser);
+
+    return new MessageResponseDto("Webhook url updated successfully");
   }
 }

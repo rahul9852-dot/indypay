@@ -5,32 +5,36 @@ export enum NODE_ENV {
 
 export enum COOKIE_KEYS {
   ACCESS_TOKEN = "atk",
+  MOBILE_INFO_KEY = "utk",
   REFRESH_TOKEN = "rtk",
-}
-
-export enum INTERNALS_ROLE {
-  GUEST = 1,
-  OPS = 2,
-  ADMIN = 3,
-  OWNER = 4,
+  VERIFY_TOKEN = "vtk",
 }
 
 export enum USERS_ROLE {
+  GUEST = 0,
   SALE = 1,
   MERCHANT = 2,
+  OPS = 3,
+  ADMIN = 4,
+  OWNER = 5,
+}
+
+export enum KYC_STATUS {
+  PENDING = 1,
+  PAN_VERIFIED = 2,
+  AADHAR_VERIFIED = 3,
+  APPROVED = 4,
+  HOLD = 5,
+  REJECTED = 6,
 }
 
 export enum ACCOUNT_STATUS {
   ACTIVE = 1,
   INACTIVE = 2,
   SUSPENDED = 3,
-  BLOCKED = 5,
-}
-
-export enum PAYMENT_STATUS {
-  PENDING = 1,
-  FAILED,
-  SUCCESS = 3,
+  BLOCKED = 4,
+  DELETED = 5,
+  TEST_DELETED = 6,
 }
 
 export enum BUSINESS_ENTITY_TYPE {
@@ -67,13 +71,22 @@ export enum ID_TYPE {
   BUSINESS_DETAILS = "bsd",
   INTERNAL_USER = "itu",
   ONBOARDING_USER = "onu",
+  ORDER = "ord",
+  OTP = "otp",
+  TRANSACTIONS_KEY = "txn",
   USER = "usr",
+  USER_ADDRESS = "uad",
+  USER_API_KEY = "apik",
+  USER_KYC = "ukyc",
+  USER_MULTI_FACTOR_AUTH = "umfa",
+  PAYIN_KEY = "pin",
+  PAYOUT_KEY = "pout",
 }
 
 export enum ONBOARDING_STATUS {
   NOT_STARTED = 0,
   SIGN_UP = 1, // signs up user with verified mobile and email
-  FILLED_BUSINESS_DETAILS = 2, // filled up personal and business details
+  FILLED_BUSINESS_DETAILS = 2, // filled up business details
   KYC_VERIFIED = 3,
   KYC_ON_HOLD = 4,
   KYC_REJECTED = 5,

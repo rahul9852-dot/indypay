@@ -1,4 +1,7 @@
 import { HelmetOptions } from "helmet";
+import { appConfig } from "./app.config";
+
+const { beBaseUrl } = appConfig();
 
 export const helmetConfigs: Readonly<HelmetOptions> = {
   contentSecurityPolicy: {
@@ -7,6 +10,8 @@ export const helmetConfigs: Readonly<HelmetOptions> = {
       scriptSrc: ["'self'", "'unsafe-inline'"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: [],
+      "img-src": ["'self'", "https:", "data:"],
+      "connect-src": ["'self'", beBaseUrl],
     },
   },
   referrerPolicy: { policy: "no-referrer" },
