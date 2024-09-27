@@ -10,7 +10,6 @@ import {
 import { UsersEntity } from "./user.entity";
 import { ID_TYPE } from "@/enums";
 import { getUlidId } from "@/utils/helperFunctions.utils";
-import { encryptData } from "@/utils/encode-decode.utils";
 
 @Entity("user_api_keys")
 export class UserApiKeysEntity {
@@ -38,6 +37,5 @@ export class UserApiKeysEntity {
   @BeforeInsert()
   async beforeInsertHook() {
     this.id = getUlidId(ID_TYPE.USER_API_KEY);
-    this.clientSecret = await encryptData(this.clientSecret);
   }
 }

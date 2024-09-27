@@ -166,9 +166,9 @@ export class UsersController {
     return this.usersService.findAll(query);
   }
 
-  @Get("api-keys")
+  @Get("api-key")
   @ApiOperation({
-    summary: "Get all api keys - Merchant",
+    summary: "Get api key - Merchant",
   })
   async getAllApiKeysMerchant(@User() user: UsersEntity) {
     return this.usersService.getAllApiKeysMerchant(user.id);

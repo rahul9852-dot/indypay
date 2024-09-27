@@ -30,7 +30,7 @@ import { AuthService } from "@/modules/auth/auth.service";
 import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
-import { decryptData } from "@/utils/encode-decode.utils";
+import { decryptData, encryptData } from "@/utils/encode-decode.utils";
 
 @Injectable()
 export class UsersService {
@@ -125,13 +125,20 @@ export class UsersService {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
 
+    const existingUserApiKey = await this.userApiKeysRepository.findOne({
+      where: { user: { id: user.id } },
+    });
+
     const clientId = getUlidId("key");
     const clientSecret = getUlidId("sc");
+
+    const encryptClientSecret = await encryptData(clientSecret);
 
     const userApiKey = this.userApiKeysRepository.create({
       user,
       clientId,
-      clientSecret,
+      clientSecret: encryptClientSecret,
+      ...(existingUserApiKey && { id: existingUserApiKey.id }),
     });
 
     const savedUserApiKey = await this.userApiKeysRepository.save(userApiKey);
@@ -145,13 +152,11 @@ export class UsersService {
   }
 
   async getAllApiKeysMerchant(userId: string) {
-    const userApiKeys = await this.userApiKeysRepository.find({
+    const userApiKeys = await this.userApiKeysRepository.findOne({
       where: { user: { id: userId } },
     });
 
-    for (const userApiKey of userApiKeys) {
-      userApiKey.clientSecret = await decryptData(userApiKey.clientSecret);
-    }
+    userApiKeys.clientSecret = await decryptData(userApiKeys.clientSecret);
 
     return userApiKeys;
   }
