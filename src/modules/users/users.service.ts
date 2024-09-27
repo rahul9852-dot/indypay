@@ -30,6 +30,7 @@ import { AuthService } from "@/modules/auth/auth.service";
 import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
+import { decryptData } from "@/utils/encode-decode.utils";
 
 @Injectable()
 export class UsersService {
@@ -127,8 +128,6 @@ export class UsersService {
     const clientId = getUlidId("key");
     const clientSecret = getUlidId("sc");
 
-    // const hashedClientSecret = await this.bcryptService.hash(clientSecret);
-
     const userApiKey = this.userApiKeysRepository.create({
       user,
       clientId,
@@ -146,9 +145,15 @@ export class UsersService {
   }
 
   async getAllApiKeysMerchant(userId: string) {
-    return this.userApiKeysRepository.find({
+    const userApiKeys = await this.userApiKeysRepository.find({
       where: { user: { id: userId } },
     });
+
+    for (const userApiKey of userApiKeys) {
+      userApiKey.clientSecret = await decryptData(userApiKey.clientSecret);
+    }
+
+    return userApiKeys;
   }
 
   async findAll({

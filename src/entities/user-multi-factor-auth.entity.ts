@@ -10,6 +10,7 @@ import {
 import { UsersEntity } from "./user.entity";
 import { ID_TYPE } from "@/enums";
 import { getUlidId } from "@/utils/helperFunctions.utils";
+import { encryptData } from "@/utils/encode-decode.utils";
 
 @Entity("user_multi_factor_auth")
 export class UserMultiFactorAuthEntity {
@@ -32,7 +33,8 @@ export class UserMultiFactorAuthEntity {
   updatedAt: Date;
 
   @BeforeInsert()
-  beforeInsertHook() {
+  async beforeInsertHook() {
     this.id = getUlidId(ID_TYPE.USER_MULTI_FACTOR_AUTH);
+    this.secret = await encryptData(this.secret);
   }
 }

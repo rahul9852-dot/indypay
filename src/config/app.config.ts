@@ -11,6 +11,7 @@ export const appConfig = registerAs("appConfig", () => ({
   allowedOrigins: getOsEnv("ALLOWED_ORIGINS").split(","),
   beBaseUrl: getOsEnv("BE_BASE_URL"),
   isProduction: getOsEnv("NODE_ENV") === NODE_ENV.PRODUCTION,
+  encryptionKey: getOsEnv("ENCRYPTION_KEY"),
   database: {
     host: getOsEnv("DB_HOST"),
     port: getOsEnv("DB_PORT"),

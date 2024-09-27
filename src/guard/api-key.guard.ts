@@ -9,16 +9,15 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
 import { REQUEST_USER_KEY } from "@/constants/auth.constant";
-import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { ACCOUNT_STATUS } from "@/enums";
 import { ERROR_MESSAGES } from "@/constants/messages.constant";
+import { decryptData } from "@/utils/encode-decode.utils";
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   constructor(
     @InjectRepository(UserApiKeysEntity)
     private readonly apiKeyRepository: Repository<UserApiKeysEntity>,
-    private readonly bcryptService: BcryptService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -49,16 +48,11 @@ export class ApiKeyGuard implements CanActivate {
         );
       }
 
-      // const isCorrectSecret = await this.bcryptService.compare(
-      //   clientSecret,
-      //   apiKeyEntity.clientSecret,
-      // );
+      const decryptedClientSecret = await decryptData(
+        apiKeyEntity.clientSecret,
+      );
 
-      // if (!isCorrectSecret) {
-      //   throw new UnauthorizedException();
-      // }
-
-      if (apiKeyEntity.clientSecret !== clientSecret) {
+      if (decryptedClientSecret !== clientSecret) {
         throw new UnauthorizedException();
       }
 
