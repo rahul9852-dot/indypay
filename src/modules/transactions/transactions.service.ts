@@ -1,9 +1,18 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, InternalServerErrorException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Response } from "express";
+import {
+  Between,
+  FindOptionsWhere,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from "typeorm";
+import { DownloadCsvDto } from "./download-csv.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
-import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { PAYMENT_STATUS, PAYMENT_TYPE } from "@/enums/payment.enum";
+import { getCsv } from "@/utils/csv.utils";
 
 @Injectable()
 export class TransactionsService {
@@ -37,6 +46,66 @@ export class TransactionsService {
       createdAt: true,
     },
   };
+
+  async getAllPayinTransactions(downloadCsvDto: DownloadCsvDto, res: Response) {
+    const { transactionType, startDate, endDate } = downloadCsvDto;
+    const where: FindOptionsWhere<PayInOrdersEntity> = {};
+
+    if (startDate && endDate) {
+      where.createdAt = Between(new Date(startDate), new Date(endDate));
+    } else if (startDate) {
+      where.createdAt = MoreThanOrEqual(new Date(startDate));
+    } else if (endDate) {
+      where.createdAt = LessThanOrEqual(new Date(endDate));
+    }
+
+    if (transactionType === PAYMENT_TYPE.PAYIN) {
+      const transactions = await this.payInOrdersRepository.find({
+        where,
+        select: {
+          id: true,
+          amount: true,
+          commissionAmount: true,
+          gstAmount: true,
+          netPayableAmount: true,
+          status: true,
+          createdAt: true,
+          orderId: true,
+          txnRefId: true,
+        },
+      });
+
+      const fields = [
+        { label: "ID", value: "id" },
+        { label: "Amount", value: "amount" },
+        { label: "Commission", value: "commissionAmount" },
+        { label: "GST", value: "gstAmount" },
+        { label: "Net Payable", value: "netPayableAmount" },
+        { label: "Status", value: "status" },
+        { label: "Order ID", value: "orderId" },
+        { label: "Txn Ref ID", value: "txnRefId" },
+        { label: "Created At", value: "createdAt" },
+      ];
+
+      const csv = getCsv(transactions, fields);
+      const date = new Date().toLocaleString("en-IN").replace(/[/:, ]/gi, "_");
+
+      const name = `payin_transactions_${date}.csv`;
+
+      if (csv) {
+        // Set headers to indicate a file download
+        res.header("Content-Type", "text/csv");
+        res.attachment(name);
+
+        // Send the CSV data
+        return res.send(csv);
+      }
+    } else {
+      return null;
+    }
+
+    throw new InternalServerErrorException("Something went wrong");
+  }
 
   async getAllTransactionsAdmin() {
     return await this.transactionsRepository.find({

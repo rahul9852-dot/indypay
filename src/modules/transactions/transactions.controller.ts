@@ -1,6 +1,8 @@
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { Controller, Get, Param } from "@nestjs/common";
+import { Response } from "express";
+import { Body, Controller, Get, Param, Post, Res } from "@nestjs/common";
 import { TransactionsService } from "./transactions.service";
+import { DownloadCsvDto } from "./download-csv.dto";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
@@ -12,6 +14,21 @@ import { USERS_ROLE } from "@/enums";
 @Controller("transactions")
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
+
+  @ApiOperation({ summary: "Download all Payin Transactions" })
+  @Role(USERS_ROLE.MERCHANT)
+  @Post("download-csv")
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  async getAllPayinTransactions(
+    @Body() downloadCsvDto: DownloadCsvDto,
+    @Res() res: Response,
+  ) {
+    return await this.transactionsService.getAllPayinTransactions(
+      downloadCsvDto,
+      res,
+    );
+  }
 
   @ApiOperation({ summary: "Get all merchant's transactions - Admin Only" })
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
