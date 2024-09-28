@@ -17,14 +17,29 @@ export class TransactionsController {
 
   @ApiOperation({ summary: "Download all Payin Transactions" })
   @Role(USERS_ROLE.MERCHANT)
-  @Post("download-csv")
+  @Post("download-csv/merchant")
   @IgnoreKyc()
   @IgnoreBusinessDetails()
-  async getAllPayinTransactions(
+  async getAllPayinTransactionsMerchant(
+    @Body() downloadCsvDto: DownloadCsvDto,
+    @Res() res: Response,
+    @User() user: UsersEntity,
+  ) {
+    return await this.transactionsService.getAllPayinTransactionsMerchant(
+      user,
+      downloadCsvDto,
+      res,
+    );
+  }
+
+  @ApiOperation({ summary: "Download all Payin Transactions - Admin" })
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Post("download-csv/admin")
+  async getAllPayinTransactionsAdmin(
     @Body() downloadCsvDto: DownloadCsvDto,
     @Res() res: Response,
   ) {
-    return await this.transactionsService.getAllPayinTransactions(
+    return await this.transactionsService.getAllPayinTransactionsAdmin(
       downloadCsvDto,
       res,
     );
