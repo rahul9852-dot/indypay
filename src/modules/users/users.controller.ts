@@ -63,7 +63,14 @@ export class UsersController {
   })
   @Post("change-password")
   @IgnoreKyc()
-  @Role(USERS_ROLE.MERCHANT)
+  @Role(
+    USERS_ROLE.OWNER,
+    USERS_ROLE.MERCHANT,
+    USERS_ROLE.OPS,
+    USERS_ROLE.ADMIN,
+    USERS_ROLE.SALE,
+    USERS_ROLE.GUEST,
+  )
   @ApiOkResponse({ type: MessageResponseDto })
   @HttpCode(HttpStatus.OK)
   async changePassword(
