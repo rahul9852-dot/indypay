@@ -214,21 +214,28 @@ export class PaymentsService {
     );
 
     if (user?.payInWebhookUrl) {
+      const webhookPayload = {
+        orderId,
+        status,
+        amount: payinOrder.amount,
+        txnRefId: payinOrder.txnRefId,
+      };
+      this.logger.info(
+        `going to call user webhook (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+        webhookPayload,
+      );
       axios
-        .post(
-          user.payInWebhookUrl,
-          {
-            orderId,
-            status,
-            amount: payinOrder.amount,
-            txnRefId: payinOrder.txnRefId,
+        .post(user.payInWebhookUrl, webhookPayload, {
+          headers: {
+            "Content-Type": "application/json",
           },
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-          },
-        )
+        })
+        .then(() => {
+          this.logger.info(
+            `User webhook (${user?.payInWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
+            user,
+          );
+        })
         .catch((err) => {
           this.logger.error(
             `externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
