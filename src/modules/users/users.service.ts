@@ -313,4 +313,31 @@ export class UsersService {
 
     return new MessageResponseDto("Webhook url updated successfully");
   }
+
+  async getClientId(userId: string) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const userApiKey = await this.userApiKeysRepository.find({
+      where: { user: { id: user.id } },
+      select: {
+        clientId: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
+          fullName: true,
+        },
+      },
+      relations: {
+        user: true,
+      },
+    });
+
+    return userApiKey;
+  }
 }

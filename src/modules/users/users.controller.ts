@@ -50,6 +50,15 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @ApiOperation({
+    summary: "Get Users Client Id to confirm",
+  })
+  @Get("client-id/:userId")
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.MERCHANT)
+  async getClientId(@Param("userId") userId: string) {
+    return this.usersService.getClientId(userId);
+  }
+
+  @ApiOperation({
     summary: "Change Password",
   })
   @Post("change-password")
