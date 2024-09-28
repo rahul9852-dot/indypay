@@ -1,6 +1,6 @@
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Response } from "express";
-import { Body, Controller, Get, Param, Post, Res } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, Res } from "@nestjs/common";
 import { TransactionsService } from "./transactions.service";
 import { DownloadCsvDto } from "./download-csv.dto";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
@@ -9,6 +9,7 @@ import { UsersEntity } from "@/entities/user.entity";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
+import { PaginationDto } from "@/dtos/common.dto";
 
 @ApiTags("Transactions")
 @Controller("transactions")
@@ -50,8 +51,10 @@ export class TransactionsController {
   @Get("admin")
   @IgnoreKyc()
   @IgnoreBusinessDetails()
-  async getAllTransactionsAdmin() {
-    return await this.transactionsService.getAllTransactionsAdmin();
+  async getAllTransactionsAdmin(@Query() paginationDto: PaginationDto) {
+    return await this.transactionsService.getAllTransactionsAdmin(
+      paginationDto,
+    );
   }
 
   @ApiOperation({
@@ -61,8 +64,14 @@ export class TransactionsController {
   @Get("merchant")
   @IgnoreKyc()
   @IgnoreBusinessDetails()
-  async getAllTransactionMerchant(@User() user: UsersEntity) {
-    return await this.transactionsService.getAllTransactionMerchant(user.id);
+  async getAllTransactionMerchant(
+    @User() user: UsersEntity,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    return await this.transactionsService.getAllTransactionMerchant(
+      user.id,
+      paginationDto,
+    );
   }
 
   @ApiOperation({
@@ -93,9 +102,13 @@ export class TransactionsController {
   @Get("admin/merchant/:merchantId")
   @IgnoreKyc()
   @IgnoreBusinessDetails()
-  async getAllTransactionsOfMerchant(@Param("merchantId") merchantId: string) {
+  async getAllTransactionsOfMerchant(
+    @Param("merchantId") merchantId: string,
+    @Query() paginationDto: PaginationDto,
+  ) {
     return await this.transactionsService.getAllTransactionsOfMerchant(
       merchantId,
+      paginationDto,
     );
   }
 

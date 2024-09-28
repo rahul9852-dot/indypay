@@ -4,6 +4,7 @@ import { Response } from "express";
 import {
   Between,
   FindOptionsWhere,
+  ILike,
   LessThanOrEqual,
   MoreThanOrEqual,
   Repository,
@@ -14,6 +15,7 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS, PAYMENT_TYPE } from "@/enums/payment.enum";
 import { getCsv } from "@/utils/csv.utils";
 import { UsersEntity } from "@/entities/user.entity";
+import { PaginationDto } from "@/dtos/common.dto";
 
 @Injectable()
 export class TransactionsService {
@@ -176,14 +178,42 @@ export class TransactionsService {
     throw new InternalServerErrorException("Something went wrong");
   }
 
-  async getAllTransactionsAdmin() {
+  async getAllTransactionsAdmin({
+    page = 1,
+    limit = 10,
+    search = "",
+    sort = "id",
+    order = "DESC",
+  }: PaginationDto) {
     return await this.transactionsRepository.find({
+      where: [
+        {
+          user: {
+            email: ILike(`%${search}%`),
+          },
+        },
+        {
+          payInOrder: {
+            orderId: ILike(`%${search}%`),
+          },
+        },
+        {
+          payOutOrder: {
+            externalPaymentId: ILike(`%${search}%`),
+          },
+        },
+      ],
       relations: {
         user: true,
         payInOrder: true,
         payOutOrder: true,
       },
       select: this.selectQuery,
+      skip: (page - 1) * limit,
+      take: limit,
+      order: {
+        [sort]: order,
+      },
     });
   }
 
@@ -207,15 +237,38 @@ export class TransactionsService {
     });
   }
 
-  async getAllTransactionMerchant(userId: string) {
+  async getAllTransactionMerchant(
+    userId: string,
+    {
+      limit = 10,
+      page = 1,
+      sort = "id",
+      order = "DESC",
+      search = "",
+    }: PaginationDto,
+  ) {
     return await this.transactionsRepository.find({
-      where: { user: { id: userId } },
+      where: [
+        {
+          user: { id: userId },
+          payInOrder: { orderId: ILike(`%${search}%`) },
+        },
+        {
+          user: { id: userId },
+          payOutOrder: { externalPaymentId: ILike(`%${search}%`) },
+        },
+      ],
       relations: {
         user: true,
         payInOrder: true,
         payOutOrder: true,
       },
       select: this.selectQuery,
+      skip: (page - 1) * limit,
+      take: limit,
+      order: {
+        [sort]: order,
+      },
     });
   }
 
@@ -239,15 +292,46 @@ export class TransactionsService {
     });
   }
 
-  async getAllTransactionsOfMerchant(userId: string) {
+  async getAllTransactionsOfMerchant(
+    userId: string,
+    {
+      limit = 10,
+      page = 1,
+      search = "",
+      sort = "id",
+      order = "DESC",
+    }: PaginationDto,
+  ) {
     return await this.transactionsRepository.find({
-      where: { user: { id: userId } },
+      where: [
+        {
+          user: {
+            id: userId,
+            payInOrders: {
+              orderId: ILike(`%${search}%`),
+            },
+          },
+        },
+        {
+          user: {
+            id: userId,
+            payOutOrders: {
+              externalPaymentId: ILike(`%${search}%`),
+            },
+          },
+        },
+      ],
       relations: {
         user: true,
         payInOrder: true,
         payOutOrder: true,
       },
       select: this.selectQuery,
+      skip: (page - 1) * limit,
+      take: limit,
+      order: {
+        [sort]: order,
+      },
     });
   }
 
