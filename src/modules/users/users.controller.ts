@@ -190,17 +190,28 @@ export class UsersController {
     return this.usersService.getAllApiKeysMerchant(user.id);
   }
 
-  @ApiOperation({ summary: "Update pay-in webhook url" })
+  @ApiOperation({ summary: "Update webhook url" })
   @Role(USERS_ROLE.MERCHANT)
   @IgnoreKyc()
   @ApiOkResponse({
     type: MessageResponseDto,
   })
   @Post("webhook-url")
-  async addPayInWebhookUrl(
+  async addWebhookUrl(
     @Body() webhookUrlDto: WebhookUrlDto,
     @User() user: UsersEntity,
   ) {
     return this.usersService.updateWebhookUrl(user, webhookUrlDto);
+  }
+
+  @ApiOperation({ summary: "Get webhook url" })
+  @Role(USERS_ROLE.MERCHANT)
+  @IgnoreKyc()
+  @ApiOkResponse({
+    type: MessageResponseDto,
+  })
+  @Get("webhook-url")
+  async getWebhookUrl(@User() user: UsersEntity) {
+    return this.usersService.getWebhookUrl(user);
   }
 }

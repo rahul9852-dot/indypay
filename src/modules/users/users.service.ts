@@ -314,6 +314,19 @@ export class UsersService {
     return new MessageResponseDto("Webhook url updated successfully");
   }
 
+  async getWebhookUrl({ id }: UsersEntity) {
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      select: {
+        id: true,
+        payInWebhookUrl: true,
+        payOutWebhookUrl: true,
+      },
+    });
+
+    return user;
+  }
+
   async getClientId(userId: string) {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
