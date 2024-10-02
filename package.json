@@ -20,7 +20,9 @@
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "mig:gen": "npm run typeorm -- migration:generate ./src/migrations/$npm_config_name -d ./src/config/migration.config.ts",
     "mig:run": "npm run typeorm -- -d ./src/config/migration.config.ts migration:run",
-    "mig:revert": "npm run typeorm -- -d ./src/config/migration.config.ts migration:revert"
+    "mig:revert": "npm run typeorm -- -d ./src/config/migration.config.ts migration:revert",
+    "pm2:deploy:prod": "pnpm build && pm2 restart prod-api",
+    "pm2:deploy:dev": "pm2 restart dev-api"
   },
   "husky": {
     "hooks": {

@@ -11,13 +11,14 @@ import {
 } from "typeorm";
 import { UsersEntity } from "./user.entity";
 import { TransactionsEntity } from "./transaction.entity";
+import { PayoutBatchesEntity } from "./payout-batch.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
-import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
 import { appConfig } from "@/config/app.config";
 
 const {
-  transactionConfig: { commissionInPercentage, gstInPercentage },
+  transactionConfig: { commissionInPercentagePayIn, gstInPercentagePayIn },
 } = appConfig();
 
 @Entity("payin_orders")
@@ -72,11 +73,19 @@ export class PayInOrdersEntity {
   @Column({ type: "numeric", precision: 10, scale: 2 })
   netPayableAmount: number;
 
+  @Column({ enum: SETTLEMENT_STATUS, default: SETTLEMENT_STATUS.NOT_INITIATED })
+  settlementStatus: string;
+
   // Relations
   @ManyToOne(() => UsersEntity, ({ payInOrders }) => payInOrders, {
     onDelete: "CASCADE",
   })
   user: UsersEntity;
+
+  @ManyToOne(() => PayoutBatchesEntity, ({ payInOrders }) => payInOrders, {
+    onDelete: "CASCADE",
+  })
+  payoutBatch: PayoutBatchesEntity;
 
   @OneToOne(() => TransactionsEntity, ({ payInOrder }) => payInOrder, {
     onDelete: "CASCADE",
@@ -98,8 +107,8 @@ export class PayInOrdersEntity {
   @BeforeInsert()
   beforeInsertHook() {
     this.id = getUlidId(ID_TYPE.PAYIN_KEY);
-    this.commissionInPercentage = commissionInPercentage;
-    this.gstInPercentage = gstInPercentage;
+    this.commissionInPercentage = commissionInPercentagePayIn;
+    this.gstInPercentage = gstInPercentagePayIn;
     this.commissionAmount = (this.amount * this.commissionInPercentage) / 100;
     this.gstAmount = (this.commissionAmount * this.gstInPercentage) / 100;
     this.netPayableAmount =

@@ -12,6 +12,8 @@ import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
+import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
+import { PayoutBatchesEntity } from "@/entities/payout-batch.entity";
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
       UserApiKeysEntity,
       PayInOrdersEntity,
       PayOutOrdersEntity,
+      UserBankDetailsEntity,
+      PayoutBatchesEntity,
     ]),
   ],
   providers: [

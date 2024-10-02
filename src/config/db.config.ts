@@ -16,4 +16,9 @@ export const dbConfig: TypeOrmModuleOptions = {
   entities: [__dirname + "/../**/*.entity{.ts,.js}"],
   synchronize: false,
   logging: !isProduction,
+  ...(isProduction && {
+    ssl: {
+      rejectUnauthorized: false,
+    },
+  }),
 };

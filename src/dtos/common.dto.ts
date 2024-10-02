@@ -39,7 +39,7 @@ export class PaginationDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  order?: string;
+  order?: "ASC" | "DESC";
 
   @ApiPropertyOptional()
   @IsString()

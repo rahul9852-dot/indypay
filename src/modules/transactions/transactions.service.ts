@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Response } from "express";
 import {
   Between,
+  FindOptionsSelect,
   FindOptionsWhere,
   ILike,
   LessThanOrEqual,
@@ -27,7 +28,7 @@ export class TransactionsService {
     private readonly payInOrdersRepository: Repository<PayInOrdersEntity>,
   ) {}
 
-  selectQuery = {
+  selectQuery: FindOptionsSelect<TransactionsEntity> = {
     id: true,
     transactionType: true,
     user: {
@@ -45,12 +46,17 @@ export class TransactionsService {
     },
     payOutOrder: {
       id: true,
+      orderId: true,
       amount: true,
+      status: true,
+      commissionAmount: true,
+      gstAmount: true,
+      netPayableAmount: true,
       createdAt: true,
     },
   };
 
-  async getAllPayinTransactionsMerchant(
+  async downloadCsvAllPayinTransactionsMerchant(
     user: UsersEntity,
     downloadCsvDto: DownloadCsvDto,
     res: Response,
@@ -115,7 +121,7 @@ export class TransactionsService {
 
     throw new InternalServerErrorException("Something went wrong");
   }
-  async getAllPayinTransactionsAdmin(
+  async downloadCsvAllPayinTransactionsAdmin(
     downloadCsvDto: DownloadCsvDto,
     res: Response,
   ) {
@@ -199,7 +205,7 @@ export class TransactionsService {
         },
         {
           payOutOrder: {
-            externalPaymentId: ILike(`%${search}%`),
+            orderId: ILike(`%${search}%`),
           },
         },
       ],
@@ -255,7 +261,7 @@ export class TransactionsService {
         },
         {
           user: { id: userId },
-          payOutOrder: { externalPaymentId: ILike(`%${search}%`) },
+          payOutOrder: { orderId: ILike(`%${search}%`) },
         },
       ],
       relations: {
@@ -316,7 +322,7 @@ export class TransactionsService {
           user: {
             id: userId,
             payOutOrders: {
-              externalPaymentId: ILike(`%${search}%`),
+              orderId: ILike(`%${search}%`),
             },
           },
         },

@@ -6,21 +6,33 @@ export enum PAYMENT_STATUS {
   TAMPERED = "TAMPERED",
 }
 
+export enum EXTERNAL_PAYOUT_PAYMENT_STATUS {
+  FAILED = "FAILED",
+  IN_PROGRESS = "IN_PROGRESS",
+  SUCCESS = "SUCCESS",
+}
+
 export enum PAYMENT_TYPE {
   PAYIN = "payin",
   PAYOUT = "payout",
-}
-
-export enum PAYMENT_METHOD {
-  CASH = "cash",
-  CREDIT_CARD = "credit_card",
-  DEBIT_CARD = "debit_card",
-  NET_BANKING = "net_banking",
-  UPI = "upi",
-  WALLET = "wallet",
+  SETTLEMENT = "settlement",
 }
 
 export enum CURRENCY_ENUM {
   INR = "INR",
   USD = "USD",
+}
+
+export enum PAYOUT_PAYMENT_MODE {
+  IMPS = "IMPS",
+  NEFT = "NEFT",
+  RTGS = "RTGS",
+  CASH = "CASH",
+}
+
+export enum SETTLEMENT_STATUS {
+  NOT_INITIATED = "NOT_INITIATED",
+  INITIATED = "INITIATED",
+  SETTLED = "SETTLED",
+  FAILED = "FAILED",
 }

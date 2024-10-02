@@ -1,19 +1,36 @@
-import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiResponseProperty,
+} from "@nestjs/swagger";
 import {
   IsEmail,
   IsNotEmpty,
   IsNumber,
   IsNumberString,
+  IsOptional,
   IsPositive,
   IsString,
   Length,
 } from "class-validator";
 
-export class CreateTransactionDto {
+export class CreatePayinTransactionDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
   orderId: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  pgReturnSuccessUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  pgReturnErrorUrl?: string;
 
   @ApiProperty()
   @IsNumber({
@@ -44,7 +61,14 @@ export class CreateTransactionDto {
   phone: string;
 }
 
-export class CreatePaymentResponseDto {
+export class PayinStatusDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+}
+
+export class CreatePayinPaymentResponseDto {
   @ApiResponseProperty()
   orderId: string;
 

@@ -28,6 +28,10 @@ import {
 } from "./dto/generate-client-secret.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeStatusDto } from "./dto/change-status.dto";
+import {
+  AddBankDetailsAdminDto,
+  AddBankDetailsDto,
+} from "./dto/add-bank-details.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
 import { User } from "@/decorators/user.decorator";
 import { IAccessTokenPayload } from "@/interface/common.interface";
@@ -40,6 +44,7 @@ import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { AuthGuard } from "@/guard/auth.guard";
 import { ChangeRoleGuard } from "@/guard/change-role.guard";
+import { ChangeAccountStatusGuard } from "@/guard/change-account-status.guard";
 
 @ApiTags("Users")
 @Controller({
@@ -146,6 +151,48 @@ export class UsersController {
     );
   }
 
+  @ApiOperation({ summary: "Add bank details" })
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @Role(USERS_ROLE.MERCHANT)
+  @Post("bank-details")
+  @ApiCreatedResponse({
+    type: MessageResponseDto,
+  })
+  updateBankDetailsMerchant(
+    @Body() addBankDetailsDto: AddBankDetailsDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.usersService.addBankDetailsMerchant(addBankDetailsDto, user);
+  }
+
+  @ApiOperation({ summary: "Get bank details" })
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @Role(USERS_ROLE.MERCHANT)
+  @Get("bank-details")
+  @ApiCreatedResponse({
+    type: MessageResponseDto,
+  })
+  getBankDetailsMerchant(@User() user: UsersEntity) {
+    return this.usersService.getBankDetailsMerchant(user);
+  }
+
+  @ApiOperation({ summary: "Add/Update bank details - Admin, Owner" })
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Post("bank-details/admin")
+  @ApiOkResponse({
+    type: MessageResponseDto,
+  })
+  @HttpCode(HttpStatus.OK)
+  updateBankDetailsAdmin(
+    @Body() addBankDetailsAdminDto: AddBankDetailsAdminDto,
+  ) {
+    return this.usersService.addBankDetailsAdmin(addBankDetailsAdminDto);
+  }
+
   @ApiOperation({ summary: "Delete user - Admin only" })
   @Delete("merchant/:id/admin")
   @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN)
@@ -154,6 +201,7 @@ export class UsersController {
     return this.usersService.deleteUser(id);
   }
 
+  @UseGuards(ChangeAccountStatusGuard)
   @ApiOperation({ summary: "Change account status - Admin only" })
   @Patch("merchant/status/admin")
   @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN)

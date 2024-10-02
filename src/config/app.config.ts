@@ -46,7 +46,11 @@ export const appConfig = registerAs("appConfig", () => ({
     webhookIps: getOsEnv("EXTERNAL_PAYMENT_WEBHOOK_IPS").split(","),
   },
   transactionConfig: {
-    commissionInPercentage: +getOsEnv("COMMISSION_IN_PERCENTAGE") || 4.5,
-    gstInPercentage: +getOsEnv("GST_IN_PERCENTAGE") || 18,
+    commissionInPercentagePayIn:
+      +getOsEnv("PAYIN_COMMISSION_IN_PERCENTAGE") || 4.5,
+    gstInPercentagePayIn: +getOsEnv("PAYIN_GST_IN_PERCENTAGE") || 18,
+    commissionInPercentagePayOut:
+      +getOsEnv("PAYOUT_COMMISSION_IN_PERCENTAGE") || 1.5,
+    gstInPercentagePayOut: +getOsEnv("PAYOUT_GST_IN_PERCENTAGE") || 18,
   },
 }));

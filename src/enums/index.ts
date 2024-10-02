@@ -81,6 +81,8 @@ export enum ID_TYPE {
   USER_MULTI_FACTOR_AUTH = "umfa",
   PAYIN_KEY = "pin",
   PAYOUT_KEY = "pout",
+  PAYOUT_BATCH_KEY = "pbatch",
+  USER_BANK_DETAILS_KEY = "ubank",
 }
 
 export enum ONBOARDING_STATUS {

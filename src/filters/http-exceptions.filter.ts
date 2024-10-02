@@ -21,6 +21,7 @@ export class HttpExceptionsFilter extends BaseExceptionFilter {
     if (exception instanceof HttpException) {
       const responseBody = {
         statusCode: status,
+        success: false,
         timestamp: new Date(),
         message: exception.getResponse(),
       };

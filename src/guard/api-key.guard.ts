@@ -53,12 +53,12 @@ export class ApiKeyGuard implements CanActivate {
       );
 
       if (decryptedClientSecret !== clientSecret) {
-        throw new UnauthorizedException();
+        throw new UnauthorizedException("Invalid credentials");
       }
 
       request[REQUEST_USER_KEY] = apiKeyEntity.user;
     } catch (err) {
-      throw new UnauthorizedException();
+      err;
     }
 
     return true;

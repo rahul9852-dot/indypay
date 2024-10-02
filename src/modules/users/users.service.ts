@@ -13,6 +13,10 @@ import { AddBusinessDetailsDto } from "./dto/add-business-details.dto";
 import { WebhookUrlDto } from "./dto/webhook.dto";
 import { ChangeStatusDto } from "./dto/change-status.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
+import {
+  AddBankDetailsAdminDto,
+  AddBankDetailsDto,
+} from "./dto/add-bank-details.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { IAccessTokenPayload } from "@/interface/common.interface";
@@ -31,6 +35,7 @@ import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { decryptData, encryptData } from "@/utils/encode-decode.utils";
+import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 
 @Injectable()
 export class UsersService {
@@ -39,6 +44,9 @@ export class UsersService {
     private readonly usersRepository: Repository<UsersEntity>,
     @InjectRepository(UserApiKeysEntity)
     private readonly userApiKeysRepository: Repository<UserApiKeysEntity>,
+    @InjectRepository(UserBankDetailsEntity)
+    private readonly userBankDetailsRepository: Repository<UserBankDetailsEntity>,
+
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
   ) {}
@@ -237,6 +245,81 @@ export class UsersService {
       .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
       .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
       .json(new MessageResponseDto("Business details added successfully"));
+  }
+
+  async addBankDetailsMerchant(
+    addBankDetailsDto: AddBankDetailsDto,
+    reqUser: UsersEntity,
+  ) {
+    const user = await this.usersRepository.findOne({
+      where: {
+        id: reqUser.id,
+      },
+      relations: {
+        bankDetails: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    if (user.bankDetails) {
+      throw new ConflictException(
+        new MessageResponseDto("Bank details already exists"),
+      );
+    }
+
+    const userDetails = this.usersRepository.create({
+      bankDetails: addBankDetailsDto,
+    });
+
+    await this.usersRepository.save({
+      ...userDetails,
+      id: user.id,
+    });
+
+    return new MessageResponseDto("Bank details added successfully");
+  }
+
+  async getBankDetailsMerchant(reqUser: UsersEntity) {
+    return this.userBankDetailsRepository.findOne({
+      where: {
+        user: { id: reqUser.id },
+      },
+    });
+  }
+
+  async addBankDetailsAdmin(addBankDetailsAdminDto: AddBankDetailsAdminDto) {
+    const user = await this.usersRepository.findOne({
+      where: {
+        id: addBankDetailsAdminDto.userId,
+      },
+      relations: {
+        bankDetails: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const { userId, ...bankDetails } = addBankDetailsAdminDto;
+
+    const userDetails = this.usersRepository.create({
+      bankDetails,
+    });
+
+    await this.usersRepository.save({
+      ...userDetails,
+      id: userId,
+    });
+
+    return new MessageResponseDto(
+      user.bankDetails
+        ? "Bank details updated successfully"
+        : "Bank details added successfully",
+    );
   }
 
   async updateUser() {}

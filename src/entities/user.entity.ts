@@ -13,6 +13,7 @@ import {
 import { UserApiKeysEntity } from "./user-api-key.entity";
 import { UserMultiFactorAuthEntity } from "./user-multi-factor-auth.entity";
 import { UserBusinessDetailsEntity } from "./user-business.entity";
+import { UserBankDetailsEntity } from "./user-bank-details.entity";
 import { UserKycEntity } from "./user-kyc.entity";
 import { UserAddressEntity } from "./user-address.entity";
 import { PayInOrdersEntity } from "./payin-orders.entity";
@@ -90,6 +91,10 @@ export class UsersEntity {
   @JoinColumn()
   @OneToOne(() => UserKycEntity, ({ user }) => user, { cascade: true })
   kyc: UserKycEntity;
+
+  @JoinColumn()
+  @OneToOne(() => UserBankDetailsEntity, ({ user }) => user, { cascade: true })
+  bankDetails: UserBankDetailsEntity;
 
   @OneToMany(() => UserApiKeysEntity, ({ user }) => user, { cascade: true })
   apiKeys: UserApiKeysEntity[];

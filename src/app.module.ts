@@ -4,9 +4,9 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 
-import { BusinessDetailsGuard } from "./guard/business-details.guard";
 import { AuthGuard } from "./guard/auth.guard";
 import { RolesGuard } from "./guard/roles.guard";
+import { PaginationGuard } from "./guard/pagination.guard";
 import { AppController } from "./app.controller";
 import { migrationConfig } from "./config/migration.config";
 import { appConfig } from "@/config/app.config";
@@ -16,8 +16,10 @@ import { UsersModule } from "@/modules/users/users.module";
 import { KycModule } from "@/modules/kyc/kyc.module";
 import { PaymentsModule } from "@/modules/payments/payments.module";
 import { UsersEntity } from "@/entities/user.entity";
-import { KycGuard } from "@/guard/kyc.guard";
 import { TransactionsModule } from "@/modules/transactions/transactions.module";
+import { SettlementsModule } from "@/modules/settlements/settlements.module";
+import { DocsModule } from "@/modules/docs/docs.module";
+import { CollectionsModule } from "@/modules/collections/collections.module";
 
 @Module({
   imports: [
@@ -34,10 +36,17 @@ import { TransactionsModule } from "@/modules/transactions/transactions.module";
     KycModule,
     PaymentsModule,
     TransactionsModule,
+    SettlementsModule,
+    DocsModule,
+    CollectionsModule,
   ],
   controllers: [AppController],
   providers: [
     JwtService,
+    {
+      provide: APP_GUARD,
+      useClass: PaginationGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: AuthGuard,
@@ -46,6 +55,7 @@ import { TransactionsModule } from "@/modules/transactions/transactions.module";
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
+
     // {
     //   provide: APP_GUARD,
     //   useClass: BusinessDetailsGuard,

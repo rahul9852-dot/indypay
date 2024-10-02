@@ -8,10 +8,16 @@ import { AuthService } from "@/modules/auth/auth.service";
 import { AuthOtpEntity } from "@/entities/otp.entity";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
+import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UsersEntity, AuthOtpEntity, UserApiKeysEntity]),
+    TypeOrmModule.forFeature([
+      UsersEntity,
+      AuthOtpEntity,
+      UserApiKeysEntity,
+      UserBankDetailsEntity,
+    ]),
   ],
   controllers: [UsersController],
   providers: [UsersService, AuthService, BcryptService, JwtService],
