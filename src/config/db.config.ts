@@ -4,6 +4,7 @@ import { appConfig } from "./app.config";
 const {
   database: { host, port, name, password, username },
   isProduction,
+  isStaging,
 } = appConfig();
 
 export const dbConfig: TypeOrmModuleOptions = {
@@ -16,7 +17,7 @@ export const dbConfig: TypeOrmModuleOptions = {
   entities: [__dirname + "/../**/*.entity{.ts,.js}"],
   synchronize: false,
   logging: !isProduction,
-  ...(isProduction && {
+  ...((isProduction || isStaging) && {
     ssl: {
       rejectUnauthorized: false,
     },

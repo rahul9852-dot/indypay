@@ -17,6 +17,7 @@ import {
   AddBankDetailsAdminDto,
   AddBankDetailsDto,
 } from "./dto/add-bank-details.dto";
+import { DeleteWhitelistIpsDto } from "./dto/whitelist-ips.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { IAccessTokenPayload } from "@/interface/common.interface";
@@ -36,6 +37,8 @@ import { getUlidId } from "@/utils/helperFunctions.utils";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { decryptData, encryptData } from "@/utils/encode-decode.utils";
 import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
+import { getPagination } from "@/utils/pagination.utils";
+import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 
 @Injectable()
 export class UsersService {
@@ -46,11 +49,22 @@ export class UsersService {
     private readonly userApiKeysRepository: Repository<UserApiKeysEntity>,
     @InjectRepository(UserBankDetailsEntity)
     private readonly userBankDetailsRepository: Repository<UserBankDetailsEntity>,
+    @InjectRepository(UserWhitelistIpsEntity)
+    private readonly userWhitelistIpsRepository: Repository<UserWhitelistIpsEntity>,
 
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
   ) {}
 
+  /**
+   * Changes the password of the user
+   * @param user User object returned from the access token
+   * @param changePasswordDto Object containing the old and new passwords
+   * @returns MessageResponseDto containing the success message
+   * @throws BadRequestException if the passwords do not match
+   * @throws NotFoundException if the user is not found or deactivated
+   * @throws BadRequestException if the old password is incorrect
+   */
   async changePassword(
     user: IAccessTokenPayload,
     changePasswordDto: ChangePasswordDto,
@@ -103,6 +117,13 @@ export class UsersService {
     return new MessageResponseDto("Password changed successfully");
   }
 
+  /**
+   * Deletes an API key of a user.
+   * @param apiKeyId The id of the API key to be deleted.
+   * @param user The user who is deleting the API key.
+   * @throws {NotFoundException} If the API key is not found.
+   * @throws {ForbiddenException} If the user is not allowed to delete the API key.
+   */
   async deleteApiKey(apiKeyId: string, user: UsersEntity) {
     const userApiKey = await this.userApiKeysRepository.findOne({
       where: { id: apiKeyId },
@@ -124,6 +145,19 @@ export class UsersService {
     }
   }
 
+  /**
+   * Generates a client ID and client secret for a user, or updates an existing one if it already exists.
+   * @param mobile The mobile number of the user.
+   * @throws {NotFoundException} If the user is not found.
+   * @returns An object with the user's mobile number, client ID, and client secret.
+   * @example
+   * {
+   *   id: '01GB1QXN9QXQ2GZVQKJNYY0H0M',
+   *   mobile: '+6598765432',
+   *   clientId: '01GB1QXN9QXQ2GZVQKJNYY0H0M_key',
+   *   clientSecret: '01GB1QXN9QXQ2GZVQKJNYY0H0M_sc',
+   * }
+   */
   async generateClientIdAndClientSecret(mobile: string) {
     const user = await this.usersRepository.findOne({
       where: { mobile },
@@ -159,6 +193,25 @@ export class UsersService {
     };
   }
 
+  /**
+   * Finds the API key for a merchant user by their ID.
+   * @param userId The ID of the merchant user.
+   * @throws {NotFoundException} If the user or their API key is not found.
+   * @returns An object with the user's API key details.
+   * @example
+   * {
+   *   id: '01GB1QXN9QXQ2GZVQKJNYY0H0M',
+   *   clientId: 'key_01GB1QXN9QXQ2GZVQKJNYY0H0M',
+   *   clientSecret: 'sc_01GB1QXN9QXQ2GZVQKJNYY0H0M',
+   *   user: {
+   *     id: 'usr_01GB1QXN9QXQ2GZVQKJNYY0H0M',
+   *     mobile: '+6598765432',
+   *     email: 'user@example.com',
+   *     name: 'John Doe',
+   *     role: 'MERCHANT',
+   *   },
+   * }
+   */
   async getAllApiKeysMerchant(userId: string) {
     const userApiKeys = await this.userApiKeysRepository.findOne({
       where: { user: { id: userId } },
@@ -173,6 +226,16 @@ export class UsersService {
     return userApiKeys;
   }
 
+  /**
+   * Finds all users with pagination and search.
+   * @param page The page number.
+   * @param limit The number of items per page.
+   * @param search The search query.
+   * @param sort The sort field.
+   * @param order The order of the sort.
+   * @returns An object with a `data` property that contains an array of users
+   * and a `pagination` property that contains the pagination details.
+   */
   async findAll({
     page = 1,
     limit = 10,
@@ -180,7 +243,7 @@ export class UsersService {
     sort = "id",
     order = "DESC",
   }: PaginationDto) {
-    return this.usersRepository.find({
+    const [users, totalItems] = await this.usersRepository.findAndCount({
       where: {
         fullName: ILike(`%${search}%`),
       },
@@ -190,8 +253,25 @@ export class UsersService {
         [sort]: order,
       },
     });
+
+    const pagination = getPagination({
+      totalItems,
+      limit,
+      page,
+    });
+
+    return {
+      data: users,
+      pagination,
+    };
   }
 
+  /**
+   * Finds a user by ID.
+   * @param userId The ID of the user to find.
+   * @throws {NotFoundException} If the user is not found.
+   * @returns The user with their business details and kyc.
+   */
   async findOne(userId: string) {
     return this.usersRepository.findOne({
       where: { id: userId },
@@ -199,6 +279,15 @@ export class UsersService {
     });
   }
 
+  /**
+   * Adds business details to the user.
+   * @param addBusinessDetailsDto The business details to add.
+   * @param reqUser The user who is adding the business details.
+   * @param res The response to return.
+   * @throws {NotFoundException} If the user is not found.
+   * @throws {ConflictException} If the user's business details already exist.
+   * @returns A JSON response with a message.
+   */
   async addBusinessDetailsDto(
     addBusinessDetailsDto: AddBusinessDetailsDto,
     reqUser: UsersEntity,
@@ -247,6 +336,14 @@ export class UsersService {
       .json(new MessageResponseDto("Business details added successfully"));
   }
 
+  /**
+   * Adds bank details for a merchant user
+   * @param addBankDetailsDto Bank details to be added
+   * @param reqUser The user requesting the addition of bank details
+   * @throws NotFoundException if the user is not found
+   * @throws ConflictException if the user already has bank details
+   * @returns MessageResponseDto
+   */
   async addBankDetailsMerchant(
     addBankDetailsDto: AddBankDetailsDto,
     reqUser: UsersEntity,
@@ -282,6 +379,11 @@ export class UsersService {
     return new MessageResponseDto("Bank details added successfully");
   }
 
+  /**
+   * Get the bank details of a merchant
+   * @param reqUser The user requesting the bank details
+   * @returns The bank details of the user
+   */
   async getBankDetailsMerchant(reqUser: UsersEntity) {
     return this.userBankDetailsRepository.findOne({
       where: {
@@ -290,6 +392,13 @@ export class UsersService {
     });
   }
 
+  /**
+   * Adds bank details to a user
+   * @param addBankDetailsAdminDto The bank details to add
+   * @returns A JSON response with a message
+   * @throws {NotFoundException} If the user is not found
+   * @throws {ConflictException} If the user's bank details already exist
+   */
   async addBankDetailsAdmin(addBankDetailsAdminDto: AddBankDetailsAdminDto) {
     const user = await this.usersRepository.findOne({
       where: {
@@ -324,6 +433,12 @@ export class UsersService {
 
   async updateUser() {}
 
+  /**
+   * Soft deletes a user with the given id
+   * @param id The id of the user to delete
+   * @returns The deleted user
+   * @throws {NotFoundException} If the user is not found
+   */
   async deleteUser(id: string) {
     const user = this.usersRepository.create({
       accountStatus: ACCOUNT_STATUS.DELETED,
@@ -332,6 +447,12 @@ export class UsersService {
     await this.usersRepository.update({ id }, user);
   }
 
+  /**
+   * Changes the account status of a user
+   * @param changeStatusDto An object with the user id and the new account status
+   * @returns A message response with the result of the operation
+   * @throws {NotFoundException} If the user is not found
+   */
   async changeAccountStatus(changeStatusDto: ChangeStatusDto) {
     const { status: accountStatus, userId: id } = changeStatusDto;
 
@@ -352,6 +473,12 @@ export class UsersService {
     return new MessageResponseDto("Account status updated successfully");
   }
 
+  /**
+   * Changes the role of a user.
+   * @param changeRoleDto An object with the user id and the new role.
+   * @returns A message response with the result of the operation.
+   * @throws {NotFoundException} If the user is not found.
+   */
   async changeRole({ userId, role }: ChangeRoleDto) {
     const dbUser = await this.usersRepository.findOne({
       where: { id: userId },
@@ -370,10 +497,116 @@ export class UsersService {
     return new MessageResponseDto("Role updated successfully");
   }
 
+  /**
+   * Finds a user by mobile number.
+   * @param mobile The mobile number to search for.
+   * @returns The user if found, otherwise null.
+   */
   async findByMobile(mobile: string) {
     return this.usersRepository.findOneBy({ mobile });
   }
 
+  /**
+   * Adds an IP address to a user's whitelist.
+   * @param userId The user's ID.
+   * @param ipAddress The IP address to whitelist.
+   * @throws NotFoundException If the user is not found.
+   * @throws ConflictException If the IP address is already whitelisted.
+   * @returns A message response indicating success.
+   */
+  async addWhitelistIps(userId: string, ipAddress: string) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const isIpWhitelisted = await this.userWhitelistIpsRepository.exists({
+      where: {
+        ipAddress,
+        user: { id: user.id },
+      },
+    });
+
+    if (isIpWhitelisted) {
+      throw new ConflictException(
+        new MessageResponseDto("IP address already whitelisted"),
+      );
+    }
+
+    const userWhitelistIps = this.userWhitelistIpsRepository.create({
+      ipAddress,
+      user,
+    });
+
+    await this.userWhitelistIpsRepository.save(userWhitelistIps);
+
+    return new MessageResponseDto("IP address whitelisted successfully");
+  }
+
+  /**
+   * Deletes an IP address from a user's whitelist.
+   * @param userId The user's ID.
+   * @param ipAddress The IP address to delete from the whitelist.
+   * @throws NotFoundException If the user is not found.
+   * @returns A message response indicating success.
+   */
+  async deleteWhitelistIps({ userId, ipAddress }: DeleteWhitelistIpsDto) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    await this.userWhitelistIpsRepository.delete({
+      user: { id: user.id },
+      ipAddress,
+    });
+
+    return new MessageResponseDto("IP address deleted successfully");
+  }
+
+  /**
+   * Gets all IP addresses from a user's whitelist.
+   * @param userId The user's ID.
+   * @returns An array of IP addresses.
+   */
+  async getWhitelistIpsByUserId(userId: string) {
+    return this.userWhitelistIpsRepository.find({
+      where: {
+        user: {
+          id: userId,
+        },
+      },
+    });
+  }
+
+  /**
+   * Gets all IP addresses from a user's whitelist.
+   * @param userId The user's ID.
+   * @returns An array of IP addresses.
+   */
+  async getWhitelistIpsMerchant(userId: string) {
+    return this.userWhitelistIpsRepository.find({
+      where: {
+        user: {
+          id: userId,
+        },
+      },
+    });
+  }
+
+  /**
+   * Updates the webhook URLs for a user.
+   * @param user The user object returned from the access token.
+   * @param webhookUrlDto The object containing the new webhook URLs.
+   * @returns A MessageResponseDto containing the success message.
+   * @throws NotFoundException if the user is not found.
+   */
   async updateWebhookUrl({ id }: UsersEntity, webhookUrlDto: WebhookUrlDto) {
     const user = await this.usersRepository.findOne({
       where: { id },
@@ -397,6 +630,12 @@ export class UsersService {
     return new MessageResponseDto("Webhook url updated successfully");
   }
 
+  /**
+   * Retrieves the webhook URLs for a user.
+   * @param user The user object returned from the access token.
+   * @returns The user object with the webhook URLs.
+   * @throws NotFoundException if the user is not found.
+   */
   async getWebhookUrl({ id }: UsersEntity) {
     const user = await this.usersRepository.findOne({
       where: { id },
@@ -410,6 +649,13 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * Finds the client ID for a user by their ID.
+   * @param userId The ID of the user to find.
+   * @throws {NotFoundException} If the user is not found.
+   * @returns An array of objects with the client ID, createdAt, updatedAt,
+   *          and the user's full name.
+   */
   async getClientId(userId: string) {
     const user = await this.usersRepository.findOne({
       where: { id: userId },

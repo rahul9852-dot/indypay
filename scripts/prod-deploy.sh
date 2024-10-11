@@ -17,18 +17,18 @@ pnpm install || {
   exit 1
 }
 
-# Build the Next.js project
-# echo "Building project..."
-# pnpm build || {
-#   echo "Error: pnpm build failed"
-#   exit 1
-# }
+Build the project
+echo "Building project..."
+pnpm build || {
+  echo "Error: pnpm build failed"
+  exit 1
+}
 
 # Restart the PM2 process
 echo "Restarting PM2 process..."
-pm2 restart dev-api || {
+pm2 restart prod-api || {
   echo "Error: PM2 restart failed"
   exit 1
 }
 
-echo "Deployment successful!"
+echo "PROD Deployment successful!"

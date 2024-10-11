@@ -19,6 +19,7 @@ import { UserAddressEntity } from "./user-address.entity";
 import { PayInOrdersEntity } from "./payin-orders.entity";
 import { PayOutOrdersEntity } from "./payout-orders.entity";
 import { TransactionsEntity } from "./transaction.entity";
+import { UserWhitelistIpsEntity } from "./user-whitelist-ip.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import {
   ONBOARDING_STATUS,
@@ -75,6 +76,11 @@ export class UsersEntity {
     cascade: true,
   })
   transactions: TransactionsEntity[];
+
+  @OneToMany(() => UserWhitelistIpsEntity, ({ user }) => user, {
+    cascade: true,
+  })
+  whitelistIps: UserWhitelistIpsEntity[];
 
   @JoinColumn()
   @OneToOne(() => UserBusinessDetailsEntity, ({ user }) => user, {

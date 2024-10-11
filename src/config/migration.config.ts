@@ -4,6 +4,7 @@ import { appConfig } from "./app.config";
 const {
   database: { host, port, name, password, username },
   isProduction,
+  isStaging,
 } = appConfig();
 
 export const migrationConfig: DataSourceOptions = {
@@ -19,7 +20,7 @@ export const migrationConfig: DataSourceOptions = {
   synchronize: false,
   migrationsRun: false,
   logging: !isProduction,
-  ...(isProduction && {
+  ...((isProduction || isStaging) && {
     ssl: {
       rejectUnauthorized: false,
     },

@@ -33,6 +33,12 @@ import {
   AddBankDetailsDto,
 } from "./dto/add-bank-details.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
+import {
+  AddWhitelistIpsDto,
+  AddWhitelistIpsMerchantDto,
+  DeleteWhitelistIpsDto,
+  WhitelistIpsResponseDto,
+} from "./dto/whitelist-ips.dto";
 import { User } from "@/decorators/user.decorator";
 import { IAccessTokenPayload } from "@/interface/common.interface";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
@@ -236,6 +242,92 @@ export class UsersController {
   })
   async getAllApiKeysMerchant(@User() user: UsersEntity) {
     return this.usersService.getAllApiKeysMerchant(user.id);
+  }
+
+  @ApiOperation({ summary: "Add whitelist ip - Admin only" })
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @ApiOkResponse({
+    type: MessageResponseDto,
+  })
+  @Post("whitelist-ips/admin")
+  async addWhitelistIp(@Body() addWhitelistIpsDto: AddWhitelistIpsDto) {
+    return this.usersService.addWhitelistIps(
+      addWhitelistIpsDto.userId,
+      addWhitelistIpsDto.ipAddress,
+    );
+  }
+
+  @ApiOperation({ summary: "Delete whitelist ip - Admin only" })
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @ApiOkResponse({
+    type: MessageResponseDto,
+  })
+  @Delete("whitelist-ips/admin")
+  async deleteWhitelistIp(
+    @Body() deleteWhitelistIpsDto: DeleteWhitelistIpsDto,
+  ) {
+    return this.usersService.deleteWhitelistIps(deleteWhitelistIpsDto);
+  }
+
+  @ApiOperation({ summary: "Get whitelist IPs - Admin only" })
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @ApiOkResponse({
+    type: [WhitelistIpsResponseDto],
+  })
+  @Get("whitelist-ips/admin/:userId")
+  async getWhitelistIpsAdmin(@Param("userId") userId: string) {
+    return this.usersService.getWhitelistIpsByUserId(userId);
+  }
+
+  @ApiOperation({ summary: "Add whitelist IPs - Merchant only" })
+  @Role(USERS_ROLE.MERCHANT)
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @ApiOkResponse({
+    type: [WhitelistIpsResponseDto],
+  })
+  @Post("whitelist-ips")
+  async addWhitelistIpsMerchant(
+    @User() { id }: UsersEntity,
+    @Body() addWhitelistIpsMerchantDto: AddWhitelistIpsMerchantDto,
+  ) {
+    return this.usersService.addWhitelistIps(
+      id,
+      addWhitelistIpsMerchantDto.ipAddress,
+    );
+  }
+
+  @ApiOperation({ summary: "Delete whitelist IPs - Merchant only" })
+  @Role(USERS_ROLE.MERCHANT)
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @ApiOkResponse({
+    type: [WhitelistIpsResponseDto],
+  })
+  @Delete("whitelist-ips/:ipAddress")
+  async deleteWhitelistIpsMerchant(
+    @User() { id }: UsersEntity,
+    @Param("ipAddress") ipAddress: string,
+  ) {
+    return this.usersService.deleteWhitelistIps({ userId: id, ipAddress });
+  }
+
+  @ApiOperation({ summary: "Get whitelist IPs - Merchant only" })
+  @Role(USERS_ROLE.MERCHANT)
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @ApiOkResponse({
+    type: [WhitelistIpsResponseDto],
+  })
+  @Get("whitelist-ips")
+  async getWhitelistIpsMerchant(@User() { id }: UsersEntity) {
+    return this.usersService.getWhitelistIpsByUserId(id);
   }
 
   @ApiOperation({ summary: "Update webhook url" })

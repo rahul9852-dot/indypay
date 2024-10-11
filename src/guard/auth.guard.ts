@@ -12,9 +12,8 @@ import { Reflector } from "@nestjs/core";
 import { appConfig } from "@/config/app.config";
 import { IAccessTokenPayload } from "@/interface/common.interface";
 import { PUBLIC_KEY, REQUEST_USER_KEY } from "@/constants/auth.constant";
-import { ACCOUNT_STATUS, COOKIE_KEYS } from "@/enums";
+import { COOKIE_KEYS } from "@/enums";
 import { UsersEntity } from "@/entities/user.entity";
-import { ERROR_MESSAGES } from "@/constants/messages.constant";
 
 const {
   jwtConfig: { accessTokenSecret },
@@ -36,7 +35,7 @@ export class AuthGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<Request>();
     const accessToken = this.extractTokenFromCookie(request);
 
     if (!accessToken) {
@@ -52,11 +51,11 @@ export class AuthGuard implements CanActivate {
         relations: ["kyc"],
       });
 
-      if (user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
-        throw new UnauthorizedException(
-          ERROR_MESSAGES.accountStatusMsg(user.accountStatus),
-        );
-      }
+      // if (user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
+      //   throw new UnauthorizedException(
+      //     ERROR_MESSAGES.accountStatusMsg(user.accountStatus),
+      //   );
+      // }
 
       request[REQUEST_USER_KEY] = user;
     } catch (err) {

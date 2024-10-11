@@ -1,5 +1,6 @@
 export enum NODE_ENV {
   DEVELOPMENT = "development",
+  STAGING = "staging",
   PRODUCTION = "production",
 }
 
@@ -83,6 +84,7 @@ export enum ID_TYPE {
   PAYOUT_KEY = "pout",
   PAYOUT_BATCH_KEY = "pbatch",
   USER_BANK_DETAILS_KEY = "ubank",
+  USER_WHITELIST_IP = "uwip",
 }
 
 export enum ONBOARDING_STATUS {

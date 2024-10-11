@@ -20,7 +20,7 @@ export class MessageResponseDto {
   message: string;
 }
 
-export class PaginationDto {
+export class PaginationWithoutSortAndOrderDto {
   @ApiPropertyOptional()
   @IsNumberString()
   @IsOptional()
@@ -34,15 +34,17 @@ export class PaginationDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
+  search?: string;
+}
+
+export class PaginationDto extends PaginationWithoutSortAndOrderDto {
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
   sort?: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   order?: "ASC" | "DESC";
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  search?: string;
 }

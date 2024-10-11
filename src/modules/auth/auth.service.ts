@@ -316,8 +316,26 @@ export class AuthService {
       .json(new MessageResponseDto("OTP verified successfully"));
   }
 
-  refreshToken(user: IRefreshTokenPayload, res: Response) {
+  async refreshToken(user: IRefreshTokenPayload, req: Request, res: Response) {
     const { email, id, mobile, onboardingStatus, role } = user;
+    const userRaw = await this.usersRepository.findOne({
+      where: {
+        id,
+      },
+    });
+
+    if (!userRaw) {
+      const { cookies } = req;
+      for (const key in cookies) {
+        if (!cookies.hasOwnProperty(key)) {
+          continue;
+        }
+        res.cookie(key, "", { maxAge: 0 });
+      }
+
+      return res.status(401).json(new MessageResponseDto("User not found"));
+    }
+
     const accessToken = this.generateAccessToken({
       id,
       mobile,

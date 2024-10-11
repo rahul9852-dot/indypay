@@ -1,11 +1,11 @@
 import { CookieOptions } from "express";
 import { appConfig } from "@/config/app.config";
 
-const { isProduction } = appConfig();
+const { isProduction, isStaging } = appConfig();
 
 export const cookieOptions: CookieOptions = {
   httpOnly: true, // accessible only by web server
-  ...(isProduction && {
+  ...((isProduction || isStaging) && {
     secure: true, // only send cookie over https
     domain: ".paybolt.in",
     sameSite: "none",

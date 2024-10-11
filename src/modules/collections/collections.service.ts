@@ -3,7 +3,10 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { ILike, Repository } from "typeorm";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { UsersEntity } from "@/entities/user.entity";
-import { PaginationDto } from "@/dtos/common.dto";
+import {
+  PaginationDto,
+  PaginationWithoutSortAndOrderDto,
+} from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 
@@ -12,104 +15,76 @@ export class CollectionsService {
   constructor(
     @InjectRepository(PayInOrdersEntity)
     private readonly payInOrdersRepository: Repository<PayInOrdersEntity>,
+    @InjectRepository(UsersEntity)
+    private readonly userRepository: Repository<UsersEntity>,
   ) {}
 
   async getAllCollectionsGroupByUserAdmin({
     limit = 10,
     page = 1,
-    sort = "id",
-    order = "DESC",
     search = "",
-  }: PaginationDto) {
-    const collections = await this.payInOrdersRepository
-      .createQueryBuilder("payin")
-      .leftJoinAndSelect("payin.user", "user")
+  }: PaginationWithoutSortAndOrderDto) {
+    const query = this.userRepository
+      .createQueryBuilder("user")
       .where("user.fullName ILIKE :search", { search: `%${search}%` })
-      .select("user.id", "id")
-      .addSelect("user.fullName", "fullName")
-      .addSelect("SUM(payin.amount)", "initiatedTotalAmount")
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :successStatus THEN payin.amount ELSE 0.00 END)",
-        "successTotalAmount",
-      )
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :failedStatus THEN payin.amount ELSE 0.00 END)",
-        "failedTotalAmount",
-      )
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :pendingStatus THEN payin.amount ELSE 0.00 END)",
-        "pendingTotalAmount",
-      )
-      .addSelect("SUM(payin.commissionAmount)", "initiatedCommissionAmount")
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :successStatus THEN payin.commissionAmount ELSE 0.00 END)",
-        "successCommissionAmount",
-      )
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :failedStatus THEN payin.commissionAmount ELSE 0.00 END)",
-        "failedCommissionAmount",
-      )
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :pendingStatus THEN payin.commissionAmount ELSE 0.00 END)",
-        "pendingCommissionAmount",
-      )
-      .addSelect("SUM(payin.gstAmount)", "initiatedGstAmount")
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :successStatus THEN payin.gstAmount ELSE 0.00 END)",
-        "successGstAmount",
-      )
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :failedStatus THEN payin.gstAmount ELSE 0.00 END)",
-        "failedGstAmount",
-      )
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :pendingStatus THEN payin.gstAmount ELSE 0.00 END)",
-        "pendingGstAmount",
-      )
-      .addSelect("SUM(payin.netPayableAmount)", "initiatedNetPayableAmount")
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :successStatus THEN payin.netPayableAmount ELSE 0.00 END)",
-        "successNetPayableAmount",
-      )
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :failedStatus THEN payin.netPayableAmount ELSE 0.00 END)",
-        "failedNetPayableAmount",
-      )
-      .addSelect(
-        "SUM(CASE WHEN payin.status = :pendingStatus THEN payin.netPayableAmount ELSE 0.00 END)",
-        "pendingNetPayableAmount",
-      )
-      .addSelect("COUNT(payin.id)", "initiatedTotalCount")
-      .addSelect(
-        "COUNT(CASE WHEN payin.status = :successStatus THEN 1 ELSE NULL END)",
-        "successCount",
-      )
-      .addSelect(
-        "COUNT(CASE WHEN payin.status = :failedStatus THEN 1 ELSE NULL END)",
-        "failedCount",
-      )
-      .addSelect(
-        "COUNT(CASE WHEN payin.status = :pendingStatus THEN 1 ELSE NULL END)",
-        "pendingCount",
-      )
+      .orWhere("user.email ILIKE :search", { search: `%${search}%` })
+      .leftJoin("user.payInOrders", "payin")
+      .select([
+        "user.id",
+
+        // Total initiated amount
+        'COALESCE(SUM(payin.amount), 0) as "initiatedTotalAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :successStatus THEN payin.amount ELSE 0.00 END), 0) as "successTotalAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :failedStatus THEN payin.amount ELSE 0.00 END), 0) as "failedTotalAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :pendingStatus THEN payin.amount ELSE 0.00 END), 0) as "pendingTotalAmount"',
+
+        // Total commission amount
+        'COALESCE(SUM(payin.commissionAmount), 0) as "initiatedCommissionAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :successStatus THEN payin.commissionAmount ELSE 0.00 END), 0) as "successCommissionAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :failedStatus THEN payin.commissionAmount ELSE 0.00 END), 0) as "failedCommissionAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :pendingStatus THEN payin.commissionAmount ELSE 0.00 END), 0) as "pendingCommissionAmount"',
+
+        // Total gst amount
+        'COALESCE(SUM(payin.gstAmount), 0) as "initiatedGstAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :successStatus THEN payin.gstAmount ELSE 0.00 END), 0) as "successGstAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :failedStatus THEN payin.gstAmount ELSE 0.00 END), 0) as "failedGstAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :pendingStatus THEN payin.gstAmount ELSE 0.00 END), 0) as "pendingGstAmount"',
+
+        // Total Net Payable amount
+        'COALESCE(SUM(payin.netPayableAmount), 0) as "initiatedNetPayableAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :successStatus THEN payin.netPayableAmount ELSE 0.00 END), 0) as "successNetPayableAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :failedStatus THEN payin.netPayableAmount ELSE 0.00 END), 0) as "failedNetPayableAmount"',
+        'COALESCE(SUM(CASE WHEN payin.status = :pendingStatus THEN payin.netPayableAmount ELSE 0.00 END), 0) as "pendingNetPayableAmount"',
+
+        // count: total initiated payin
+        'COUNT(payin.id) as "initiatedTotalCount"',
+        'COUNT(CASE WHEN payin.status = :successStatus THEN payin.id ELSE NULL END) as "successCount"',
+        'COUNT(CASE WHEN payin.status = :failedStatus THEN payin.id ELSE NULL END) as "failedCount"',
+        'COUNT(CASE WHEN payin.status = :pendingStatus THEN payin.id ELSE NULL END) as "pendingCount"',
+      ])
       .groupBy("user.id")
-      .addGroupBy("user.fullName")
+      .addSelect("user.id", "id")
+      .addSelect("user.fullName", "fullName")
+      .addSelect("user.email", "email")
       .setParameter("successStatus", PAYMENT_STATUS.SUCCESS)
       .setParameter("failedStatus", PAYMENT_STATUS.FAILED)
-      .setParameter("pendingStatus", PAYMENT_STATUS.PENDING)
+      .setParameter("pendingStatus", PAYMENT_STATUS.PENDING);
+
+    const { raw: data } = await query
       .skip((page - 1) * limit)
       .take(limit)
-      .orderBy(sort, order)
-      .getRawMany();
+      .getRawAndEntities();
+
+    const totalItems = await query.getCount();
 
     const pagination = getPagination({
       page,
       limit,
-      totalItems: collections.length,
+      totalItems,
     });
 
     return {
-      data: collections,
+      data,
       pagination,
     };
   }
@@ -124,34 +99,35 @@ export class CollectionsService {
       search = "",
     }: PaginationDto,
   ) {
-    const [collections] = await this.payInOrdersRepository.findAndCount({
-      where: { orderId: ILike(`%${search}%`), user: { id: userId } },
-      relations: {
-        user: true,
-      },
-      select: {
-        id: true,
-        amount: true,
-        status: true,
-        createdAt: true,
-        txnRefId: true,
-        orderId: true,
-        netPayableAmount: true,
-        settlementStatus: true,
-        user: {
-          id: true,
-          fullName: true,
+    const [collections, totalItems] =
+      await this.payInOrdersRepository.findAndCount({
+        where: { orderId: ILike(`%${search}%`), user: { id: userId } },
+        relations: {
+          user: true,
         },
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-      order: { [sort]: order },
-    });
+        select: {
+          id: true,
+          amount: true,
+          status: true,
+          createdAt: true,
+          txnRefId: true,
+          orderId: true,
+          netPayableAmount: true,
+          settlementStatus: true,
+          user: {
+            id: true,
+            fullName: true,
+          },
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        order: { [sort]: order },
+      });
 
     const pagination = getPagination({
       page,
       limit,
-      totalItems: collections.length,
+      totalItems,
     });
 
     return {

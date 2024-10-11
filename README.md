@@ -27,3 +27,19 @@ brew install postgresql
 ```bash
 brew services start postgresql
 ```
+
+## To Deploy On EC2
+
+- After connecting instance
+
+1. For Staging
+
+```bash
+pnpm deploy:staging
+```
+
+2. For Prod
+
+```bash
+pnpm deploy:prod
+```

@@ -9,6 +9,7 @@ import { AuthOtpEntity } from "@/entities/otp.entity";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
 import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
+import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
       AuthOtpEntity,
       UserApiKeysEntity,
       UserBankDetailsEntity,
+      UserWhitelistIpsEntity,
     ]),
   ],
   controllers: [UsersController],

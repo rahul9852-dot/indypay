@@ -14,6 +14,7 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 import { PayoutBatchesEntity } from "@/entities/payout-batch.entity";
+import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { PayoutBatchesEntity } from "@/entities/payout-batch.entity";
       PayOutOrdersEntity,
       UserBankDetailsEntity,
       PayoutBatchesEntity,
+      UserWhitelistIpsEntity,
     ]),
   ],
   providers: [

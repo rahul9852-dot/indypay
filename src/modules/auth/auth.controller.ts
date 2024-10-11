@@ -141,7 +141,11 @@ export class AuthController {
   @HttpCode(200)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("refresh")
-  async refreshToken(@Res() res: Response, @User() user: IRefreshTokenPayload) {
-    return this.authService.refreshToken(user, res);
+  async refreshToken(
+    @Req() req: Request,
+    @Res() res: Response,
+    @User() user: IRefreshTokenPayload,
+  ) {
+    return this.authService.refreshToken(user, req, res);
   }
 }
