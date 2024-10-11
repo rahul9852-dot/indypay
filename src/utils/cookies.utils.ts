@@ -7,7 +7,7 @@ export const cookieOptions: CookieOptions = {
   httpOnly: true, // accessible only by web server
   ...((isProduction || isStaging) && {
     secure: true, // only send cookie over https
-    domain: ".paybolt.in",
+    domain: ".paybolt.money",
     sameSite: "none",
   }),
 };

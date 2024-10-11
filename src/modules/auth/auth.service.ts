@@ -210,6 +210,33 @@ export class AuthService {
       );
     }
 
+    const existingOtp = await this.authOtpRepository.findOne({
+      where: {
+        mobile,
+      },
+    });
+
+    const payload: IVerifyMobilePayload = {
+      mobile,
+      isVerified: false,
+    };
+
+    const token = this.generateAccessToken(payload, {
+      expiresIn: "15m",
+    });
+
+    if (existingOtp) {
+      // TODO: send otp via mobile
+
+      return res
+        .cookie(COOKIE_KEYS.MOBILE_INFO_KEY, token, mobileVerifyCookieOptions)
+        .json({
+          id: existingOtp.id,
+          mobile,
+          ...(!isProduction && { otp: existingOtp.code }),
+        });
+    }
+
     const otp = generateOtp();
 
     const authOtp = this.authOtpRepository.create({
@@ -221,15 +248,6 @@ export class AuthService {
     const savedOtp = await this.authOtpRepository.save(authOtp);
 
     // TODO: send otp via mobile
-
-    const payload: IVerifyMobilePayload = {
-      mobile,
-      isVerified: false,
-    };
-
-    const token = this.generateAccessToken(payload, {
-      expiresIn: "15m",
-    });
 
     return res
       .cookie(COOKIE_KEYS.MOBILE_INFO_KEY, token, mobileVerifyCookieOptions)
