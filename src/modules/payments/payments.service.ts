@@ -36,9 +36,11 @@ import { appConfig } from "@/config/app.config";
 import { generateQrCode } from "@/utils/upiqr.util";
 import { PayoutBatchesEntity } from "@/entities/payout-batch.entity";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
+import { ISMART_PAY } from "@/constants/external-api.constant";
 
 const {
   externalPaymentConfig: { baseUrl, clientId, clientSecret },
+  beBaseUrl,
 } = appConfig();
 
 @Injectable()
@@ -47,8 +49,8 @@ export class PaymentsService {
   private readonly axiosService = new AxiosService(baseUrl, {
     headers: {
       "Content-Type": "application/json",
-      "client-id": clientId,
-      "secret-key": clientSecret,
+      mid: clientId,
+      key: clientSecret,
     },
   });
   constructor(
@@ -64,6 +66,12 @@ export class PaymentsService {
     private readonly dataSource: DataSource,
   ) {}
 
+  /**
+   * Create a new Payin transaction
+   * @param createPayinTransactionDto Payin transaction details
+   * @param user User making the transaction
+   * @returns transaction details
+   */
   async createTransactionPayin(
     createPayinTransactionDto: CreatePayinTransactionDto,
     user: UsersEntity,
@@ -113,18 +121,36 @@ export class PaymentsService {
       );
 
       // 5. create external payment
-      const payload = createPayinTransactionDto;
+      const payload = {
+        currency: "INR", // default: INR
+        amount: createPayinTransactionDto.amount.toFixed(2),
+        order_id: createPayinTransactionDto.orderId,
+        email: createPayinTransactionDto.email,
+        mobile: createPayinTransactionDto.phone,
+        name: `${createPayinTransactionDto.firstName} ${createPayinTransactionDto.lastName}`,
+        redirect_url: createPayinTransactionDto.pgReturnUrl,
+        webhook_url: `${beBaseUrl}/api/v1/payments/payin/webhook`,
+        utf: {
+          userId: user.id,
+          userName: user.fullName,
+          email: user.email,
+        },
+      };
 
       this.logger.info(
-        `PAYIN - calling external (fundsweep-payin-svc/api/v1/payin/ext/txn/initiate-intent) API with payload: ${LoggerPlaceHolder.Json}`,
+        `PAYIN - calling external (${ISMART_PAY.PAYIN}) API with payload: ${LoggerPlaceHolder.Json}`,
         payload,
       );
 
       const externalPaymentResponse =
         await this.axiosService.postRequest<IExternalPayinPaymentResponse>(
-          "fundsweep-payin-svc/api/v1/payin/ext/txn/initiate-intent",
+          ISMART_PAY.PAYIN,
           payload,
         );
+
+      if (!externalPaymentResponse.status) {
+        throw new BadRequestException(externalPaymentResponse.errors);
+      }
 
       this.logger.info(
         `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
@@ -135,8 +161,8 @@ export class PaymentsService {
       const savedOrder = await queryRunner.manager.save(
         this.payInOrdersRepository.create({
           ...savedPayinOrder,
-          txnRefId: externalPaymentResponse.data.txnRefId,
-          paymentUrl: externalPaymentResponse.data.paymentUrl,
+          txnRefId: externalPaymentResponse.transaction_id,
+          paymentUrl: externalPaymentResponse.intent,
         }),
       );
 
@@ -340,12 +366,27 @@ export class PaymentsService {
       `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - externalPayinWebhookDto: ${LoggerPlaceHolder.Json}`,
       externalPayinWebhookDto,
     );
-    const { orderId, status } = externalPayinWebhookDto;
+    const {
+      order_id: orderId,
+      status: isSuccess,
+      status_code: status,
+      transaction_id: txnRefId,
+    } = externalPayinWebhookDto;
+
+    if (!isSuccess) {
+      this.logger.warn(
+        `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - externalPayinWebhookDto: ${JSON.stringify(externalPayinWebhookDto)}`,
+      );
+
+      throw new BadRequestException(
+        new MessageResponseDto("Invalid webhook request"),
+      );
+    }
 
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: {
-        orderId: externalPayinWebhookDto.orderId,
-        txnRefId: externalPayinWebhookDto.transactionRefId,
+        orderId,
+        txnRefId,
       },
       relations: ["user"],
     });
@@ -358,12 +399,14 @@ export class PaymentsService {
 
     const { user } = payinOrder;
 
+    const internalStatus = convertExternalPaymentStatusToInternal(status);
+
     const payinOrderRaw = this.payInOrdersRepository.create({
-      status,
-      ...(status === PAYMENT_STATUS.SUCCESS && {
+      status: internalStatus,
+      ...(internalStatus === PAYMENT_STATUS.SUCCESS && {
         successAt: new Date(),
       }),
-      ...(status === PAYMENT_STATUS.FAILED && {
+      ...(internalStatus === PAYMENT_STATUS.FAILED && {
         failureAt: new Date(),
       }),
     });

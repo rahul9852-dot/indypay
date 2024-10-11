@@ -1,34 +1,56 @@
 import {
-  IsEnum,
+  IsBoolean,
   IsNotEmpty,
   IsNumber,
+  IsObject,
+  IsOptional,
   IsPositive,
   IsString,
 } from "class-validator";
-import { ApiProperty } from "@nestjs/swagger";
-import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class ExternalPayinWebhookDto {
+  @ApiProperty()
+  @IsBoolean()
+  status: boolean;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  status_code: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  currency: string;
+
   @ApiProperty()
   @IsNumber()
   @IsPositive()
   amount: number;
 
-  @ApiProperty({
-    enum: PAYMENT_STATUS,
-    default: PAYMENT_STATUS.SUCCESS,
-  })
-  @IsEnum(PAYMENT_STATUS)
+  @ApiProperty()
+  @IsString()
   @IsNotEmpty()
-  status: PAYMENT_STATUS;
+  bank_id: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  transactionRefId: string;
+  order_id: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  orderId: string;
+  transaction_id: string;
+
+  @ApiPropertyOptional()
+  @IsObject()
+  @IsOptional()
+  utf?: Record<string, unknown>;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  hash: string;
 }
