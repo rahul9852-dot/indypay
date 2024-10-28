@@ -165,7 +165,7 @@ export class AuthService {
 
     if (newAttempts >= MAX_ATTEMPTS) {
       await this.cacheManager.set(generateLockAccountKey(mobile), true, LOCK_TIME);
-      throw new BadRequestException(new MessageResponseDto('Account locked due to multiple failed login attempts. Try again in 2 minutes.'));
+      throw new BadRequestException(new MessageResponseDto('Account locked due to multiple failed login attempts. Try again in 30 minutes.'));
     } else {
       await this.cacheManager.set(generateAttemptsKey(mobile), newAttempts, LOCK_TIME);
     }
