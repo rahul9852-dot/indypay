@@ -27,7 +27,7 @@ import {
   IVerifyMobilePayload,
 } from "@/interface/common.interface";
 import { AuthOtpEntity } from "@/entities/otp.entity";
-import { generateAttemptsKey, generateLockAccountKey, generateOtp } from "@/utils/helperFunctions.utils";
+import { formatTime, generateAttemptsKey, generateLockAccountKey, generateOtp } from "@/utils/helperFunctions.utils";
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { MAX_ATTEMPTS, LOCK_TIME } from '@/constants/redis-cache.constant';
@@ -57,9 +57,11 @@ export class AuthService {
 
 
   async login(loginUserDto: LoginUserDto, res: Response) {
-    const isLocked = await this.cacheManager.get<boolean>(generateLockAccountKey(loginUserDto.mobile));
+    const isLocked = await this.cacheManager.get<number>(generateLockAccountKey(loginUserDto.mobile));
     if (isLocked) {
-      throw new BadRequestException(new MessageResponseDto('Account is locked. Try again later.'));
+      throw new BadRequestException(
+        new MessageResponseDto(`Account is locked. Please try again after ${formatTime(new Date(isLocked))}.`)
+      );
     }
 
     const user = await this.usersRepository.findOne({
@@ -71,7 +73,7 @@ export class AuthService {
 
     if (!user) {
       throw new BadRequestException(
-        new MessageResponseDto("Incorrect mobile number"),
+        new MessageResponseDto("Incorrect mobile number or password"),
       );
     }
 
@@ -83,7 +85,7 @@ export class AuthService {
     if (!isPasswordValid) {
       const attemptsLeft = await this.handleFailedLogin(loginUserDto.mobile);
       throw new BadRequestException(
-        new MessageResponseDto(`Incorrect password. ${attemptsLeft} attempts left.`)
+        new MessageResponseDto(`Incorrect mobile number or password. ${attemptsLeft} attempts left.`)
       );
     }
 
@@ -164,8 +166,11 @@ export class AuthService {
     const attemptsLeft = MAX_ATTEMPTS - newAttempts;
 
     if (newAttempts >= MAX_ATTEMPTS) {
-      await this.cacheManager.set(generateLockAccountKey(mobile), true, LOCK_TIME);
-      throw new BadRequestException(new MessageResponseDto('Account locked due to multiple failed login attempts. Try again in 30 minutes.'));
+      const lockEndTime = Date.now() + LOCK_TIME; 
+      await this.cacheManager.set(generateLockAccountKey(mobile), lockEndTime, LOCK_TIME);
+      throw new BadRequestException(
+        new MessageResponseDto('Account locked due to multiple failed login attempts. Try again in 30 minutes.')
+      );
     } else {
       await this.cacheManager.set(generateAttemptsKey(mobile), newAttempts, LOCK_TIME);
     }

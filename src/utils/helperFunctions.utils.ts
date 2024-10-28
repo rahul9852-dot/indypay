@@ -46,3 +46,17 @@ export const generateLockAccountKey = (mobile: string) => {
 export const generateAttemptsKey = (mobile: string) => {
   return `attempts_${mobile}`;
 };
+
+
+export const formatTime = (date: Date) => {
+  const formattedDate = date.toLocaleString('en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  return formattedDate;
+}
