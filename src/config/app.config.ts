@@ -13,6 +13,7 @@ export const appConfig = registerAs("appConfig", () => ({
   isProduction: getOsEnv("NODE_ENV") === NODE_ENV.PRODUCTION,
   isStaging: getOsEnv("NODE_ENV") === NODE_ENV.STAGING,
   encryptionKey: getOsEnv("ENCRYPTION_KEY"),
+  allowCookiesDomain: getOsEnv("ALLOW_COOKIES_DOMAIN"),
   database: {
     host: getOsEnv("DB_HOST"),
     port: getOsEnv("DB_PORT"),
@@ -58,5 +59,5 @@ export const appConfig = registerAs("appConfig", () => ({
   redisConfig: {
     redisHostUrl: getOsEnv("REDIS_HOST_URL"),
     redisPort: +getOsEnv("REDIS_PORT") || 6379,
-  }
+  },
 }));
