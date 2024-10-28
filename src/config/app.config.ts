@@ -54,4 +54,9 @@ export const appConfig = registerAs("appConfig", () => ({
       +getOsEnv("PAYOUT_COMMISSION_IN_PERCENTAGE") || 1.5,
     gstInPercentagePayOut: +getOsEnv("PAYOUT_GST_IN_PERCENTAGE") || 18,
   },
+
+  redisConfig: {
+    redisHostUrl: getOsEnv("REDIS_HOST_URL"),
+    redisPort: +getOsEnv("REDIS_PORT") || 6379,
+  }
 }));

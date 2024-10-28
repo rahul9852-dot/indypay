@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Inject,
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
@@ -26,7 +27,10 @@ import {
   IVerifyMobilePayload,
 } from "@/interface/common.interface";
 import { AuthOtpEntity } from "@/entities/otp.entity";
-import { generateOtp } from "@/utils/helperFunctions.utils";
+import { generateAttemptsKey, generateLockAccountKey, generateOtp } from "@/utils/helperFunctions.utils";
+import { Cache } from 'cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { MAX_ATTEMPTS, LOCK_TIME } from '@/constants/redis-cache.constant';
 
 const {
   jwtConfig: {
@@ -48,9 +52,16 @@ export class AuthService {
 
     private readonly bcryptService: BcryptService,
     private readonly jwtService: JwtService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
+
   async login(loginUserDto: LoginUserDto, res: Response) {
+    const isLocked = await this.cacheManager.get<boolean>(generateLockAccountKey(loginUserDto.mobile));
+    if (isLocked) {
+      throw new BadRequestException(new MessageResponseDto('Account is locked. Try again later.'));
+    }
+
     const user = await this.usersRepository.findOne({
       where: {
         mobile: loginUserDto.mobile,
@@ -60,7 +71,7 @@ export class AuthService {
 
     if (!user) {
       throw new BadRequestException(
-        new MessageResponseDto("Incorrect mobile or password"),
+        new MessageResponseDto("Incorrect mobile number"),
       );
     }
 
@@ -70,10 +81,13 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
+      const attemptsLeft = await this.handleFailedLogin(loginUserDto.mobile);
       throw new BadRequestException(
-        new MessageResponseDto("Incorrect mobile or password"),
+        new MessageResponseDto(`Incorrect password. ${attemptsLeft} attempts left.`)
       );
     }
+
+    await this.cacheManager.del(generateAttemptsKey(loginUserDto.mobile));
 
     const payload: IAccessTokenPayload = {
       id: user.id,
@@ -142,6 +156,21 @@ export class AuthService {
       .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
       .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
       .json(new MessageResponseDto("User registered successfully"));
+  }
+
+  private async handleFailedLogin(mobile: string): Promise<number> {
+    const attempts = (await this.cacheManager.get<number>(generateAttemptsKey(mobile))) || 0;
+    const newAttempts = attempts + 1;
+    const attemptsLeft = MAX_ATTEMPTS - newAttempts;
+
+    if (newAttempts >= MAX_ATTEMPTS) {
+      await this.cacheManager.set(generateLockAccountKey(mobile), true, LOCK_TIME);
+      throw new BadRequestException(new MessageResponseDto('Account locked due to multiple failed login attempts. Try again in 2 minutes.'));
+    } else {
+      await this.cacheManager.set(generateAttemptsKey(mobile), newAttempts, LOCK_TIME);
+    }
+
+    return attemptsLeft;
   }
 
   async registerByAdmin(registerUserDto: RegisterUserDto) {

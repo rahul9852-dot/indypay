@@ -38,3 +38,11 @@ export const convertExternalPaymentStatusToInternal = (status: string) => {
       return PAYMENT_STATUS.TAMPERED;
   }
 };
+
+export const generateLockAccountKey = (mobile: string) => {
+  return `lock_${mobile}`;
+};
+
+export const generateAttemptsKey = (mobile: string) => {
+  return `attempts_${mobile}`;
+};
