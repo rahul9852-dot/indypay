@@ -1,4 +1,5 @@
 import { ulid } from "ulid";
+import * as dayjs from "dayjs";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 
 export const getUlidId = (prefix = "pb") => `${prefix}_${ulid()}`;
@@ -47,16 +48,8 @@ export const generateAttemptsKey = (mobile: string) => {
   return `attempts_${mobile}`;
 };
 
-
 export const formatTime = (date: Date) => {
-  const formattedDate = date.toLocaleString('en-US', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const formattedDate = dayjs(date).format("hh:mm A");
 
   return formattedDate;
-}
+};
