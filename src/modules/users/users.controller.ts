@@ -177,11 +177,16 @@ export class UsersController {
   @IgnoreBusinessDetails()
   @Role(USERS_ROLE.MERCHANT)
   @Get("bank-details")
-  @ApiCreatedResponse({
-    type: MessageResponseDto,
-  })
   getBankDetailsMerchant(@User() user: UsersEntity) {
-    return this.usersService.getBankDetailsMerchant(user);
+    return this.usersService.getBankDetailsMerchant(user.id);
+  }
+  @ApiOperation({ summary: "Get bank details by User Id - Admin" })
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Get("bank-details/:userId")
+  getBankDetailsAdmin(@Param("userId") userId: string) {
+    return this.usersService.getBankDetailsMerchant(userId);
   }
 
   @ApiOperation({ summary: "Add/Update bank details - Admin, Owner" })

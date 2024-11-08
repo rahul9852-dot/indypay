@@ -384,10 +384,10 @@ export class UsersService {
    * @param reqUser The user requesting the bank details
    * @returns The bank details of the user
    */
-  async getBankDetailsMerchant(reqUser: UsersEntity) {
+  async getBankDetailsMerchant(userId: string) {
     return this.userBankDetailsRepository.findOne({
       where: {
-        user: { id: reqUser.id },
+        user: { id: userId },
       },
     });
   }
