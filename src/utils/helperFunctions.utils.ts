@@ -27,6 +27,8 @@ export const convertExternalPaymentStatusToInternal = (status: string) => {
       return PAYMENT_STATUS.FAILED;
     case "FAIL":
       return PAYMENT_STATUS.FAILED;
+    case "ERROR":
+      return PAYMENT_STATUS.FAILED;
     case "TAMPERED":
       return PAYMENT_STATUS.TAMPERED;
     case "DUPLICATE":

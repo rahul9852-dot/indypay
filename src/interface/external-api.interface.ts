@@ -1,4 +1,4 @@
-import { EXTERNAL_PAYOUT_PAYMENT_STATUS } from "@/enums/payment.enum";
+import { PAYOUT_PAYMENT_MODE } from "@/enums/payment.enum";
 
 export interface IExternalPayinPaymentRequest {
   amount: string;
@@ -16,14 +16,27 @@ export interface IExternalPayinPaymentResponse {
   };
 }
 
-export interface IExternalPayoutPaymentResponse {
-  timestamp: string;
-  statusCode: number;
-  status: string;
-  message: string;
-  success: boolean;
+export interface IExternalPayoutRequest {
+  amount: number;
+  bene_name: string;
+  mobile: string;
+  email: string;
+  ref_no: string;
+  account: string;
+  ifsc: string;
+  mode: PAYOUT_PAYMENT_MODE;
+  Remark: string;
+  Address: string;
+}
+
+export interface IExternalPayoutResponse {
+  res_code: string;
+  msg: string;
   data: {
-    status: EXTERNAL_PAYOUT_PAYMENT_STATUS;
-    transferId: string;
+    ID: string;
+    status: string;
+    Utr: string;
+    Ref_No: string;
+    Amount: number;
   };
 }

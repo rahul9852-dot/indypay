@@ -11,7 +11,6 @@ import {
 } from "typeorm";
 import { UsersEntity } from "./user.entity";
 import { TransactionsEntity } from "./transaction.entity";
-import { PayoutBatchesEntity } from "./payout-batch.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
 import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
@@ -78,11 +77,6 @@ export class PayInOrdersEntity {
     onDelete: "CASCADE",
   })
   user: UsersEntity;
-
-  @ManyToOne(() => PayoutBatchesEntity, ({ payInOrders }) => payInOrders, {
-    onDelete: "CASCADE",
-  })
-  payoutBatch: PayoutBatchesEntity;
 
   @OneToOne(() => TransactionsEntity, ({ payInOrder }) => payInOrder, {
     onDelete: "CASCADE",

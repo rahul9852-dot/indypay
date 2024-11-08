@@ -4,4 +4,9 @@ export const ISMART_PAY = {
 
 export const ANVITAPAY = {
   PAYIN: "api/dynamic_qr_code/get_qr_code",
+  PAYOUT: "api/payout_api/create_request",
+
+  STATUS: {
+    SUCCESS: "101",
+  },
 };

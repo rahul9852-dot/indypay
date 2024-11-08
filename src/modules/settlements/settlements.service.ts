@@ -1,26 +1,22 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, ILike, Repository } from "typeorm";
+import { Between, DataSource, ILike, Repository } from "typeorm";
+import * as dayjs from "dayjs";
 import { InitiateSettlementAdminDto } from "./dto/initate-settlement-admin.dto";
-import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
-import {
-  PAYMENT_STATUS,
-  PAYMENT_TYPE,
-  SETTLEMENT_STATUS,
-} from "@/enums/payment.enum";
+import { PaginationWithDateDto } from "@/dtos/common.dto";
+import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
 import { UsersEntity } from "@/entities/user.entity";
-import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
-import { PayoutBatchesEntity } from "@/entities/payout-batch.entity";
-import {
-  convertExternalPaymentStatusToInternal,
-  getUlidId,
-} from "@/utils/helperFunctions.utils";
-import { TransactionsEntity } from "@/entities/transaction.entity";
+import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
-import { IExternalPayoutPaymentResponse } from "@/interface/external-api.interface";
+import {
+  IExternalPayoutResponse,
+  IExternalPayoutRequest,
+} from "@/interface/external-api.interface";
 import { getPagination } from "@/utils/pagination.utils";
+import { SettlementsEntity } from "@/entities/settlements.entity";
+import { ANVITAPAY } from "@/constants/external-api.constant";
 
 const {
   externalPaymentConfig: { baseUrl, clientId, clientSecret },
@@ -40,12 +36,8 @@ export class SettlementsService {
   constructor(
     @InjectRepository(UsersEntity)
     private readonly usersRepository: Repository<UsersEntity>,
-    @InjectRepository(PayInOrdersEntity)
-    private readonly payInOrdersRepository: Repository<PayInOrdersEntity>,
-    @InjectRepository(PayoutBatchesEntity)
-    private readonly payoutBatchesRepository: Repository<PayoutBatchesEntity>,
-    @InjectRepository(TransactionsEntity)
-    private readonly transactionsRepository: Repository<TransactionsEntity>,
+    @InjectRepository(SettlementsEntity)
+    private readonly settlementsRepository: Repository<SettlementsEntity>,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -56,7 +48,9 @@ export class SettlementsService {
     search = "",
     order = "DESC",
     sort = "id",
-  }: PaginationDto) {
+    startDate = dayjs().startOf("day").toDate(),
+    endDate = dayjs().endOf("day").toDate(),
+  }: PaginationWithDateDto) {
     const settlements = await this.usersRepository.find({
       where: [
         {
@@ -65,6 +59,7 @@ export class SettlementsService {
             status: PAYMENT_STATUS.SUCCESS,
             settlementStatus: SETTLEMENT_STATUS.NOT_INITIATED,
           },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
         },
         {
           fullName: ILike(`%${search}%`),
@@ -72,6 +67,7 @@ export class SettlementsService {
             status: PAYMENT_STATUS.SUCCESS,
             settlementStatus: SETTLEMENT_STATUS.FAILED,
           },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
         },
       ],
       relations: {
@@ -138,6 +134,7 @@ export class SettlementsService {
       relations: {
         bankDetails: true,
         businessDetails: true,
+        address: true,
       },
     });
 
@@ -154,154 +151,71 @@ export class SettlementsService {
     await queryRunner.startTransaction();
 
     try {
-      const orderId = getUlidId("stmnt");
-
-      const [payinOrderList, count] =
-        await this.payInOrdersRepository.findAndCount({
-          where: [
-            {
-              status: PAYMENT_STATUS.SUCCESS,
-              settlementStatus: SETTLEMENT_STATUS.NOT_INITIATED,
-              user: {
-                id: userId,
-              },
-            },
-            {
-              status: PAYMENT_STATUS.SUCCESS,
-              settlementStatus: SETTLEMENT_STATUS.FAILED,
-              user: {
-                id: userId,
-              },
-            },
-          ],
-        });
-
-      if (count <= 0) {
-        throw new BadRequestException(
-          new MessageResponseDto("No pending payin to settle"),
-        );
-      }
-
-      const payoutAmount = await this.payInOrdersRepository.sum(
-        "netPayableAmount",
-        [
-          {
-            status: PAYMENT_STATUS.SUCCESS,
-            settlementStatus: SETTLEMENT_STATUS.NOT_INITIATED,
-            user: {
-              id: userId,
-            },
-          },
-          {
-            status: PAYMENT_STATUS.SUCCESS,
-            settlementStatus: SETTLEMENT_STATUS.FAILED,
-            user: {
-              id: userId,
-            },
-          },
-        ],
-      );
-
-      // 1. create payout batch order
-      const payoutBatchOrder = this.payoutBatchesRepository.create({
-        user,
-        orderId,
-        amount: payoutAmount,
-        industryType: "E-COM",
+      const settlement = this.settlementsRepository.create({
+        amount: +initiateSettlementAdminDto.amount,
         transferMode: initiateSettlementAdminDto.transferMode,
-      });
-
-      // 2. save payout batch order
-      const savedPayoutBatchOrder =
-        await queryRunner.manager.save(payoutBatchOrder);
-
-      // 3. create transaction
-      const transaction = this.transactionsRepository.create({
         user,
-        payoutBatch: savedPayoutBatchOrder,
-        transactionType: PAYMENT_TYPE.SETTLEMENT,
       });
 
-      // 4. save transaction
-      const savedTransaction = await queryRunner.manager.save(transaction);
+      const savedSettlement = await queryRunner.manager.save(settlement);
 
       this.logger.info(
-        `SETTLEMENT - createTransaction - transaction: ${LoggerPlaceHolder.Json}`,
-        savedTransaction,
+        `SETTLEMENT - Sending Settlements Amount: ${initiateSettlementAdminDto.amount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
+        bankDetails,
       );
 
-      // 5. create external payment
-
-      const payload = {
-        orderId,
-        amount: savedPayoutBatchOrder.netPayableAmount,
-        transferMode: initiateSettlementAdminDto.transferMode,
-        industryType: payoutBatchOrder.industryType,
-        beneDetails: {
-          beneBankName: bankDetails.bankName,
-          beneAccountNo: bankDetails.accountNumber,
-          beneIfsc: bankDetails.bankIFSC,
-          beneName: bankDetails.name,
-          beneEmail: bankDetails.email,
-          benePhone: bankDetails.mobile,
-        },
+      const payload: IExternalPayoutRequest = {
+        amount: +initiateSettlementAdminDto.amount,
+        bene_name: bankDetails.name,
+        email: bankDetails.email,
+        mobile: bankDetails.mobile,
+        account: bankDetails.accountNumber,
+        ifsc: bankDetails.bankIFSC,
+        Address: user.address?.[0].address || "",
+        mode: initiateSettlementAdminDto.transferMode,
+        ref_no: savedSettlement.id,
+        Remark: initiateSettlementAdminDto.remarks,
       };
+
       this.logger.info(
-        `SETTLEMENT - calling external (digi-payout/api/v1/external/payout/ft) API with payload: ${LoggerPlaceHolder.Json}`,
+        `SETTLEMENT - Calling PAYOUT: ${baseUrl}/${ANVITAPAY.PAYOUT} with payload: ${LoggerPlaceHolder.Json}`,
         payload,
       );
 
-      const externalPaymentResponse =
-        await this.axiosService.postRequest<IExternalPayoutPaymentResponse>(
-          "digi-payout/api/v1/external/payout/ft",
+      const externalPayoutResponse =
+        await this.axiosService.postRequest<IExternalPayoutResponse>(
+          ANVITAPAY.PAYOUT,
           payload,
         );
 
       this.logger.info(
-        `PAYOUT - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
-        externalPaymentResponse,
+        `SETTLEMENT - External Payout Response: ${LoggerPlaceHolder.Json}`,
+        externalPayoutResponse,
       );
 
-      // 6. save external payment
-      const savedOrder = await queryRunner.manager.save(
-        this.payoutBatchesRepository.create({
-          ...savedPayoutBatchOrder,
-          transferId: externalPaymentResponse.data.transferId,
+      if (externalPayoutResponse.res_code !== ANVITAPAY.STATUS.SUCCESS) {
+        throw new BadRequestException(externalPayoutResponse.msg);
+      }
+
+      await queryRunner.manager.update(
+        SettlementsEntity,
+        { id: savedSettlement.id },
+        {
+          transferId: externalPayoutResponse.data.Utr,
           status: convertExternalPaymentStatusToInternal(
-            externalPaymentResponse.status,
+            externalPayoutResponse.data.status,
           ),
-        }),
+        },
       );
-
-      // 7. update pay-in order status
-      const updatedPayinList = payinOrderList.map((list) =>
-        this.payInOrdersRepository.create({
-          ...list,
-          settlementStatus: SETTLEMENT_STATUS.INITIATED,
-        }),
-      );
-
-      await this.payInOrdersRepository.save(updatedPayinList);
 
       await queryRunner.commitTransaction();
-
-      return {
-        orderId,
-        transferId: savedOrder.transferId,
-        status: convertExternalPaymentStatusToInternal(
-          externalPaymentResponse.status,
-        ),
-      };
-    } catch (err: any) {
+    } catch (error) {
       this.logger.error(
-        `SETTLEMENT - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
-        err,
+        `SETTLEMENT - initiateSettlementAdmin - error: ${LoggerPlaceHolder.Json}`,
+        error,
       );
-      // Rollback transaction if any operation fails
       await queryRunner.rollbackTransaction();
-      throw new BadRequestException(err.message);
     } finally {
-      // Release the queryRunner to avoid memory leaks
       await queryRunner.release();
     }
   }

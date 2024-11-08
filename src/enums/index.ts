@@ -85,6 +85,7 @@ export enum ID_TYPE {
   PAYOUT_BATCH_KEY = "pbatch",
   USER_BANK_DETAILS_KEY = "ubank",
   USER_WHITELIST_IP = "uwip",
+  SETTLEMENT_PAYOUT = "stl",
 }
 
 export enum ONBOARDING_STATUS {

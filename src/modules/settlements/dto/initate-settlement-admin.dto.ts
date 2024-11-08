@@ -1,5 +1,9 @@
-import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
-import { IsEnum, IsNotEmpty, IsString } from "class-validator";
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiResponseProperty,
+} from "@nestjs/swagger";
+import { IsEnum, IsNotEmpty, IsNumberString, IsString } from "class-validator";
 import { PAYOUT_PAYMENT_MODE, SETTLEMENT_STATUS } from "@/enums/payment.enum";
 
 export class InitiateSettlementAdminDto {
@@ -8,13 +12,22 @@ export class InitiateSettlementAdminDto {
   @IsNotEmpty()
   userId: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     enum: PAYOUT_PAYMENT_MODE,
     default: PAYOUT_PAYMENT_MODE.IMPS,
   })
   @IsEnum(PAYOUT_PAYMENT_MODE)
+  transferMode?: PAYOUT_PAYMENT_MODE;
+
+  @ApiProperty()
+  @IsNumberString()
   @IsNotEmpty()
-  transferMode: PAYOUT_PAYMENT_MODE;
+  amount: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  remarks: string;
 }
 
 export class PayoutStatusDto {

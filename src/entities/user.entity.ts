@@ -20,6 +20,7 @@ import { PayInOrdersEntity } from "./payin-orders.entity";
 import { PayOutOrdersEntity } from "./payout-orders.entity";
 import { TransactionsEntity } from "./transaction.entity";
 import { UserWhitelistIpsEntity } from "./user-whitelist-ip.entity";
+import { SettlementsEntity } from "./settlements.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import {
   ONBOARDING_STATUS,
@@ -71,6 +72,9 @@ export class UsersEntity {
 
   @OneToMany(() => PayOutOrdersEntity, ({ user }) => user, { cascade: true })
   payOutOrders: PayOutOrdersEntity[];
+
+  @OneToMany(() => SettlementsEntity, ({ user }) => user, { cascade: true })
+  settlements: SettlementsEntity[];
 
   @OneToMany(() => TransactionsEntity, ({ user }) => user, {
     cascade: true,

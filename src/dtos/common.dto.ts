@@ -1,5 +1,10 @@
 import { ApiPropertyOptional, ApiResponseProperty } from "@nestjs/swagger";
-import { IsNumberString, IsOptional, IsString } from "class-validator";
+import {
+  IsDateString,
+  IsNumberString,
+  IsOptional,
+  IsString,
+} from "class-validator";
 
 export class ValidationErrorDto {
   @ApiResponseProperty({ example: ["email must be an email"] })
@@ -47,4 +52,16 @@ export class PaginationDto extends PaginationWithoutSortAndOrderDto {
   @IsString()
   @IsOptional()
   order?: "ASC" | "DESC";
+}
+
+export class PaginationWithDateDto extends PaginationDto {
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  startDate?: Date;
+
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  endDate?: Date;
 }

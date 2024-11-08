@@ -29,7 +29,6 @@ export enum PAYOUT_PAYMENT_MODE {
   IMPS = "IMPS",
   NEFT = "NEFT",
   RTGS = "RTGS",
-  CASH = "CASH",
 }
 
 export enum SETTLEMENT_STATUS {

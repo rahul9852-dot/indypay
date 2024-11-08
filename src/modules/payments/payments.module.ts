@@ -13,7 +13,6 @@ import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
-import { PayoutBatchesEntity } from "@/entities/payout-batch.entity";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 
 @Module({
@@ -26,7 +25,6 @@ import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
       PayInOrdersEntity,
       PayOutOrdersEntity,
       UserBankDetailsEntity,
-      PayoutBatchesEntity,
       UserWhitelistIpsEntity,
     ]),
   ],

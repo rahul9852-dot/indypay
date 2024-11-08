@@ -20,7 +20,6 @@ import {
 } from "./dto/create-payin-payment.dto";
 import { ExternalPayinWebhookDto } from "./dto/external-webhook-payin.dto";
 import { PayoutStatusDto } from "./dto/create-payout-payment.dto";
-import { ExternalPayoutWebhookDto } from "./dto/external-webhook-payout.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -78,19 +77,5 @@ export class PaymentsController {
     @Body() externalPayinWebhookDto: ExternalPayinWebhookDto,
   ) {
     return this.paymentsService.externalWebhookPayin(externalPayinWebhookDto);
-  }
-
-  @ApiOperation({ summary: "External webhook for pay-out" })
-  @UseGuards(WebhookGuard)
-  @ApiOperation({ summary: "External webhook" })
-  @HttpCode(HttpStatus.OK)
-  @ApiOkResponse({ type: MessageResponseDto })
-  @Post("payout/webhook")
-  async externalWebhookPayoutBatch(
-    @Body() externalPayoutWebhookDto: ExternalPayoutWebhookDto,
-  ) {
-    return this.paymentsService.externalWebhookPayoutBatch(
-      externalPayoutWebhookDto,
-    );
   }
 }

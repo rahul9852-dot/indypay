@@ -3,22 +3,17 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   ManyToOne,
-  OneToMany,
-  OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
 import { UsersEntity } from "./user.entity";
-import { TransactionsEntity } from "./transaction.entity";
-import { PayInOrdersEntity } from "./payin-orders.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
-import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { PAYMENT_STATUS, PAYOUT_PAYMENT_MODE } from "@/enums/payment.enum";
 
-@Entity("payout_batches")
-export class PayoutBatchesEntity {
+@Entity("settlements")
+export class SettlementsEntity {
   @PrimaryColumn()
   id: string;
 
@@ -29,11 +24,7 @@ export class PayoutBatchesEntity {
   })
   amount: number;
 
-  @Index()
-  @Column({ unique: true })
-  orderId: string;
-
-  @Column()
+  @Column({ enum: PAYOUT_PAYMENT_MODE, default: PAYOUT_PAYMENT_MODE.IMPS })
   transferMode: string;
 
   @Column({ enum: PAYMENT_STATUS, default: PAYMENT_STATUS.PENDING })
@@ -43,20 +34,10 @@ export class PayoutBatchesEntity {
   transferId: string;
 
   // Relations
-  @ManyToOne(() => UsersEntity, ({ payOutOrders }) => payOutOrders, {
+  @ManyToOne(() => UsersEntity, ({ settlements }) => settlements, {
     onDelete: "CASCADE",
   })
   user: UsersEntity;
-
-  @OneToMany(() => PayInOrdersEntity, ({ payoutBatch }) => payoutBatch, {
-    cascade: true,
-  })
-  payInOrders: PayInOrdersEntity;
-
-  @OneToOne(() => TransactionsEntity, ({ payoutBatch }) => payoutBatch, {
-    onDelete: "CASCADE",
-  })
-  transaction: TransactionsEntity;
 
   @Column({ nullable: true, type: "timestamp" })
   successAt: Date;
@@ -72,6 +53,6 @@ export class PayoutBatchesEntity {
 
   @BeforeInsert()
   beforeInsertHook() {
-    this.id = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
+    this.id = getUlidId(ID_TYPE.SETTLEMENT_PAYOUT);
   }
 }

@@ -4,7 +4,7 @@ import { SettlementsService } from "./settlements.service";
 import { InitiateSettlementAdminDto } from "./dto/initate-settlement-admin.dto";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
-import { PaginationDto } from "@/dtos/common.dto";
+import { PaginationWithDateDto } from "@/dtos/common.dto";
 
 @ApiTags("Settlements")
 @Controller("settlements")
@@ -14,7 +14,7 @@ export class SettlementsController {
   @ApiOperation({ summary: "Get settlements - Admin, Ops, Owner" })
   @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @Get()
-  getSettlementsAdmin(@Query() query: PaginationDto) {
+  getSettlementsAdmin(@Query() query: PaginationWithDateDto) {
     return this.settlementsService.getSettlementsAdmin(query);
   }
 
