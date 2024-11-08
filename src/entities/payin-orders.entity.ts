@@ -38,16 +38,13 @@ export class PayInOrdersEntity {
   orderId: string;
 
   @Column()
-  firstName: string;
-
-  @Column()
-  lastName: string;
+  name: string;
 
   @Column()
   email: string;
 
   @Column()
-  phone: string;
+  mobile: string;
 
   @Column({ enum: PAYMENT_STATUS, default: PAYMENT_STATUS.PENDING })
   status: string;
@@ -56,7 +53,7 @@ export class PayInOrdersEntity {
   txnRefId: string;
 
   @Column({ nullable: true })
-  paymentUrl: string;
+  intent: string;
 
   @Column({ type: "numeric", precision: 10, scale: 2, default: 4.5 })
   commissionInPercentage: number;

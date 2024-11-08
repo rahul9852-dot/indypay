@@ -39,13 +39,10 @@ export class PayOutOrdersEntity {
   @Column()
   transferMode: string;
 
-  @Column()
-  industryType: string;
-
   @Column({ enum: PAYMENT_STATUS, default: PAYMENT_STATUS.PENDING })
   status: string;
 
-  @Column()
+  @Column({ nullable: true })
   transferId: string;
 
   @Column({ type: "numeric", precision: 10, scale: 2 })

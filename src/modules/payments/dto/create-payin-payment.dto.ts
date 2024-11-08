@@ -16,11 +16,6 @@ export class CreatePayinTransactionDto {
   orderId: string;
 
   @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  pgReturnUrl: string;
-
-  @ApiProperty()
   @IsNumber({
     maxDecimalPlaces: 2,
   })
@@ -30,12 +25,7 @@ export class CreatePayinTransactionDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  firstName: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  lastName: string;
+  name: string;
 
   @ApiProperty()
   @IsEmail()
@@ -46,7 +36,7 @@ export class CreatePayinTransactionDto {
   @IsNumberString()
   @IsNotEmpty()
   @Length(10, 10)
-  phone: string;
+  mobile: string;
 }
 
 export class PayinStatusDto {

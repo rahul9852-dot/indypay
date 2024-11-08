@@ -1,20 +1,19 @@
 import { EXTERNAL_PAYOUT_PAYMENT_STATUS } from "@/enums/payment.enum";
 
-export interface IExternalPayinPaymentResponse {
-  status: boolean;
-  status_code: string;
-  transaction_id: string;
-  order_id: string;
+export interface IExternalPayinPaymentRequest {
   amount: string;
-  currency: string;
-  created_on: string;
-  payment_url: string;
-  intent: string;
-  utf: {
-    customer_id: string;
-    hash_key: string;
+  customer_name: string;
+  customer_mobile: string;
+  customer_email: string;
+  ref_no: string;
+}
+
+export interface IExternalPayinPaymentResponse {
+  res_code: string;
+  msg: string;
+  data: {
+    qr: string;
   };
-  errors?: string;
 }
 
 export interface IExternalPayoutPaymentResponse {

@@ -79,7 +79,7 @@ export class ApiKeyGuard implements CanActivate {
       );
 
       if (!isIpWhitelisted) {
-        throw new ForbiddenException("Invalid IP address");
+        throw new ForbiddenException(`Invalid IP address || ${requestIp}`);
       }
 
       const decryptedClientSecret = await decryptData(

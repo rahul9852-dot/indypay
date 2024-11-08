@@ -27,20 +27,19 @@ import { UsersEntity } from "@/entities/user.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import {
+  IExternalPayinPaymentRequest,
   IExternalPayinPaymentResponse,
   IExternalPayoutPaymentResponse,
 } from "@/interface/external-api.interface";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
-import { generateQrCode } from "@/utils/upiqr.util";
 import { PayoutBatchesEntity } from "@/entities/payout-batch.entity";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
-import { ISMART_PAY } from "@/constants/external-api.constant";
+import { ANVITAPAY } from "@/constants/external-api.constant";
 
 const {
-  externalPaymentConfig: { baseUrl, clientId, clientSecret },
-  beBaseUrl,
+  externalPaymentConfig: { baseUrl, clientId, clientSecret, clientSign },
 } = appConfig();
 
 @Injectable()
@@ -49,8 +48,9 @@ export class PaymentsService {
   private readonly axiosService = new AxiosService(baseUrl, {
     headers: {
       "Content-Type": "application/json",
-      mid: clientId,
-      key: clientSecret,
+      PPI: clientId,
+      AUTH: clientSecret,
+      SIGN: clientSign,
     },
   });
   constructor(
@@ -121,60 +121,47 @@ export class PaymentsService {
       );
 
       // 5. create external payment
-      const payload = {
-        currency: "INR", // default: INR
+      const payload: IExternalPayinPaymentRequest = {
         amount: createPayinTransactionDto.amount.toFixed(2),
-        order_id: createPayinTransactionDto.orderId,
-        email: createPayinTransactionDto.email,
-        mobile: createPayinTransactionDto.phone,
-        name: `${createPayinTransactionDto.firstName} ${createPayinTransactionDto.lastName}`,
-        redirect_url: createPayinTransactionDto.pgReturnUrl,
-        webhook_url: `${beBaseUrl}/api/v1/payments/payin/webhook`,
-        utf: {
-          userId: user.id,
-          userName: user.fullName,
-          email: user.email,
-        },
+        ref_no: createPayinTransactionDto.orderId,
+        customer_email: createPayinTransactionDto.email,
+        customer_mobile: createPayinTransactionDto.mobile,
+        customer_name: createPayinTransactionDto.name,
       };
 
       this.logger.info(
-        `PAYIN - calling external (${ISMART_PAY.PAYIN}) API with payload: ${LoggerPlaceHolder.Json}`,
+        `PAYIN - calling external (${ANVITAPAY.PAYIN}) API with payload: ${LoggerPlaceHolder.Json}`,
         payload,
       );
 
       const externalPaymentResponse =
         await this.axiosService.postRequest<IExternalPayinPaymentResponse>(
-          ISMART_PAY.PAYIN,
+          ANVITAPAY.PAYIN,
           payload,
         );
-
-      if (!externalPaymentResponse.status) {
-        throw new BadRequestException(externalPaymentResponse.errors);
-      }
 
       this.logger.info(
         `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
         externalPaymentResponse,
       );
 
+      if (externalPaymentResponse.res_code !== "101") {
+        throw new BadRequestException(externalPaymentResponse.msg);
+      }
       // 6. save external payment
       const savedOrder = await queryRunner.manager.save(
         this.payInOrdersRepository.create({
           ...savedPayinOrder,
-          txnRefId: externalPaymentResponse.transaction_id,
-          paymentUrl: externalPaymentResponse.intent,
+          intent: externalPaymentResponse.data.qr,
+          mobile: createPayinTransactionDto.mobile,
         }),
       );
 
       await queryRunner.commitTransaction();
 
-      const qr = await generateQrCode(savedOrder.paymentUrl);
-
       return {
         orderId: createPayinTransactionDto.orderId,
-        txnRefId: savedOrder.txnRefId,
-        paymentUrl: savedOrder.paymentUrl,
-        qr,
+        intent: externalPaymentResponse.data.qr,
       };
 
       // Commit transaction
