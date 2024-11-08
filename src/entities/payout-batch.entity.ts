@@ -16,11 +16,6 @@ import { PayInOrdersEntity } from "./payin-orders.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
-import { appConfig } from "@/config/app.config";
-
-const {
-  transactionConfig: { commissionInPercentagePayOut, gstInPercentagePayOut },
-} = appConfig();
 
 @Entity("payout_batches")
 export class PayoutBatchesEntity {
@@ -41,29 +36,11 @@ export class PayoutBatchesEntity {
   @Column()
   transferMode: string;
 
-  @Column()
-  industryType: string;
-
   @Column({ enum: PAYMENT_STATUS, default: PAYMENT_STATUS.PENDING })
   status: string;
 
   @Column({ nullable: true })
   transferId: string;
-
-  @Column({ type: "numeric", precision: 10, scale: 2 })
-  commissionInPercentage: number;
-
-  @Column({ type: "numeric", precision: 10, scale: 2 })
-  commissionAmount: number;
-
-  @Column({ type: "numeric", precision: 10, scale: 2 })
-  gstInPercentage: number;
-
-  @Column({ type: "numeric", precision: 10, scale: 2 })
-  gstAmount: number;
-
-  @Column({ type: "numeric", precision: 10, scale: 2 })
-  netPayableAmount: number;
 
   // Relations
   @ManyToOne(() => UsersEntity, ({ payOutOrders }) => payOutOrders, {
@@ -96,11 +73,5 @@ export class PayoutBatchesEntity {
   @BeforeInsert()
   beforeInsertHook() {
     this.id = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
-    this.commissionInPercentage = commissionInPercentagePayOut;
-    this.gstInPercentage = gstInPercentagePayOut;
-    this.commissionAmount = (this.amount * this.commissionInPercentage) / 100;
-    this.gstAmount = (this.commissionAmount * this.gstInPercentage) / 100;
-    this.netPayableAmount =
-      this.amount - (this.commissionAmount + this.gstAmount);
   }
 }
