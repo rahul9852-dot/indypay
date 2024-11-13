@@ -28,10 +28,6 @@ import {
 } from "./dto/generate-client-secret.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeStatusDto } from "./dto/change-status.dto";
-import {
-  AddBankDetailsAdminDto,
-  AddBankDetailsDto,
-} from "./dto/add-bank-details.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
 import {
   AddWhitelistIpsDto,
@@ -59,6 +55,15 @@ import { ChangeAccountStatusGuard } from "@/guard/change-account-status.guard";
 })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @ApiOperation({
+    summary: "Get All Merchants - Admin & OPS",
+  })
+  @Get("merchants")
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.MERCHANT, USERS_ROLE.OPS)
+  async getAllMerchants() {
+    return this.usersService.getAllMerchants();
+  }
 
   @ApiOperation({
     summary: "Get Users Client Id to confirm",
@@ -157,20 +162,20 @@ export class UsersController {
     );
   }
 
-  @ApiOperation({ summary: "Add bank details" })
-  @IgnoreKyc()
-  @IgnoreBusinessDetails()
-  @Role(USERS_ROLE.MERCHANT)
-  @Post("bank-details")
-  @ApiCreatedResponse({
-    type: MessageResponseDto,
-  })
-  updateBankDetailsMerchant(
-    @Body() addBankDetailsDto: AddBankDetailsDto,
-    @User() user: UsersEntity,
-  ) {
-    return this.usersService.addBankDetailsMerchant(addBankDetailsDto, user);
-  }
+  // @ApiOperation({ summary: "Add bank details" })
+  // @IgnoreKyc()
+  // @IgnoreBusinessDetails()
+  // @Role(USERS_ROLE.MERCHANT)
+  // @Post("bank-details")
+  // @ApiCreatedResponse({
+  //   type: MessageResponseDto,
+  // })
+  // updateBankDetailsMerchant(
+  //   @Body() addBankDetailsDto: AddBankDetailsDto,
+  //   @User() user: UsersEntity,
+  // ) {
+  //   return this.usersService.addBankDetailsMerchant(addBankDetailsDto, user);
+  // }
 
   @ApiOperation({ summary: "Get bank details" })
   @IgnoreKyc()
@@ -189,20 +194,20 @@ export class UsersController {
     return this.usersService.getBankDetailsMerchant(userId);
   }
 
-  @ApiOperation({ summary: "Add/Update bank details - Admin, Owner" })
-  @IgnoreKyc()
-  @IgnoreBusinessDetails()
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
-  @Post("bank-details/admin")
-  @ApiOkResponse({
-    type: MessageResponseDto,
-  })
-  @HttpCode(HttpStatus.OK)
-  updateBankDetailsAdmin(
-    @Body() addBankDetailsAdminDto: AddBankDetailsAdminDto,
-  ) {
-    return this.usersService.addBankDetailsAdmin(addBankDetailsAdminDto);
-  }
+  // @ApiOperation({ summary: "Add/Update bank details - Admin, Owner" })
+  // @IgnoreKyc()
+  // @IgnoreBusinessDetails()
+  // @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  // @Post("bank-details/admin")
+  // @ApiOkResponse({
+  //   type: MessageResponseDto,
+  // })
+  // @HttpCode(HttpStatus.OK)
+  // updateBankDetailsAdmin(
+  //   @Body() addBankDetailsAdminDto: AddBankDetailsAdminDto,
+  // ) {
+  //   return this.usersService.addBankDetailsAdmin(addBankDetailsAdminDto);
+  // }
 
   @ApiOperation({ summary: "Delete user - Admin only" })
   @Delete("merchant/:id/admin")

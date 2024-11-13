@@ -102,9 +102,8 @@ export class UsersEntity {
   @OneToOne(() => UserKycEntity, ({ user }) => user, { cascade: true })
   kyc: UserKycEntity;
 
-  @JoinColumn()
-  @OneToOne(() => UserBankDetailsEntity, ({ user }) => user, { cascade: true })
-  bankDetails: UserBankDetailsEntity;
+  @OneToMany(() => UserBankDetailsEntity, ({ user }) => user, { cascade: true })
+  bankDetails: UserBankDetailsEntity[];
 
   @OneToMany(() => UserApiKeysEntity, ({ user }) => user, { cascade: true })
   apiKeys: UserApiKeysEntity[];

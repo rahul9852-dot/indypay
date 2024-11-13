@@ -13,10 +13,6 @@ import { AddBusinessDetailsDto } from "./dto/add-business-details.dto";
 import { WebhookUrlDto } from "./dto/webhook.dto";
 import { ChangeStatusDto } from "./dto/change-status.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
-import {
-  AddBankDetailsAdminDto,
-  AddBankDetailsDto,
-} from "./dto/add-bank-details.dto";
 import { DeleteWhitelistIpsDto } from "./dto/whitelist-ips.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
@@ -55,6 +51,18 @@ export class UsersService {
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
   ) {}
+
+  async getAllMerchants() {
+    return this.usersRepository.find({
+      where: {
+        role: USERS_ROLE.MERCHANT,
+      },
+      select: {
+        fullName: true,
+        id: true,
+      },
+    });
+  }
 
   /**
    * Changes the password of the user
@@ -344,40 +352,34 @@ export class UsersService {
    * @throws ConflictException if the user already has bank details
    * @returns MessageResponseDto
    */
-  async addBankDetailsMerchant(
-    addBankDetailsDto: AddBankDetailsDto,
-    reqUser: UsersEntity,
-  ) {
-    const user = await this.usersRepository.findOne({
-      where: {
-        id: reqUser.id,
-      },
-      relations: {
-        bankDetails: true,
-      },
-    });
+  // async addBankDetailsMerchant(
+  //   addBankDetailsDto: AddBankDetailsDto,
+  //   reqUser: UsersEntity,
+  // ) {
+  //   const user = await this.usersRepository.findOne({
+  //     where: {
+  //       id: reqUser.id,
+  //     },
+  //     relations: {
+  //       bankDetails: true,
+  //     },
+  //   });
 
-    if (!user) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
+  //   if (!user) {
+  //     throw new NotFoundException(new MessageResponseDto("User not found"));
+  //   }
 
-    if (user.bankDetails) {
-      throw new ConflictException(
-        new MessageResponseDto("Bank details already exists"),
-      );
-    }
+  //   const userDetails = this.usersRepository.create({
+  //     bankDetails: addBankDetailsDto,
+  //   });
 
-    const userDetails = this.usersRepository.create({
-      bankDetails: addBankDetailsDto,
-    });
+  //   await this.usersRepository.save({
+  //     ...userDetails,
+  //     id: user.id,
+  //   });
 
-    await this.usersRepository.save({
-      ...userDetails,
-      id: user.id,
-    });
-
-    return new MessageResponseDto("Bank details added successfully");
-  }
+  //   return new MessageResponseDto("Bank details added successfully");
+  // }
 
   /**
    * Get the bank details of a merchant
@@ -399,37 +401,37 @@ export class UsersService {
    * @throws {NotFoundException} If the user is not found
    * @throws {ConflictException} If the user's bank details already exist
    */
-  async addBankDetailsAdmin(addBankDetailsAdminDto: AddBankDetailsAdminDto) {
-    const user = await this.usersRepository.findOne({
-      where: {
-        id: addBankDetailsAdminDto.userId,
-      },
-      relations: {
-        bankDetails: true,
-      },
-    });
+  // async addBankDetailsAdmin(addBankDetailsAdminDto: AddBankDetailsAdminDto) {
+  //   const user = await this.usersRepository.findOne({
+  //     where: {
+  //       id: addBankDetailsAdminDto.userId,
+  //     },
+  //     relations: {
+  //       bankDetails: true,
+  //     },
+  //   });
 
-    if (!user) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
+  //   if (!user) {
+  //     throw new NotFoundException(new MessageResponseDto("User not found"));
+  //   }
 
-    const { userId, ...bankDetails } = addBankDetailsAdminDto;
+  //   const { userId, ...bankDetails } = addBankDetailsAdminDto;
 
-    const userDetails = this.usersRepository.create({
-      bankDetails,
-    });
+  //   const userDetails = this.usersRepository.create({
+  //     bankDetails,
+  //   });
 
-    await this.usersRepository.save({
-      ...userDetails,
-      id: userId,
-    });
+  //   await this.usersRepository.save({
+  //     ...userDetails,
+  //     id: userId,
+  //   });
 
-    return new MessageResponseDto(
-      user.bankDetails
-        ? "Bank details updated successfully"
-        : "Bank details added successfully",
-    );
-  }
+  //   return new MessageResponseDto(
+  //     user.bankDetails
+  //       ? "Bank details updated successfully"
+  //       : "Bank details added successfully",
+  //   );
+  // }
 
   async updateUser() {}
 

@@ -124,99 +124,99 @@ export class SettlementsService {
     };
   }
 
-  async initiateSettlementAdmin(
-    initiateSettlementAdminDto: InitiateSettlementAdminDto,
-  ) {
-    const { userId } = initiateSettlementAdminDto;
+  // async initiateSettlementAdmin(
+  //   initiateSettlementAdminDto: InitiateSettlementAdminDto,
+  // ) {
+  //   const { userId } = initiateSettlementAdminDto;
 
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-      relations: {
-        bankDetails: true,
-        businessDetails: true,
-        address: true,
-      },
-    });
+  //   const user = await this.usersRepository.findOne({
+  //     where: { id: userId },
+  //     relations: {
+  //       bankDetails: true,
+  //       businessDetails: true,
+  //       address: true,
+  //     },
+  //   });
 
-    if (!user.bankDetails) {
-      throw new BadRequestException("Please add User's bank details first");
-    }
+  //   if (!user.bankDetails) {
+  //     throw new BadRequestException("Please add User's bank details first");
+  //   }
 
-    const { bankDetails } = user;
+  //   const { bankDetails } = user;
 
-    const queryRunner = this.dataSource.createQueryRunner();
+  //   const queryRunner = this.dataSource.createQueryRunner();
 
-    // Start transaction
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+  //   // Start transaction
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
 
-    try {
-      const settlement = this.settlementsRepository.create({
-        amount: +initiateSettlementAdminDto.amount,
-        transferMode: initiateSettlementAdminDto.transferMode,
-        user,
-      });
+  //   try {
+  //     const settlement = this.settlementsRepository.create({
+  //       amount: +initiateSettlementAdminDto.amount,
+  //       transferMode: initiateSettlementAdminDto.transferMode,
+  //       user,
+  //     });
 
-      const savedSettlement = await queryRunner.manager.save(settlement);
+  //     const savedSettlement = await queryRunner.manager.save(settlement);
 
-      this.logger.info(
-        `SETTLEMENT - Sending Settlements Amount: ${initiateSettlementAdminDto.amount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
-        bankDetails,
-      );
+  //     this.logger.info(
+  //       `SETTLEMENT - Sending Settlements Amount: ${initiateSettlementAdminDto.amount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
+  //       bankDetails,
+  //     );
 
-      const payload: IExternalPayoutRequest = {
-        amount: +initiateSettlementAdminDto.amount,
-        bene_name: bankDetails.name,
-        email: bankDetails.email,
-        mobile: bankDetails.mobile,
-        account: bankDetails.accountNumber,
-        ifsc: bankDetails.bankIFSC,
-        Address: user.address?.[0].address || "",
-        mode: initiateSettlementAdminDto.transferMode,
-        ref_no: savedSettlement.id,
-        Remark: initiateSettlementAdminDto.remarks,
-      };
+  //     const payload: IExternalPayoutRequest = {
+  //       amount: +initiateSettlementAdminDto.amount,
+  //       bene_name: bankDetails.name,
+  //       email: bankDetails.email,
+  //       mobile: bankDetails.mobile,
+  //       account: bankDetails.accountNumber,
+  //       ifsc: bankDetails.bankIFSC,
+  //       Address: user.address?.[0].address || "",
+  //       mode: initiateSettlementAdminDto.transferMode,
+  //       ref_no: savedSettlement.id,
+  //       Remark: initiateSettlementAdminDto.remarks,
+  //     };
 
-      this.logger.info(
-        `SETTLEMENT - Calling PAYOUT: ${baseUrl}/${ANVITAPAY.PAYOUT} with payload: ${LoggerPlaceHolder.Json}`,
-        payload,
-      );
+  //     this.logger.info(
+  //       `SETTLEMENT - Calling PAYOUT: ${baseUrl}/${ANVITAPAY.PAYOUT} with payload: ${LoggerPlaceHolder.Json}`,
+  //       payload,
+  //     );
 
-      const externalPayoutResponse =
-        await this.axiosService.postRequest<IExternalPayoutResponse>(
-          ANVITAPAY.PAYOUT,
-          payload,
-        );
+  //     const externalPayoutResponse =
+  //       await this.axiosService.postRequest<IExternalPayoutResponse>(
+  //         ANVITAPAY.PAYOUT,
+  //         payload,
+  //       );
 
-      this.logger.info(
-        `SETTLEMENT - External Payout Response: ${LoggerPlaceHolder.Json}`,
-        externalPayoutResponse,
-      );
+  //     this.logger.info(
+  //       `SETTLEMENT - External Payout Response: ${LoggerPlaceHolder.Json}`,
+  //       externalPayoutResponse,
+  //     );
 
-      if (externalPayoutResponse.res_code !== ANVITAPAY.STATUS.SUCCESS) {
-        throw new BadRequestException(externalPayoutResponse.msg);
-      }
+  //     if (externalPayoutResponse.res_code !== ANVITAPAY.STATUS.SUCCESS) {
+  //       throw new BadRequestException(externalPayoutResponse.msg);
+  //     }
 
-      await queryRunner.manager.update(
-        SettlementsEntity,
-        { id: savedSettlement.id },
-        {
-          transferId: externalPayoutResponse.data.Utr,
-          status: convertExternalPaymentStatusToInternal(
-            externalPayoutResponse.data.status,
-          ),
-        },
-      );
+  //     await queryRunner.manager.update(
+  //       SettlementsEntity,
+  //       { id: savedSettlement.id },
+  //       {
+  //         transferId: externalPayoutResponse.data.Utr,
+  //         status: convertExternalPaymentStatusToInternal(
+  //           externalPayoutResponse.data.status,
+  //         ),
+  //       },
+  //     );
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      this.logger.error(
-        `SETTLEMENT - initiateSettlementAdmin - error: ${LoggerPlaceHolder.Json}`,
-        error,
-      );
-      await queryRunner.rollbackTransaction();
-    } finally {
-      await queryRunner.release();
-    }
-  }
+  //     await queryRunner.commitTransaction();
+  //   } catch (error) {
+  //     this.logger.error(
+  //       `SETTLEMENT - initiateSettlementAdmin - error: ${LoggerPlaceHolder.Json}`,
+  //       error,
+  //     );
+  //     await queryRunner.rollbackTransaction();
+  //   } finally {
+  //     await queryRunner.release();
+  //   }
+  // }
 }

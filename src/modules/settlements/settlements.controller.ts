@@ -18,17 +18,17 @@ export class SettlementsController {
     return this.settlementsService.getSettlementsAdmin(query);
   }
 
-  @ApiOperation({
-    summary: "Initiate settlement transaction - Admin, Ops, Owner",
-  })
-  @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
-  // @ApiCreatedResponse({ type: CreatePayoutPaymentResponseDto })
-  @Post("initiate")
-  async createPayOutTransaction(
-    @Body() initiateSettlementAdminDto: InitiateSettlementAdminDto,
-  ) {
-    return this.settlementsService.initiateSettlementAdmin(
-      initiateSettlementAdminDto,
-    );
-  }
+  // @ApiOperation({
+  //   summary: "Initiate settlement transaction - Admin, Ops, Owner",
+  // })
+  // @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  // // @ApiCreatedResponse({ type: CreatePayoutPaymentResponseDto })
+  // @Post("initiate")
+  // async createPayOutTransaction(
+  //   @Body() initiateSettlementAdminDto: InitiateSettlementAdminDto,
+  // ) {
+  //   return this.settlementsService.initiateSettlementAdmin(
+  //     initiateSettlementAdminDto,
+  //   );
+  // }
 }

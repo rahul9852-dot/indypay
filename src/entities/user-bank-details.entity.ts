@@ -1,4 +1,10 @@
-import { BeforeInsert, Column, Entity, OneToOne, PrimaryColumn } from "typeorm";
+import {
+  BeforeInsert,
+  Column,
+  Entity,
+  ManyToOne,
+  PrimaryColumn,
+} from "typeorm";
 import { UsersEntity } from "./user.entity";
 import { ID_TYPE } from "@/enums";
 import { getUlidId } from "@/utils/helperFunctions.utils";
@@ -26,7 +32,7 @@ export class UserBankDetailsEntity {
   @Column()
   accountNumber: string;
   // Relations
-  @OneToOne(() => UsersEntity, ({ bankDetails }) => bankDetails, {
+  @ManyToOne(() => UsersEntity, ({ bankDetails }) => bankDetails, {
     onDelete: "CASCADE",
   })
   user: UsersEntity;
