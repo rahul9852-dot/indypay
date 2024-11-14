@@ -305,10 +305,10 @@ export class SettlementsService {
     const [data, totalItems] = await this.settlementsRepository.findAndCount({
       where: {
         ...(startDate && {
-          createdAt: MoreThanOrEqual(startDate),
+          createdAt: MoreThanOrEqual(new Date(startDate)),
         }),
         ...(endDate && {
-          createdAt: LessThanOrEqual(endDate),
+          createdAt: LessThanOrEqual(new Date(endDate)),
         }),
         ...(search && {
           user: {
