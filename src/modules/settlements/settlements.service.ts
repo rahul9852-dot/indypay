@@ -10,6 +10,7 @@ import {
   Repository,
   MoreThanOrEqual,
   LessThanOrEqual,
+  Between,
 } from "typeorm";
 import { InitiateSettlementAdminDto } from "./dto/initate-settlement-admin.dto";
 import { GetSettlementListDto } from "./dto/get-settlement-list.dto";
@@ -28,6 +29,11 @@ import { BanksService } from "@/modules/banks/banks.service";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { USERS_ROLE } from "@/enums";
+import { getPagination } from "@/utils/pagination.utils";
+import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
+import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { todayEndDate, todayStartDate } from "@/utils/date.utils";
+import { getCommissions } from "@/utils/commissions.utils";
 
 const {
   externalPaymentConfig: { baseUrl, clientId, clientSecret, clientSign },
@@ -52,6 +58,8 @@ export class SettlementsService {
     private readonly settlementsRepository: Repository<SettlementsEntity>,
     @InjectRepository(WalletEntity)
     private readonly walletRepository: Repository<WalletEntity>,
+    @InjectRepository(PayInOrdersEntity)
+    private readonly payinRepository: Repository<PayInOrdersEntity>,
 
     private readonly bankService: BanksService,
     private readonly dataSource: DataSource,
@@ -67,49 +75,225 @@ export class SettlementsService {
       },
     });
 
-    const walletsPromises = merchants
-      .filter(({ wallet }) => !!wallet)
-      .map((merchant) => {
-        const newWallet = this.walletRepository.create({
+    for (const merchant of merchants) {
+      if (!merchant.wallet) {
+        await this.walletRepository.save({
           user: merchant,
         });
-
-        return this.walletRepository.save(newWallet);
-      });
-
-    await Promise.all(walletsPromises);
+      }
+    }
 
     return new MessageResponseDto("Wallets created successfully");
   }
 
-  async getSettlementsList({ search = "" }: GetSettlementListDto) {
-    return this.walletRepository.find({
+  async getSettlementsStats() {
+    const collections: {
+      totalCollections: number;
+    } = await this.payinRepository
+      .createQueryBuilder("payin")
+      .select("SUM(payin.amount)", "totalCollections")
+      .where("payin.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+      .andWhere("payin.createdAt BETWEEN :startDate AND :endDate", {
+        startDate: todayStartDate(),
+        endDate: todayEndDate(),
+      })
+      .getRawOne();
+
+    const settlements: {
+      totalSettlements: number;
+    } = await this.settlementsRepository
+      .createQueryBuilder("settlement")
+      .select("SUM(settlement.amount)", "totalSettlements")
+      .where("settlement.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+      .andWhere("settlement.createdAt BETWEEN :startDate AND :endDate", {
+        startDate: todayStartDate(),
+        endDate: todayEndDate(),
+      })
+      .getRawOne();
+
+    return {
+      todayTotalCollections: +collections.totalCollections,
+      todayTotalSettlements: +settlements.totalSettlements,
+      todayTotalUnSettled:
+        +collections.totalCollections - +settlements.totalSettlements,
+    };
+  }
+
+  async getUnsettledAmountGroupedByUser({
+    search = "",
+    startDate = todayStartDate(),
+    endDate = todayEndDate(),
+    status = "UNSETTLED",
+  }: GetSettlementListDto) {
+    const calculateNetUnsettled = (
+      collections: {
+        collectedAmount: number;
+        user: UsersEntity;
+      }[],
+      settlements: {
+        settledAmount: number;
+        user: UsersEntity;
+      }[],
+    ) => {
+      const netAmounts = new Map<
+        string,
+        {
+          collectedAmount: number;
+          settledAmount: number;
+          user: UsersEntity;
+        }
+      >();
+
+      // Process collections
+      collections.forEach(({ user, collectedAmount }) => {
+        if (!netAmounts.has(user.id)) {
+          netAmounts.set(user.id, {
+            collectedAmount: 0,
+            settledAmount: 0,
+            user,
+          });
+        }
+        const val = netAmounts.get(user.id);
+        val.collectedAmount += collectedAmount;
+        netAmounts.set(user.id, val);
+      });
+
+      // Process settlements
+      settlements.forEach(({ user, settledAmount }) => {
+        if (!netAmounts.has(user.id)) {
+          netAmounts.set(user.id, {
+            collectedAmount: 0,
+            settledAmount: 0,
+            user,
+          });
+        }
+        const val = netAmounts.get(user.id);
+        val.settledAmount += settledAmount;
+        netAmounts.set(user.id, val);
+      });
+
+      return Array.from(netAmounts).map((val) => ({
+        user: val[1].user,
+        collectedAmount: +val[1].collectedAmount,
+        settledAmount: +val[1].settledAmount,
+        unsettledAmount: +val[1].collectedAmount - +val[1].settledAmount,
+      }));
+    };
+
+    const payInUserGroup = await this.usersRepository.find({
       where: {
         ...(search && {
-          user: {
-            fullName: ILike(`%${search}%`),
-          },
+          fullName: ILike(`%${search}%`),
         }),
-        user: {
-          role: USERS_ROLE.MERCHANT,
+        payInOrders: {
+          createdAt: Between(startDate, endDate),
+          status: PAYMENT_STATUS.SUCCESS,
         },
       },
       relations: {
-        user: true,
-      },
-      select: {
-        id: true,
-        settledAmount: true,
-        unsettledAmount: true,
-        totalCollections: true,
-        user: {
-          fullName: true,
-        },
+        payInOrders: true,
       },
     });
+
+    const settlementUserGroup = await this.usersRepository.find({
+      where: {
+        ...(search && {
+          fullName: ILike(`%${search}%`),
+        }),
+        settlements: {
+          createdAt: Between(startDate, endDate),
+          status: PAYMENT_STATUS.SUCCESS,
+        },
+      },
+      relations: {
+        settlements: true,
+      },
+    });
+
+    const totalPayinGroupedByUser = payInUserGroup.map((user) => {
+      const collectedAmount = user.payInOrders.reduce((acc, order) => {
+        if (order.status === PAYMENT_STATUS.SUCCESS) {
+          acc += +order.amount;
+        }
+
+        return acc;
+      }, 0);
+
+      return { collectedAmount, user };
+    });
+
+    const totalSettlementGroupedByUser = settlementUserGroup.map((user) => {
+      const settledAmount = user.settlements.reduce((acc, order) => {
+        if (order.status === PAYMENT_STATUS.SUCCESS) {
+          acc += +order.amount;
+        }
+
+        return acc;
+      }, 0);
+
+      return { settledAmount, user };
+    });
+
+    const res = calculateNetUnsettled(
+      totalPayinGroupedByUser,
+      totalSettlementGroupedByUser,
+    );
+
+    if (status === "COLLECTIONS") {
+      return res
+        .filter((val) => !!val.collectedAmount)
+        .map((val) => {
+          const { totalServiceChange: _, ...rest } = getCommissions({
+            amount: val.collectedAmount,
+            commissionInPercentage: val.user.commissionInPercentagePayin,
+            gstInPercentage: val.user.gstInPercentagePayin,
+          });
+
+          return {
+            fullName: val.user.fullName,
+            collectionAmount: +val.collectedAmount,
+            status,
+            ...rest,
+          };
+        });
+    } else if (status === "SETTLED") {
+      return res
+        .filter((val) => !!val.settledAmount)
+        .map((val) => {
+          const { totalServiceChange: _, ...rest } = getCommissions({
+            amount: val.settledAmount,
+            commissionInPercentage: val.user.commissionInPercentagePayin,
+            gstInPercentage: val.user.gstInPercentagePayin,
+          });
+
+          return {
+            fullName: val.user.fullName,
+            settledAmount: +val.settledAmount,
+            status,
+            ...rest,
+          };
+        });
+    } else {
+      return res
+        .filter((val) => !!val.unsettledAmount)
+        .map((val) => {
+          const { totalServiceChange: _, ...rest } = getCommissions({
+            amount: val.unsettledAmount,
+            commissionInPercentage: val.user.commissionInPercentagePayin,
+            gstInPercentage: val.user.gstInPercentagePayin,
+          });
+
+          return {
+            fullName: val.user.fullName,
+            unsettledAmount: +val.unsettledAmount,
+            status,
+            ...rest,
+          };
+        });
+    }
   }
 
-  async findAll({
+  async findAllSettlementsTransactions({
     limit = 10,
     page = 1,
     order = "DESC",
@@ -118,7 +302,7 @@ export class SettlementsService {
     startDate,
     endDate,
   }: PaginationWithDateDto) {
-    return await this.settlementsRepository.find({
+    const [data, totalItems] = await this.settlementsRepository.findAndCount({
       where: {
         ...(startDate && {
           createdAt: MoreThanOrEqual(startDate),
@@ -157,6 +341,17 @@ export class SettlementsService {
         [sort]: order,
       },
     });
+
+    const pagination = getPagination({
+      limit,
+      totalItems,
+      page,
+    });
+
+    return {
+      data,
+      pagination,
+    };
   }
 
   async initiateSettlement(

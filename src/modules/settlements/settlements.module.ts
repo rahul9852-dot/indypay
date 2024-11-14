@@ -7,6 +7,7 @@ import { SettlementsEntity } from "@/entities/settlements.entity";
 import { BanksService } from "@/modules/banks/banks.service";
 import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 import { WalletEntity } from "@/entities/wallet.entity";
+import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { WalletEntity } from "@/entities/wallet.entity";
       SettlementsEntity,
       UserBankDetailsEntity,
       WalletEntity,
+      PayInOrdersEntity,
     ]),
   ],
   providers: [SettlementsService, BanksService],

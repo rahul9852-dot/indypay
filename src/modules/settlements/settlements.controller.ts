@@ -18,14 +18,21 @@ export class SettlementsController {
   @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @Get()
   async getSettlementsAdmin(@Query() query: PaginationWithDateDto) {
-    return this.settlementsService.findAll(query);
+    return this.settlementsService.findAllSettlementsTransactions(query);
   }
 
-  @ApiOperation({ summary: "Get settlements List - Admin, Ops, Owner" })
+  @ApiOperation({ summary: "Get settlements Daily Stats - Admin, Ops, Owner" })
+  @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Get("stats")
+  async getSettlementsStats() {
+    return this.settlementsService.getSettlementsStats();
+  }
+
+  @ApiOperation({ summary: "Get settlements Daily Stats - Admin, Ops, Owner" })
   @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @Get("list")
   async getSettlementsList(@Query() query: GetSettlementListDto) {
-    return this.settlementsService.getSettlementsList(query);
+    return this.settlementsService.getUnsettledAmountGroupedByUser(query);
   }
 
   @ApiOperation({

@@ -67,6 +67,38 @@ export class UsersEntity {
   @Column({ nullable: true })
   payOutWebhookUrl?: string;
 
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    default: 4.5,
+  })
+  commissionInPercentagePayin?: number;
+
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    default: 1.5,
+  })
+  commissionInPercentagePayout?: number;
+
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    default: 18,
+  })
+  gstInPercentagePayin?: number;
+
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    default: 18,
+  })
+  gstInPercentagePayout?: number;
+
   // Relations
   @OneToMany(() => PayInOrdersEntity, ({ user }) => user, { cascade: true })
   payInOrders: PayInOrdersEntity[];
