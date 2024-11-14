@@ -12,6 +12,11 @@ export class InitiateSettlementAdminDto {
   @IsNotEmpty()
   userId: string;
 
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  bankId: string;
+
   @ApiPropertyOptional({
     enum: PAYOUT_PAYMENT_MODE,
     default: PAYOUT_PAYMENT_MODE.IMPS,

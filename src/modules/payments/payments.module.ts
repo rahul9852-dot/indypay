@@ -14,6 +14,8 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
+import { UserAddressEntity } from "@/entities/user-address.entity";
+import { WalletEntity } from "@/entities/wallet.entity";
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
       PayOutOrdersEntity,
       UserBankDetailsEntity,
       UserWhitelistIpsEntity,
+      UserAddressEntity,
+      WalletEntity,
     ]),
   ],
   providers: [

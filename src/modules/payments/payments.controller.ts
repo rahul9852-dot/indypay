@@ -69,7 +69,6 @@ export class PaymentsController {
 
   @ApiOperation({ summary: "External webhook for pay-in" })
   @UseGuards(WebhookGuard)
-  @ApiOperation({ summary: "External webhook" })
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
@@ -77,5 +76,14 @@ export class PaymentsController {
     @Body() externalPayinWebhookDto: ExternalPayinWebhookDto,
   ) {
     return this.paymentsService.externalWebhookPayin(externalPayinWebhookDto);
+  }
+
+  @ApiOperation({ summary: "External webhook for pay-out" })
+  @UseGuards(WebhookGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payout/webhook")
+  async externalWebhookPayout(@Body() externalWebhookPayout: any) {
+    return this.paymentsService.externalWebhookPayout(externalWebhookPayout);
   }
 }

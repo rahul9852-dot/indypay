@@ -3,7 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  ManyToOne,
+  OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
@@ -32,7 +32,7 @@ export class UserAddressEntity {
   pincode: string;
 
   // Relations
-  @ManyToOne(() => UsersEntity, ({ address }) => address, {
+  @OneToOne(() => UsersEntity, ({ address }) => address, {
     onDelete: "CASCADE",
   })
   user: UsersEntity;

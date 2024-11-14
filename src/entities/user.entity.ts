@@ -21,6 +21,7 @@ import { PayOutOrdersEntity } from "./payout-orders.entity";
 import { TransactionsEntity } from "./transaction.entity";
 import { UserWhitelistIpsEntity } from "./user-whitelist-ip.entity";
 import { SettlementsEntity } from "./settlements.entity";
+import { WalletEntity } from "./wallet.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import {
   ONBOARDING_STATUS,
@@ -99,6 +100,16 @@ export class UsersEntity {
   multiFactorAuth: UserMultiFactorAuthEntity;
 
   @JoinColumn()
+  @OneToOne(() => WalletEntity, ({ user }) => user, {
+    cascade: true,
+  })
+  wallet: WalletEntity;
+
+  @JoinColumn()
+  @OneToOne(() => UserAddressEntity, ({ user }) => user, { cascade: true })
+  address: UserAddressEntity;
+
+  @JoinColumn()
   @OneToOne(() => UserKycEntity, ({ user }) => user, { cascade: true })
   kyc: UserKycEntity;
 
@@ -107,9 +118,6 @@ export class UsersEntity {
 
   @OneToMany(() => UserApiKeysEntity, ({ user }) => user, { cascade: true })
   apiKeys: UserApiKeysEntity[];
-
-  @OneToMany(() => UserAddressEntity, ({ user }) => user, { cascade: true })
-  address: UserAddressEntity[];
 
   @CreateDateColumn({ type: "timestamp" })
   createdAt: Date;

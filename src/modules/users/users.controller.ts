@@ -35,6 +35,7 @@ import {
   DeleteWhitelistIpsDto,
   WhitelistIpsResponseDto,
 } from "./dto/whitelist-ips.dto";
+import { AddAddressAdminDto, AddAddressDto } from "./dto/add-address.dto";
 import { User } from "@/decorators/user.decorator";
 import { IAccessTokenPayload } from "@/interface/common.interface";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
@@ -55,6 +56,44 @@ import { ChangeAccountStatusGuard } from "@/guard/change-account-status.guard";
 })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @ApiOperation({
+    summary: "Add Address - Admin & OPS",
+  })
+  @Post("address/admin")
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN, USERS_ROLE.OPS)
+  async addAddressAdmin(@Body() { userId, ...rest }: AddAddressAdminDto) {
+    return this.usersService.addUserAddress(userId, rest);
+  }
+
+  @ApiOperation({
+    summary: "Get Address - Merchant",
+  })
+  @Get("address")
+  @Role(USERS_ROLE.MERCHANT)
+  async getAddress(@User() { id }: UsersEntity) {
+    return this.usersService.getAddress(id);
+  }
+  @ApiOperation({
+    summary: "Get Address - Admin & OPS",
+  })
+  @Get("address/:userId")
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS, USERS_ROLE.OWNER)
+  async getAddressAdmin(@Param("userId") userId: string) {
+    return this.usersService.getAddress(userId);
+  }
+
+  @ApiOperation({
+    summary: "Add Address - Merchant",
+  })
+  @Post("address")
+  @Role(USERS_ROLE.MERCHANT)
+  async addAddress(
+    @Body() addAddressDto: AddAddressDto,
+    @User() { id }: UsersEntity,
+  ) {
+    return this.usersService.addUserAddress(id, addAddressDto);
+  }
 
   @ApiOperation({
     summary: "Get All Merchants - Admin & OPS",

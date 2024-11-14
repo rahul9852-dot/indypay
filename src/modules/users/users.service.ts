@@ -13,6 +13,7 @@ import { AddBusinessDetailsDto } from "./dto/add-business-details.dto";
 import { WebhookUrlDto } from "./dto/webhook.dto";
 import { ChangeStatusDto } from "./dto/change-status.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
+import { AddAddressDto } from "./dto/add-address.dto";
 import { DeleteWhitelistIpsDto } from "./dto/whitelist-ips.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
@@ -35,6 +36,7 @@ import { decryptData, encryptData } from "@/utils/encode-decode.utils";
 import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 import { getPagination } from "@/utils/pagination.utils";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
+import { UserAddressEntity } from "@/entities/user-address.entity";
 
 @Injectable()
 export class UsersService {
@@ -47,10 +49,63 @@ export class UsersService {
     private readonly userBankDetailsRepository: Repository<UserBankDetailsEntity>,
     @InjectRepository(UserWhitelistIpsEntity)
     private readonly userWhitelistIpsRepository: Repository<UserWhitelistIpsEntity>,
+    @InjectRepository(UserAddressEntity)
+    private readonly addressEntity: Repository<UserAddressEntity>,
 
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
   ) {}
+
+  async getAddress(userId: string) {
+    const user = await this.usersRepository.findOne({
+      where: {
+        id: userId,
+      },
+      relations: {
+        address: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    if (!user.address) {
+      throw new NotFoundException(new MessageResponseDto("Address not found"));
+    }
+
+    return user.address;
+  }
+
+  async addUserAddress(userId: string, addAddressDto: AddAddressDto) {
+    const user = await this.usersRepository.findOne({
+      where: {
+        id: userId,
+      },
+      relations: {
+        address: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    if (user.address) {
+      throw new ConflictException(
+        new MessageResponseDto("Address already exists"),
+      );
+    }
+
+    const address = this.addressEntity.create({
+      user,
+      ...addAddressDto,
+    });
+
+    await this.addressEntity.save(address);
+
+    return new MessageResponseDto("Address added successfully");
+  }
 
   async getAllMerchants() {
     return this.usersRepository.find({

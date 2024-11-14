@@ -27,6 +27,7 @@ import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { ANVITAPAY } from "@/constants/external-api.constant";
+import { WalletEntity } from "@/entities/wallet.entity";
 
 const {
   externalPaymentConfig: { baseUrl, clientId, clientSecret, clientSign },
@@ -50,6 +51,8 @@ export class PaymentsService {
     private readonly payInOrdersRepository: Repository<PayInOrdersEntity>,
     @InjectRepository(PayOutOrdersEntity)
     private readonly payOutOrdersRepository: Repository<PayOutOrdersEntity>,
+    @InjectRepository(WalletEntity)
+    private readonly walletRepository: Repository<WalletEntity>,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -266,6 +269,29 @@ export class PaymentsService {
       payinOrderRaw,
     );
 
+    // update wallet
+    if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+      const wallet = await this.walletRepository.findOne({
+        where: { user: { id: user.id } },
+        relations: ["user"],
+      });
+
+      const walletRaw = this.walletRepository.create({
+        ...(wallet?.id && { id: wallet.id }),
+        totalCollections: wallet?.totalCollections
+          ? +wallet.totalCollections
+          : 0 + +payinOrder.netPayableAmount,
+        user,
+      });
+
+      await this.walletRepository.save(walletRaw);
+
+      this.logger.info(
+        `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+        walletRaw,
+      );
+    }
+
     if (user?.payInWebhookUrl) {
       const webhookPayload = {
         orderId,
@@ -296,6 +322,18 @@ export class PaymentsService {
           );
         });
     }
+
+    return new MessageResponseDto("Transaction status updated successfully.");
+  }
+
+  async externalWebhookPayout(externalPayoutWebhookDto: any) {
+    this.logger.info(
+      `PAYOUT WEBHOOK - externalWebhookUpdateStatusPayin - externalPayinWebhookDto: ${LoggerPlaceHolder.Json}`,
+      externalPayoutWebhookDto,
+    );
+
+    //FIXME
+    // if fail add amount to unsettled
 
     return new MessageResponseDto("Transaction status updated successfully.");
   }

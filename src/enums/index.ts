@@ -86,6 +86,7 @@ export enum ID_TYPE {
   USER_BANK_DETAILS_KEY = "ubank",
   USER_WHITELIST_IP = "uwip",
   SETTLEMENT_PAYOUT = "stl",
+  WALLET = "wlt",
 }
 
 export enum ONBOARDING_STATUS {

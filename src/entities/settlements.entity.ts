@@ -33,11 +33,17 @@ export class SettlementsEntity {
   @Column({ nullable: true })
   transferId: string;
 
+  @Column({ nullable: true })
+  remarks: string;
+
   // Relations
   @ManyToOne(() => UsersEntity, ({ settlements }) => settlements, {
     onDelete: "CASCADE",
   })
   user: UsersEntity;
+
+  @ManyToOne(() => UsersEntity, { nullable: true })
+  settledBy: UsersEntity;
 
   @Column({ nullable: true, type: "timestamp" })
   successAt: Date;
