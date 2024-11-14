@@ -20,7 +20,7 @@ import { TransactionsModule } from "@/modules/transactions/transactions.module";
 import { SettlementsModule } from "@/modules/settlements/settlements.module";
 import { DocsModule } from "@/modules/docs/docs.module";
 import { CollectionsModule } from "@/modules/collections/collections.module";
-import { BanksModule } from './modules/banks/banks.module';
+import { BanksModule } from "@/modules/banks/banks.module";
 
 @Module({
   imports: [

@@ -57,6 +57,31 @@ export class SettlementsService {
     private readonly dataSource: DataSource,
   ) {}
 
+  async createWalletForMerchants() {
+    const merchants = await this.usersRepository.find({
+      where: {
+        role: USERS_ROLE.MERCHANT,
+      },
+      relations: {
+        wallet: true,
+      },
+    });
+
+    const walletsPromises = merchants
+      .filter(({ wallet }) => !!wallet)
+      .map((merchant) => {
+        const newWallet = this.walletRepository.create({
+          user: merchant,
+        });
+
+        return this.walletRepository.save(newWallet);
+      });
+
+    await Promise.all(walletsPromises);
+
+    return new MessageResponseDto("Wallets created successfully");
+  }
+
   async getSettlementsList({ search = "" }: GetSettlementListDto) {
     return this.walletRepository.find({
       where: {

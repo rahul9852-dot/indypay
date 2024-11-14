@@ -42,4 +42,11 @@ export class SettlementsController {
       user,
     );
   }
+
+  @ApiOperation({ summary: "Create Wallets for all merchants - Owner" })
+  @Role(USERS_ROLE.OWNER)
+  @Post("create-wallets")
+  async createWalletForMerchants() {
+    return this.settlementsService.createWalletForMerchants();
+  }
 }
