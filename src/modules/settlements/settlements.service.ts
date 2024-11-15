@@ -14,7 +14,11 @@ import {
 } from "typeorm";
 import { InitiateSettlementAdminDto } from "./dto/initate-settlement-admin.dto";
 import { GetSettlementListDto } from "./dto/get-settlement-list.dto";
-import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
+import {
+  MessageResponseDto,
+  PaginationWithDateDto,
+  PaginationWithoutSortAndOrderDto,
+} from "@/dtos/common.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
@@ -487,7 +491,7 @@ export class SettlementsService {
         orderId: externalPayoutResponse.data.Ref_No,
         externalId: externalPayoutResponse.data.ID,
         amount: externalPayoutResponse.data.Amount,
-        ...(externalPayoutResponse.data.Utr && {
+        ...(externalPayoutResponse.data?.Utr && {
           UTR: externalPayoutResponse.data.Utr,
         }),
       };
@@ -502,5 +506,66 @@ export class SettlementsService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async getPendingSettlements({
+    limit = 10,
+    page = 1,
+    search = "",
+  }: PaginationWithoutSortAndOrderDto) {
+    const [settlements, totalItems] = await this.usersRepository.findAndCount({
+      where: {
+        role: USERS_ROLE.MERCHANT,
+        ...(search && {
+          fullName: ILike(`%${search}%`),
+        }),
+      },
+      relations: {
+        wallet: true,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const pagination = getPagination({
+      totalItems,
+      page,
+      limit,
+    });
+
+    const data = settlements.map((settlement) => {
+      return {
+        id: settlement.id,
+        name: settlement.fullName,
+        unsettledAmount: +settlement.wallet.unsettledAmount,
+      };
+    });
+
+    return {
+      data,
+      pagination,
+    };
+  }
+
+  async getPendingSettlementsByUserId(userId: string) {
+    const settlement = await this.usersRepository.findOne({
+      where: {
+        role: USERS_ROLE.MERCHANT,
+        id: userId,
+      },
+      relations: {
+        wallet: true,
+      },
+    });
+
+    if (!settlement) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    return {
+      id: settlement.id,
+      name: settlement.fullName,
+      unsettledAmount: +settlement.wallet.unsettledAmount,
+    };
   }
 }

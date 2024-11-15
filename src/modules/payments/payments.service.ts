@@ -270,9 +270,11 @@ export class PaymentsService {
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
         totalCollections:
-          (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
+          (totalCollections ? +totalCollections : 0) +
+          +payinOrder.netPayableAmount,
         unsettledAmount:
-          (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
+          (unsettledAmount ? +unsettledAmount : 0) +
+          +payinOrder.netPayableAmount,
         user,
       });
 
