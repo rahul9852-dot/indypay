@@ -78,4 +78,14 @@ export class SettlementsController {
   async createWalletForMerchants() {
     return this.settlementsService.createWalletForMerchants();
   }
+
+  @ApiOperation({ summary: "Get all settlements for a merchant" })
+  @Role(USERS_ROLE.MERCHANT)
+  @Get("merchant")
+  async getAllSettlementsForMerchant(
+    @User() user: UsersEntity,
+    @Query() query: PaginationWithDateDto,
+  ) {
+    return this.settlementsService.getAllSettlementsForMerchant(user.id, query);
+  }
 }

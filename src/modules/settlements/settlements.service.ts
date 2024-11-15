@@ -610,4 +610,52 @@ export class SettlementsService {
       commissionAmount: +settlement.wallet.commissionAmount,
     };
   }
+
+  async getAllSettlementsForMerchant(
+    userId: string,
+    {
+      limit = 10,
+      page = 1,
+      order = "DESC",
+      sort = "id",
+      startDate = todayStartDate(),
+      endDate = todayEndDate(),
+    }: PaginationWithDateDto,
+  ) {
+    const settlements = await this.settlementsRepository.find({
+      where: {
+        user: { id: userId },
+        // ...(startDate && {
+        //   createdAt: MoreThanOrEqual(new Date(startDate)),
+        // }),
+        // ...(endDate && {
+        //   createdAt: LessThanOrEqual(new Date(endDate)),
+        // }),
+      },
+      relations: {
+        user: true,
+      },
+      select: {
+        id: true,
+        amount: true,
+        status: true,
+        transferId: true,
+        transferMode: true,
+        remarks: true,
+        createdAt: true,
+        user: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
+      take: limit,
+      skip: (page - 1) * limit,
+      order: {
+        [sort]: order,
+      },
+    });
+
+    return settlements;
+  }
 }
