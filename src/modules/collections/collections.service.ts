@@ -113,7 +113,6 @@ export class CollectionsService {
           txnRefId: true,
           orderId: true,
           netPayableAmount: true,
-          settlementStatus: true,
           user: {
             id: true,
             fullName: true,
@@ -150,7 +149,6 @@ export class CollectionsService {
         txnRefId: true,
         orderId: true,
         netPayableAmount: true,
-        settlementStatus: true,
         user: {
           id: true,
           fullName: true,
@@ -183,7 +181,6 @@ export class CollectionsService {
           txnRefId: true,
           orderId: true,
           netPayableAmount: true,
-          settlementStatus: true,
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -213,7 +210,6 @@ export class CollectionsService {
         txnRefId: true,
         orderId: true,
         netPayableAmount: true,
-        settlementStatus: true,
         user: {
           id: true,
           fullName: true,

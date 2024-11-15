@@ -265,13 +265,14 @@ export class PaymentsService {
         relations: ["user"],
       });
 
-      const { totalCollections } = wallet ?? {};
+      const { totalCollections, unsettledAmount } = wallet ?? {};
 
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
         totalCollections:
-          (totalCollections ? +totalCollections : 0) +
-          +payinOrder.netPayableAmount,
+          (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
+        unsettledAmount:
+          (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
         user,
       });
 
