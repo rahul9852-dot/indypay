@@ -534,6 +534,14 @@ export class SettlementsService {
     });
 
     const data = settlements.map((settlement) => {
+      if (!settlement.wallet) {
+        throw new NotFoundException(
+          new MessageResponseDto(
+            "User wallet not found for: " + settlement.fullName,
+          ),
+        );
+      }
+
       return {
         id: settlement.id,
         name: settlement.fullName,
