@@ -562,6 +562,12 @@ export class SettlementsService {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
 
+    if (!settlement.wallet) {
+      throw new NotFoundException(
+        new MessageResponseDto("User wallet not found"),
+      );
+    }
+
     return {
       id: settlement.id,
       name: settlement.fullName,
