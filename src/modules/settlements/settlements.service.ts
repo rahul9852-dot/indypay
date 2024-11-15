@@ -37,7 +37,10 @@ import { getPagination } from "@/utils/pagination.utils";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
-import { getCommissions } from "@/utils/commissions.utils";
+import {
+  calculateOriginalAmountFromNetPayable,
+  getCommissions,
+} from "@/utils/commissions.utils";
 
 const {
   externalPaymentConfig: { baseUrl, clientId, clientSecret, clientSign },
@@ -405,6 +408,9 @@ export class SettlementsService {
             id: userId,
           },
         },
+        relations: {
+          user: true,
+        },
       });
 
       if (!wallet) {
@@ -413,15 +419,31 @@ export class SettlementsService {
         );
       }
 
-      if (+wallet.unsettledAmount < +amount) {
+      if (+wallet.netPayableAmount < +amount) {
         throw new BadRequestException(
           new MessageResponseDto("Amount is greater than unsettled amount"),
         );
       }
+      const originalAmount = calculateOriginalAmountFromNetPayable({
+        netPayableAmount: +amount,
+        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+        gstInPercentage: +wallet.user.gstInPercentagePayin,
+      });
+
+      const commission = getCommissions({
+        amount: originalAmount,
+        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+        gstInPercentage: +wallet.user.gstInPercentagePayin,
+      });
+
       const newWallet = this.walletRepository.create({
         id: wallet.id,
-        settledAmount: +wallet.settledAmount + +amount,
-        unsettledAmount: +wallet.unsettledAmount - +amount,
+        settledAmount: +wallet.settledAmount + +originalAmount,
+        unsettledAmount: +wallet.unsettledAmount - +originalAmount,
+        netPayableAmount: +wallet.netPayableAmount - +amount,
+        commissionAmount:
+          +wallet.commissionAmount - +commission.commissionAmount,
+        gstAmount: +wallet.gstAmount - +commission.gstAmount,
       });
 
       await queryRunner.manager.save(newWallet);
@@ -546,6 +568,9 @@ export class SettlementsService {
         id: settlement.id,
         name: settlement.fullName,
         unsettledAmount: +settlement.wallet.unsettledAmount,
+        netUnsettledPayableAmount: +settlement.wallet.netPayableAmount,
+        gstAmount: +settlement.wallet.gstAmount,
+        commissionAmount: +settlement.wallet.commissionAmount,
       };
     });
 
@@ -580,6 +605,9 @@ export class SettlementsService {
       id: settlement.id,
       name: settlement.fullName,
       unsettledAmount: +settlement.wallet.unsettledAmount,
+      netUnsettledPayableAmount: +settlement.wallet.netPayableAmount,
+      gstAmount: +settlement.wallet.gstAmount,
+      commissionAmount: +settlement.wallet.commissionAmount,
     };
   }
 }

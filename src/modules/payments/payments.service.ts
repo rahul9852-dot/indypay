@@ -28,6 +28,7 @@ import { appConfig } from "@/config/app.config";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { ANVITAPAY } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
+import { getCommissions } from "@/utils/commissions.utils";
 
 const {
   externalPaymentConfig: { baseUrl, clientId, clientSecret, clientSign },
@@ -267,14 +268,25 @@ export class PaymentsService {
 
       const { totalCollections, unsettledAmount } = wallet ?? {};
 
+      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+        amount: +payinOrder.amount,
+        commissionInPercentage: +user.commissionInPercentagePayin,
+        gstInPercentage: +user.gstInPercentagePayin,
+      });
+
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
         totalCollections:
-          (totalCollections ? +totalCollections : 0) +
-          +payinOrder.netPayableAmount,
+          (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
         unsettledAmount:
-          (unsettledAmount ? +unsettledAmount : 0) +
-          +payinOrder.netPayableAmount,
+          (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
+        commissionAmount:
+          (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
+          +commissionAmount,
+        gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
+        netPayableAmount:
+          (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
+          +netPayableAmount,
         user,
       });
 

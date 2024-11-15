@@ -40,6 +40,30 @@ export class WalletEntity {
   })
   unsettledAmount: number; // Total amount unsettled
 
+  @Column({
+    type: "numeric",
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  commissionAmount: number;
+
+  @Column({
+    type: "numeric",
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  gstAmount: number;
+
+  @Column({
+    type: "numeric",
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  netPayableAmount: number;
+
   // Relations
   @OneToOne(() => UsersEntity, ({ wallet }) => wallet, {
     onDelete: "CASCADE",

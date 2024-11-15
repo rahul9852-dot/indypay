@@ -19,3 +19,28 @@ export const getCommissions = ({
     totalServiceChange,
   };
 };
+
+export const calculateOriginalAmountFromNetPayable = ({
+  netPayableAmount,
+  commissionInPercentage,
+  gstInPercentage,
+}: {
+  netPayableAmount: number;
+  commissionInPercentage: number;
+  gstInPercentage: number;
+}) => {
+  const commissionRate = commissionInPercentage / 100;
+  const gstRate = (commissionRate * gstInPercentage) / 100;
+
+  const totalDeductionRate = commissionRate + gstRate;
+
+  if (totalDeductionRate >= 1) {
+    throw new Error(
+      "Invalid rates: Total deduction cannot be equal or greater than 1.",
+    );
+  }
+
+  const originalAmount = netPayableAmount / (1 - totalDeductionRate);
+
+  return originalAmount;
+};
