@@ -215,10 +215,6 @@ export class PaymentsService {
   }
 
   async externalWebhookPayin(externalPayinWebhookDto: ExternalPayinWebhookDto) {
-    this.logger.info(
-      `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - externalPayinWebhookDto: ${LoggerPlaceHolder.Json}`,
-      externalPayinWebhookDto,
-    );
     const {
       Data: { ref_no: orderId, TxnPaymentStatus, Utr: txnRefId },
     } = externalPayinWebhookDto;
@@ -236,6 +232,14 @@ export class PaymentsService {
       throw new NotFoundException(
         new MessageResponseDto("Payin order not found"),
       );
+    }
+
+    if (status === payinOrder.status) {
+      this.logger.info(
+        `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+      );
+
+      return new MessageResponseDto("Status updated successfully.");
     }
 
     const { user } = payinOrder;
@@ -261,11 +265,13 @@ export class PaymentsService {
         relations: ["user"],
       });
 
+      const { totalCollections } = wallet ?? {};
+
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
-        totalCollections: wallet?.totalCollections
-          ? +wallet.totalCollections
-          : 0 + +payinOrder.netPayableAmount,
+        totalCollections:
+          (totalCollections ? +totalCollections : 0) +
+          +payinOrder.netPayableAmount,
         user,
       });
 
