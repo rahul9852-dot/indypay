@@ -618,20 +618,29 @@ export class SettlementsService {
       page = 1,
       order = "DESC",
       sort = "id",
+      search = "",
       startDate = todayStartDate(),
       endDate = todayEndDate(),
     }: PaginationWithDateDto,
   ) {
-    const settlements = await this.settlementsRepository.find({
-      where: {
-        user: { id: userId },
-        // ...(startDate && {
-        //   createdAt: MoreThanOrEqual(new Date(startDate)),
-        // }),
-        // ...(endDate && {
-        //   createdAt: LessThanOrEqual(new Date(endDate)),
-        // }),
-      },
+    const [data, totalItems] = await this.settlementsRepository.findAndCount({
+      where: [
+        {
+          user: {
+            id: userId,
+          },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
+        },
+        ...(search && [
+          {
+            user: {
+              fullName: ILike(`%${search}%`),
+            },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
+          },
+        ]),
+      ],
+
       relations: {
         user: true,
       },
@@ -649,13 +658,19 @@ export class SettlementsService {
           email: true,
         },
       },
-      take: limit,
       skip: (page - 1) * limit,
+      take: limit,
       order: {
         [sort]: order,
       },
     });
 
-    return settlements;
+    const pagination = getPagination({
+      totalItems,
+      page,
+      limit,
+    });
+
+    return { data, pagination };
   }
 }

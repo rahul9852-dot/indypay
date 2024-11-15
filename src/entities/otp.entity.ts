@@ -20,13 +20,13 @@ export class AuthOtpEntity {
   @Column({ unique: true })
   mobile: string;
 
-  @Column({ type: "timestamp" })
+  @Column({ type: "timestamptz" })
   expiredAt: Date;
 
-  @CreateDateColumn({ type: "timestamp" })
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: "timestamp" })
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @BeforeInsert()

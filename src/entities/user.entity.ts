@@ -151,10 +151,10 @@ export class UsersEntity {
   @OneToMany(() => UserApiKeysEntity, ({ user }) => user, { cascade: true })
   apiKeys: UserApiKeysEntity[];
 
-  @CreateDateColumn({ type: "timestamp" })
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: "timestamp" })
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @BeforeInsert()

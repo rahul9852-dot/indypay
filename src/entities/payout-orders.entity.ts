@@ -71,16 +71,16 @@ export class PayOutOrdersEntity {
   })
   transaction: TransactionsEntity;
 
-  @Column({ nullable: true, type: "timestamp" })
+  @Column({ nullable: true, type: "timestamptz" })
   successAt: Date;
 
-  @Column({ nullable: true, type: "timestamp" })
+  @Column({ nullable: true, type: "timestamptz" })
   failureAt: Date;
 
-  @CreateDateColumn({ type: "timestamp" })
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: "timestamp" })
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
   @BeforeInsert()
