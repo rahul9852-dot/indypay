@@ -220,26 +220,14 @@ export class PaymentsService {
       externalPayinWebhookDto,
     );
     const {
-      order_id: orderId,
-      status: isSuccess,
-      status_code: status,
-      transaction_id: txnRefId,
+      Data: { ref_no: orderId, TxnPaymentStatus, Utr: txnRefId },
     } = externalPayinWebhookDto;
 
-    if (!isSuccess) {
-      this.logger.warn(
-        `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - externalPayinWebhookDto: ${JSON.stringify(externalPayinWebhookDto)}`,
-      );
-
-      throw new BadRequestException(
-        new MessageResponseDto("Invalid webhook request"),
-      );
-    }
+    const status = convertExternalPaymentStatusToInternal(TxnPaymentStatus);
 
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: {
         orderId,
-        txnRefId,
       },
       relations: ["user"],
     });
@@ -252,25 +240,22 @@ export class PaymentsService {
 
     const { user } = payinOrder;
 
-    const internalStatus = convertExternalPaymentStatusToInternal(status);
-
     const payinOrderRaw = this.payInOrdersRepository.create({
-      status: internalStatus,
-      ...(internalStatus === PAYMENT_STATUS.SUCCESS && {
+      id: payinOrder.id,
+      status,
+      txnRefId,
+      ...(status === PAYMENT_STATUS.SUCCESS && {
         successAt: new Date(),
       }),
-      ...(internalStatus === PAYMENT_STATUS.FAILED && {
+      ...(status === PAYMENT_STATUS.FAILED && {
         failureAt: new Date(),
       }),
     });
 
-    await this.payInOrdersRepository.update(
-      { id: payinOrder.id },
-      payinOrderRaw,
-    );
+    await this.payInOrdersRepository.save(payinOrderRaw);
 
     // update wallet
-    if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+    if (status === PAYMENT_STATUS.SUCCESS) {
       const wallet = await this.walletRepository.findOne({
         where: { user: { id: user.id } },
         relations: ["user"],
@@ -297,7 +282,7 @@ export class PaymentsService {
         orderId,
         status,
         amount: payinOrder.amount,
-        txnRefId: payinOrder.txnRefId,
+        txnRefId: payinOrder.txnRefId, // utr
       };
       this.logger.info(
         `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
