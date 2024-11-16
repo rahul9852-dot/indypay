@@ -17,6 +17,8 @@ import { PAYMENT_STATUS, PAYMENT_TYPE } from "@/enums/payment.enum";
 import { getCsv } from "@/utils/csv.utils";
 import { UsersEntity } from "@/entities/user.entity";
 import { PaginationDto } from "@/dtos/common.dto";
+import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
+import { SettlementsEntity } from "@/entities/settlements.entity";
 
 @Injectable()
 export class TransactionsService {
@@ -26,6 +28,12 @@ export class TransactionsService {
 
     @InjectRepository(PayInOrdersEntity)
     private readonly payInOrdersRepository: Repository<PayInOrdersEntity>,
+
+    @InjectRepository(PayOutOrdersEntity)
+    private readonly payOutOrdersRepository: Repository<PayOutOrdersEntity>,
+
+    @InjectRepository(SettlementsEntity)
+    private readonly settlementsRepository: Repository<SettlementsEntity>,
   ) {}
 
   selectQuery: FindOptionsSelect<TransactionsEntity> = {
@@ -52,6 +60,14 @@ export class TransactionsService {
       commissionAmount: true,
       gstAmount: true,
       netPayableAmount: true,
+      createdAt: true,
+    },
+    settlementOrder: {
+      id: true,
+      amount: true,
+      status: true,
+      transferMode: true,
+      transferId: true,
       createdAt: true,
     },
   };
@@ -359,6 +375,47 @@ export class TransactionsService {
       where: { status: PAYMENT_STATUS.FAILED },
     });
 
+    // payout
+    const totalAmountPayout = await this.payOutOrdersRepository.sum(
+      "amount",
+      {},
+    );
+    const totalCountPayout = await this.payOutOrdersRepository.count({});
+
+    const successAmountPayout = await this.payOutOrdersRepository.sum(
+      "amount",
+      {
+        status: PAYMENT_STATUS.SUCCESS,
+      },
+    );
+    const successCountPayout = await this.payOutOrdersRepository.count({
+      where: { status: PAYMENT_STATUS.SUCCESS },
+    });
+
+    const failedAmountPayout = await this.payOutOrdersRepository.sum("amount", {
+      status: PAYMENT_STATUS.FAILED,
+    });
+    const failedCountPayout = await this.payOutOrdersRepository.count({
+      where: { status: PAYMENT_STATUS.FAILED },
+    });
+
+    // Settlement
+    const totalSettlementAmount = await this.settlementsRepository.sum(
+      "amount",
+      {},
+    );
+    const totalSettlementCount = await this.settlementsRepository.count({});
+
+    const successSettlementAmount = await this.settlementsRepository.sum(
+      "amount",
+      {
+        status: PAYMENT_STATUS.SUCCESS,
+      },
+    );
+    const successSettlementCount = await this.settlementsRepository.count({
+      where: { status: PAYMENT_STATUS.SUCCESS },
+    });
+
     return {
       payin: {
         totalAmount,
@@ -368,7 +425,20 @@ export class TransactionsService {
         failedAmount,
         failedCount,
       },
-      payout: {},
+      payout: {
+        totalAmount: totalAmountPayout,
+        totalCount: totalCountPayout,
+        successAmount: successAmountPayout,
+        successCount: successCountPayout,
+        failedAmount: failedAmountPayout,
+        failedCount: failedCountPayout,
+      },
+      settlement: {
+        totalAmount: totalSettlementAmount,
+        totalCount: totalSettlementCount,
+        successAmount: successSettlementAmount,
+        successCount: successSettlementCount,
+      },
     };
   }
 
@@ -396,6 +466,47 @@ export class TransactionsService {
       where: { user: { id: userId }, status: PAYMENT_STATUS.FAILED },
     });
 
+      // payout
+      const totalAmountPayout = await this.payOutOrdersRepository.sum(
+        "amount",
+        {},
+      );
+      const totalCountPayout = await this.payOutOrdersRepository.count({});
+  
+      const successAmountPayout = await this.payOutOrdersRepository.sum(
+        "amount",
+        {
+          status: PAYMENT_STATUS.SUCCESS,
+        },
+      );
+      const successCountPayout = await this.payOutOrdersRepository.count({
+        where: { status: PAYMENT_STATUS.SUCCESS },
+      });
+  
+      const failedAmountPayout = await this.payOutOrdersRepository.sum("amount", {
+        status: PAYMENT_STATUS.FAILED,
+      });
+      const failedCountPayout = await this.payOutOrdersRepository.count({
+        where: { status: PAYMENT_STATUS.FAILED },
+      });
+  
+      // Settlement
+      const totalSettlementAmount = await this.settlementsRepository.sum(
+        "amount",
+        {},
+      );
+      const totalSettlementCount = await this.settlementsRepository.count({});
+  
+      const successSettlementAmount = await this.settlementsRepository.sum(
+        "amount",
+        {
+          status: PAYMENT_STATUS.SUCCESS,
+        },
+      );
+      const successSettlementCount = await this.settlementsRepository.count({
+      where: { status: PAYMENT_STATUS.SUCCESS },
+    });
+
     return {
       payin: {
         totalAmount,
@@ -405,7 +516,20 @@ export class TransactionsService {
         failedAmount,
         failedCount,
       },
-      payout: {},
+      payout: {
+        totalAmount: totalAmountPayout,
+        totalCount: totalCountPayout,
+        successAmount: successAmountPayout,
+        successCount: successCountPayout,
+        failedAmount: failedAmountPayout,
+        failedCount: failedCountPayout,
+      },
+      settlement: {
+        totalAmount: totalSettlementAmount,
+        totalCount: totalSettlementCount,
+        successAmount: successSettlementAmount,
+        successCount: successSettlementCount,
+      },
     };
   }
 }

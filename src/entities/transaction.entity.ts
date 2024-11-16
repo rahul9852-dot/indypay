@@ -11,6 +11,7 @@ import {
 } from "typeorm";
 import { PayInOrdersEntity } from "./payin-orders.entity";
 import { PayOutOrdersEntity } from "./payout-orders.entity";
+import { SettlementsEntity } from "./settlements.entity";
 import { UsersEntity } from "./user.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
@@ -36,6 +37,12 @@ export class TransactionsEntity {
     onDelete: "CASCADE",
   })
   payOutOrder: PayOutOrdersEntity;
+
+  @JoinColumn()
+  @OneToOne(() => SettlementsEntity, ({ transaction }) => transaction, {
+    onDelete: "CASCADE",
+  })
+  settlementOrder: SettlementsEntity;
 
   @ManyToOne(() => UsersEntity, ({ transactions }) => transactions, {
     onDelete: "CASCADE",
