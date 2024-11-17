@@ -400,13 +400,13 @@ export class TransactionsService {
         failedCount,
       },
       payout: {},
-      settlements: {
-        initiatedSettlementAmount,
-        initiatedSettlementCount,
-        successSettlementAmount,
-        successSettlementCount,
-        failedSettlementAmount,
-        failedSettlementCount,
+      settlement: {
+        totalAmount: initiatedSettlementAmount,
+        totalCount: initiatedSettlementCount,
+        successAmount: successSettlementAmount,
+        successCount: successSettlementCount,
+        failedAmount: failedSettlementAmount,
+        failedCount: failedSettlementCount,
       },
     };
   }
@@ -481,12 +481,12 @@ export class TransactionsService {
       },
       payout: {},
       settlement: {
-        initiatedSettlementAmount,
-        initiatedSettlementCount,
-        successSettlementAmount,
-        successSettlementCount,
-        failedSettlementAmount,
-        failedSettlementCount,
+        totalAmount: initiatedSettlementAmount,
+        totalCount: initiatedSettlementCount,
+        successAmount: successSettlementAmount,
+        successCount: successSettlementCount,
+        failedAmount: failedSettlementAmount,
+        failedCount: failedSettlementCount,
       },
     };
   }
