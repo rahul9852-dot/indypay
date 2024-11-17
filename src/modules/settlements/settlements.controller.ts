@@ -50,13 +50,6 @@ export class SettlementsController {
     return this.settlementsService.getSettlementsStats();
   }
 
-  // @ApiOperation({ summary: "Get settlements Daily Stats - Admin, Ops, Owner" })
-  // @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
-  // @Get("list")
-  // async getSettlementsList(@Query() query: GetSettlementListDto) {
-  //   return this.settlementsService.getUnsettledAmountGroupedByUser(query);
-  // }
-
   @ApiOperation({
     summary: "Initiate settlement payout - Admin, Ops, Owner",
   })

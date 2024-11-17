@@ -65,3 +65,15 @@ export class PaginationWithDateDto extends PaginationDto {
   @IsOptional()
   endDate?: Date;
 }
+
+export class DateDto {
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  startDate?: Date;
+
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  endDate?: Date;
+}

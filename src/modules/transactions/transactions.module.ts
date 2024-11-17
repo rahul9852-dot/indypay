@@ -4,7 +4,6 @@ import { TransactionsService } from "./transactions.service";
 import { TransactionsController } from "./transactions.controller";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
-import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 
 @Module({
@@ -12,7 +11,6 @@ import { SettlementsEntity } from "@/entities/settlements.entity";
     TypeOrmModule.forFeature([
       TransactionsEntity,
       PayInOrdersEntity,
-      PayOutOrdersEntity,
       SettlementsEntity,
     ]),
   ],

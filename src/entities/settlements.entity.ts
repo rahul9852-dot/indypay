@@ -4,11 +4,9 @@ import {
   CreateDateColumn,
   Entity,
   ManyToOne,
-  OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from "typeorm";
-import { TransactionsEntity } from "./transaction.entity";
 import { UsersEntity } from "./user.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
@@ -43,11 +41,6 @@ export class SettlementsEntity {
     onDelete: "CASCADE",
   })
   user: UsersEntity;
-
-  @OneToOne(() => TransactionsEntity, ({ settlementOrder }) => settlementOrder, {
-    onDelete: "CASCADE",
-  })
-  transaction: TransactionsEntity;
 
   @ManyToOne(() => UsersEntity, { nullable: true })
   settledBy: UsersEntity;

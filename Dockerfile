@@ -1,46 +1,52 @@
-# First Stage : Install and build dependencies
-
-# Use the latest Node.js Alpine image
-FROM node:20.12.2-alpine AS builder
-WORKDIR /app
-
-# Copy only the package.json and pnpm lockfile first to leverage Docker caching
-COPY package.json pnpm-lock.yaml ./
+FROM node:20.12.2-alpine AS base
 
 # Install pnpm globally
-RUN npm install -g pnpm
+RUN npm i -g pnpm
 
-# Install dependencies
-# Use the cache mount to /root/.pnpm-store to cache dependencies between builds
-RUN --mount=type=cache,target=/root/.pnpm-store pnpm install --frozen-lockfile
+FROM base AS dependencies
 
-# Copy the rest of the application code
-COPY . .
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install
 
-# Build the application
+FROM base AS build
+
+WORKDIR /app
+# Copy source files
+COPY /.env.production ./.env
+COPY src/ ./src/
+COPY tsconfig.json ./
+COPY tsconfig.build.json ./
+COPY package.json pnpm-lock.yaml ./
+COPY --from=dependencies /app/node_modules ./node_modules
+
+# Show contents before build
+RUN ls -la
 RUN pnpm build
+# Show contents after build
+RUN ls -la dist/
 
-# Second Stage: Setup to run your app using a lightweight node image
+FROM base AS deploy
 
-FROM node:20.12.2-alpine
 WORKDIR /app
 
-# Copy only the necessary files from the builder stage
-COPY --from=builder /app/node_modules node_modules
-COPY --from=builder /app/package.json package.json
-COPY --from=builder /app/dist dist
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/.env ./.env
 
-# Set a default port if not provided
-ARG PORT=3000
+ARG PORT=4000
 ENV PORT=$PORT
 EXPOSE $PORT
 
-# Install curl for health checks
 RUN apk add --no-cache curl
 
-# Health check endpoint
+# Verify the contents in the final stage
+RUN ls -la
+RUN ls -la dist/
+
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
     CMD curl --fail "http://localhost:$PORT/api/health-check" || exit 1
 
-# Command to run your app in production mode
-CMD ["pnpm", "start:prod"]
+# Try alternative start command
+CMD ["node", "./dist/src/main.js"]
