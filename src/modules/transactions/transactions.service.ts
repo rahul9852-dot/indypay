@@ -363,23 +363,30 @@ export class TransactionsService {
       where: { status: PAYMENT_STATUS.FAILED },
     });
 
-    const initiatedSettlementAmount = this.settlementsRepository.sum("amount");
+    const initiatedSettlementAmount =
+      await this.settlementsRepository.sum("amount");
 
-    const initiatedSettlementCount = this.settlementsRepository.count();
+    const initiatedSettlementCount = await this.settlementsRepository.count();
 
-    const successSettlementAmount = this.settlementsRepository.sum("amount", {
-      status: PAYMENT_STATUS.SUCCESS,
-    });
+    const successSettlementAmount = await this.settlementsRepository.sum(
+      "amount",
+      {
+        status: PAYMENT_STATUS.SUCCESS,
+      },
+    );
 
-    const successSettlementCount = this.settlementsRepository.count({
+    const successSettlementCount = await this.settlementsRepository.count({
       where: { status: PAYMENT_STATUS.SUCCESS },
     });
 
-    const failedSettlementAmount = this.settlementsRepository.sum("amount", {
-      status: PAYMENT_STATUS.FAILED,
-    });
+    const failedSettlementAmount = await this.settlementsRepository.sum(
+      "amount",
+      {
+        status: PAYMENT_STATUS.FAILED,
+      },
+    );
 
-    const failedSettlementCount = this.settlementsRepository.count({
+    const failedSettlementCount = await this.settlementsRepository.count({
       where: { status: PAYMENT_STATUS.FAILED },
     });
 
@@ -428,29 +435,38 @@ export class TransactionsService {
       where: { user: { id: userId }, status: PAYMENT_STATUS.FAILED },
     });
 
-    const initiatedSettlementAmount = this.settlementsRepository.sum("amount", {
-      user: { id: userId },
-    });
+    const initiatedSettlementAmount = await this.settlementsRepository.sum(
+      "amount",
+      {
+        user: { id: userId },
+      },
+    );
 
-    const initiatedSettlementCount = this.settlementsRepository.count({
+    const initiatedSettlementCount = await this.settlementsRepository.count({
       where: { user: { id: userId } },
     });
 
-    const successSettlementAmount = this.settlementsRepository.sum("amount", {
-      user: { id: userId },
-      status: PAYMENT_STATUS.SUCCESS,
-    });
+    const successSettlementAmount = await this.settlementsRepository.sum(
+      "amount",
+      {
+        user: { id: userId },
+        status: PAYMENT_STATUS.SUCCESS,
+      },
+    );
 
-    const successSettlementCount = this.settlementsRepository.count({
+    const successSettlementCount = await this.settlementsRepository.count({
       where: { user: { id: userId }, status: PAYMENT_STATUS.SUCCESS },
     });
 
-    const failedSettlementAmount = this.settlementsRepository.sum("amount", {
-      user: { id: userId },
-      status: PAYMENT_STATUS.FAILED,
-    });
+    const failedSettlementAmount = await this.settlementsRepository.sum(
+      "amount",
+      {
+        user: { id: userId },
+        status: PAYMENT_STATUS.FAILED,
+      },
+    );
 
-    const failedSettlementCount = this.settlementsRepository.count({
+    const failedSettlementCount = await this.settlementsRepository.count({
       where: { user: { id: userId }, status: PAYMENT_STATUS.FAILED },
     });
 
