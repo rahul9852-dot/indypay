@@ -14,12 +14,13 @@ import {
 } from "@nestjs/swagger";
 import { PaymentsService } from "./payments.service";
 import {
-  CreatePayinTransactionDto,
   CreatePayinPaymentResponseDto,
   PayinStatusDto,
+  CreatePayinTransactionIsmartDto,
 } from "./dto/create-payin-payment.dto";
-import { ExternalPayinWebhookDto } from "./dto/external-webhook-payin.dto";
+import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
 import { PayoutStatusDto } from "./dto/create-payout-payment.dto";
+import { ExternalPayoutWebhookIsmartDto } from "./dto/external-webhook-payout.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -42,10 +43,10 @@ export class PaymentsController {
   @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })
   @Post("payin/create")
   async createPayInTransaction(
-    @Body() createTransactionDto: CreatePayinTransactionDto,
+    @Body() createTransactionDto: CreatePayinTransactionIsmartDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createTransactionPayin(
+    return this.paymentsService.createTransactionPayinIsmart(
       createTransactionDto,
       user,
     );
@@ -73,7 +74,7 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
   async externalWebhookPayin(
-    @Body() externalPayinWebhookDto: ExternalPayinWebhookDto,
+    @Body() externalPayinWebhookDto: ExternalPayinWebhookIsmartDto,
   ) {
     return this.paymentsService.externalWebhookPayin(externalPayinWebhookDto);
   }
@@ -83,7 +84,9 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payout/webhook")
-  async externalWebhookPayout(@Body() externalWebhookPayout: any) {
+  async externalWebhookPayout(
+    @Body() externalWebhookPayout: ExternalPayoutWebhookIsmartDto,
+  ) {
     return this.paymentsService.externalWebhookPayout(externalWebhookPayout);
   }
 }

@@ -16,11 +16,13 @@ import { UsersEntity } from "@/entities/user.entity";
 export class SettlementsController {
   constructor(private readonly settlementsService: SettlementsService) {}
 
-  @ApiOperation({ summary: "Get settlements Transactions - Admin, Ops, Owner" })
-  @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Get settlements Transactions - All" })
   @Get()
-  async getSettlementsAdmin(@Query() query: PaginationWithDateDto) {
-    return this.settlementsService.findAllSettlementsTransactions(query);
+  async getSettlementsAdmin(
+    @Query() query: PaginationWithDateDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.settlementsService.findAllSettlementsTransactions(query, user);
   }
 
   @ApiOperation({
@@ -59,10 +61,18 @@ export class SettlementsController {
     @Body() initiateSettlementAdminDto: InitiateSettlementAdminDto,
     @User() user: UsersEntity,
   ) {
-    return this.settlementsService.initiateSettlement(
+    return this.settlementsService.initiateSettlementIsmart(
       initiateSettlementAdminDto,
       user,
     );
+  }
+
+  @ApiOperation({
+    summary: "Check settlement status",
+  })
+  @Get("status/:settlementId")
+  async checkSettlementStatus(@Param("settlementId") settlementId: string) {
+    return this.settlementsService.checkSettlementStatus(settlementId);
   }
 
   @ApiOperation({ summary: "Create Wallets for all merchants - Owner" })

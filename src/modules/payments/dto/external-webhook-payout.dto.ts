@@ -1,31 +1,68 @@
 import {
-  IsEnum,
+  IsBoolean,
   IsNotEmpty,
   IsNumber,
   IsPositive,
   IsString,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
-import { EXTERNAL_PAYOUT_PAYMENT_STATUS } from "@/enums/payment.enum";
 
-export class ExternalPayoutWebhookDto {
+export class ExternalPayoutWebhookIsmartDto {
+  @ApiProperty()
+  @IsBoolean()
+  status: boolean;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  status_code: string;
+
+  @ApiProperty()
+  @IsString()
+  message: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  transaction_id: string;
+
   @ApiProperty()
   @IsNumber()
   @IsPositive()
   amount: number;
 
-  @ApiProperty({
-    enum: EXTERNAL_PAYOUT_PAYMENT_STATUS,
-    default: EXTERNAL_PAYOUT_PAYMENT_STATUS.SUCCESS,
-  })
-  @IsEnum(EXTERNAL_PAYOUT_PAYMENT_STATUS)
-  @IsNotEmpty()
-  status: EXTERNAL_PAYOUT_PAYMENT_STATUS;
+  @ApiProperty()
+  @IsString()
+  bank_id: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  transferId: string;
+  order_id: string;
+
+  @ApiProperty()
+  @IsString()
+  purpose: string;
+
+  @ApiProperty()
+  @IsString()
+  narration: string;
+
+  @ApiProperty()
+  @IsString()
+  currency: string;
+
+  @ApiProperty()
+  @IsString()
+  wallet_id: string;
+
+  @ApiProperty()
+  @IsString()
+  wallet_name: string;
+
+  @ApiProperty()
+  @IsString()
+  created_on: string;
 
   @ApiProperty()
   @IsString()

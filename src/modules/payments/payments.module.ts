@@ -16,6 +16,7 @@ import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { UserAddressEntity } from "@/entities/user-address.entity";
 import { WalletEntity } from "@/entities/wallet.entity";
+import { SettlementsEntity } from "@/entities/settlements.entity";
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { WalletEntity } from "@/entities/wallet.entity";
       UserWhitelistIpsEntity,
       UserAddressEntity,
       WalletEntity,
+      SettlementsEntity,
     ]),
   ],
   providers: [

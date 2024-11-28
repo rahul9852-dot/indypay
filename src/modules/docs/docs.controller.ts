@@ -2,7 +2,7 @@ import { Body, Controller, Post, UseGuards } from "@nestjs/common";
 import { ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
 import {
   CreatePayinPaymentResponseDto,
-  CreatePayinTransactionDto,
+  CreatePayinTransactionIsmartDto,
   PayinStatusDto,
 } from "../payments/dto/create-payin-payment.dto";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
@@ -25,7 +25,7 @@ export class DocsController {
 
   @Post("payin")
   @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })
-  async payin(@Body() createTransactionDto: CreatePayinTransactionDto) {
+  async payin(@Body() createTransactionDto: CreatePayinTransactionIsmartDto) {
     const paymentUrl = await generateDummyPaymentUrl({
       amount: createTransactionDto.amount.toFixed(2),
     });

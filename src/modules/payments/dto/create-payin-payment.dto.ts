@@ -9,7 +9,7 @@ import {
   Length,
 } from "class-validator";
 
-export class CreatePayinTransactionDto {
+export class CreatePayinTransactionAnviNeoDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -37,6 +37,41 @@ export class CreatePayinTransactionDto {
   @IsNotEmpty()
   @Length(10, 10)
   mobile: string;
+}
+
+export class CreatePayinTransactionIsmartDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
+  @ApiProperty()
+  @IsNumber({
+    maxDecimalPlaces: 2,
+  })
+  @IsPositive()
+  amount: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty()
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty()
+  @IsNumberString()
+  @IsNotEmpty()
+  @Length(10, 10)
+  mobile: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  vpa: string;
 }
 
 export class PayinStatusDto {

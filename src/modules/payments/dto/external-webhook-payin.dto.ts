@@ -1,7 +1,10 @@
 import {
+  IsBoolean,
   IsNotEmpty,
+  IsNumber,
   IsNumberString,
   IsObject,
+  IsPositive,
   IsString,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
@@ -102,7 +105,7 @@ class DataDto {
   ref_no: string;
 }
 
-export class ExternalPayinWebhookDto {
+export class ExternalPayinWebhookAnviNeoDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -117,4 +120,36 @@ export class ExternalPayinWebhookDto {
   @IsObject()
   @IsNotEmpty()
   Data: DataDto;
+}
+
+export class ExternalPayinWebhookIsmartDto {
+  @ApiProperty()
+  @IsBoolean()
+  status: boolean;
+
+  @ApiProperty()
+  @IsString()
+  status_code: string;
+
+  @ApiProperty()
+  @IsString()
+  currency: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @ApiProperty()
+  @IsString()
+  bank_id?: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  order_id: string;
+
+  @ApiProperty()
+  @IsString()
+  transaction_id?: string;
 }

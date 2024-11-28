@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 import { UsersEntity } from "./user.entity";
+import { UserBankDetailsEntity } from "./user-bank-details.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
 import { PAYMENT_STATUS, PAYOUT_PAYMENT_MODE } from "@/enums/payment.enum";
@@ -41,6 +42,11 @@ export class SettlementsEntity {
     onDelete: "CASCADE",
   })
   user: UsersEntity;
+
+  @ManyToOne(() => UserBankDetailsEntity, ({ settlements }) => settlements, {
+    onDelete: "CASCADE",
+  })
+  bankDetails: UserBankDetailsEntity;
 
   @ManyToOne(() => UsersEntity, { nullable: true })
   settledBy: UsersEntity;

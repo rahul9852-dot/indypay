@@ -45,7 +45,7 @@ export const appConfig = registerAs("appConfig", () => ({
     baseUrl: getOsEnv("EXTERNAL_PAYMENT_BASE_URL"),
     clientId: getOsEnv("EXTERNAL_PAYMENT_CLIENT_ID"),
     clientSecret: getOsEnv("EXTERNAL_PAYMENT_CLIENT_SECRET"),
-    clientSign: getOsEnv("EXTERNAL_PAYMENT_SIGN"),
+    clientSign: getOsEnvOptional("EXTERNAL_PAYMENT_SIGN"),
     webhookIps: getOsEnv("EXTERNAL_PAYMENT_WEBHOOK_IPS").split(","),
   },
   transactionConfig: {

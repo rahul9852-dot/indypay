@@ -1,5 +1,7 @@
 export const ISMART_PAY = {
   PAYIN: "api/create/order",
+  PAYOUT: "api/create/payout",
+  PAYOUT_STATUS: "api/payout/status", // api/payout/status/{{transaction_id}}
 };
 
 export const ANVITAPAY = {

@@ -8,6 +8,8 @@ import {
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
+import { Cache } from "cache-manager";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { ReSendOtpDto, SendOtpDto, VerifyOtpDto } from "./dto/send-otp.dto";
 import { RegisterUserDto } from "./dto/register-user.dto";
 import { LoginUserDto } from "./dto/login-user.dto";
@@ -17,6 +19,7 @@ import { MessageResponseDto } from "@/dtos/common.dto";
 import { appConfig } from "@/config/app.config";
 import {
   accessCookieOptions,
+  cookieOptions,
   mobileVerifyCookieOptions,
   refreshCookieOptions,
 } from "@/utils/cookies.utils";
@@ -27,10 +30,13 @@ import {
   IVerifyMobilePayload,
 } from "@/interface/common.interface";
 import { AuthOtpEntity } from "@/entities/otp.entity";
-import { formatTime, generateAttemptsKey, generateLockAccountKey, generateOtp } from "@/utils/helperFunctions.utils";
-import { Cache } from 'cache-manager';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { MAX_ATTEMPTS, LOCK_TIME } from '@/constants/redis-cache.constant';
+import {
+  formatTime,
+  generateAttemptsKey,
+  generateLockAccountKey,
+  generateOtp,
+} from "@/utils/helperFunctions.utils";
+import { MAX_ATTEMPTS, LOCK_TIME } from "@/constants/redis-cache.constant";
 
 const {
   jwtConfig: {
@@ -55,12 +61,15 @@ export class AuthService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-
   async login(loginUserDto: LoginUserDto, res: Response) {
-    const isLocked = await this.cacheManager.get<number>(generateLockAccountKey(loginUserDto.mobile));
+    const isLocked = await this.cacheManager.get<number>(
+      generateLockAccountKey(loginUserDto.mobile),
+    );
     if (isLocked) {
       throw new BadRequestException(
-        new MessageResponseDto(`Account is locked. Please try again after ${formatTime(new Date(isLocked))}.`)
+        new MessageResponseDto(
+          `Account is locked. Please try again after ${formatTime(new Date(isLocked))}.`,
+        ),
       );
     }
 
@@ -85,7 +94,9 @@ export class AuthService {
     if (!isPasswordValid) {
       const attemptsLeft = await this.handleFailedLogin(loginUserDto.mobile);
       throw new BadRequestException(
-        new MessageResponseDto(`Incorrect mobile number or password. ${attemptsLeft} attempts left.`)
+        new MessageResponseDto(
+          `Incorrect mobile number or password. ${attemptsLeft} attempts left.`,
+        ),
       );
     }
 
@@ -161,18 +172,29 @@ export class AuthService {
   }
 
   private async handleFailedLogin(mobile: string): Promise<number> {
-    const attempts = (await this.cacheManager.get<number>(generateAttemptsKey(mobile))) || 0;
+    const attempts =
+      (await this.cacheManager.get<number>(generateAttemptsKey(mobile))) || 0;
     const newAttempts = attempts + 1;
     const attemptsLeft = MAX_ATTEMPTS - newAttempts;
 
     if (newAttempts >= MAX_ATTEMPTS) {
-      const lockEndTime = Date.now() + LOCK_TIME; 
-      await this.cacheManager.set(generateLockAccountKey(mobile), lockEndTime, LOCK_TIME);
+      const lockEndTime = Date.now() + LOCK_TIME;
+      await this.cacheManager.set(
+        generateLockAccountKey(mobile),
+        lockEndTime,
+        LOCK_TIME,
+      );
       throw new BadRequestException(
-        new MessageResponseDto('Account locked due to multiple failed login attempts. Try again in 30 minutes.')
+        new MessageResponseDto(
+          "Account locked due to multiple failed login attempts. Try again in 30 minutes.",
+        ),
       );
     } else {
-      await this.cacheManager.set(generateAttemptsKey(mobile), newAttempts, LOCK_TIME);
+      await this.cacheManager.set(
+        generateAttemptsKey(mobile),
+        newAttempts,
+        LOCK_TIME,
+      );
     }
 
     return attemptsLeft;
@@ -225,7 +247,7 @@ export class AuthService {
       if (!cookies.hasOwnProperty(key)) {
         continue;
       }
-      res.cookie(key, "", { maxAge: 0 });
+      res.cookie(key, "", { ...cookieOptions, maxAge: 0 });
     }
 
     return res.json(new MessageResponseDto("User logged out successfully"));

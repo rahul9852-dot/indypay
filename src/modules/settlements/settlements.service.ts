@@ -8,9 +8,10 @@ import {
   DataSource,
   ILike,
   Repository,
+  Between,
+  FindOptionsWhere,
   MoreThanOrEqual,
   LessThanOrEqual,
-  Between,
 } from "typeorm";
 import { InitiateSettlementAdminDto } from "./dto/initate-settlement-admin.dto";
 import { GetSettlementListDto } from "./dto/get-settlement-list.dto";
@@ -23,12 +24,8 @@ import { UsersEntity } from "@/entities/user.entity";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
-import {
-  IExternalPayoutResponse,
-  IExternalPayoutRequest,
-} from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
-import { ANVITAPAY } from "@/constants/external-api.constant";
+import { ANVITAPAY, ISMART_PAY } from "@/constants/external-api.constant";
 import { BanksService } from "@/modules/banks/banks.service";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
@@ -41,9 +38,16 @@ import {
   calculateOriginalAmountFromNetPayable,
   getCommissions,
 } from "@/utils/commissions.utils";
+import {
+  IExternalPayoutRequestAnviNeo,
+  IExternalPayoutRequestIsmart,
+  IExternalPayoutResponseAnviNeo,
+  IExternalPayoutResponseIsmart,
+  IExternalPayoutStatusResponseIsmart,
+} from "@/interface/external-api.interface";
 
 const {
-  externalPaymentConfig: { baseUrl, clientId, clientSecret, clientSign },
+  externalPaymentConfig: { baseUrl, clientId, clientSecret },
 } = appConfig();
 
 @Injectable()
@@ -52,9 +56,8 @@ export class SettlementsService {
   private readonly axiosService = new AxiosService(baseUrl, {
     headers: {
       "Content-Type": "application/json",
-      PPI: clientId,
-      AUTH: clientSecret,
-      SIGN: clientSign,
+      mid: clientId,
+      key: clientSecret,
     },
   });
 
@@ -82,13 +85,15 @@ export class SettlementsService {
       },
     });
 
-    for (const merchant of merchants) {
-      if (!merchant.wallet) {
-        await this.walletRepository.save({
+    const walletPromises = merchants
+      .filter((merchant) => !merchant.wallet)
+      .map((merchant) =>
+        this.walletRepository.create({
           user: merchant,
-        });
-      }
-    }
+        }),
+      );
+
+    await this.walletRepository.save(walletPromises);
 
     return new MessageResponseDto("Wallets created successfully");
   }
@@ -300,23 +305,40 @@ export class SettlementsService {
     }
   }
 
-  async findAllSettlementsTransactions({
-    limit = 10,
-    page = 1,
-    order = "DESC",
-    sort = "id",
-    search = "",
-    startDate,
-    endDate,
-  }: PaginationWithDateDto) {
+  async findAllSettlementsTransactions(
+    {
+      limit = 10,
+      page = 1,
+      order = "DESC",
+      sort = "id",
+      search = "",
+      startDate,
+      endDate,
+    }: PaginationWithDateDto,
+    user: UsersEntity,
+  ) {
+    const whereQuery:
+      | FindOptionsWhere<SettlementsEntity>
+      | FindOptionsWhere<SettlementsEntity>[] = {};
+
+    if (startDate && endDate) {
+      whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
+    } else if (startDate) {
+      whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
+    } else if (endDate) {
+      whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+    }
+
+    if (![USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
+      whereQuery.user = {
+        id: user.id,
+        fullName: ILike(`%${search}%`),
+      };
+    }
+
     const [data, totalItems] = await this.settlementsRepository.findAndCount({
       where: {
-        ...(startDate && {
-          createdAt: MoreThanOrEqual(new Date(startDate)),
-        }),
-        ...(endDate && {
-          createdAt: LessThanOrEqual(new Date(endDate)),
-        }),
+        ...whereQuery,
         ...(search && {
           user: {
             fullName: ILike(`%${search}%`),
@@ -326,6 +348,7 @@ export class SettlementsService {
       relations: {
         user: true,
         settledBy: true,
+        bankDetails: true,
       },
       select: {
         id: true,
@@ -334,12 +357,20 @@ export class SettlementsService {
         transferId: true,
         transferMode: true,
         remarks: true,
+        createdAt: true,
         settledBy: {
           fullName: true,
         },
-        createdAt: true,
         user: {
           fullName: true,
+          bankDetails: true,
+        },
+        bankDetails: {
+          id: true,
+          name: true,
+          bankName: true,
+          accountNumber: true,
+          bankIFSC: true,
         },
       },
       take: limit,
@@ -361,7 +392,7 @@ export class SettlementsService {
     };
   }
 
-  async initiateSettlement(
+  async initiateSettlementAnviNeo(
     {
       amount,
       bankId,
@@ -454,6 +485,7 @@ export class SettlementsService {
         user,
         settledBy,
         remarks,
+        bankDetails: targetBank,
       });
 
       const savedSettlement = await queryRunner.manager.save(settlement);
@@ -463,7 +495,7 @@ export class SettlementsService {
         targetBank,
       );
 
-      const payload: IExternalPayoutRequest = {
+      const payload: IExternalPayoutRequestAnviNeo = {
         amount: +amount,
         bene_name: targetBank.name,
         email: targetBank.email,
@@ -482,7 +514,7 @@ export class SettlementsService {
       );
 
       const externalPayoutResponse =
-        await this.axiosService.postRequest<IExternalPayoutResponse>(
+        await this.axiosService.postRequest<IExternalPayoutResponseAnviNeo>(
           ANVITAPAY.PAYOUT,
           payload,
         );
@@ -530,6 +562,181 @@ export class SettlementsService {
     }
   }
 
+  async initiateSettlementIsmart(
+    {
+      amount,
+      bankId,
+      remarks,
+      userId,
+      transferMode,
+    }: InitiateSettlementAdminDto,
+    settledBy: UsersEntity,
+  ) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: {
+        address: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    if (!user.address) {
+      throw new NotFoundException(
+        new MessageResponseDto("User address not found"),
+      );
+    }
+
+    const banks = await this.bankService.getAllBanks(userId);
+
+    const targetBank = banks.find((bank) => bank.id === bankId);
+
+    if (!targetBank) {
+      throw new NotFoundException(new MessageResponseDto("Bank not found"));
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    try {
+      // Start transaction
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      const wallet = await this.walletRepository.findOne({
+        where: {
+          user: {
+            id: userId,
+          },
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (!wallet) {
+        throw new NotFoundException(
+          new MessageResponseDto("User wallet not found"),
+        );
+      }
+
+      if (+wallet.netPayableAmount < +amount) {
+        throw new BadRequestException(
+          new MessageResponseDto("Amount is greater than unsettled amount"),
+        );
+      }
+      const originalAmount = calculateOriginalAmountFromNetPayable({
+        netPayableAmount: +amount,
+        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+        gstInPercentage: +wallet.user.gstInPercentagePayin,
+      });
+
+      const commission = getCommissions({
+        amount: originalAmount,
+        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+        gstInPercentage: +wallet.user.gstInPercentagePayin,
+      });
+
+      const newWallet = this.walletRepository.create({
+        id: wallet.id,
+        settledAmount: +wallet.settledAmount + +originalAmount,
+        unsettledAmount: +wallet.unsettledAmount - +originalAmount,
+        netPayableAmount: +wallet.netPayableAmount - +amount,
+        commissionAmount:
+          +wallet.commissionAmount - +commission.commissionAmount,
+        gstAmount: +wallet.gstAmount - +commission.gstAmount,
+      });
+
+      await queryRunner.manager.save(newWallet);
+
+      const settlement = this.settlementsRepository.create({
+        amount: +amount,
+        transferMode,
+        user,
+        settledBy,
+        remarks,
+        bankDetails: targetBank,
+      });
+
+      const savedSettlement = await queryRunner.manager.save(settlement);
+
+      this.logger.info(
+        `SETTLEMENT - initiateSettlements - Sending Settlements Amount: ${amount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
+        targetBank,
+      );
+
+      const payload: IExternalPayoutRequestIsmart = {
+        amount: +amount,
+        currency: "INR",
+        narration: remarks,
+        order_id: savedSettlement.id,
+        phone_number: targetBank.mobile,
+        purpose: "Settlement Fund",
+        payment_details: {
+          account_number: targetBank.accountNumber,
+          ifsc_code: targetBank.bankIFSC,
+          beneficiary_name: targetBank.name,
+          type: "NB",
+          mode: transferMode,
+        },
+      };
+
+      this.logger.info(
+        `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${baseUrl}/${ISMART_PAY.PAYOUT} with payload: ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
+
+      const externalPayoutResponse =
+        await this.axiosService.postRequest<IExternalPayoutResponseIsmart>(
+          ISMART_PAY.PAYOUT,
+          payload,
+        );
+
+      this.logger.info(
+        `SETTLEMENT - initiateSettlements - External Payout Response: ${LoggerPlaceHolder.Json}`,
+        externalPayoutResponse,
+      );
+
+      if (!externalPayoutResponse.status) {
+        throw new BadRequestException(
+          externalPayoutResponse?.errors || "Something went wrong",
+        );
+      }
+
+      const status = convertExternalPaymentStatusToInternal(
+        externalPayoutResponse.status_code,
+      );
+
+      await queryRunner.manager.update(
+        SettlementsEntity,
+        { id: savedSettlement.id },
+        {
+          transferId: externalPayoutResponse.transaction_id,
+          status,
+        },
+      );
+
+      await queryRunner.commitTransaction();
+
+      return {
+        orderId: externalPayoutResponse.order_id,
+        amount: externalPayoutResponse.amount,
+        transferId: externalPayoutResponse.transaction_id,
+        status,
+      };
+    } catch (err) {
+      this.logger.error(
+        `SETTLEMENT - initiateSettlements - error: ${LoggerPlaceHolder.Json}`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async getPendingSettlements({
     limit = 10,
     page = 1,
@@ -555,24 +762,18 @@ export class SettlementsService {
       limit,
     });
 
-    const data = settlements.map((settlement) => {
-      if (!settlement.wallet) {
-        throw new NotFoundException(
-          new MessageResponseDto(
-            "User wallet not found for: " + settlement.fullName,
-          ),
-        );
-      }
-
-      return {
-        id: settlement.id,
-        name: settlement.fullName,
-        unsettledAmount: +settlement.wallet.unsettledAmount,
-        netUnsettledPayableAmount: +settlement.wallet.netPayableAmount,
-        gstAmount: +settlement.wallet.gstAmount,
-        commissionAmount: +settlement.wallet.commissionAmount,
-      };
-    });
+    const data = settlements
+      .filter((settlement) => !!settlement.wallet)
+      .map((settlement) => {
+        return {
+          id: settlement.id,
+          name: settlement.fullName,
+          unsettledAmount: +settlement.wallet.unsettledAmount,
+          netUnsettledPayableAmount: +settlement.wallet.netPayableAmount,
+          gstAmount: +settlement.wallet.gstAmount,
+          commissionAmount: +settlement.wallet.commissionAmount,
+        };
+      });
 
     return {
       data,
@@ -672,5 +873,58 @@ export class SettlementsService {
     });
 
     return { data, pagination };
+  }
+
+  async checkSettlementStatus(settlementId: string) {
+    const settlement = await this.settlementsRepository.findOne({
+      where: {
+        id: settlementId,
+      },
+    });
+
+    if (!settlement) {
+      throw new NotFoundException(
+        new MessageResponseDto("No Settlement Found"),
+      );
+    }
+
+    if (settlement.status === PAYMENT_STATUS.SUCCESS) {
+      return {
+        settlementId,
+        status: settlement.status,
+        amount: settlement.amount,
+      };
+    }
+
+    // call third party api
+    const response =
+      await this.axiosService.getRequest<IExternalPayoutStatusResponseIsmart>(
+        `${ISMART_PAY.PAYOUT_STATUS}/${settlement.transferId}`,
+      );
+
+    if (!response.status) {
+      throw new BadRequestException(new MessageResponseDto(response.message));
+    }
+
+    const status = convertExternalPaymentStatusToInternal(response.status_code);
+
+    const settlementRaw = this.settlementsRepository.create({
+      id: settlement.id,
+      status,
+      ...(status === PAYMENT_STATUS.SUCCESS && {
+        successAt: new Date(),
+      }),
+      ...(status === PAYMENT_STATUS.FAILED && {
+        failureAt: new Date(),
+      }),
+    });
+
+    await this.settlementsRepository.save(settlementRaw);
+
+    return {
+      settlementId,
+      status,
+      amount: settlement.amount,
+    };
   }
 }

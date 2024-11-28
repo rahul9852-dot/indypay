@@ -3,9 +3,11 @@ import {
   Column,
   Entity,
   ManyToOne,
+  OneToMany,
   PrimaryColumn,
 } from "typeorm";
 import { UsersEntity } from "./user.entity";
+import { SettlementsEntity } from "./settlements.entity";
 import { ID_TYPE } from "@/enums";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 
@@ -31,11 +33,17 @@ export class UserBankDetailsEntity {
 
   @Column()
   accountNumber: string;
+
   // Relations
   @ManyToOne(() => UsersEntity, ({ bankDetails }) => bankDetails, {
     onDelete: "CASCADE",
   })
   user: UsersEntity;
+
+  @OneToMany(() => SettlementsEntity, ({ bankDetails }) => bankDetails, {
+    cascade: true,
+  })
+  settlements: SettlementsEntity[];
 
   @BeforeInsert()
   beforeInsertHook() {

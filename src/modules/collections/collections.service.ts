@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { ILike, Repository } from "typeorm";
+import { Between, ILike, Repository } from "typeorm";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import {
@@ -9,6 +9,7 @@ import {
 } from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 
 @Injectable()
 export class CollectionsService {
@@ -101,7 +102,10 @@ export class CollectionsService {
   ) {
     const [collections, totalItems] =
       await this.payInOrdersRepository.findAndCount({
-        where: { orderId: ILike(`%${search}%`), user: { id: userId } },
+        where: [
+          { orderId: ILike(`%${search}%`), user: { id: userId } },
+          { txnRefId: ILike(`%${search}%`), user: { id: userId } },
+        ],
         relations: {
           user: true,
         },
@@ -130,9 +134,37 @@ export class CollectionsService {
       totalItems,
     });
 
+    const todayCollectionsPromise = this.payInOrdersRepository.sum("amount", {
+      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+      user: { id: userId },
+    });
+
+    const todaySuccessPromise = this.payInOrdersRepository.sum("amount", {
+      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+      status: PAYMENT_STATUS.SUCCESS,
+      user: { id: userId },
+    });
+
+    const todayFailedPromise = this.payInOrdersRepository.sum("amount", {
+      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+      status: PAYMENT_STATUS.FAILED,
+      user: { id: userId },
+    });
+
+    const [todayCollections, todaySuccess, todayFailed] = await Promise.all([
+      todayCollectionsPromise,
+      todaySuccessPromise,
+      todayFailedPromise,
+    ]);
+
     return {
       data: collections,
       pagination,
+      stats: {
+        todayCollections: +todayCollections,
+        todaySuccess: +todaySuccess,
+        todayFailed: +todayFailed,
+      },
     };
   }
 
@@ -174,7 +206,10 @@ export class CollectionsService {
   ) {
     const [collections, totalItems] =
       await this.payInOrdersRepository.findAndCount({
-        where: { orderId: ILike(`%${search}%`), user: { id: user.id } },
+        where: [
+          { orderId: ILike(`%${search}%`), user: { id: user.id } },
+          { txnRefId: ILike(`%${search}%`), user: { id: user.id } },
+        ],
         select: {
           id: true,
           amount: true,

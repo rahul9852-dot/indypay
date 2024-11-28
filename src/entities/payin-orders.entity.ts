@@ -14,11 +14,6 @@ import { TransactionsEntity } from "./transaction.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
 import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
-import { appConfig } from "@/config/app.config";
-
-const {
-  transactionConfig: { commissionInPercentagePayIn, gstInPercentagePayIn },
-} = appConfig();
 
 @Entity("payin_orders")
 export class PayInOrdersEntity {
@@ -98,11 +93,5 @@ export class PayInOrdersEntity {
   @BeforeInsert()
   beforeInsertHook() {
     this.id = getUlidId(ID_TYPE.PAYIN_KEY);
-    this.commissionInPercentage = commissionInPercentagePayIn;
-    this.gstInPercentage = gstInPercentagePayIn;
-    this.commissionAmount = (this.amount * this.commissionInPercentage) / 100;
-    this.gstAmount = (this.commissionAmount * this.gstInPercentage) / 100;
-    this.netPayableAmount =
-      this.amount - (this.commissionAmount + this.gstAmount);
   }
 }
