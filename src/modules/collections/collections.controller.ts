@@ -6,7 +6,7 @@ import { UsersEntity } from "@/entities/user.entity";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import {
-  PaginationDto,
+  PaginationWithDateDto,
   PaginationWithoutSortAndOrderDto,
 } from "@/dtos/common.dto";
 
@@ -38,7 +38,7 @@ export class CollectionsController {
   @Get("admin/:userId")
   getAllCollectionsByUserIdAdmin(
     @Param("userId") userId: string,
-    @Query() paginationDto: PaginationDto,
+    @Query() paginationDto: PaginationWithDateDto,
   ) {
     return this.collectionsService.getAllCollectionsByUserIdAdmin(
       userId,
@@ -51,7 +51,7 @@ export class CollectionsController {
   @Get()
   async getAllCollections(
     @User() user: UsersEntity,
-    @Query() paginationDto: PaginationDto,
+    @Query() paginationDto: PaginationWithDateDto,
   ) {
     return this.collectionsService.getAllCollections(user, paginationDto);
   }

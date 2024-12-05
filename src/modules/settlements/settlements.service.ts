@@ -317,79 +317,154 @@ export class SettlementsService {
     }: PaginationWithDateDto,
     user: UsersEntity,
   ) {
-    const whereQuery:
-      | FindOptionsWhere<SettlementsEntity>
-      | FindOptionsWhere<SettlementsEntity>[] = {};
+    // for admin user
+    if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
+      const whereQuery:
+        | FindOptionsWhere<SettlementsEntity>
+        | FindOptionsWhere<SettlementsEntity>[] = {};
 
-    if (startDate && endDate) {
-      whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
-    } else if (startDate) {
-      whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
-    } else if (endDate) {
-      whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
-    }
+      // Date Filter
+      if (startDate && endDate) {
+        whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
+      } else if (startDate) {
+        whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
+      } else if (endDate) {
+        whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+      }
 
-    if (![USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
-      whereQuery.user = {
-        id: user.id,
-        fullName: ILike(`%${search}%`),
-      };
-    }
+      const query = [whereQuery];
 
-    const [data, totalItems] = await this.settlementsRepository.findAndCount({
-      where: {
-        ...whereQuery,
-        ...(search && {
+      if (search) {
+        query.push({
+          transferId: ILike(`%${search}%`),
+        });
+        query.push({
           user: {
             fullName: ILike(`%${search}%`),
           },
-        }),
-      },
-      relations: {
-        user: true,
-        settledBy: true,
-        bankDetails: true,
-      },
-      select: {
-        id: true,
-        amount: true,
-        status: true,
-        transferId: true,
-        transferMode: true,
-        remarks: true,
-        createdAt: true,
-        settledBy: {
-          fullName: true,
-        },
-        user: {
-          fullName: true,
+        });
+      }
+
+      const [data, totalItems] = await this.settlementsRepository.findAndCount({
+        where: query,
+        relations: {
+          user: true,
+          settledBy: true,
           bankDetails: true,
         },
-        bankDetails: {
+        select: {
           id: true,
-          name: true,
-          bankName: true,
-          accountNumber: true,
-          bankIFSC: true,
+          amount: true,
+          status: true,
+          transferId: true,
+          transferMode: true,
+          remarks: true,
+          createdAt: true,
+          settledBy: {
+            fullName: true,
+          },
+          user: {
+            fullName: true,
+            bankDetails: true,
+          },
+          bankDetails: {
+            id: true,
+            name: true,
+            bankName: true,
+            accountNumber: true,
+            bankIFSC: true,
+          },
         },
-      },
-      take: limit,
-      skip: (page - 1) * limit,
-      order: {
-        [sort]: order,
-      },
-    });
+        take: limit,
+        skip: (page - 1) * limit,
+        order: {
+          [sort]: order,
+        },
+      });
 
-    const pagination = getPagination({
-      limit,
-      totalItems,
-      page,
-    });
+      const pagination = getPagination({
+        limit,
+        totalItems,
+        page,
+      });
 
-    return {
-      data,
-      pagination,
-    };
+      return {
+        data,
+        pagination,
+      };
+    } else {
+      const whereQuery:
+        | FindOptionsWhere<SettlementsEntity>
+        | FindOptionsWhere<SettlementsEntity>[] = {};
+
+      // Date Filter
+      if (startDate && endDate) {
+        whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
+      } else if (startDate) {
+        whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
+      } else if (endDate) {
+        whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+      }
+
+      if (search) {
+        whereQuery.transferId = ILike(`%${search}%`);
+        whereQuery.user = {
+          id: user.id,
+        };
+      } else {
+        whereQuery.user = {
+          id: user.id,
+        };
+      }
+
+      const [data, totalItems] = await this.settlementsRepository.findAndCount({
+        where: whereQuery,
+        relations: {
+          user: true,
+          settledBy: true,
+          bankDetails: true,
+        },
+        select: {
+          id: true,
+          amount: true,
+          status: true,
+          transferId: true,
+          transferMode: true,
+          remarks: true,
+          createdAt: true,
+          settledBy: {
+            fullName: true,
+          },
+          user: {
+            fullName: true,
+            bankDetails: true,
+          },
+          bankDetails: {
+            id: true,
+            name: true,
+            bankName: true,
+            accountNumber: true,
+            bankIFSC: true,
+          },
+        },
+        take: limit,
+        skip: (page - 1) * limit,
+        order: {
+          [sort]: order,
+        },
+      });
+
+      const pagination = getPagination({
+        limit,
+        totalItems,
+        page,
+      });
+
+      return {
+        data,
+        pagination,
+      };
+    }
   }
 
   async initiateSettlementAnviNeo(

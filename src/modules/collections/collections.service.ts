@@ -1,10 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, ILike, Repository } from "typeorm";
+import {
+  Between,
+  FindOptionsWhere,
+  ILike,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from "typeorm";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import {
-  PaginationDto,
+  PaginationWithDateDto,
   PaginationWithoutSortAndOrderDto,
 } from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
@@ -98,14 +105,50 @@ export class CollectionsService {
       sort = "id",
       order = "DESC",
       search = "",
-    }: PaginationDto,
+      startDate,
+      endDate,
+    }: PaginationWithDateDto,
   ) {
+    const whereQuery:
+      | FindOptionsWhere<PayInOrdersEntity>
+      | FindOptionsWhere<PayInOrdersEntity>[] = {};
+
+    // Date Filter
+    if (startDate && endDate) {
+      whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
+    } else if (startDate) {
+      whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
+    } else if (endDate) {
+      whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+    }
+
+    const query = [];
+
+    if (search) {
+      query.push({
+        orderId: ILike(`%${search}%`),
+        user: {
+          id: userId,
+        },
+      });
+      query.push({
+        txnRefId: ILike(`%${search}%`),
+        user: {
+          id: userId,
+        },
+      });
+    } else {
+      query.push({
+        ...whereQuery,
+        user: {
+          id: userId,
+        },
+      });
+    }
+
     const [collections, totalItems] =
       await this.payInOrdersRepository.findAndCount({
-        where: [
-          { orderId: ILike(`%${search}%`), user: { id: userId } },
-          { txnRefId: ILike(`%${search}%`), user: { id: userId } },
-        ],
+        where: query,
         relations: {
           user: true,
         },
@@ -202,14 +245,44 @@ export class CollectionsService {
       sort = "id",
       order = "DESC",
       search = "",
-    }: PaginationDto,
+      startDate,
+      endDate,
+    }: PaginationWithDateDto,
   ) {
+    const whereQuery:
+      | FindOptionsWhere<PayInOrdersEntity>
+      | FindOptionsWhere<PayInOrdersEntity>[] = {};
+
+    // Date Filter
+    if (startDate && endDate) {
+      whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
+    } else if (startDate) {
+      whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
+    } else if (endDate) {
+      whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+    }
+
+    const query = [];
+
+    if (search) {
+      query.push({
+        orderId: ILike(`%${search}%`),
+        user: { id: user.id },
+      });
+      query.push({
+        txnRefId: ILike(`%${search}%`),
+        user: { id: user.id },
+      });
+    } else {
+      query.push({
+        ...whereQuery,
+        user: { id: user.id },
+      });
+    }
+
     const [collections, totalItems] =
       await this.payInOrdersRepository.findAndCount({
-        where: [
-          { orderId: ILike(`%${search}%`), user: { id: user.id } },
-          { txnRefId: ILike(`%${search}%`), user: { id: user.id } },
-        ],
+        where: query,
         select: {
           id: true,
           amount: true,
