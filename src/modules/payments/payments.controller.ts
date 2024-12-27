@@ -5,6 +5,8 @@ import {
   HttpStatus,
   Post,
   UseGuards,
+  Get,
+  Query,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -27,17 +29,20 @@ import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.deco
 import { Public } from "@/decorators/public.decorator";
 import { ApiKeyGuard } from "@/guard/api-key.guard";
 import { UsersEntity } from "@/entities/user.entity";
-import { MessageResponseDto } from "@/dtos/common.dto";
+import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
 import { WebhookGuard } from "@/guard/webhook.guard";
+import { AuthGuard } from "@/guard/auth.guard";
+import { Role } from "@/decorators/role.decorator";
+import { USERS_ROLE } from "@/enums";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
-@Public()
 @ApiTags("Payments")
 @Controller("payments")
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  @Public()
   @ApiOperation({ summary: "Create pay-in transaction" })
   @UseGuards(ApiKeyGuard)
   @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })
@@ -52,6 +57,7 @@ export class PaymentsController {
     );
   }
 
+  @Public()
   @ApiOperation({ summary: "Check status of pay-in transaction" })
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)
@@ -60,6 +66,7 @@ export class PaymentsController {
     return this.paymentsService.checkPayInStatusTransaction(payinStatusDto);
   }
 
+  @Public()
   @ApiOperation({ summary: "Check status of pay-out transaction" })
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)
@@ -68,6 +75,7 @@ export class PaymentsController {
     return this.paymentsService.checkPayOutStatusTransaction(payoutStatusDto);
   }
 
+  @Public()
   @ApiOperation({ summary: "External webhook for pay-in" })
   @UseGuards(WebhookGuard)
   @HttpCode(HttpStatus.OK)
@@ -79,6 +87,7 @@ export class PaymentsController {
     return this.paymentsService.externalWebhookPayin(externalPayinWebhookDto);
   }
 
+  @Public()
   @ApiOperation({ summary: "External webhook for pay-out" })
   @UseGuards(WebhookGuard)
   @HttpCode(HttpStatus.OK)
@@ -88,5 +97,14 @@ export class PaymentsController {
     @Body() externalWebhookPayout: ExternalPayoutWebhookIsmartDto,
   ) {
     return this.paymentsService.externalWebhookPayout(externalWebhookPayout);
+  }
+
+  @Get("payment-link")
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  async getTransactionsForDashboard(
+    @User() user: UsersEntity,
+    @Query() paginationDto: PaginationWithDateDto,
+  ) {
+    return this.paymentsService.getTransactionsDetails(user.id, paginationDto);
   }
 }

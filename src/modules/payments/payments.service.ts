@@ -1,11 +1,19 @@
 import {
   BadRequestException,
   Injectable,
+  UnauthorizedException,
   NotFoundException,
 } from "@nestjs/common";
 import axios from "axios";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import {
+  Between,
+  DataSource,
+  FindOptionsWhere,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from "typeorm";
 import {
   CreatePayinTransactionAnviNeoDto,
   CreatePayinTransactionIsmartDto,
@@ -15,7 +23,7 @@ import { PayoutStatusDto } from "./dto/create-payout-payment.dto";
 import { ExternalPayoutWebhookIsmartDto } from "./dto/external-webhook-payout.dto";
 import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
-import { MessageResponseDto } from "@/dtos/common.dto";
+import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
 import { PAYMENT_STATUS, PAYMENT_TYPE } from "@/enums/payment.enum";
 import { UsersEntity } from "@/entities/user.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
@@ -34,6 +42,7 @@ import {
   IExternalPayinPaymentResponseIsmart,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
+import { getPagination } from "@/utils/pagination.utils";
 
 const {
   beBaseUrl,
@@ -42,6 +51,7 @@ const {
 
 @Injectable()
 export class PaymentsService {
+  private readonly baseUrl = "https://paybolt.in/payment";
   private readonly logger = new CustomLogger(PaymentsService.name);
   private readonly axiosService = new AxiosService(baseUrl, {
     headers: {
@@ -609,5 +619,75 @@ export class PaymentsService {
     }
 
     return new MessageResponseDto("Transaction status updated successfully.");
+  }
+
+  // Payment link url's
+  async getTransactionsDetails(
+    userId: string,
+    {
+      limit = 10,
+      page = 1,
+      sort = "id",
+      order = "DESC",
+      search = "",
+      startDate,
+      endDate,
+    }: PaginationWithDateDto,
+  ) {
+    const whereQuery:
+      | FindOptionsWhere<PayInOrdersEntity>
+      | FindOptionsWhere<PayInOrdersEntity>[] = {};
+
+    // Date Filter
+    if (startDate && endDate) {
+      whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
+    } else if (startDate) {
+      whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
+    } else if (endDate) {
+      whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+    }
+
+    whereQuery.user = {
+      id: userId
+    }
+
+    const query = [];
+
+    query.push(whereQuery)
+
+    const [data, totalItems] = await this.payInOrdersRepository.findAndCount({
+      where: query,
+      relations: {
+        user: true,
+      },
+      select: {
+        id: true,
+        amount: true,
+        status: true,
+        createdAt: true,
+        txnRefId: true,
+        orderId: true,
+        intent: true,
+        name: true,
+        user: {
+          id: true,
+          fullName: true,
+        },
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { [sort]: order },
+    });
+
+   const pagination = getPagination({
+      totalItems,
+      page,
+      limit
+    })
+
+    return {
+      data,
+      pagination
+    };
   }
 }
