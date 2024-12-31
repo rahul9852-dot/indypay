@@ -593,7 +593,7 @@ export class UsersService {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
 
-    const isIpWhitelisted = await this.userWhitelistIpsRepository.exists({
+    const isIpWhitelisted = await this.userWhitelistIpsRepository.exist({
       where: {
         ipAddress,
         user: { id: user.id },

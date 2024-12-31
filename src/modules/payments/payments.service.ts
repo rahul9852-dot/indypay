@@ -79,7 +79,6 @@ const {
 
 @Injectable()
 export class PaymentsService {
-  private readonly baseUrl = "https://paybolt.in/payment";
   private readonly logger = new CustomLogger(PaymentsService.name);
   private readonly axiosService = new AxiosService(PAYNPRO.PAYIN.BASE_URL, {
     headers: {

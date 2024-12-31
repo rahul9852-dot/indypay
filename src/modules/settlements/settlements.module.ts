@@ -8,6 +8,9 @@ import { BanksService } from "@/modules/banks/banks.service";
 import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
+import { EmailService } from "@/shared/services/email.service";
+import { InvoiceService } from "@/shared/services/invoice.service";
+import { UserAddressEntity } from "@/entities/user-address.entity";
 
 @Module({
   imports: [
@@ -17,9 +20,10 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
       UserBankDetailsEntity,
       WalletEntity,
       PayInOrdersEntity,
+      UserAddressEntity,
     ]),
   ],
-  providers: [SettlementsService, BanksService],
+  providers: [SettlementsService, BanksService, EmailService, InvoiceService],
   controllers: [SettlementsController],
 })
 export class SettlementsModule {}

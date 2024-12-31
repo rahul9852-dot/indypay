@@ -72,4 +72,11 @@ export const appConfig = registerAs("appConfig", () => ({
       baseUrl: getOsEnv("SSO_INVOICE_BASE_URL"),
     },
   },
+  emailConfig: {
+    host: getOsEnv("EMAIL_SMTP_HOST"),
+    port: +getOsEnv("EMAIL_SMTP_PORT") || 587,
+    username: getOsEnv("EMAIL_SMTP_USER"),
+    password: getOsEnv("EMAIL_SMTP_PASSWORD"),
+    from: getOsEnv("EMAIL_SMTP_FROM"),
+  },
 }));

@@ -54,6 +54,10 @@ import {
   IExternalPayoutStatusResponsePayNPro,
 } from "@/interface/external-api.interface";
 
+import { EmailService } from "@/shared/services/email.service";
+import { InvoiceService } from "@/shared/services/invoice.service";
+import { UserAddressEntity } from "@/entities/user-address.entity";
+
 const {
   externalPaymentConfig: {
     payoutSignature,
@@ -81,9 +85,13 @@ export class SettlementsService {
     private readonly walletRepository: Repository<WalletEntity>,
     @InjectRepository(PayInOrdersEntity)
     private readonly payinRepository: Repository<PayInOrdersEntity>,
+    @InjectRepository(UserAddressEntity)
+    private readonly addressRepository: Repository<UserAddressEntity>,
 
     private readonly bankService: BanksService,
     private readonly dataSource: DataSource,
+    private readonly emailService: EmailService,
+    private readonly invoiceService: InvoiceService,
   ) {}
 
   async createWalletForMerchants() {
@@ -648,6 +656,103 @@ export class SettlementsService {
     }
   }
 
+  async sendSettlementInvoice(
+    settlementId: string,
+    status: "Initiated" | "Completed",
+  ) {
+    const settlement = await this.settlementsRepository.findOne({
+      where: {
+        id: settlementId,
+      },
+      relations: {
+        user: true,
+        settledBy: true,
+        bankDetails: true,
+      },
+    });
+
+    if (!settlement) {
+      throw new NotFoundException(
+        new MessageResponseDto("Settlement not found"),
+      );
+    }
+
+    try {
+      const userAddress = await this.addressRepository.findOne({
+        where: {
+          user: {
+            id: settlement.user.id,
+          },
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (!settlement.bankDetails) {
+        throw new NotFoundException(
+          new MessageResponseDto("Bank Details not found"),
+        );
+      }
+
+      const pdf = await this.invoiceService.generateInvoicePDF({
+        amount: settlement.amount,
+        transferMode: settlement.transferMode,
+        userName: settlement.user.fullName,
+        settledBy: settlement.settledBy.fullName,
+        remarks: settlement.remarks,
+        bankDetails: {
+          accountNumber: settlement.bankDetails.accountNumber,
+          ifscCode: settlement.bankDetails.bankIFSC,
+          bankName: settlement.bankDetails.bankName,
+          accountHolderName: settlement.bankDetails.name,
+        },
+        status,
+        dateTime: new Date().toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+        }),
+        address: {
+          billing: {
+            name: settlement.user.fullName,
+            street: userAddress.address,
+            city: userAddress.city,
+            state: userAddress.state,
+            zip: userAddress.pincode,
+            country: userAddress.country,
+          },
+          shipping: {
+            name: "PayBolt Technologies Pvt. Ltd.",
+            street: "#1068, 3rd Floor, 1st Stage, Kumaraswamy Layout",
+            city: "Bengaluru",
+            state: "Karnataka",
+            zip: "560078",
+            country: "India",
+          },
+        },
+      });
+
+      this.logger.info(
+        `SETTLEMENT - sendSettlementInvoice - Sending Settlement Invoice to USER ${settlement.user.fullName} (${settlement.user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
+        settlement.bankDetails,
+      );
+
+      this.emailService.sendEmail(
+        settlement.user.email,
+        `Settlement ${status} - PayBolt`,
+        `Your settlement request for ₹${settlement.amount} has been ${status.toLowerCase()}.`,
+        [
+          {
+            filename: `settlement-${status.toLowerCase()}-${settlement.id}.pdf`,
+            content: pdf,
+          },
+        ],
+      );
+    } catch (error) {
+      this.logger.error(`Failed to send settlement ${status} invoice`, error);
+      // Don't throw error as this is a non-critical operation
+    }
+  }
+
   async initiateSettlementIsmart(
     {
       amount,
@@ -803,6 +908,11 @@ export class SettlementsService {
       );
 
       await queryRunner.commitTransaction();
+
+      await this.sendSettlementInvoice(savedSettlement.id, "Initiated");
+      if (status === PAYMENT_STATUS.SUCCESS) {
+        await this.sendSettlementInvoice(savedSettlement.id, "Completed");
+      }
 
       return {
         orderId: externalPayoutResponse.order_id,
@@ -977,6 +1087,11 @@ export class SettlementsService {
       );
 
       await queryRunner.commitTransaction();
+
+      await this.sendSettlementInvoice(savedSettlement.id, "Initiated");
+      if (status === PAYMENT_STATUS.SUCCESS) {
+        await this.sendSettlementInvoice(savedSettlement.id, "Completed");
+      }
 
       return {
         orderId: externalPayoutResponse.Data.payout_ref,
