@@ -34,7 +34,6 @@ import { ApiKeyGuard } from "@/guard/api-key.guard";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
 import { WebhookGuard } from "@/guard/webhook.guard";
-import { AuthGuard } from "@/guard/auth.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 

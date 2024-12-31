@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  UnauthorizedException,
   NotFoundException,
 } from "@nestjs/common";
 import axios from "axios";
@@ -994,7 +993,6 @@ export class PaymentsService {
 
     return new MessageResponseDto("Transaction status updated successfully.");
   }
-
 
   async getTransactionsDetails(
     user: UsersEntity,
