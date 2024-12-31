@@ -118,3 +118,86 @@ export interface IExternalPayoutStatusResponseIsmart {
   wallet_name: string;
   created_on: string;
 }
+
+// Pay N Pro
+export interface IExternalPayinPaymentRequestPayNPro {
+  amount: string;
+  key_id: string;
+  name: string;
+  mobile: string;
+  txnCurr: string;
+  key_secret: string;
+  email: string;
+}
+
+export interface IExternalPayinPaymentResponsePayNPro {
+  key_id: string;
+  data: string;
+  Description?: string;
+  statusCode?: string;
+}
+
+export interface IExternalPayoutRequestPayNPro {
+  username: string;
+  email_id: string;
+  mob_no: string;
+  amount: string;
+  payout_ref: string;
+  txn_type: PAYOUT_PAYMENT_MODE;
+  recv_bank_ifsc: string;
+  recv_name: string;
+  recv_bank_name: string;
+  purpose: string;
+  recv_acc_no: string;
+  signature: string;
+}
+
+export interface IExternalPayoutResponsePayNPro {
+  Data?: {
+    txn_id: string;
+    date: string;
+    payout_ref: string;
+    amount: string;
+    udf5: string;
+    description: string;
+    rrn: string;
+    status: string;
+  };
+  error?: string;
+  statusCode: number;
+}
+
+export interface IExternalPayoutStatusRequestPayNPro {
+  payout_ref: string;
+  // txnId: string;
+  // emailId: string;
+  // mobileNumber: string;
+  signature: string;
+}
+
+export interface IExternalPayoutStatusResponsePayNPro {
+  data?: {
+    txn_id: string;
+    payout_ref: string;
+    description: string;
+    bank_ref_no: string;
+    status: string;
+  }[];
+  error?: string;
+  statusCode: number;
+}
+
+export interface IWebhookDataPayNPro {
+  date: string;
+  bankId: string;
+  amount: number;
+  key_id: string;
+  orderId: string;
+  signature: string;
+  mobile: string;
+  description: string;
+  txnCurr: string;
+  transactionId: string;
+  email: string;
+  status: string;
+}

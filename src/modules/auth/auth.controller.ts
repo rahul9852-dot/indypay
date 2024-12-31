@@ -30,6 +30,7 @@ import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { AuthGuard } from "@/guard/auth.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
+import { UsersEntity } from "@/entities/user.entity";
 
 @ApiTags("Auth")
 @IgnoreBusinessDetails()
@@ -94,8 +95,12 @@ export class AuthController {
   @HttpCode(200)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("logout")
-  async logout(@Req() req: Request, @Res() res: Response) {
-    return this.authService.logout(req, res);
+  async logout(
+    @Req() req: Request,
+    @Res() res: Response,
+    @User() { id }: UsersEntity,
+  ) {
+    return this.authService.logout(req, res, id);
   }
 
   @Public()

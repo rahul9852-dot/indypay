@@ -69,3 +69,50 @@ export class ExternalPayoutWebhookIsmartDto {
   @IsNotEmpty()
   orderId: string;
 }
+
+export class ExternalPayOutWebhookPayNProDto {
+  @ApiProperty()
+  @IsString()
+  DATE: string;
+
+  @ApiProperty()
+  @IsString()
+  STATUS: string;
+
+  @ApiProperty()
+  @IsString()
+  CHECKSUM: string;
+
+  @ApiProperty()
+  @IsString()
+  TXN_ID: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  AMOUNT: number;
+
+  @ApiProperty()
+  @IsString()
+  PAYOUT_REF: string;
+
+  @ApiProperty()
+  @IsString()
+  EMAIL_ID: string;
+
+  @ApiProperty()
+  @IsString()
+  TXN_TYPE: string;
+
+  @ApiProperty()
+  @IsString()
+  MOB_NO: string;
+
+  @ApiProperty()
+  @IsString()
+  DESC: string;
+
+  @ApiProperty()
+  @IsString()
+  RRN: string;
+}

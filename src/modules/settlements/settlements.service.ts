@@ -25,7 +25,11 @@ import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
 import { SettlementsEntity } from "@/entities/settlements.entity";
-import { ANVITAPAY, ISMART_PAY } from "@/constants/external-api.constant";
+import {
+  ANVITAPAY,
+  ISMART_PAY,
+  PAYNPRO,
+} from "@/constants/external-api.constant";
 import { BanksService } from "@/modules/banks/banks.service";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
@@ -41,23 +45,30 @@ import {
 import {
   IExternalPayoutRequestAnviNeo,
   IExternalPayoutRequestIsmart,
+  IExternalPayoutRequestPayNPro,
   IExternalPayoutResponseAnviNeo,
   IExternalPayoutResponseIsmart,
+  IExternalPayoutResponsePayNPro,
+  IExternalPayoutStatusRequestPayNPro,
   IExternalPayoutStatusResponseIsmart,
+  IExternalPayoutStatusResponsePayNPro,
 } from "@/interface/external-api.interface";
 
 const {
-  externalPaymentConfig: { baseUrl, clientId, clientSecret },
+  externalPaymentConfig: {
+    payoutSignature,
+    payoutClientId,
+    payoutClientSecret,
+  },
 } = appConfig();
-
 @Injectable()
 export class SettlementsService {
   private readonly logger = new CustomLogger(SettlementsService.name);
-  private readonly axiosService = new AxiosService(baseUrl, {
+  private readonly axiosService = new AxiosService(PAYNPRO.PAYOUT.BASE_URL, {
     headers: {
       "Content-Type": "application/json",
-      mid: clientId,
-      key: clientSecret,
+      "X-APIKEY": payoutClientId,
+      "X-APISECRET": payoutClientSecret,
     },
   });
 
@@ -584,7 +595,7 @@ export class SettlementsService {
       };
 
       this.logger.info(
-        `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${baseUrl}/${ANVITAPAY.PAYOUT} with payload: ${LoggerPlaceHolder.Json}`,
+        `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${ANVITAPAY.PAYOUT} with payload: ${LoggerPlaceHolder.Json}`,
         payload,
       );
 
@@ -757,7 +768,7 @@ export class SettlementsService {
       };
 
       this.logger.info(
-        `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${baseUrl}/${ISMART_PAY.PAYOUT} with payload: ${LoggerPlaceHolder.Json}`,
+        `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${ISMART_PAY.PAYOUT} with payload: ${LoggerPlaceHolder.Json}`,
         payload,
       );
 
@@ -797,6 +808,180 @@ export class SettlementsService {
         orderId: externalPayoutResponse.order_id,
         amount: externalPayoutResponse.amount,
         transferId: externalPayoutResponse.transaction_id,
+        status,
+      };
+    } catch (err) {
+      this.logger.error(
+        `SETTLEMENT - initiateSettlements - error: ${LoggerPlaceHolder.Json}`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async initiateSettlementPayNPro(
+    {
+      amount,
+      bankId,
+      remarks,
+      userId,
+      transferMode,
+    }: InitiateSettlementAdminDto,
+    settledBy: UsersEntity,
+  ) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: {
+        address: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    if (!user.address) {
+      throw new NotFoundException(
+        new MessageResponseDto("User address not found"),
+      );
+    }
+
+    const banks = await this.bankService.getAllBanks(userId);
+
+    const targetBank = banks.find((bank) => bank.id === bankId);
+
+    if (!targetBank) {
+      throw new NotFoundException(new MessageResponseDto("Bank not found"));
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    try {
+      // Start transaction
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      const wallet = await this.walletRepository.findOne({
+        where: {
+          user: {
+            id: userId,
+          },
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (!wallet) {
+        throw new NotFoundException(
+          new MessageResponseDto("User wallet not found"),
+        );
+      }
+
+      if (+wallet.netPayableAmount < +amount) {
+        throw new BadRequestException(
+          new MessageResponseDto("Amount is greater than unsettled amount"),
+        );
+      }
+      const originalAmount = calculateOriginalAmountFromNetPayable({
+        netPayableAmount: +amount,
+        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+        gstInPercentage: +wallet.user.gstInPercentagePayin,
+      });
+
+      const commission = getCommissions({
+        amount: originalAmount,
+        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+        gstInPercentage: +wallet.user.gstInPercentagePayin,
+      });
+
+      const newWallet = this.walletRepository.create({
+        id: wallet.id,
+        settledAmount: +wallet.settledAmount + +originalAmount,
+        unsettledAmount: +wallet.unsettledAmount - +originalAmount,
+        netPayableAmount: +wallet.netPayableAmount - +amount,
+        commissionAmount:
+          +wallet.commissionAmount - +commission.commissionAmount,
+        gstAmount: +wallet.gstAmount - +commission.gstAmount,
+      });
+
+      await queryRunner.manager.save(newWallet);
+
+      const settlement = this.settlementsRepository.create({
+        amount: +amount,
+        transferMode,
+        user,
+        settledBy,
+        remarks,
+        bankDetails: targetBank,
+      });
+
+      const savedSettlement = await queryRunner.manager.save(settlement);
+
+      this.logger.info(
+        `SETTLEMENT - initiateSettlements - Sending Settlements Amount: ${amount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
+        targetBank,
+      );
+
+      const payload: IExternalPayoutRequestPayNPro = {
+        amount: (+amount).toFixed(2),
+        purpose: remarks,
+        payout_ref: savedSettlement.id,
+        mob_no: targetBank.mobile,
+        email_id: targetBank.email,
+        recv_acc_no: targetBank.accountNumber,
+        recv_bank_ifsc: targetBank.bankIFSC,
+        recv_bank_name: targetBank.bankName,
+        recv_name: targetBank.name,
+        txn_type: transferMode,
+        username: user.fullName,
+        signature: payoutSignature,
+      };
+
+      this.logger.info(
+        `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${PAYNPRO.PAYOUT.BASE_URL}/${PAYNPRO.PAYOUT.LIVE_ENDPOINT} with payload: ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
+
+      const externalPayoutResponse =
+        await this.axiosService.postRequest<IExternalPayoutResponsePayNPro>(
+          PAYNPRO.PAYOUT.LIVE_ENDPOINT,
+          payload,
+        );
+
+      this.logger.info(
+        `SETTLEMENT - initiateSettlements - External Payout Response: ${LoggerPlaceHolder.Json}`,
+        externalPayoutResponse,
+      );
+
+      if (externalPayoutResponse.statusCode.toString() !== "200") {
+        throw new BadRequestException(
+          externalPayoutResponse?.error || "Something went wrong",
+        );
+      }
+
+      const status = convertExternalPaymentStatusToInternal(
+        externalPayoutResponse.Data.status.toUpperCase(),
+      );
+
+      await queryRunner.manager.update(
+        SettlementsEntity,
+        { id: savedSettlement.id },
+        {
+          transferId: externalPayoutResponse.Data.txn_id,
+          status,
+        },
+      );
+
+      await queryRunner.commitTransaction();
+
+      return {
+        orderId: externalPayoutResponse.Data.payout_ref,
+        amount: externalPayoutResponse.Data.amount,
+        transferId: externalPayoutResponse.Data.txn_id,
         status,
       };
     } catch (err) {
@@ -950,7 +1135,7 @@ export class SettlementsService {
     return { data, pagination };
   }
 
-  async checkSettlementStatus(settlementId: string) {
+  async checkSettlementStatusIsmart(settlementId: string) {
     const settlement = await this.settlementsRepository.findOne({
       where: {
         id: settlementId,
@@ -982,6 +1167,67 @@ export class SettlementsService {
     }
 
     const status = convertExternalPaymentStatusToInternal(response.status_code);
+
+    const settlementRaw = this.settlementsRepository.create({
+      id: settlement.id,
+      status,
+      ...(status === PAYMENT_STATUS.SUCCESS && {
+        successAt: new Date(),
+      }),
+      ...(status === PAYMENT_STATUS.FAILED && {
+        failureAt: new Date(),
+      }),
+    });
+
+    await this.settlementsRepository.save(settlementRaw);
+
+    return {
+      settlementId,
+      status,
+      amount: settlement.amount,
+    };
+  }
+  async checkSettlementStatusPayNPro(settlementId: string) {
+    const settlement = await this.settlementsRepository.findOne({
+      where: {
+        id: settlementId,
+      },
+    });
+
+    if (!settlement) {
+      throw new NotFoundException(
+        new MessageResponseDto("No Settlement Found"),
+      );
+    }
+
+    if (settlement.status === PAYMENT_STATUS.SUCCESS) {
+      return {
+        settlementId,
+        status: settlement.status,
+        amount: settlement.amount,
+      };
+    }
+
+    // call third party api
+    const payload: IExternalPayoutStatusRequestPayNPro = {
+      payout_ref: settlementId,
+      signature: payoutSignature,
+    };
+    const response =
+      await this.axiosService.postRequest<IExternalPayoutStatusResponsePayNPro>(
+        PAYNPRO.PAYOUT.STATUS,
+        payload,
+      );
+
+    if (response.statusCode?.toString() !== "200") {
+      throw new BadRequestException(
+        new MessageResponseDto(response?.error || "Something went wrong!"),
+      );
+    }
+
+    const status = convertExternalPaymentStatusToInternal(
+      response.data?.[0]?.status?.toUpperCase(),
+    );
 
     const settlementRaw = this.settlementsRepository.create({
       id: settlement.id,

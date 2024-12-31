@@ -21,6 +21,7 @@ import { SettlementsModule } from "@/modules/settlements/settlements.module";
 import { DocsModule } from "@/modules/docs/docs.module";
 import { CollectionsModule } from "@/modules/collections/collections.module";
 import { BanksModule } from "@/modules/banks/banks.module";
+import { SsoModule } from "@/modules/sso/sso.module";
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { BanksModule } from "@/modules/banks/banks.module";
     DocsModule,
     CollectionsModule,
     BanksModule,
+    SsoModule,
   ],
   controllers: [AppController],
   providers: [

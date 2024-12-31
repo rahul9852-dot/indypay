@@ -6,10 +6,10 @@ import {
 } from "@nestjs/common";
 import { Request } from "express";
 import { appConfig } from "@/config/app.config";
-import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+import { CustomLogger } from "@/logger";
 
 const {
-  externalPaymentConfig: { webhookIps },
+  externalPaymentConfig: { webhookIps, encryptionSalt, aesSecretKey },
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -18,11 +18,6 @@ export class WebhookGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-
-    this.logger.info(
-      `WebhookGuard - request body: ${LoggerPlaceHolder.Json}`,
-      request.body,
-    );
 
     const requestIp = this.parseIp(request);
 

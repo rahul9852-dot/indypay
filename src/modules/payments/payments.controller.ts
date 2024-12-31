@@ -4,6 +4,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Res,
   UseGuards,
   Get,
   Query,
@@ -14,15 +15,17 @@ import {
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
+import { Response } from "express";
 import { PaymentsService } from "./payments.service";
 import {
   CreatePayinPaymentResponseDto,
   PayinStatusDto,
-  CreatePayinTransactionIsmartDto,
+  CreatePayinTransactionPayNProDto,
 } from "./dto/create-payin-payment.dto";
-import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
+import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import { PayoutStatusDto } from "./dto/create-payout-payment.dto";
-import { ExternalPayoutWebhookIsmartDto } from "./dto/external-webhook-payout.dto";
+import { ExternalPayinWebhookPayNProDto } from "./dto/external-webhook-payin.dto";
+import { ExternalPayOutWebhookPayNProDto } from "./dto/external-webhook-payout.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -48,12 +51,14 @@ export class PaymentsController {
   @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })
   @Post("payin/create")
   async createPayInTransaction(
-    @Body() createTransactionDto: CreatePayinTransactionIsmartDto,
+    @Body() createTransactionDto: CreatePayinTransactionPayNProDto,
     @User() user: UsersEntity,
+    @Res() res: Response,
   ) {
-    return this.paymentsService.createTransactionPayinIsmart(
+    return this.paymentsService.createTransactionPayinPayNPro(
       createTransactionDto,
       user,
+      res,
     );
   }
 
@@ -82,9 +87,11 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
   async externalWebhookPayin(
-    @Body() externalPayinWebhookDto: ExternalPayinWebhookIsmartDto,
+    @Body() externalPayinWebhookDto: ExternalPayinWebhookPayNProDto,
   ) {
-    return this.paymentsService.externalWebhookPayin(externalPayinWebhookDto);
+    return this.paymentsService.externalWebhookPayinPayNPro(
+      externalPayinWebhookDto,
+    );
   }
 
   @Public()
@@ -94,17 +101,19 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payout/webhook")
   async externalWebhookPayout(
-    @Body() externalWebhookPayout: ExternalPayoutWebhookIsmartDto,
+    @Body() externalWebhookPayout: ExternalPayOutWebhookPayNProDto,
   ) {
     return this.paymentsService.externalWebhookPayout(externalWebhookPayout);
   }
 
+  @ApiOperation({ summary: "Get all collection list" })
+  @ApiOkResponse({ type: GetTransactionsDetailsResponseDto })
   @Get("payment-link")
   @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   async getTransactionsForDashboard(
     @User() user: UsersEntity,
     @Query() paginationDto: PaginationWithDateDto,
   ) {
-    return this.paymentsService.getTransactionsDetails(user.id, paginationDto);
+    return this.paymentsService.getTransactionsDetails(user, paginationDto);
   }
 }

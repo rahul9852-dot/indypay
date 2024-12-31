@@ -61,7 +61,7 @@ export class SettlementsController {
     @Body() initiateSettlementAdminDto: InitiateSettlementAdminDto,
     @User() user: UsersEntity,
   ) {
-    return this.settlementsService.initiateSettlementIsmart(
+    return this.settlementsService.initiateSettlementPayNPro(
       initiateSettlementAdminDto,
       user,
     );
@@ -72,7 +72,7 @@ export class SettlementsController {
   })
   @Get("status/:settlementId")
   async checkSettlementStatus(@Param("settlementId") settlementId: string) {
-    return this.settlementsService.checkSettlementStatus(settlementId);
+    return this.settlementsService.checkSettlementStatusPayNPro(settlementId);
   }
 
   @ApiOperation({ summary: "Create Wallets for all merchants - Owner" })

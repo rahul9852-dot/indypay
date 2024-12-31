@@ -42,10 +42,13 @@ export const appConfig = registerAs("appConfig", () => ({
   },
 
   externalPaymentConfig: {
-    baseUrl: getOsEnv("EXTERNAL_PAYMENT_BASE_URL"),
     clientId: getOsEnv("EXTERNAL_PAYMENT_CLIENT_ID"),
     clientSecret: getOsEnv("EXTERNAL_PAYMENT_CLIENT_SECRET"),
-    clientSign: getOsEnvOptional("EXTERNAL_PAYMENT_SIGN"),
+    encryptionSalt: getOsEnv("EXTERNAL_PAYMENT_ENCRYPTION_SALT"),
+    aesSecretKey: getOsEnv("EXTERNAL_PAYMENT_AES_SECRET_KEY"),
+    payoutSignature: getOsEnv("EXTERNAL_PAYMENT_PAYOUT_SIGNATURE"),
+    payoutClientId: getOsEnv("EXTERNAL_PAYMENT_PAYOUT_CLIENT_ID"),
+    payoutClientSecret: getOsEnv("EXTERNAL_PAYMENT_PAYOUT_CLIENT_SECRET"),
     webhookIps: getOsEnv("EXTERNAL_PAYMENT_WEBHOOK_IPS").split(","),
   },
   transactionConfig: {
@@ -60,5 +63,13 @@ export const appConfig = registerAs("appConfig", () => ({
   redisConfig: {
     redisHostUrl: getOsEnv("REDIS_HOST_URL"),
     redisPort: +getOsEnv("REDIS_PORT") || 6379,
+  },
+
+  sso: {
+    invoice: {
+      clientId: getOsEnv("SSO_INVOICE_CLIENT_ID"),
+      clientSecret: getOsEnv("SSO_INVOICE_CLIENT_SECRET"),
+      baseUrl: getOsEnv("SSO_INVOICE_BASE_URL"),
+    },
   },
 }));

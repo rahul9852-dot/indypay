@@ -10,18 +10,24 @@ import {
   Between,
   DataSource,
   FindOptionsWhere,
+  ILike,
   LessThanOrEqual,
   MoreThanOrEqual,
   Repository,
 } from "typeorm";
+import { Response } from "express";
 import {
   CreatePayinTransactionAnviNeoDto,
   CreatePayinTransactionIsmartDto,
+  CreatePayinTransactionPayNProDto,
   PayinStatusDto,
 } from "./dto/create-payin-payment.dto";
 import { PayoutStatusDto } from "./dto/create-payout-payment.dto";
-import { ExternalPayoutWebhookIsmartDto } from "./dto/external-webhook-payout.dto";
-import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
+import { ExternalPayOutWebhookPayNProDto } from "./dto/external-webhook-payout.dto";
+import {
+  ExternalPayinWebhookIsmartDto,
+  ExternalPayinWebhookPayNProDto,
+} from "./dto/external-webhook-payin.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
 import { PAYMENT_STATUS, PAYMENT_TYPE } from "@/enums/payment.enum";
@@ -31,29 +37,52 @@ import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
-import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
-import { ANVITAPAY, ISMART_PAY } from "@/constants/external-api.constant";
+import {
+  convertExternalPaymentStatusToInternal,
+  getUlidId,
+} from "@/utils/helperFunctions.utils";
+import {
+  ANVITAPAY,
+  ISMART_PAY,
+  PAYNPRO,
+} from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { getCommissions } from "@/utils/commissions.utils";
 import {
   IExternalPayinPaymentRequestAnviNeo,
   IExternalPayinPaymentRequestIsmart,
+  IExternalPayinPaymentRequestPayNPro,
   IExternalPayinPaymentResponseAnviNeo,
   IExternalPayinPaymentResponseIsmart,
+  IExternalPayinPaymentResponsePayNPro,
+  IWebhookDataPayNPro,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
+import {
+  decryptPayNPro,
+  encryptPayNPro,
+  generateSignature,
+  IEncryptData,
+} from "@/utils/paynpro-crypto.utils";
+import { generateQrCode } from "@/utils/upiqr.util";
 import { getPagination } from "@/utils/pagination.utils";
+import { USERS_ROLE } from "@/enums";
 
 const {
   beBaseUrl,
-  externalPaymentConfig: { baseUrl, clientId, clientSecret },
+  externalPaymentConfig: {
+    clientId,
+    clientSecret,
+    encryptionSalt,
+    aesSecretKey,
+  },
 } = appConfig();
 
 @Injectable()
 export class PaymentsService {
   private readonly baseUrl = "https://paybolt.in/payment";
   private readonly logger = new CustomLogger(PaymentsService.name);
-  private readonly axiosService = new AxiosService(baseUrl, {
+  private readonly axiosService = new AxiosService(PAYNPRO.PAYIN.BASE_URL, {
     headers: {
       "Content-Type": "application/json",
       mid: clientId,
@@ -361,6 +390,203 @@ export class PaymentsService {
     }
   }
 
+  async createTransactionPayinPayNPro(
+    createPayinTransactionDto: CreatePayinTransactionPayNProDto,
+    user: UsersEntity,
+    res: Response,
+  ) {
+    const { amount, email, mobile, name } = createPayinTransactionDto;
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    // Start transaction
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+        amount,
+        commissionInPercentage: user.commissionInPercentagePayin,
+        gstInPercentage: user.gstInPercentagePayin,
+      });
+
+      const wallet = await this.walletRepository.findOne({
+        where: {
+          user: {
+            id: user.id,
+          },
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (!wallet) {
+        await queryRunner.manager.save(
+          this.walletRepository.create({
+            user,
+          }),
+        );
+      }
+
+      // 1. create pay-in order
+      const payinOrder = this.payInOrdersRepository.create({
+        user,
+        amount,
+        email,
+        name,
+        mobile,
+        commissionAmount,
+        gstAmount,
+        netPayableAmount,
+        orderId: getUlidId("odr"), // add dummy order id - we will update once order will create
+      });
+
+      // 2. save pay-in order
+      const savedPayinOrder = await queryRunner.manager.save(payinOrder);
+
+      // 3. create transaction
+      const transaction = this.transactionsRepository.create({
+        user,
+        payInOrder: savedPayinOrder,
+        transactionType: PAYMENT_TYPE.PAYIN,
+      });
+
+      // 4. save transaction
+      const savedTransaction = await queryRunner.manager.save(transaction);
+
+      this.logger.info(
+        `PAYIN - createTransaction - transaction: ${LoggerPlaceHolder.Json}`,
+        savedTransaction,
+      );
+
+      // 5. create external payment
+      const payload: IExternalPayinPaymentRequestPayNPro = {
+        amount: createPayinTransactionDto.amount.toFixed(2),
+        txnCurr: "INR",
+        email: createPayinTransactionDto.email,
+        mobile: createPayinTransactionDto.mobile,
+        name: createPayinTransactionDto.name,
+        key_id: clientId,
+        key_secret: clientSecret,
+      };
+
+      const signature = generateSignature(payload);
+
+      const payloadWithSignature: IEncryptData = {
+        ...payload,
+        signature,
+      };
+
+      const encryptedData = encryptPayNPro(
+        payloadWithSignature,
+        encryptionSalt,
+        aesSecretKey,
+      );
+
+      this.logger.info(
+        `PAYIN - calling external (${PAYNPRO.PAYIN.LIVE_ENDPOINT}) API with payload: ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
+
+      const externalEncryptedResponse =
+        await this.axiosService.postRequest<IExternalPayinPaymentResponsePayNPro>(
+          PAYNPRO.PAYIN.LIVE_ENDPOINT,
+          {
+            key_id: clientId,
+            data: encryptedData,
+          },
+        );
+
+      if (
+        externalEncryptedResponse?.data?.trim() === "" &&
+        externalEncryptedResponse?.statusCode !== "200"
+      ) {
+        this.logger.error(
+          `PAYIN - createTransaction - ERROR: ${externalEncryptedResponse?.statusCode} ${externalEncryptedResponse?.Description}`,
+        );
+        throw new BadRequestException(externalEncryptedResponse.Description);
+      }
+
+      const externalPaymentResponse = decryptPayNPro(
+        externalEncryptedResponse.data,
+        encryptionSalt,
+        aesSecretKey,
+      );
+
+      this.logger.info(
+        `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
+        externalPaymentResponse,
+      );
+
+      if (
+        externalPaymentResponse.status.toLowerCase() !== "success" ||
+        externalPaymentResponse.statusCode !== "200"
+      ) {
+        throw new BadRequestException(
+          externalPaymentResponse?.description || "Something went wrong",
+        );
+      }
+
+      // const internalStatus = convertExternalPaymentStatusToInternal(
+      //   externalPaymentResponse.status?.toUpperCase(),
+      // );
+      // 6. save external payment
+      const savedOrder = await queryRunner.manager.save(
+        this.payInOrdersRepository.create({
+          ...savedPayinOrder,
+          ...(externalPaymentResponse?.upiIntent && {
+            intent: externalPaymentResponse?.upiIntent,
+          }),
+          // status: internalStatus,
+          txnRefId: externalPaymentResponse.transactionId,
+          orderId: externalPaymentResponse.orderId, // here we are updating dummy => real order id generated by bank
+        }),
+      );
+
+      if (!externalPaymentResponse?.upiIntent?.trim()) {
+        throw new BadRequestException(
+          new MessageResponseDto("Something went wrong"),
+        );
+      }
+
+      const qr = await generateQrCode(externalPaymentResponse.upiIntent); // base64 qr image
+      const img = qr.replace(/^data:image\/png;base64,/, "");
+      const imageBuffer = Buffer.from(img, "base64");
+
+      await queryRunner.commitTransaction();
+
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Content-Disposition", "attachment; filename=qr.png");
+      res.setHeader("Content-Length", imageBuffer.length);
+
+      this.logger.info(
+        `PAYIN - createTransaction - Created transaction successfully`,
+      );
+
+      return res.send(imageBuffer);
+
+      // return {
+      //   orderId: externalPaymentResponse.orderId,
+      // ...(externalPaymentResponse?.upiIntent && {
+      //   intent: externalPaymentResponse?.upiIntent,
+      // }),
+      // };
+
+      // Commit transaction
+    } catch (err: any) {
+      this.logger.error(
+        `PAYIN - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
+        err,
+      );
+      // Rollback transaction if any operation fails
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      // Release the queryRunner to avoid memory leaks
+      await queryRunner.release();
+    }
+  }
+
   async checkPayInStatusTransaction({ orderId }: PayinStatusDto) {
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: { orderId },
@@ -526,13 +752,161 @@ export class PaymentsService {
     return new MessageResponseDto("Transaction status updated successfully.");
   }
 
-  async externalWebhookPayout({
-    status_code,
-    order_id,
-    transaction_id,
-    amount,
-  }: ExternalPayoutWebhookIsmartDto) {
+  async externalWebhookPayinPayNPro(
+    externalPayinWebhookDto: ExternalPayinWebhookPayNProDto,
+  ) {
+    const decryptedData = decryptPayNPro(
+      externalPayinWebhookDto.data,
+      encryptionSalt,
+      aesSecretKey,
+    ) as unknown as IWebhookDataPayNPro;
+
+    const {
+      orderId,
+      status: status_code,
+      transactionId: txnRefId,
+      description,
+    } = decryptedData;
+
+    this.logger.info(
+      `WEBHOOK: decrypted data: ${LoggerPlaceHolder.Json}`,
+      decryptedData,
+    );
+
     const status = convertExternalPaymentStatusToInternal(status_code);
+
+    const isSuccess =
+      description === "Transaction Success" &&
+      status === PAYMENT_STATUS.SUCCESS;
+    const isFailed =
+      description === "Transaction Failed" && status === "FAILED";
+
+    const payinOrder = await this.payInOrdersRepository.findOne({
+      where: {
+        orderId,
+      },
+      relations: ["user"],
+    });
+
+    if (!payinOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payin order not found"),
+      );
+    }
+
+    if (status === payinOrder.status) {
+      this.logger.info(
+        `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+      );
+
+      return new MessageResponseDto("Status updated successfully.");
+    }
+
+    const { user } = payinOrder;
+
+    const payinOrderRaw = this.payInOrdersRepository.create({
+      id: payinOrder.id,
+      status,
+      txnRefId,
+      ...(isSuccess && {
+        successAt: new Date(),
+      }),
+      ...(isFailed && {
+        failureAt: new Date(),
+      }),
+    });
+
+    await this.payInOrdersRepository.save(payinOrderRaw);
+
+    // update wallet
+    if (isSuccess) {
+      const wallet = await this.walletRepository.findOne({
+        where: { user: { id: user.id } },
+        relations: ["user"],
+      });
+
+      const { totalCollections, unsettledAmount } = wallet ?? {};
+
+      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+        amount: +payinOrder.amount,
+        commissionInPercentage: +user.commissionInPercentagePayin,
+        gstInPercentage: +user.gstInPercentagePayin,
+      });
+
+      const walletRaw = this.walletRepository.create({
+        ...(wallet?.id && { id: wallet.id }),
+        totalCollections:
+          (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
+        unsettledAmount:
+          (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
+        commissionAmount:
+          (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
+          +commissionAmount,
+        gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
+        netPayableAmount:
+          (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
+          +netPayableAmount,
+        user,
+      });
+
+      await this.walletRepository.save(walletRaw);
+
+      this.logger.info(
+        `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+        walletRaw,
+      );
+    }
+
+    if (user?.payInWebhookUrl) {
+      const webhookPayload = {
+        orderId,
+        status,
+        amount: payinOrder.amount,
+        txnRefId: payinOrder.txnRefId, // utr
+      };
+      this.logger.info(
+        `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+        webhookPayload,
+      );
+      axios
+        .post(user.payInWebhookUrl, webhookPayload, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+        .then(() => {
+          this.logger.info(
+            `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
+            user,
+          );
+        })
+        .catch((err) => {
+          this.logger.error(
+            `PAYIN - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+            err,
+          );
+        });
+    }
+
+    return new MessageResponseDto("Transaction status updated successfully.");
+  }
+
+  async externalWebhookPayout({
+    STATUS: status_code,
+    PAYOUT_REF: order_id,
+    TXN_ID: transaction_id,
+    AMOUNT: amount,
+  }: ExternalPayOutWebhookPayNProDto) {
+    const status = convertExternalPaymentStatusToInternal(
+      status_code.toUpperCase(),
+    );
+
+    this.logger.info(`WEBHOOK: decrypted data: ${LoggerPlaceHolder.Json}`, {
+      STATUS: status_code,
+      PAYOUT_REF: order_id,
+      TXN_ID: transaction_id,
+      AMOUNT: amount,
+    });
 
     const settlement = await this.settlementRepository.findOne({
       where: {
@@ -621,9 +995,9 @@ export class PaymentsService {
     return new MessageResponseDto("Transaction status updated successfully.");
   }
 
-  // Payment link url's
+
   async getTransactionsDetails(
-    userId: string,
+    user: UsersEntity,
     {
       limit = 10,
       page = 1,
@@ -646,14 +1020,106 @@ export class PaymentsService {
     } else if (endDate) {
       whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
     }
-
-    whereQuery.user = {
-      id: userId
-    }
-
     const query = [];
 
-    query.push(whereQuery)
+    if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
+      if (search) {
+        const orderIdSearch = {
+          orderId: ILike(`%${search}%`),
+        };
+
+        const txnRefSearch = {
+          txnRefId: ILike(`%${search}%`),
+        };
+
+        const userIdSearch = {
+          user: {
+            id: ILike(`%${search}%`),
+          },
+        };
+
+        const nameSearch = {
+          user: {
+            fullName: ILike(`%${search}%`),
+          },
+        };
+
+        const emailSearch = {
+          user: {
+            email: ILike(`%${search}%`),
+          },
+        };
+
+        const mobileSearch = {
+          user: {
+            mobile: ILike(`%${search}%`),
+          },
+        };
+
+        query.push(orderIdSearch);
+        query.push(txnRefSearch);
+        query.push(nameSearch);
+        query.push(emailSearch);
+        query.push(mobileSearch);
+        query.push(userIdSearch);
+      }
+    } else {
+      if (search) {
+        const userIdSearch = {
+          user: {
+            id: user.id,
+          },
+        };
+
+        const orderIdSearch = {
+          user: {
+            id: user.id,
+          },
+          orderId: ILike(`%${search}%`),
+        };
+
+        const txnRefSearch = {
+          user: {
+            id: user.id,
+          },
+          txnRefId: ILike(`%${search}%`),
+        };
+
+        const nameSearch = {
+          user: {
+            id: user.id,
+            fullName: ILike(`%${search}%`),
+          },
+        };
+
+        const emailSearch = {
+          user: {
+            id: user.id,
+            email: ILike(`%${search}%`),
+          },
+        };
+
+        const mobileSearch = {
+          user: {
+            id: user.id,
+            mobile: ILike(`%${search}%`),
+          },
+        };
+
+        query.push(userIdSearch);
+        query.push(orderIdSearch);
+        query.push(txnRefSearch);
+        query.push(nameSearch);
+        query.push(emailSearch);
+        query.push(mobileSearch);
+      } else {
+        query.push({
+          user: {
+            id: user.id,
+          },
+        });
+      }
+    }
 
     const [data, totalItems] = await this.payInOrdersRepository.findAndCount({
       where: query,
@@ -679,15 +1145,15 @@ export class PaymentsService {
       order: { [sort]: order },
     });
 
-   const pagination = getPagination({
+    const pagination = getPagination({
       totalItems,
       page,
-      limit
-    })
+      limit,
+    });
 
     return {
       data,
-      pagination
+      pagination,
     };
   }
 }

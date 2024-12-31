@@ -35,9 +35,9 @@ import {
   DeleteWhitelistIpsDto,
   WhitelistIpsResponseDto,
 } from "./dto/whitelist-ips.dto";
+import { UserListQuery, UserListResponseDto } from "./dto/user-list.dto";
 import { AddAddressAdminDto, AddAddressDto } from "./dto/add-address.dto";
 import { User } from "@/decorators/user.decorator";
-import { IAccessTokenPayload } from "@/interface/common.interface";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { UserProfileResDto } from "@/modules/users/dto/user-profile.dto";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -178,8 +178,8 @@ export class UsersController {
     type: UserProfileResDto,
   })
   @Get("profile")
-  async getUserProfile(@User() user: IAccessTokenPayload) {
-    return this.usersService.findOne(user.id);
+  async getUserProfile(@User() user: UsersEntity) {
+    return user;
   }
 
   @ApiOperation({ summary: "Add business details" })
@@ -402,5 +402,13 @@ export class UsersController {
   @Get("webhook-url")
   async getWebhookUrl(@User() user: UsersEntity) {
     return this.usersService.getWebhookUrl(user);
+  }
+
+  @ApiOperation({ summary: "Get list of users - Admin Only" })
+  @ApiOkResponse({ type: UserListResponseDto })
+  @Get("list")
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  async getAllUsers(@Query() query: UserListQuery) {
+    return this.usersService.getPaginatedUsers(query);
   }
 }

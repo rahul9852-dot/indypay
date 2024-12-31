@@ -74,6 +74,31 @@ export class CreatePayinTransactionIsmartDto {
   vpa: string;
 }
 
+export class CreatePayinTransactionPayNProDto {
+  @ApiProperty()
+  @IsNumber({
+    maxDecimalPlaces: 2,
+  })
+  @IsPositive()
+  amount: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty()
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty()
+  @IsNumberString()
+  @IsNotEmpty()
+  @Length(10, 10)
+  mobile: string;
+}
+
 export class PayinStatusDto {
   @ApiProperty()
   @IsString()

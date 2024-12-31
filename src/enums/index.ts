@@ -15,9 +15,10 @@ export enum USERS_ROLE {
   GUEST = 0,
   SALE = 1,
   MERCHANT = 2,
-  OPS = 3,
-  ADMIN = 4,
-  OWNER = 5,
+  CHANNEL_PARTNER = 3,
+  OPS = 4,
+  ADMIN = 5,
+  OWNER = 6,
 }
 
 export enum KYC_STATUS {

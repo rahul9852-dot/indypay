@@ -2,12 +2,15 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
 import { Request } from "express";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { Cache } from "cache-manager";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
 import { REQUEST_USER_KEY } from "@/constants/auth.constant";
 import { ACCOUNT_STATUS } from "@/enums";
@@ -15,6 +18,7 @@ import { ERROR_MESSAGES } from "@/constants/messages.constant";
 import { decryptData } from "@/utils/encode-decode.utils";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
+import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -24,6 +28,7 @@ export class ApiKeyGuard implements CanActivate {
     private readonly apiKeyRepository: Repository<UserApiKeysEntity>,
     @InjectRepository(UserWhitelistIpsEntity)
     private readonly userWhitelistIpsRepository: Repository<UserWhitelistIpsEntity>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,21 +51,33 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     try {
-      const apiKeyEntity = await this.apiKeyRepository.findOne({
-        where: { clientId },
-        relations: {
-          user: true,
-        },
-      });
+      let apiKeyEntity: UserApiKeysEntity = await this.cacheManager.get(
+        REDIS_KEYS.API_KEY(clientId),
+      );
 
       if (!apiKeyEntity) {
-        throw new UnauthorizedException("Invalid credentials");
-      }
+        apiKeyEntity = await this.apiKeyRepository.findOne({
+          where: { clientId },
+          relations: {
+            user: true,
+          },
+        });
 
-      if (apiKeyEntity.user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
-        throw new UnauthorizedException(
-          ERROR_MESSAGES.accountStatusMsg(apiKeyEntity.user.accountStatus),
-        );
+        if (!apiKeyEntity) {
+          throw new UnauthorizedException("Invalid credentials");
+        }
+
+        await this.cacheManager.set(
+          REDIS_KEYS.API_KEY(clientId),
+          apiKeyEntity,
+          1000 * 60 * 60 * 24 * 30,
+        ); // 30 day
+
+        if (apiKeyEntity.user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
+          throw new UnauthorizedException(
+            ERROR_MESSAGES.accountStatusMsg(apiKeyEntity.user.accountStatus),
+          );
+        }
       }
 
       const userId = apiKeyEntity.user.id;

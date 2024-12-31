@@ -23,6 +23,10 @@ export const convertExternalPaymentStatusToInternal = (status: string) => {
       return PAYMENT_STATUS.PENDING;
     case "SUCCESS":
       return PAYMENT_STATUS.SUCCESS;
+    case "200":
+      return PAYMENT_STATUS.SUCCESS;
+    case "400":
+      return PAYMENT_STATUS.FAILED;
     case "FAILED":
       return PAYMENT_STATUS.FAILED;
     case "FAIL":
@@ -37,8 +41,10 @@ export const convertExternalPaymentStatusToInternal = (status: string) => {
       return PAYMENT_STATUS.DENIED;
     case "REFUNDED":
       return PAYMENT_STATUS.REFUNDED;
-    default:
+    case "TAMPERED":
       return PAYMENT_STATUS.TAMPERED;
+    default:
+      return PAYMENT_STATUS.TEST;
   }
 };
 

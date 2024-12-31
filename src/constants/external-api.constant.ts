@@ -13,3 +13,18 @@ export const ANVITAPAY = {
     SUCCESS: "101",
   },
 };
+
+export const PAYNPRO = {
+  PAYIN: {
+    BASE_URL: "https://pg.paynpro.com",
+    TEST_ENDPOINT: "payment/gateway/v1/test/intent/request",
+    LIVE_ENDPOINT: "payment/gateway/v1/live/intent/request",
+    STATUS: "sapi/payin_status",
+  },
+  PAYOUT: {
+    BASE_URL: "https://pout.paynpro.com",
+    LIVE_ENDPOINT: "payout/v1/transfer",
+    STATUS: "payout/v1/getStatus",
+    BALANCE: "payout/v1/fetchBalance",
+  },
+};

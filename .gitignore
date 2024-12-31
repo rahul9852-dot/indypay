@@ -1,6 +1,7 @@
 # compiled output
 /dist
 /node_modules
+/test
 .env
 .env.production
 
@@ -18,6 +19,7 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+performance_test.json
 
 # IDEs and editors
 /.idea
@@ -34,3 +36,4 @@ lerna-debug.log*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+

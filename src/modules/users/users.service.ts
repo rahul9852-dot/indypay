@@ -2,12 +2,15 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { Response } from "express";
 import { InjectRepository } from "@nestjs/typeorm";
 import { ILike, Repository } from "typeorm";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AddBusinessDetailsDto } from "./dto/add-business-details.dto";
 import { WebhookUrlDto } from "./dto/webhook.dto";
@@ -15,6 +18,7 @@ import { ChangeStatusDto } from "./dto/change-status.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
 import { AddAddressDto } from "./dto/add-address.dto";
 import { DeleteWhitelistIpsDto } from "./dto/whitelist-ips.dto";
+import { UserListQuery } from "./dto/user-list.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { IAccessTokenPayload } from "@/interface/common.interface";
@@ -37,6 +41,7 @@ import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 import { getPagination } from "@/utils/pagination.utils";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { UserAddressEntity } from "@/entities/user-address.entity";
+import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 
 @Injectable()
 export class UsersService {
@@ -51,6 +56,8 @@ export class UsersService {
     private readonly userWhitelistIpsRepository: Repository<UserWhitelistIpsEntity>,
     @InjectRepository(UserAddressEntity)
     private readonly addressEntity: Repository<UserAddressEntity>,
+
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
@@ -247,6 +254,12 @@ export class UsersService {
     });
 
     const savedUserApiKey = await this.userApiKeysRepository.save(userApiKey);
+
+    await this.cacheManager.set(
+      REDIS_KEYS.API_KEY(clientId),
+      savedUserApiKey,
+      1000 * 60 * 60 * 24 * 30,
+    ); // 30 day
 
     return {
       id: savedUserApiKey.id,
@@ -738,5 +751,63 @@ export class UsersService {
     });
 
     return userApiKey;
+  }
+
+  async getPaginatedUsers(query: UserListQuery) {
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      role,
+      order = "ASC",
+      sort = "id",
+    } = query;
+
+    let roleInDb = 2;
+
+    switch (role) {
+      case "merchant":
+        roleInDb = 2;
+        break;
+      case "cp":
+        roleInDb = 3;
+        break;
+      case "ops":
+        roleInDb = 4;
+        break;
+    }
+
+    const [users, total] = await this.usersRepository.findAndCount({
+      where: search
+        ? { fullName: ILike(`%${search}%`), role: roleInDb }
+        : {
+            role: roleInDb,
+          },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        mobile: true,
+        role: true,
+        onboardingStatus: true,
+        accountStatus: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      take: limit,
+      skip: (page - 1) * limit,
+      order: { [sort]: order },
+    });
+
+    const pagination = getPagination({
+      totalItems: total,
+      page,
+      limit,
+    });
+
+    return {
+      data: users,
+      pagination,
+    };
   }
 }

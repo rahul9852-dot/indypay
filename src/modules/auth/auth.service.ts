@@ -36,7 +36,11 @@ import {
   generateLockAccountKey,
   generateOtp,
 } from "@/utils/helperFunctions.utils";
-import { MAX_ATTEMPTS, LOCK_TIME } from "@/constants/redis-cache.constant";
+import {
+  MAX_ATTEMPTS,
+  LOCK_TIME,
+  REDIS_KEYS,
+} from "@/constants/redis-cache.constant";
 
 const {
   jwtConfig: {
@@ -241,7 +245,7 @@ export class AuthService {
     return;
   }
 
-  logout(req: Request, res: Response) {
+  async logout(req: Request, res: Response, userId: string) {
     const { cookies } = req;
     for (const key in cookies) {
       if (!cookies.hasOwnProperty(key)) {
@@ -249,6 +253,8 @@ export class AuthService {
       }
       res.cookie(key, "", { ...cookieOptions, maxAge: 0 });
     }
+
+    await this.cacheManager.del(REDIS_KEYS.USER_KEY(userId)); // clear user cache
 
     return res.json(new MessageResponseDto("User logged out successfully"));
   }

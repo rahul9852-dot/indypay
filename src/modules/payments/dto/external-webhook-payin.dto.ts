@@ -9,29 +9,6 @@ import {
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
-// const example = {
-//   ServiceName: "QRCollection",
-//   Action: "QRCollection",
-//   Data: {
-//     TxnPaymentStatus: "SUCCESS",
-//     TxnID: "DYQRC151124065108CPI",
-//     TxnMode: "LIVE",
-//     ChMod: "upi",
-//     Amount: "2.00",
-//     CurrencyCode: "356",
-//     TxnStatus: "200",
-//     Message: "Success",
-//     Customer: "",
-//     CustomerEmail: "VIVEK@PAYBOLT.IN",
-//     CustomerPhone: "9876543210",
-//     TransactionType: "320",
-//     TxnTime: "15-11-2024 06:51:08",
-//     Utr: "432023637572",
-//     CardType: "",
-//     ref_no: "test_pin_12",
-//   },
-// };
-
 class DataDto {
   @ApiProperty()
   @IsString()
@@ -152,4 +129,14 @@ export class ExternalPayinWebhookIsmartDto {
   @ApiProperty()
   @IsString()
   transaction_id?: string;
+}
+
+export class ExternalPayinWebhookPayNProDto {
+  @ApiProperty()
+  @IsString()
+  data: string;
+
+  @ApiProperty()
+  @IsString()
+  key_id: string;
 }

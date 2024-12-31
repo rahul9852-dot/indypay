@@ -1,9 +1,12 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
 import { InjectRepository } from "@nestjs/typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { Repository } from "typeorm";
@@ -14,6 +17,7 @@ import { IAccessTokenPayload } from "@/interface/common.interface";
 import { PUBLIC_KEY, REQUEST_USER_KEY } from "@/constants/auth.constant";
 import { COOKIE_KEYS } from "@/enums";
 import { UsersEntity } from "@/entities/user.entity";
+import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 
 const {
   jwtConfig: { accessTokenSecret },
@@ -26,6 +30,7 @@ export class AuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     @InjectRepository(UsersEntity)
     private readonly usersRepository: Repository<UsersEntity>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,10 +51,19 @@ export class AuthGuard implements CanActivate {
         secret: accessTokenSecret,
       })) as IAccessTokenPayload;
 
-      const user = await this.usersRepository.findOne({
-        where: { id: payload.id },
-        relations: ["kyc"],
-      });
+      let user = await this.cacheManager.get(REDIS_KEYS.USER_KEY(payload.id));
+
+      if (!user) {
+        user = await this.usersRepository.findOne({
+          where: { id: payload.id },
+          relations: ["kyc"],
+        });
+        await this.cacheManager.set(
+          REDIS_KEYS.USER_KEY(payload.id),
+          user,
+          1000 * 60 * 60 * 24,
+        ); // 24 hr
+      }
 
       // if (user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
       //   throw new UnauthorizedException(
