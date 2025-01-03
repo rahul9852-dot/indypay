@@ -89,7 +89,7 @@ export enum ID_TYPE {
   USER_KYC = "ukyc",
   USER_MULTI_FACTOR_AUTH = "umfa",
   USER_WHITELIST_IP = "uwip",
-  WALLET = "wlt"
+  WALLET = "wlt",
 }
 
 export enum ONBOARDING_STATUS {

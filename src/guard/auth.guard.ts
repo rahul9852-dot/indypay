@@ -41,6 +41,7 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
+
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
@@ -63,6 +64,7 @@ export class AuthGuard implements CanActivate {
           where: { id: payload.id },
           relations: ["kyc"],
         });
+
         await this.cacheManager.set(
           REDIS_KEYS.USER_KEY(payload.id),
           user,
@@ -89,11 +91,7 @@ export class AuthGuard implements CanActivate {
 
       request[REQUEST_USER_KEY] = user;
     } catch (err) {
-      if (err instanceof UnauthorizedException) {
-        throw err;
-      } else {
-        throw new ForbiddenException();
-      }
+      throw err;
     }
 
     return true;
