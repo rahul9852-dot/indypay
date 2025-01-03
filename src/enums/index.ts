@@ -1,7 +1,7 @@
 export enum NODE_ENV {
   DEVELOPMENT = "development",
   PRODUCTION = "production",
-  STAGING = "staging"
+  STAGING = "staging",
 }
 
 export enum COOKIE_KEYS {
@@ -67,7 +67,7 @@ export enum DESIGNATION {
   MANAGER = "manager",
   OTHER = "other",
   OWNER = "owner",
-  SVP_EVP_VP = "svp/evp/vp"
+  SVP_EVP_VP = "svp/evp/vp",
 }
 
 export enum ID_TYPE {
@@ -87,18 +87,18 @@ export enum ID_TYPE {
   USER_API_KEY = "apik",
   USER_BANK_DETAILS_KEY = "ubank",
   USER_KYC = "ukyc",
-  USER_WHITELIST_IP = "uwip",
-  WALLET = "wlt",
   USER_MULTI_FACTOR_AUTH = "umfa",
+  USER_WHITELIST_IP = "uwip",
+  WALLET = "wlt"
 }
 
 export enum ONBOARDING_STATUS {
   NOT_STARTED = 0,
   SIGN_UP = 1, // signs up user with verified mobile and email
-  KYC_PENDING = 2,
-  KYC_VERIFIED = 3,
-  KYC_ON_HOLD = 4,
-  KYC_REJECTED = 5,
+  KYC_PENDING = 2, // kyc document submitted - almost there page
+  KYC_ON_HOLD = 3, // kyc on hold by admin - almost there page
+  KYC_REJECTED = 4, // kyc rejected by admin - almost there page
+  KYC_VERIFIED = 5, // final: kyc verified - almost there page
   FILLED_BUSINESS_DETAILS = 6, // fix: need to remove
   MOBILE_EMAIL_VERIFIED = 7, // fix: need to remove
 }

@@ -1,16 +1,18 @@
 import { Injectable } from "@nestjs/common";
 import { SNS } from "aws-sdk";
-import { ConfigService } from "@nestjs/config";
+import { appConfig } from "@/config/app.config";
+import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+
+const {
+  aws: { accessKeyId, secretAccessKey, region },
+} = appConfig();
 
 @Injectable()
 export class SNSService {
   private sns: SNS;
+  private readonly logger = new CustomLogger(SNSService.name);
 
-  constructor(private configService: ConfigService) {
-    const accessKeyId = this.configService.get("AWS_ACCESS_KEY_ID");
-    const secretAccessKey = this.configService.get("AWS_SECRET_ACCESS_KEY");
-    const region = this.configService.get("AWS_REGION");
-
+  constructor() {
     this.sns = new SNS({
       accessKeyId,
       secretAccessKey,
@@ -27,10 +29,19 @@ export class SNSService {
           : `+${phoneNumber}`,
       };
 
+      this.logger.info(`Sending SMS to ${phoneNumber}: ${message}`);
+
       const result = await this.sns.publish(params).promise();
+
+      this.logger.info(
+        `SMS sent to ${phoneNumber}: ${LoggerPlaceHolder.Json}`,
+        result,
+      );
 
       return true;
     } catch (error) {
+      this.logger.error(`Error sending SMS to ${phoneNumber}: ${error}`);
+
       return false;
     }
   }

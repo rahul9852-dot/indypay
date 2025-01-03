@@ -13,12 +13,13 @@ import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
 import { REQUEST_USER_KEY } from "@/constants/auth.constant";
-import { ACCOUNT_STATUS } from "@/enums";
+import { ACCOUNT_STATUS, ONBOARDING_STATUS } from "@/enums";
 import { ERROR_MESSAGES } from "@/constants/messages.constant";
 import { decryptData } from "@/utils/encode-decode.utils";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
+import { MessageResponseDto } from "@/dtos/common.dto";
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -75,6 +76,20 @@ export class ApiKeyGuard implements CanActivate {
 
         if (apiKeyEntity.user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
           throw new UnauthorizedException(
+            ERROR_MESSAGES.accountStatusMsg(apiKeyEntity.user.accountStatus),
+          );
+        }
+
+        if (
+          apiKeyEntity.user.onboardingStatus < ONBOARDING_STATUS.KYC_VERIFIED
+        ) {
+          throw new ForbiddenException(
+            new MessageResponseDto("Please verify your KYC first"),
+          );
+        }
+
+        if (apiKeyEntity.user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
+          throw new ForbiddenException(
             ERROR_MESSAGES.accountStatusMsg(apiKeyEntity.user.accountStatus),
           );
         }

@@ -79,4 +79,11 @@ export const appConfig = registerAs("appConfig", () => ({
     password: getOsEnv("EMAIL_SMTP_PASSWORD"),
     from: getOsEnv("EMAIL_SMTP_FROM"),
   },
+  aws: {
+    accessKeyId: getOsEnv("AWS_ACCESS_KEY_ID"),
+    secretAccessKey: getOsEnv("AWS_SECRET_ACCESS_KEY"),
+    region: getOsEnv("AWS_REGION"),
+    snsTopicArn: getOsEnv("AWS_SNS_TOPIC_ARN"),
+    s3BucketName: getOsEnv("AWS_S3_BUCKET_NAME"),
+  },
 }));

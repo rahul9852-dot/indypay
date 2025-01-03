@@ -409,7 +409,7 @@ export class AuthService {
       .json(new MessageResponseDto("Token refreshed successfully"));
   }
 
-  async sendSignupOtp(sendSignupOtpDto: SendSignupOtpDto, res: Response) {
+  async sendSignupOtp(sendSignupOtpDto: SendSignupOtpDto) {
     const { email, mobile } = sendSignupOtpDto;
 
     // Check if user already exists
@@ -427,8 +427,9 @@ export class AuthService {
     const mobileOtp = generateOtp();
     const emailOtp = generateOtp();
 
+    const otpKey = REDIS_KEYS.OTP_KEY(mobile + email);
+
     // Store both OTPs in Redis with 15 minutes expiry
-    const otpKey = `signup:${mobile}`;
     await this.cacheManager.set(
       otpKey,
       {
@@ -437,7 +438,7 @@ export class AuthService {
         email,
         createdAt: Date.now(),
       },
-      900, // 15 minutes in seconds
+      1000 * 60 * 15, // 15 minutes in seconds
     );
 
     // Format phone number for SNS
@@ -457,12 +458,13 @@ export class AuthService {
       );
     }
 
-    // TODO: Implement email OTP sending here
+    // FIXME: Implement email OTP sending here
     // await this.emailService.sendOtp(email, emailOtp);
 
-    return res
-      .status(200)
-      .json(new MessageResponseDto("OTPs sent successfully"));
+    return {
+      message: "OTPs sent successfully",
+      ...(!isProduction && { mobileOtp, emailOtp }),
+    };
   }
 
   async verifyContact(verifyContactDto: VerifyContactDto, res: Response) {
@@ -490,9 +492,10 @@ export class AuthService {
       );
     }
 
+    const otpKey = REDIS_KEYS.OTP_KEY(mobile + email);
+
     try {
       // Get stored OTPs from Redis
-      const otpKey = `signup:${mobile}`;
       const storedData = await this.cacheManager.get<{
         mobileOtp: string;
         emailOtp: string;
@@ -542,17 +545,28 @@ export class AuthService {
         role: USERS_ROLE.MERCHANT,
       });
 
-      await this.usersRepository.save(newUser);
+      const user = await this.usersRepository.save(newUser);
 
       // Clear OTPs from Redis after successful verification
       await this.cacheManager.del(otpKey);
 
+      const payload: IAccessTokenPayload = {
+        id: user.id,
+        mobile: user.mobile,
+        onboardingStatus: user.onboardingStatus,
+        role: user.role,
+        email: user.email,
+      };
+      const accessToken = this.generateAccessToken(payload);
+      const refreshToken = this.generateRefreshToken(payload);
+
       return res
-        .status(201)
+        .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
+        .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
         .json(new MessageResponseDto("Registration completed successfully"));
     } catch (error) {
       // Clean up Redis in case of any error
-      await this.cacheManager.del(`signup:${mobile}`);
+      await this.cacheManager.del(otpKey);
       throw error;
     }
   }

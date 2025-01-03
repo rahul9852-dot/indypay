@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -15,9 +16,11 @@ import { Reflector } from "@nestjs/core";
 import { appConfig } from "@/config/app.config";
 import { IAccessTokenPayload } from "@/interface/common.interface";
 import { PUBLIC_KEY, REQUEST_USER_KEY } from "@/constants/auth.constant";
-import { COOKIE_KEYS } from "@/enums";
+import { ACCOUNT_STATUS, COOKIE_KEYS, ONBOARDING_STATUS } from "@/enums";
 import { UsersEntity } from "@/entities/user.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
+import { MessageResponseDto } from "@/dtos/common.dto";
+import { ERROR_MESSAGES } from "@/constants/messages.constant";
 
 const {
   jwtConfig: { accessTokenSecret },
@@ -51,7 +54,9 @@ export class AuthGuard implements CanActivate {
         secret: accessTokenSecret,
       })) as IAccessTokenPayload;
 
-      let user = await this.cacheManager.get(REDIS_KEYS.USER_KEY(payload.id));
+      let user = (await this.cacheManager.get(
+        REDIS_KEYS.USER_KEY(payload.id),
+      )) as UsersEntity | undefined;
 
       if (!user) {
         user = await this.usersRepository.findOne({
@@ -65,18 +70,29 @@ export class AuthGuard implements CanActivate {
         ); // 24 hr
       }
 
-      // if (user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
-      //   throw new UnauthorizedException(
-      //     ERROR_MESSAGES.accountStatusMsg(user.accountStatus),
-      //   );
-      // }
+      if (user.onboardingStatus < ONBOARDING_STATUS.KYC_VERIFIED) {
+        throw new ForbiddenException(
+          new MessageResponseDto("Please verify your KYC first"),
+        );
+      }
+
+      if (
+        !(
+          user.accountStatus === ACCOUNT_STATUS.ACTIVE ||
+          user.accountStatus === ACCOUNT_STATUS.INACTIVE
+        )
+      ) {
+        throw new ForbiddenException(
+          ERROR_MESSAGES.accountStatusMsg(user.accountStatus),
+        );
+      }
 
       request[REQUEST_USER_KEY] = user;
     } catch (err) {
       if (err instanceof UnauthorizedException) {
         throw err;
       } else {
-        throw new UnauthorizedException();
+        throw new ForbiddenException();
       }
     }
 

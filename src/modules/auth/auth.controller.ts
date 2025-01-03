@@ -67,16 +67,13 @@ export class AuthController {
   @Post("send-signup-otp")
   @HttpCode(200)
   @ApiOkResponse({ type: MessageResponseDto })
-  async sendSignupOtp(
-    @Body() sendSignupOtpDto: SendSignupOtpDto,
-    @Res() res: Response,
-  ) {
-    return this.authService.sendSignupOtp(sendSignupOtpDto, res);
+  async sendSignupOtp(@Body() sendSignupOtpDto: SendSignupOtpDto) {
+    return this.authService.sendSignupOtp(sendSignupOtpDto);
   }
 
   @Public()
   @ApiOperation({
-    summary: "Step 1: Send OTP to mobile and email for verification",
+    summary: "Step 2: Verify contact",
   })
   @Post("register-contact")
   @HttpCode(200)
