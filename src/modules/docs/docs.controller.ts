@@ -4,7 +4,7 @@ import {
   CreatePayinPaymentResponseDto,
   CreatePayinTransactionIsmartDto,
   PayinStatusDto,
-} from "../payments/dto/create-payin-payment.dto";
+} from "@/modules/payments/dto/create-payin-payment.dto";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
 import { generateOtp } from "@/utils/helperFunctions.utils";

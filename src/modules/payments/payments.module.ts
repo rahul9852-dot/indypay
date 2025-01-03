@@ -17,6 +17,7 @@ import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { UserAddressEntity } from "@/entities/user-address.entity";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { SettlementsEntity } from "@/entities/settlements.entity";
+import { SNSService } from "@/modules/aws/sns.service";
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { SettlementsEntity } from "@/entities/settlements.entity";
     AuthService,
     BcryptService,
     JwtService,
+    SNSService,
   ],
   controllers: [PaymentsController],
 })

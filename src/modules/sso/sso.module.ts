@@ -12,6 +12,7 @@ import { UserAddressEntity } from "@/entities/user-address.entity";
 import { AuthService } from "@/modules/auth/auth.service";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { AuthOtpEntity } from "@/entities/otp.entity";
+import { SNSService } from "@/modules/aws/sns.service";
 
 @Module({
   imports: [
@@ -24,7 +25,14 @@ import { AuthOtpEntity } from "@/entities/otp.entity";
       AuthOtpEntity,
     ]),
   ],
-  providers: [SsoService, UsersService, AuthService, BcryptService, JwtService],
+  providers: [
+    SsoService,
+    UsersService,
+    AuthService,
+    BcryptService,
+    JwtService,
+    SNSService,
+  ],
   controllers: [SsoController],
 })
 export class SsoModule {}

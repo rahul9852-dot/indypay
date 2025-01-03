@@ -1,7 +1,7 @@
 export enum NODE_ENV {
   DEVELOPMENT = "development",
-  STAGING = "staging",
   PRODUCTION = "production",
+  STAGING = "staging"
 }
 
 export enum COOKIE_KEYS {
@@ -61,42 +61,46 @@ export enum TURNOVER_TYPE {
 
 export enum DESIGNATION {
   ACCOUNTANT = "accountant",
+  CHATERED_ACCOUNTANT = "ca",
   DIRECTOR = "director",
   FOUNDER_CXO = "founder/cxo",
   MANAGER = "manager",
   OTHER = "other",
   OWNER = "owner",
-  SVP_EVP_VP = "svp/evp/vp",
+  SVP_EVP_VP = "svp/evp/vp"
 }
 
 export enum ID_TYPE {
   BUSINESS_DETAILS = "bsd",
   INTERNAL_USER = "itu",
+  MEDIA_KYC = "mkc",
   ONBOARDING_USER = "onu",
   ORDER = "ord",
   OTP = "otp",
+  PAYIN_KEY = "pin",
+  PAYOUT_BATCH_KEY = "pbatch",
+  PAYOUT_KEY = "pout",
+  SETTLEMENT_PAYOUT = "stl",
   TRANSACTIONS_KEY = "txn",
   USER = "usr",
   USER_ADDRESS = "uad",
   USER_API_KEY = "apik",
-  USER_KYC = "ukyc",
-  USER_MULTI_FACTOR_AUTH = "umfa",
-  PAYIN_KEY = "pin",
-  PAYOUT_KEY = "pout",
-  PAYOUT_BATCH_KEY = "pbatch",
   USER_BANK_DETAILS_KEY = "ubank",
+  USER_KYC = "ukyc",
   USER_WHITELIST_IP = "uwip",
-  SETTLEMENT_PAYOUT = "stl",
   WALLET = "wlt",
+  USER_MULTI_FACTOR_AUTH = "umfa",
 }
 
 export enum ONBOARDING_STATUS {
   NOT_STARTED = 0,
   SIGN_UP = 1, // signs up user with verified mobile and email
-  FILLED_BUSINESS_DETAILS = 2, // filled up business details
+  KYC_PENDING = 2,
   KYC_VERIFIED = 3,
   KYC_ON_HOLD = 4,
   KYC_REJECTED = 5,
+  FILLED_BUSINESS_DETAILS = 6, // fix: need to remove
+  MOBILE_EMAIL_VERIFIED = 7, // fix: need to remove
 }
 
 export enum BUSINESS_INDUSTRIES {

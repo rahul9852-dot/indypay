@@ -17,7 +17,10 @@ import { Request, Response } from "express";
 import { SendOtpDto, SendOtpResDto, VerifyOtpDto } from "./dto/send-otp.dto";
 import { AuthService } from "./auth.service";
 import { RegisterUserDto } from "./dto/register-user.dto";
+import { VerifyContactDto } from "./dto/verify-contact.dto";
 import { LoginUserDto } from "./dto/login-user.dto";
+import { SendSignupOtpDto } from "./dto/send-signup-otp.dto";
+
 import { Public } from "@/decorators/public.decorator";
 import { VerifyMobileGuard } from "@/guard/verify-mobile.guard";
 import { IgnoreMobileVerification } from "@/decorators/mobile.decorator";
@@ -31,6 +34,7 @@ import { AuthGuard } from "@/guard/auth.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { UsersEntity } from "@/entities/user.entity";
+import { SNSService } from "@/modules/aws/sns.service";
 
 @ApiTags("Auth")
 @IgnoreBusinessDetails()
@@ -40,7 +44,10 @@ import { UsersEntity } from "@/entities/user.entity";
   version: "1",
 })
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly snsService: SNSService,
+  ) {}
 
   @Public()
   @ApiOperation({
@@ -54,17 +61,31 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(VerifyMobileGuard)
   @ApiOperation({
-    summary: "Register",
+    summary: "Register merchant - Step 1: Send OTPs",
   })
-  @ApiCreatedResponse({ type: MessageResponseDto })
-  @Post("register")
-  async register(
-    @Body() registerUserDto: RegisterUserDto,
+  @Post("send-signup-otp")
+  @HttpCode(200)
+  @ApiOkResponse({ type: MessageResponseDto })
+  async sendSignupOtp(
+    @Body() sendSignupOtpDto: SendSignupOtpDto,
     @Res() res: Response,
   ) {
-    return this.authService.register(registerUserDto, res);
+    return this.authService.sendSignupOtp(sendSignupOtpDto, res);
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: "Step 1: Send OTP to mobile and email for verification",
+  })
+  @Post("register-contact")
+  @HttpCode(200)
+  @ApiOkResponse({ type: MessageResponseDto })
+  async onboarding(
+    @Body() verifyContactDto: VerifyContactDto,
+    @Res() res: Response,
+  ) {
+    return this.authService.verifyContact(verifyContactDto, res);
   }
 
   @ApiOperation({
@@ -139,6 +160,19 @@ export class AuthController {
   }
 
   @Public()
+  @ApiOperation({
+    summary: "Step 2: Verify OTP for mobile and email",
+  })
+  // @Post("verify-contact-otp")
+  // @HttpCode(200)
+  // @ApiOkResponse({ type: MessageResponseDto })
+  // async verifyContactOtp(
+  //   @Body() verifyOtpContactDto: VerifyOtpContactDto,
+  //   @Res() res: Response,
+  // ) {
+  //   return this.authService.verifyContactOtp(verifyOtpContactDto, res);
+  // }
+  @Public()
   @UseGuards(RefreshGuard)
   @ApiOperation({
     summary: "Refresh Token",
@@ -152,5 +186,28 @@ export class AuthController {
     @User() user: IRefreshTokenPayload,
   ) {
     return this.authService.refreshToken(user, req, res);
+  }
+
+  @Public()
+  @Post("verify-sandbox-phone")
+  async verifySandboxPhone(
+    @Body("mobile") mobile: string,
+    @Res() res: Response,
+  ) {
+    const result = await this.snsService.verifyPhoneForSandbox(mobile);
+
+    return res.json(new MessageResponseDto(result.message));
+  }
+
+  @Public()
+  @Post("confirm-sandbox-phone")
+  async confirmSandboxPhone(
+    @Body("mobile") mobile: string,
+    @Body("otp") otp: string,
+    @Res() res: Response,
+  ) {
+    const result = await this.snsService.confirmPhoneVerification(mobile, otp);
+
+    return res.json(new MessageResponseDto(result.message));
   }
 }

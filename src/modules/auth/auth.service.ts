@@ -13,6 +13,9 @@ import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { ReSendOtpDto, SendOtpDto, VerifyOtpDto } from "./dto/send-otp.dto";
 import { RegisterUserDto } from "./dto/register-user.dto";
 import { LoginUserDto } from "./dto/login-user.dto";
+import { VerifyContactDto } from "./dto/verify-contact.dto";
+import { SendSignupOtpDto } from "./dto/send-signup-otp.dto";
+import { SNSService } from "@/modules/aws/sns.service";
 import { UsersEntity } from "@/entities/user.entity";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { MessageResponseDto } from "@/dtos/common.dto";
@@ -29,18 +32,21 @@ import {
   IRefreshTokenPayload,
   IVerifyMobilePayload,
 } from "@/interface/common.interface";
+
 import { AuthOtpEntity } from "@/entities/otp.entity";
 import {
   formatTime,
   generateAttemptsKey,
   generateLockAccountKey,
   generateOtp,
+  getUlidId,
 } from "@/utils/helperFunctions.utils";
 import {
   MAX_ATTEMPTS,
   LOCK_TIME,
   REDIS_KEYS,
 } from "@/constants/redis-cache.constant";
+import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 
 const {
   jwtConfig: {
@@ -52,6 +58,12 @@ const {
   isProduction,
 } = appConfig();
 
+interface StoredOtps {
+  mobileOtp: string;
+  emailOtp: string;
+  email: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -62,6 +74,7 @@ export class AuthService {
 
     private readonly bcryptService: BcryptService,
     private readonly jwtService: JwtService,
+    private readonly snsService: SNSService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
@@ -123,122 +136,89 @@ export class AuthService {
   }
 
   async register(registerUserDto: RegisterUserDto, res: Response) {
-    if (registerUserDto.password !== registerUserDto.confirmPassword) {
+    const { email, mobile, password, confirmPassword, firstName, lastName } =
+      registerUserDto;
+
+    if (password !== confirmPassword) {
       throw new BadRequestException(
-        new MessageResponseDto("Passwords do not match"),
+        new MessageResponseDto("Password and confirm password do not match"),
       );
     }
 
-    const existingUser = await this.usersRepository.exists({
-      where: {
-        mobile: registerUserDto.mobile,
-      },
+    const existingUser = await this.usersRepository.findOne({
+      where: [{ email }, { mobile }],
     });
 
-    const existingEmail = await this.usersRepository.exists({
-      where: {
-        email: registerUserDto.email,
-      },
-    });
-
-    if (existingUser || existingEmail) {
-      throw new ConflictException(
-        new MessageResponseDto("User already exists"),
+    if (existingUser) {
+      throw new BadRequestException(
+        new MessageResponseDto(
+          "User with this email or mobile number already exists",
+        ),
       );
     }
 
-    const hashedPassword = await this.bcryptService.hash(
-      registerUserDto.password,
-    );
+    const hashedPassword = await this.bcryptService.hash(password);
+    const fullName = `${firstName} ${lastName}`;
 
-    const newUser = this.usersRepository.create({
-      ...registerUserDto,
+    const user = this.usersRepository.create({
+      id: getUlidId(),
+      email,
+      mobile,
       password: hashedPassword,
+      firstName,
+      lastName,
+      fullName,
+      onboardingStatus: ONBOARDING_STATUS.SIGN_UP,
+      role: USERS_ROLE.MERCHANT,
     });
 
-    const user = await this.usersRepository.save(newUser);
-
-    const payload: IAccessTokenPayload = {
-      id: user.id,
-      mobile: user.mobile,
-      onboardingStatus: user.onboardingStatus,
-      role: user.role,
-      email: user.email,
-    };
-    const accessToken = this.generateAccessToken(payload);
-    const refreshToken = this.generateRefreshToken(payload);
+    await this.usersRepository.save(user);
 
     return res
-      .cookie(COOKIE_KEYS.MOBILE_INFO_KEY, "", { maxAge: 0 })
-      .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
-      .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
+      .status(201)
       .json(new MessageResponseDto("User registered successfully"));
   }
 
-  private async handleFailedLogin(mobile: string): Promise<number> {
-    const attempts =
-      (await this.cacheManager.get<number>(generateAttemptsKey(mobile))) || 0;
-    const newAttempts = attempts + 1;
-    const attemptsLeft = MAX_ATTEMPTS - newAttempts;
+  async registerByAdmin(registerUserDto: RegisterUserDto) {
+    const { email, mobile, password, confirmPassword, firstName, lastName } =
+      registerUserDto;
 
-    if (newAttempts >= MAX_ATTEMPTS) {
-      const lockEndTime = Date.now() + LOCK_TIME;
-      await this.cacheManager.set(
-        generateLockAccountKey(mobile),
-        lockEndTime,
-        LOCK_TIME,
+    if (password !== confirmPassword) {
+      throw new BadRequestException(
+        new MessageResponseDto("Password and confirm password do not match"),
       );
+    }
+
+    const existingUser = await this.usersRepository.findOne({
+      where: [{ email }, { mobile }],
+    });
+
+    if (existingUser) {
       throw new BadRequestException(
         new MessageResponseDto(
-          "Account locked due to multiple failed login attempts. Try again in 30 minutes.",
+          "User with this email or mobile number already exists",
         ),
       );
-    } else {
-      await this.cacheManager.set(
-        generateAttemptsKey(mobile),
-        newAttempts,
-        LOCK_TIME,
-      );
     }
 
-    return attemptsLeft;
-  }
+    const hashedPassword = await this.bcryptService.hash(password);
+    const fullName = `${firstName} ${lastName}`;
 
-  async registerByAdmin(registerUserDto: RegisterUserDto) {
-    if (registerUserDto.password !== registerUserDto.confirmPassword) {
-      throw new BadRequestException(
-        new MessageResponseDto("Passwords do not match"),
-      );
-    }
-
-    const existingUser = await this.usersRepository.exists({
-      where: {
-        mobile: registerUserDto.mobile,
-      },
-    });
-
-    const existingUserEmail = await this.usersRepository.exists({
-      where: {
-        email: registerUserDto.email,
-      },
-    });
-
-    if (existingUser || existingUserEmail) {
-      throw new ConflictException(
-        new MessageResponseDto("User already exists"),
-      );
-    }
-
-    const hashedPassword = await this.bcryptService.hash(
-      registerUserDto.password,
-    );
-
-    const newUser = this.usersRepository.create({
-      ...registerUserDto,
+    const user = this.usersRepository.create({
+      id: getUlidId(),
+      email,
+      mobile,
       password: hashedPassword,
+      firstName,
+      lastName,
+      fullName,
+      onboardingStatus: ONBOARDING_STATUS.SIGN_UP,
+      role: USERS_ROLE.MERCHANT,
     });
 
-    return await this.usersRepository.save(newUser);
+    await this.usersRepository.save(user);
+
+    return new MessageResponseDto("User registered successfully");
   }
 
   forgotPassword() {
@@ -429,6 +409,154 @@ export class AuthService {
       .json(new MessageResponseDto("Token refreshed successfully"));
   }
 
+  async sendSignupOtp(sendSignupOtpDto: SendSignupOtpDto, res: Response) {
+    const { email, mobile } = sendSignupOtpDto;
+
+    // Check if user already exists
+    const existingUser = await this.usersRepository.findOne({
+      where: [{ mobile }, { email }],
+    });
+
+    if (existingUser) {
+      throw new BadRequestException(
+        new MessageResponseDto("User with this email or mobile already exists"),
+      );
+    }
+
+    // Generate OTPs
+    const mobileOtp = generateOtp();
+    const emailOtp = generateOtp();
+
+    // Store both OTPs in Redis with 15 minutes expiry
+    const otpKey = `signup:${mobile}`;
+    await this.cacheManager.set(
+      otpKey,
+      {
+        mobileOtp,
+        emailOtp,
+        email,
+        createdAt: Date.now(),
+      },
+      900, // 15 minutes in seconds
+    );
+
+    // Format phone number for SNS
+    const formattedPhone = mobile.startsWith("+") ? mobile : `+91${mobile}`;
+
+    // Send OTP via SMS
+    const smsSent = await this.snsService.sendSMS(
+      formattedPhone,
+      `Your PayBolt verification code is: ${mobileOtp}`,
+    );
+
+    if (!smsSent) {
+      // Clean up Redis if SMS fails
+      await this.cacheManager.del(otpKey);
+      throw new BadRequestException(
+        new MessageResponseDto("Failed to send mobile OTP"),
+      );
+    }
+
+    // TODO: Implement email OTP sending here
+    // await this.emailService.sendOtp(email, emailOtp);
+
+    return res
+      .status(200)
+      .json(new MessageResponseDto("OTPs sent successfully"));
+  }
+
+  async verifyContact(verifyContactDto: VerifyContactDto, res: Response) {
+    const {
+      firstName,
+      lastName,
+      email,
+      mobile,
+      password,
+      confirmPassword,
+      mobileOtp,
+      emailOtp,
+      termsAccepted,
+    } = verifyContactDto;
+
+    if (!termsAccepted) {
+      throw new BadRequestException(
+        new MessageResponseDto("Please accept terms and conditions"),
+      );
+    }
+
+    if (password !== confirmPassword) {
+      throw new BadRequestException(
+        new MessageResponseDto("Passwords do not match"),
+      );
+    }
+
+    try {
+      // Get stored OTPs from Redis
+      const otpKey = `signup:${mobile}`;
+      const storedData = await this.cacheManager.get<{
+        mobileOtp: string;
+        emailOtp: string;
+        email: string;
+        createdAt: number;
+      }>(otpKey);
+
+      if (!storedData) {
+        throw new BadRequestException(
+          new MessageResponseDto("OTPs have expired. Please request new OTPs"),
+        );
+      }
+
+      // Verify email matches
+      if (storedData.email !== email) {
+        throw new BadRequestException(
+          new MessageResponseDto("Email does not match the one used for OTP"),
+        );
+      }
+
+      // Verify mobile OTP
+      if (storedData.mobileOtp !== mobileOtp) {
+        await this.cacheManager.del(otpKey);
+        throw new BadRequestException(
+          new MessageResponseDto("Invalid mobile OTP"),
+        );
+      }
+
+      // Verify email OTP
+      if (storedData.emailOtp !== emailOtp) {
+        await this.cacheManager.del(otpKey);
+        throw new BadRequestException(
+          new MessageResponseDto("Invalid email OTP"),
+        );
+      }
+
+      // Create new user
+      const hashedPassword = await this.bcryptService.hash(password);
+
+      const newUser = this.usersRepository.create({
+        firstName,
+        lastName,
+        email,
+        mobile,
+        password: hashedPassword,
+        onboardingStatus: ONBOARDING_STATUS.SIGN_UP,
+        role: USERS_ROLE.MERCHANT,
+      });
+
+      await this.usersRepository.save(newUser);
+
+      // Clear OTPs from Redis after successful verification
+      await this.cacheManager.del(otpKey);
+
+      return res
+        .status(201)
+        .json(new MessageResponseDto("Registration completed successfully"));
+    } catch (error) {
+      // Clean up Redis in case of any error
+      await this.cacheManager.del(`signup:${mobile}`);
+      throw error;
+    }
+  }
+
   generateAccessToken(payload: Record<string, any>, options?: JwtSignOptions) {
     return this.jwtService.sign(payload, {
       secret: accessTokenSecret,
@@ -443,5 +571,34 @@ export class AuthService {
       expiresIn: refreshTokenExpiresIn,
       ...options,
     });
+  }
+
+  private async handleFailedLogin(mobile: string): Promise<number> {
+    const attempts =
+      (await this.cacheManager.get<number>(generateAttemptsKey(mobile))) || 0;
+    const newAttempts = attempts + 1;
+    const attemptsLeft = MAX_ATTEMPTS - newAttempts;
+
+    if (newAttempts >= MAX_ATTEMPTS) {
+      const lockEndTime = Date.now() + LOCK_TIME;
+      await this.cacheManager.set(
+        generateLockAccountKey(mobile),
+        lockEndTime,
+        LOCK_TIME,
+      );
+      throw new BadRequestException(
+        new MessageResponseDto(
+          "Account locked due to multiple failed login attempts. Try again in 30 minutes.",
+        ),
+      );
+    } else {
+      await this.cacheManager.set(
+        generateAttemptsKey(mobile),
+        newAttempts,
+        LOCK_TIME,
+      );
+    }
+
+    return attemptsLeft;
   }
 }

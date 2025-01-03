@@ -9,28 +9,32 @@
   },
   "scripts": {
     "build": "rimraf dist && nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" !\"src/migrations/*\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
     "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
+    "lint:fix": "eslint \"src/**/*.ts\" --ignore-pattern \"src/migrations/**\" --fix",
     "prettier:fix": "prettier --write \"src/**/*.+(md|js|ts)\"",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "mig:gen": "npm run typeorm -- migration:generate ./src/migrations/$npm_config_name -d ./src/config/migration.config.ts",
     "mig:run": "npm run typeorm -- -d ./src/config/migration.config.ts migration:run",
     "mig:revert": "npm run typeorm -- -d ./src/config/migration.config.ts migration:revert",
     "deploy:prod": "bash scripts/prod-deploy.sh",
-    "deploy:staging": "bash scripts/staging-deploy.sh"
+    "deploy:staging": "bash scripts/staging-deploy.sh",
+    "prepare": "husky"
   },
-  "husky": {
-    "hooks": {
-      "pre-commit": "echo 'Pre commit check'",
-      "pre-push": "echo 'Lint check \n' && npm run lint"
-    }
+  "lint-staged": {
+    "src/**/*.ts": [
+      "prettier --write \"src/**/*.ts\" !\"src/migrations/*\"",
+      "eslint \"src/**/*.ts\" --ignore-pattern \"src/migrations/**/*.ts\" --fix",
+      "git add ."
+    ]
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.717.0",
+    "@aws-sdk/s3-request-presigner": "^3.717.0",
     "@json2csv/plainjs": "^7.0.6",
     "@nestjs/cache-manager": "^2.3.0",
     "@nestjs/common": "^10.3.10",
@@ -42,6 +46,7 @@
     "@nestjs/swagger": "^7.3.1",
     "@nestjs/typeorm": "^10.0.2",
     "@nestjs/websockets": "^10.3.10",
+    "aws-sdk": "^2.1692.0",
     "axios": "^1.7.3",
     "bcryptjs": "^2.4.3",
     "cache-manager": "^5.7.6",
@@ -70,6 +75,8 @@
     "winston": "^3.13.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
     "@eslint/eslintrc": "^3.0.2",
     "@eslint/js": "^9.1.1",
     "@nestjs/cli": "^10.3.1",
@@ -93,6 +100,8 @@
     "eslint-plugin-typescript-sort-keys": "^3.2.0",
     "eslint-plugin-unused-imports": "^3.1.0",
     "globals": "^15.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.3.0",
     "prettier": "^3.2.5",
     "source-map-support": "^0.5.21",
     "ts-loader": "^9.5.1",
