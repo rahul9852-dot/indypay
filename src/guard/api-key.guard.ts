@@ -75,7 +75,7 @@ export class ApiKeyGuard implements CanActivate {
         ); // 30 day
 
         if (apiKeyEntity.user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
-          throw new UnauthorizedException(
+          throw new ForbiddenException(
             ERROR_MESSAGES.accountStatusMsg(apiKeyEntity.user.accountStatus),
           );
         }
@@ -85,12 +85,6 @@ export class ApiKeyGuard implements CanActivate {
         ) {
           throw new ForbiddenException(
             new MessageResponseDto("Please verify your KYC first"),
-          );
-        }
-
-        if (apiKeyEntity.user.accountStatus !== ACCOUNT_STATUS.ACTIVE) {
-          throw new ForbiddenException(
-            ERROR_MESSAGES.accountStatusMsg(apiKeyEntity.user.accountStatus),
           );
         }
       }

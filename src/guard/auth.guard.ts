@@ -64,18 +64,11 @@ export class AuthGuard implements CanActivate {
           where: { id: payload.id },
           relations: ["kyc"],
         });
-
         await this.cacheManager.set(
           REDIS_KEYS.USER_KEY(payload.id),
           user,
           1000 * 60 * 60 * 24,
         ); // 24 hr
-      }
-
-      if (user.onboardingStatus < ONBOARDING_STATUS.KYC_VERIFIED) {
-        throw new ForbiddenException(
-          new MessageResponseDto("Please verify your KYC first"),
-        );
       }
 
       if (
@@ -86,6 +79,12 @@ export class AuthGuard implements CanActivate {
       ) {
         throw new ForbiddenException(
           ERROR_MESSAGES.accountStatusMsg(user.accountStatus),
+        );
+      }
+
+      if (user.onboardingStatus < ONBOARDING_STATUS.KYC_VERIFIED) {
+        throw new ForbiddenException(
+          new MessageResponseDto("Please verify your KYC first"),
         );
       }
 
