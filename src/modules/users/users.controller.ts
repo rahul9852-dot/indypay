@@ -125,6 +125,7 @@ export class UsersController {
     USERS_ROLE.ADMIN,
     USERS_ROLE.SALE,
     USERS_ROLE.GUEST,
+    USERS_ROLE.CHANNEL_PARTNER,
   )
   @ApiOkResponse({ type: MessageResponseDto })
   @HttpCode(HttpStatus.OK)
@@ -266,6 +267,7 @@ export class UsersController {
   }
 
   @UseGuards(ChangeRoleGuard)
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN)
   @ApiOperation({ summary: "Change user role" })
   @Patch("change-role")
   @HttpCode(HttpStatus.OK)
@@ -287,8 +289,9 @@ export class UsersController {
 
   @Get("api-key")
   @ApiOperation({
-    summary: "Get api key - Merchant",
+    summary: "Get api key",
   })
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN, USERS_ROLE.MERCHANT)
   async getAllApiKeysMerchant(@User() user: UsersEntity) {
     return this.usersService.getAllApiKeysMerchant(user.id);
   }

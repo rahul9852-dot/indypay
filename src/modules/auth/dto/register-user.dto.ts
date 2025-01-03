@@ -1,5 +1,12 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsEmail, IsNotEmpty, IsString } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from "class-validator";
+import { USERS_ROLE } from "@/enums";
 
 export class RegisterUserDto {
   @ApiProperty()
@@ -31,4 +38,18 @@ export class RegisterUserDto {
   @IsString()
   @IsNotEmpty()
   mobile: string;
+
+  @ApiPropertyOptional({
+    enum: [USERS_ROLE.MERCHANT, USERS_ROLE.CHANNEL_PARTNER],
+    default: USERS_ROLE.MERCHANT,
+  })
+  @IsOptional()
+  @IsEnum([USERS_ROLE.MERCHANT, USERS_ROLE.CHANNEL_PARTNER])
+  @IsNotEmpty()
+  role?: USERS_ROLE.MERCHANT | USERS_ROLE.CHANNEL_PARTNER;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  channelPartnerId?: string;
 }

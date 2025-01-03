@@ -18,6 +18,7 @@ import { getCsv } from "@/utils/csv.utils";
 import { UsersEntity } from "@/entities/user.entity";
 import { PaginationDto } from "@/dtos/common.dto";
 import { SettlementsEntity } from "@/entities/settlements.entity";
+import { getPagination } from "@/utils/pagination.utils";
 
 @Injectable()
 export class TransactionsService {
@@ -195,36 +196,48 @@ export class TransactionsService {
     sort = "id",
     order = "DESC",
   }: PaginationDto) {
-    return await this.transactionsRepository.find({
-      where: [
-        {
-          user: {
-            email: ILike(`%${search}%`),
+    const [transactions, totalItems] =
+      await this.transactionsRepository.findAndCount({
+        where: [
+          {
+            user: {
+              email: ILike(`%${search}%`),
+            },
           },
-        },
-        {
-          payInOrder: {
-            orderId: ILike(`%${search}%`),
+          {
+            payInOrder: {
+              orderId: ILike(`%${search}%`),
+            },
           },
-        },
-        {
-          payOutOrder: {
-            orderId: ILike(`%${search}%`),
+          {
+            payOutOrder: {
+              orderId: ILike(`%${search}%`),
+            },
           },
+        ],
+        relations: {
+          user: true,
+          payInOrder: true,
+          payOutOrder: true,
         },
-      ],
-      relations: {
-        user: true,
-        payInOrder: true,
-        payOutOrder: true,
-      },
-      select: this.selectQuery,
-      skip: (page - 1) * limit,
-      take: limit,
-      order: {
-        [sort]: order,
-      },
+        select: this.selectQuery,
+        skip: (page - 1) * limit,
+        take: limit,
+        order: {
+          [sort]: order,
+        },
+      });
+
+    const pagination = getPagination({
+      totalItems,
+      page,
+      limit,
     });
+
+    return {
+      data: transactions,
+      pagination,
+    };
   }
 
   async getTransactionByIdAdmin(transactionId: string) {

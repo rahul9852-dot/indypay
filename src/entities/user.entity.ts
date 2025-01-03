@@ -5,6 +5,7 @@ import {
   Entity,
   Index,
   JoinColumn,
+  ManyToOne,
   OneToMany,
   OneToOne,
   PrimaryColumn,
@@ -107,6 +108,13 @@ export class UsersEntity {
   gstInPercentagePayout?: number;
 
   // Relations
+  @ManyToOne(() => UsersEntity, { nullable: true })
+  @JoinColumn()
+  channelPartner: UsersEntity;
+
+  @Column({ nullable: true })
+  channelPartnerId: string;
+
   @OneToMany(() => PayInOrdersEntity, ({ user }) => user, { cascade: true })
   payInOrders: PayInOrdersEntity[];
 

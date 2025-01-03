@@ -201,6 +201,21 @@ export class AuthService {
       );
     }
 
+    if (registerUserDto.channelPartnerId) {
+      const existingChannelPartner = await this.usersRepository.exists({
+        where: {
+          role: USERS_ROLE.CHANNEL_PARTNER,
+          id: registerUserDto.channelPartnerId,
+        },
+      });
+
+      if (!existingChannelPartner) {
+        throw new BadRequestException(
+          new MessageResponseDto("Channel Partner Not Found"),
+        );
+      }
+    }
+
     const hashedPassword = await this.bcryptService.hash(password);
     const fullName = `${firstName} ${lastName}`;
 
