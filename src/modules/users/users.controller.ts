@@ -99,7 +99,7 @@ export class UsersController {
     summary: "Get All Merchants - Admin & OPS",
   })
   @Get("merchants")
-  @Role(USERS_ROLE.OWNER, USERS_ROLE.MERCHANT, USERS_ROLE.OPS)
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN, USERS_ROLE.MERCHANT, USERS_ROLE.OPS)
   async getAllMerchants() {
     return this.usersService.getAllMerchants();
   }
