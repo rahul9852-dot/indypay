@@ -12,18 +12,22 @@ import { AwsModule } from "@/modules/aws/aws.module";
 import { UsersEntity } from "@/entities/user.entity";
 import { AuthOtpEntity } from "@/entities/otp.entity";
 import { SNSService } from "@/modules/aws/sns.service";
+import { appConfig } from "@/config/app.config";
+
+const {
+  redisConfig: { redisHostUrl, redisPort },
+} = appConfig();
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([UsersEntity, AuthOtpEntity]),
     JwtModule.register({
-      secret: "your-secret-key",
       signOptions: { expiresIn: "1h" },
     }),
     CacheModule.register({
       store: redisStore,
-      host: "localhost",
-      port: 6379,
+      host: redisHostUrl,
+      port: redisPort,
       ttl: LOCK_TIME,
       isGlobal: true,
     }),
