@@ -62,7 +62,6 @@ export class AuthGuard implements CanActivate {
       if (!user) {
         user = await this.usersRepository.findOne({
           where: { id: payload.id },
-          relations: ["kyc"],
         });
         await this.cacheManager.set(
           REDIS_KEYS.USER_KEY(payload.id),
