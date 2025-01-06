@@ -1,4 +1,5 @@
-import { ApiResponseProperty } from "@nestjs/swagger";
+import { IsNotEmpty, IsString } from "class-validator";
+import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
 import {
   ACCOUNT_STATUS,
   KYC_STATUS,
@@ -39,4 +40,21 @@ export class UserProfileResDto {
 
   @ApiResponseProperty()
   updatedAt: Date;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  userId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  confirmPassword: string;
 }

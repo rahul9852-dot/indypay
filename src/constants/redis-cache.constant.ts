@@ -1,5 +1,5 @@
 export const MAX_ATTEMPTS = 3;
-export const LOCK_TIME = 30 * 60 * 1000;
+export const LOCK_TIME_MS = 30 * 60 * 1000; // 30 minutes
 
 export const REDIS_KEYS = {
   API_KEY: (clientId: string) => `api_key_entity_${clientId}`,

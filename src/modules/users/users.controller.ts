@@ -39,7 +39,10 @@ import { UserListQuery, UserListResponseDto } from "./dto/user-list.dto";
 import { AddAddressAdminDto, AddAddressDto } from "./dto/add-address.dto";
 import { User } from "@/decorators/user.decorator";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
-import { UserProfileResDto } from "@/modules/users/dto/user-profile.dto";
+import {
+  ResetPasswordDto,
+  UserProfileResDto,
+} from "@/modules/users/dto/user-profile.dto";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { UsersEntity } from "@/entities/user.entity";
@@ -413,5 +416,16 @@ export class UsersController {
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   async getAllUsers(@Query() query: UserListQuery) {
     return this.usersService.getPaginatedUsers(query);
+  }
+
+  @ApiOperation({ summary: "Reset password - Admin Only" })
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @IgnoreKyc()
+  @ApiOkResponse({
+    type: MessageResponseDto,
+  })
+  @Post("reset-password-admin")
+  async resetPasswordAdmin(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.usersService.resetPassword(resetPasswordDto);
   }
 }

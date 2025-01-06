@@ -14,6 +14,7 @@ import { Cache } from "cache-manager";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AddBusinessDetailsDto } from "./dto/add-business-details.dto";
 import { WebhookUrlDto } from "./dto/webhook.dto";
+import { ResetPasswordDto } from "./dto/user-profile.dto";
 import { ChangeStatusDto } from "./dto/change-status.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
 import { AddAddressDto } from "./dto/add-address.dto";
@@ -62,6 +63,34 @@ export class UsersService {
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
   ) {}
+
+  async resetPassword({ userId, password, confirmPassword }: ResetPasswordDto) {
+    if (password !== confirmPassword) {
+      throw new BadRequestException(
+        new MessageResponseDto("Password and confirm password do not match"),
+      );
+    }
+
+    const user = await this.usersRepository.findOne({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const hashedPassword = await this.bcryptService.hash(password);
+
+    const updatedUser = this.usersRepository.create({
+      password: hashedPassword,
+    });
+
+    await this.usersRepository.update(user.id, updatedUser);
+
+    return new MessageResponseDto("Password reset successfully");
+  }
 
   async getAddress(userId: string) {
     const user = await this.usersRepository.findOne({

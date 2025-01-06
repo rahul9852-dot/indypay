@@ -43,8 +43,8 @@ import {
 } from "@/utils/helperFunctions.utils";
 import {
   MAX_ATTEMPTS,
-  LOCK_TIME,
   REDIS_KEYS,
+  LOCK_TIME_MS,
 } from "@/constants/redis-cache.constant";
 import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 
@@ -609,11 +609,11 @@ export class AuthService {
     const attemptsLeft = MAX_ATTEMPTS - newAttempts;
 
     if (newAttempts >= MAX_ATTEMPTS) {
-      const lockEndTime = Date.now() + LOCK_TIME;
+      const lockEndTime = new Date(Date.now() + LOCK_TIME_MS);
       await this.cacheManager.set(
         generateLockAccountKey(mobile),
-        lockEndTime,
-        LOCK_TIME,
+        lockEndTime.getTime(),
+        LOCK_TIME_MS,
       );
       throw new BadRequestException(
         new MessageResponseDto(
@@ -624,7 +624,7 @@ export class AuthService {
       await this.cacheManager.set(
         generateAttemptsKey(mobile),
         newAttempts,
-        LOCK_TIME,
+        LOCK_TIME_MS,
       );
     }
 

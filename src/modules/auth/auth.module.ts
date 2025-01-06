@@ -7,7 +7,7 @@ import { redisStore } from "cache-manager-redis-yet";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
-import { LOCK_TIME } from "@/constants/redis-cache.constant";
+import { LOCK_TIME_MS } from "@/constants/redis-cache.constant";
 import { AwsModule } from "@/modules/aws/aws.module";
 import { UsersEntity } from "@/entities/user.entity";
 import { AuthOtpEntity } from "@/entities/otp.entity";
@@ -28,7 +28,7 @@ const {
       store: redisStore,
       host: redisHostUrl,
       port: redisPort,
-      ttl: LOCK_TIME,
+      ttl: LOCK_TIME_MS,
       isGlobal: true,
     }),
     AwsModule,
