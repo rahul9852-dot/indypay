@@ -428,4 +428,15 @@ export class UsersController {
   async resetPasswordAdmin(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.usersService.resetPassword(resetPasswordDto);
   }
+
+  @ApiOperation({ summary: "Reset cache - Admin Only" })
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @IgnoreKyc()
+  @ApiOkResponse({
+    type: MessageResponseDto,
+  })
+  @Get("reset-cache-admin")
+  async resetCacheAdmin() {
+    return this.usersService.resetCache();
+  }
 }

@@ -64,6 +64,12 @@ export class UsersService {
     private readonly bcryptService: BcryptService,
   ) {}
 
+  async resetCache() {
+    await this.cacheManager.reset();
+
+    return new MessageResponseDto("Cache reset successfully");
+  }
+
   async resetPassword({ userId, password, confirmPassword }: ResetPasswordDto) {
     if (password !== confirmPassword) {
       throw new BadRequestException(
