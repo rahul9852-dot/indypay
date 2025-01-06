@@ -16,9 +16,10 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS, PAYMENT_TYPE } from "@/enums/payment.enum";
 import { getCsv } from "@/utils/csv.utils";
 import { UsersEntity } from "@/entities/user.entity";
-import { PaginationDto } from "@/dtos/common.dto";
+import { DateDto, PaginationDto } from "@/dtos/common.dto";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
+import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 
 @Injectable()
 export class TransactionsService {
@@ -424,39 +425,60 @@ export class TransactionsService {
     };
   }
 
-  async getStatsForMerchant(userId: string) {
+  async getStatsForMerchant(
+    userId: string,
+    { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
+  ) {
     const totalAmount = await this.payInOrdersRepository.sum("amount", {
       user: { id: userId },
+      createdAt: Between(new Date(startDate), new Date(endDate)),
     });
     const totalCount = await this.payInOrdersRepository.count({
-      where: { user: { id: userId } },
+      where: {
+        user: { id: userId },
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
     const successAmount = await this.payInOrdersRepository.sum("amount", {
       user: { id: userId },
       status: PAYMENT_STATUS.SUCCESS,
+      createdAt: Between(new Date(startDate), new Date(endDate)),
     });
     const successCount = await this.payInOrdersRepository.count({
-      where: { user: { id: userId }, status: PAYMENT_STATUS.SUCCESS },
+      where: {
+        user: { id: userId },
+        status: PAYMENT_STATUS.SUCCESS,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
     const failedAmount = await this.payInOrdersRepository.sum("amount", {
       user: { id: userId },
       status: PAYMENT_STATUS.FAILED,
+      createdAt: Between(new Date(startDate), new Date(endDate)),
     });
     const failedCount = await this.payInOrdersRepository.count({
-      where: { user: { id: userId }, status: PAYMENT_STATUS.FAILED },
+      where: {
+        user: { id: userId },
+        status: PAYMENT_STATUS.FAILED,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
     const initiatedSettlementAmount = await this.settlementsRepository.sum(
       "amount",
       {
         user: { id: userId },
+        createdAt: Between(new Date(startDate), new Date(endDate)),
       },
     );
 
     const initiatedSettlementCount = await this.settlementsRepository.count({
-      where: { user: { id: userId } },
+      where: {
+        user: { id: userId },
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
     const successSettlementAmount = await this.settlementsRepository.sum(
@@ -464,11 +486,16 @@ export class TransactionsService {
       {
         user: { id: userId },
         status: PAYMENT_STATUS.SUCCESS,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
       },
     );
 
     const successSettlementCount = await this.settlementsRepository.count({
-      where: { user: { id: userId }, status: PAYMENT_STATUS.SUCCESS },
+      where: {
+        user: { id: userId },
+        status: PAYMENT_STATUS.SUCCESS,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
     const failedSettlementAmount = await this.settlementsRepository.sum(
@@ -476,11 +503,16 @@ export class TransactionsService {
       {
         user: { id: userId },
         status: PAYMENT_STATUS.FAILED,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
       },
     );
 
     const failedSettlementCount = await this.settlementsRepository.count({
-      where: { user: { id: userId }, status: PAYMENT_STATUS.FAILED },
+      where: {
+        user: { id: userId },
+        status: PAYMENT_STATUS.FAILED,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
     return {

@@ -9,7 +9,7 @@ import { UsersEntity } from "@/entities/user.entity";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
-import { PaginationDto } from "@/dtos/common.dto";
+import { PaginationDto, DateDto } from "@/dtos/common.dto";
 
 @ApiTags("Transactions")
 @Controller("transactions")
@@ -80,8 +80,14 @@ export class TransactionsController {
   @Role(USERS_ROLE.MERCHANT)
   @Get("stats")
   @IgnoreKyc()
-  async getStatsForMerchant(@User() user: UsersEntity) {
-    return await this.transactionsService.getStatsForMerchant(user.id);
+  async getStatsForMerchant(
+    @User() user: UsersEntity,
+    @Query() paginationDto: DateDto,
+  ) {
+    return await this.transactionsService.getStatsForMerchant(
+      user.id,
+      paginationDto,
+    );
   }
 
   @ApiOperation({
