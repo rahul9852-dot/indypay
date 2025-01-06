@@ -15,7 +15,11 @@ import { Request } from "express";
 import { Reflector } from "@nestjs/core";
 import { appConfig } from "@/config/app.config";
 import { IAccessTokenPayload } from "@/interface/common.interface";
-import { PUBLIC_KEY, REQUEST_USER_KEY } from "@/constants/auth.constant";
+import {
+  IGNORE_KYC_KEY,
+  PUBLIC_KEY,
+  REQUEST_USER_KEY,
+} from "@/constants/auth.constant";
 import { ACCOUNT_STATUS, COOKIE_KEYS, ONBOARDING_STATUS } from "@/enums";
 import { UsersEntity } from "@/entities/user.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
@@ -81,10 +85,16 @@ export class AuthGuard implements CanActivate {
         );
       }
 
-      if (user.onboardingStatus < ONBOARDING_STATUS.KYC_VERIFIED) {
-        throw new ForbiddenException(
-          new MessageResponseDto("Please verify your KYC first"),
-        );
+      const ignoreKyc = this.reflector.getAllAndOverride<boolean>(
+        IGNORE_KYC_KEY,
+        [context.getHandler(), context.getClass()],
+      );
+      if (!ignoreKyc) {
+        if (user.onboardingStatus < ONBOARDING_STATUS.KYC_VERIFIED) {
+          throw new ForbiddenException(
+            new MessageResponseDto("Please verify your KYC first"),
+          );
+        }
       }
 
       request[REQUEST_USER_KEY] = user;

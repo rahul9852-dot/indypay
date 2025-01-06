@@ -10,6 +10,7 @@ import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 
 @ApiTags("KYC")
+@IgnoreKyc()
 @Controller("kyc")
 export class KycController {
   constructor(private readonly kycService: KycService) {}
