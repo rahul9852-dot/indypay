@@ -34,7 +34,6 @@ import { AuthGuard } from "@/guard/auth.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { UsersEntity } from "@/entities/user.entity";
-import { SNSService } from "@/modules/aws/sns.service";
 
 @ApiTags("Auth")
 @IgnoreBusinessDetails()
@@ -44,10 +43,7 @@ import { SNSService } from "@/modules/aws/sns.service";
   version: "1",
 })
 export class AuthController {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly snsService: SNSService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Public()
   @ApiOperation({
@@ -183,28 +179,5 @@ export class AuthController {
     @User() user: IRefreshTokenPayload,
   ) {
     return this.authService.refreshToken(user, req, res);
-  }
-
-  @Public()
-  @Post("verify-sandbox-phone")
-  async verifySandboxPhone(
-    @Body("mobile") mobile: string,
-    @Res() res: Response,
-  ) {
-    const result = await this.snsService.verifyPhoneForSandbox(mobile);
-
-    return res.json(new MessageResponseDto(result.message));
-  }
-
-  @Public()
-  @Post("confirm-sandbox-phone")
-  async confirmSandboxPhone(
-    @Body("mobile") mobile: string,
-    @Body("otp") otp: string,
-    @Res() res: Response,
-  ) {
-    const result = await this.snsService.confirmPhoneVerification(mobile, otp);
-
-    return res.json(new MessageResponseDto(result.message));
   }
 }

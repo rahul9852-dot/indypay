@@ -444,6 +444,21 @@ export class AuthService {
 
     const otpKey = REDIS_KEYS.OTP_KEY(mobile + email);
 
+    // Format phone number for SNS
+    const formattedPhone = mobile.startsWith("+") ? mobile : `+91${mobile}`;
+
+    // Send OTP via SMS
+    const smsSent = await this.snsService.sendSMS(
+      formattedPhone,
+      `Your PayBolt verification code is: ${mobileOtp}`,
+    );
+
+    if (!smsSent) {
+      throw new BadRequestException(
+        new MessageResponseDto("Failed to send mobile OTP"),
+      );
+    }
+
     // Store both OTPs in Redis with 15 minutes expiry
     await this.cacheManager.set(
       otpKey,
@@ -455,23 +470,6 @@ export class AuthService {
       },
       1000 * 60 * 15, // 15 minutes in seconds
     );
-
-    // Format phone number for SNS
-    const formattedPhone = mobile.startsWith("+") ? mobile : `+91${mobile}`;
-
-    // Send OTP via SMS
-    const smsSent = await this.snsService.sendSMS(
-      formattedPhone,
-      `Your PayBolt verification code is: ${mobileOtp}`,
-    );
-
-    if (!smsSent) {
-      // Clean up Redis if SMS fails
-      await this.cacheManager.del(otpKey);
-      throw new BadRequestException(
-        new MessageResponseDto("Failed to send mobile OTP"),
-      );
-    }
 
     // FIXME: Implement email OTP sending here
     // await this.emailService.sendOtp(email, emailOtp);
@@ -510,7 +508,6 @@ export class AuthService {
     const otpKey = REDIS_KEYS.OTP_KEY(mobile + email);
 
     try {
-      // Get stored OTPs from Redis
       const storedData = await this.cacheManager.get<{
         mobileOtp: string;
         emailOtp: string;

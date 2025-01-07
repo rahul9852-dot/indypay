@@ -13,10 +13,11 @@ module.exports = {
       },
       env: {
         NODE_ENV: "production",
+        TZ: "Asia/Calcutta",
       },
       error_file: "./logs/err.log",
       out_file: "./logs/out.log",
-      log_date_format: "YYYY-MM-DD HH:mm:ss",
+      log_date_format: "DD-MM-YYYY HH:mm:ss A",
       watch: false, // Disable watching in production
       // Advanced load distribution settings
       instance_var: "INSTANCE_ID",
