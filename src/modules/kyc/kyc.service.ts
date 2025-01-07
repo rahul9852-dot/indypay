@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { JwtService, JwtSignOptions } from "@nestjs/jwt";
+import { Response } from "express";
 import { KycSubmissionDto } from "./dto/kyc.dto";
 import { DocumentUploadDto } from "./dto/document-upload.dto";
 import { UsersEntity } from "@/entities/user.entity";
@@ -9,7 +11,22 @@ import { IAccessTokenPayload } from "@/interface/common.interface";
 import { S3Service } from "@/modules/aws/s3.service";
 import { UserMediaKycEntity } from "@/entities/user-media-kyc.entity";
 import { UserBusinessDetailsEntity } from "@/entities/user-business.entity";
-import { KYC_STATUS } from "@/enums";
+import { COOKIE_KEYS, KYC_STATUS, ONBOARDING_STATUS } from "@/enums";
+import {
+  accessCookieOptions,
+  refreshCookieOptions,
+} from "@/utils/cookies.utils";
+import { appConfig } from "@/config/app.config";
+import { AuthService } from "@/modules/auth/auth.service";
+
+const {
+  jwtConfig: {
+    accessTokenExpiresIn,
+    accessTokenSecret,
+    refreshTokenExpiresIn,
+    refreshTokenSecret,
+  },
+} = appConfig();
 
 @Injectable()
 export class KycService {
@@ -22,6 +39,8 @@ export class KycService {
     private readonly userBusinessRepository: Repository<UserBusinessDetailsEntity>,
     @InjectRepository(UserKycEntity)
     private readonly userKycRepository: Repository<UserKycEntity>,
+    private readonly authService: AuthService,
+    private readonly jwtService: JwtService,
     private readonly s3Service: S3Service,
   ) {}
 
@@ -39,7 +58,11 @@ export class KycService {
     };
   }
 
-  async submitFullKyc(userId: string, kycData: KycSubmissionDto) {
+  async submitFullKyc(
+    userId: string,
+    kycData: KycSubmissionDto,
+    res: Response,
+  ) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ["businessDetails", "kyc", "mediaKyc"],
@@ -48,6 +71,13 @@ export class KycService {
     if (!user) {
       throw new NotFoundException("User not found");
     }
+
+    await this.userRepository.save(
+      this.userRepository.create({
+        id: userId,
+        onboardingStatus: ONBOARDING_STATUS.KYC_PENDING,
+      }),
+    );
 
     // Update or create business details
     const businessDetails =
@@ -70,6 +100,7 @@ export class KycService {
     // Create UserKycEntity if it doesn't exist
     const userKyc = user.kyc || new UserKycEntity();
     userKyc.kycStatus = KYC_STATUS.PENDING;
+    user.onboardingStatus = ONBOARDING_STATUS.KYC_PENDING;
     userKyc.user = user;
     const savedUserKyc = await this.userKycRepository.save(userKyc);
 
@@ -112,10 +143,41 @@ export class KycService {
       savedUserKyc[mapping.idField] = savedMediaKyc.id;
     }
 
+    await this.userRepository.save(user);
+
     // Save the updated UserKycEntity with document IDs
     await this.userKycRepository.save(savedUserKyc);
 
-    return { message: "KYC submitted successfully" };
+    const payload: IAccessTokenPayload = {
+      id: user.id,
+      mobile: user.mobile,
+      onboardingStatus: user.onboardingStatus,
+      role: user.role,
+      email: user.email,
+    };
+    const accessToken = this.generateAccessToken(payload);
+    const refreshToken = this.generateRefreshToken(payload);
+
+    return res
+      .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
+      .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
+      .json({ message: "KYC submitted successfully" });
+  }
+
+  generateAccessToken(payload: Record<string, any>, options?: JwtSignOptions) {
+    return this.jwtService.sign(payload, {
+      secret: accessTokenSecret,
+      expiresIn: accessTokenExpiresIn,
+      ...options,
+    });
+  }
+
+  generateRefreshToken(payload: Record<string, any>, options?: JwtSignOptions) {
+    return this.jwtService.sign(payload, {
+      secret: refreshTokenSecret,
+      expiresIn: refreshTokenExpiresIn,
+      ...options,
+    });
   }
 
   async getDocumentUploadUrl(userId: string, documentInfo: DocumentUploadDto) {

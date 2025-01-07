@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body } from "@nestjs/common";
+import { Controller, Get, Post, Body, Res } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Response } from "express";
 import { KycService } from "./kyc.service";
 import { KycStatusResDto } from "./dto/kyc-status.dto";
 import { DocumentUploadDto } from "./dto/document-upload.dto";
@@ -32,8 +33,9 @@ export class KycController {
   async submitFullKyc(
     @User() user: UsersEntity,
     @Body() kycData: KycSubmissionDto,
+    @Res() res: Response,
   ) {
-    return this.kycService.submitFullKyc(user.id, kycData);
+    return this.kycService.submitFullKyc(user.id, kycData, res);
   }
 
   @Post("document/presigned-url")
