@@ -95,7 +95,8 @@ export class KycService {
       kycStatus: KYC_STATUS.PENDING,
     });
 
-    await this.userBusinessRepository.save(businessDetails);
+    const savedBusinessDetails =
+      await this.userBusinessRepository.save(businessDetails);
 
     // Create UserKycEntity if it doesn't exist
     const userKyc = user.kyc || new UserKycEntity();
@@ -103,6 +104,11 @@ export class KycService {
     user.onboardingStatus = ONBOARDING_STATUS.KYC_PENDING;
     userKyc.user = user;
     const savedUserKyc = await this.userKycRepository.save(userKyc);
+
+    user.businessDetails = savedBusinessDetails;
+    user.kyc = savedUserKyc;
+
+    await this.userRepository.save(user);
 
     // Create and save MediaKycEntity entries for each document
     const documentMappings = [

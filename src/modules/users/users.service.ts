@@ -64,6 +64,17 @@ export class UsersService {
     private readonly bcryptService: BcryptService,
   ) {}
 
+  async getBusinessDetails(user: UsersEntity) {
+    return this.usersRepository.findOne({
+      where: {
+        id: user.id,
+      },
+      relations: {
+        businessDetails: true,
+      },
+    });
+  }
+
   async resetCache() {
     await this.cacheManager.reset();
 
@@ -357,6 +368,10 @@ export class UsersService {
     const [users, totalItems] = await this.usersRepository.findAndCount({
       where: {
         fullName: ILike(`%${search}%`),
+      },
+      relations: {
+        channelPartner: true,
+        businessDetails: true,
       },
       skip: (page - 1) * limit,
       take: limit,

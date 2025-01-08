@@ -205,6 +205,14 @@ export class UsersController {
     );
   }
 
+  @ApiOperation({ summary: "Get business details" })
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @Get("business-details")
+  getBusinessDetails(@User() user: UsersEntity) {
+    return this.usersService.getBusinessDetails(user);
+  }
+
   // @ApiOperation({ summary: "Add bank details" })
   // @IgnoreKyc()
   // @IgnoreBusinessDetails()
