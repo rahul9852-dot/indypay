@@ -23,7 +23,6 @@ import { TransactionsEntity } from "./transaction.entity";
 import { UserWhitelistIpsEntity } from "./user-whitelist-ip.entity";
 import { SettlementsEntity } from "./settlements.entity";
 import { WalletEntity } from "./wallet.entity";
-import { UserMediaKycEntity } from "./user-media-kyc.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import {
   ONBOARDING_STATUS,
@@ -156,10 +155,8 @@ export class UsersEntity {
   @OneToOne(() => UserAddressEntity, ({ user }) => user, { cascade: true })
   address: UserAddressEntity;
 
-  @OneToMany(() => UserMediaKycEntity, (mediaKyc) => mediaKyc.user)
-  mediaKyc: UserMediaKycEntity[];
-
-  @OneToOne(() => UserKycEntity, (kyc) => kyc.user)
+  @JoinColumn()
+  @OneToOne(() => UserKycEntity, ({ user }) => user, { cascade: true })
   kyc: UserKycEntity;
 
   @OneToMany(() => UserBankDetailsEntity, ({ user }) => user, { cascade: true })

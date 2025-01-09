@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { IGNORE_KYC_KEY, REQUEST_USER_KEY } from "@/constants/auth.constant";
-import { KYC_STATUS, USERS_ROLE } from "@/enums";
+import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto } from "@/dtos/common.dto";
 
@@ -34,7 +34,7 @@ export class KycGuard implements CanActivate {
       return true;
     }
 
-    if (user.kyc?.kycStatus !== KYC_STATUS.APPROVED) {
+    if (user?.onboardingStatus !== ONBOARDING_STATUS.KYC_VERIFIED) {
       throw new ForbiddenException(new MessageResponseDto("KYC is pending"));
     }
 

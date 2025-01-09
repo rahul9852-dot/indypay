@@ -1,6 +1,8 @@
 import { ulid } from "ulid";
 import * as dayjs from "dayjs";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { ONBOARDING_STATUS } from "@/enums";
+import { appConfig } from "@/config/app.config";
 
 export const getUlidId = (prefix = "pb") => `${prefix}_${ulid()}`;
 
@@ -60,4 +62,28 @@ export const formatTime = (date: Date) => {
   const formattedDate = dayjs(date).format("hh:mm A");
 
   return formattedDate;
+};
+
+export const formatDateTime = (date: Date) => {
+  const formattedDate = dayjs(date).format("DD MMM YYYY hh:mm A");
+
+  return formattedDate;
+};
+
+export const getCheckoutUrl = (payinId: string) =>
+  `${appConfig().beBaseUrl}/api/v1/payments/redirect/payment-link/${payinId}`;
+
+export const getOnboardingStatus = (status: ONBOARDING_STATUS) => {
+  switch (status) {
+    case ONBOARDING_STATUS.KYC_PENDING:
+      return "pending";
+    case ONBOARDING_STATUS.KYC_VERIFIED:
+      return "completed";
+    case ONBOARDING_STATUS.KYC_REJECTED:
+      return "rejected";
+    case ONBOARDING_STATUS.KYC_ON_HOLD:
+      return "onHold";
+    default:
+      return "signUp";
+  }
 };

@@ -8,7 +8,7 @@ import { appConfig } from "@/config/app.config";
 import { UsersEntity } from "@/entities/user.entity";
 import { KycEntity } from "@/entities/kyc.entity";
 import { AwsModule } from "@/modules/aws/aws.module";
-import { UserMediaKycEntity } from "@/entities/user-media-kyc.entity";
+import { UserMediaEntity } from "@/entities/user-media-kyc.entity";
 import { UserBusinessDetailsEntity } from "@/entities/user-business.entity";
 import { UserKycEntity } from "@/entities/user-kyc.entity";
 
@@ -21,7 +21,7 @@ const {
     TypeOrmModule.forFeature([
       UsersEntity,
       KycEntity,
-      UserMediaKycEntity,
+      UserMediaEntity,
       UserBusinessDetailsEntity,
       UserKycEntity,
     ]),

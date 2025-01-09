@@ -73,7 +73,7 @@ export enum DESIGNATION {
 export enum ID_TYPE {
   BUSINESS_DETAILS = "bsd",
   INTERNAL_USER = "itu",
-  MEDIA_KYC = "mkc",
+  MEDIA_KYC = "mda",
   ONBOARDING_USER = "onu",
   ORDER = "ord",
   OTP = "otp",

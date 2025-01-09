@@ -32,7 +32,7 @@ export class MediaKycEntity {
   documentType: string;
 
   // Relations
-  @ManyToOne(() => UserKycEntity, (userKyc) => userKyc.mediaKyc, {
+  @ManyToOne(() => UserKycEntity, ({ media }) => media, {
     onDelete: "CASCADE",
   })
   userKyc: UserKycEntity;

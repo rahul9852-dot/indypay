@@ -8,13 +8,12 @@ import {
   JoinColumn,
   BeforeInsert,
 } from "typeorm";
-import { UsersEntity } from "./user.entity";
 import { UserKycEntity } from "./user-kyc.entity";
-import { KYC_STATUS, ID_TYPE } from "@/enums";
+import { ID_TYPE } from "@/enums";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 
-@Entity("user_media_kyc")
-export class UserMediaKycEntity {
+@Entity("user_media")
+export class UserMediaEntity {
   @PrimaryColumn()
   id: string;
 
@@ -24,17 +23,15 @@ export class UserMediaKycEntity {
   @Column()
   documentUrl: string;
 
-  @Column({ type: "int", enum: KYC_STATUS, default: KYC_STATUS.PENDING })
-  status: number;
+  @Column()
+  documentName: string;
 
   // Relations
-  @ManyToOne(() => UsersEntity, (user) => user.mediaKyc)
   @JoinColumn()
-  user: UsersEntity;
-
-  @ManyToOne(() => UserKycEntity, (userKyc) => userKyc.mediaKyc)
-  @JoinColumn()
-  userKyc: UserKycEntity;
+  @ManyToOne(() => UserKycEntity, ({ media }) => media, {
+    onDelete: "CASCADE",
+  })
+  kyc: UserKycEntity;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -44,22 +41,6 @@ export class UserMediaKycEntity {
 
   @BeforeInsert()
   generateId() {
-    const prefix = this.getDocumentPrefix();
-    this.id = `${prefix}_${getUlidId(ID_TYPE.MEDIA_KYC)}`;
-  }
-
-  private getDocumentPrefix(): string {
-    switch (this.documentType) {
-      case "panCard":
-        return "pan";
-      case "aadharNumber":
-        return "aa";
-      case "addressProof":
-        return "ap";
-      case "bankStatement":
-        return "bs";
-      default:
-        return "doc";
-    }
+    this.id = getUlidId(ID_TYPE.MEDIA_KYC);
   }
 }

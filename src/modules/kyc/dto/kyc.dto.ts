@@ -1,5 +1,14 @@
-import { IsString, IsEnum, ValidateNested, IsObject } from "class-validator";
+import {
+  IsString,
+  IsEnum,
+  ValidateNested,
+  IsObject,
+  IsNotEmpty,
+  IsEmail,
+  IsPositive,
+} from "class-validator";
 import { Type } from "class-transformer";
+import { ApiProperty } from "@nestjs/swagger";
 import {
   BUSINESS_ENTITY_TYPE,
   DESIGNATION,
@@ -8,13 +17,19 @@ import {
 } from "@/enums";
 
 export class DocumentDto {
+  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   url: string;
 
+  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   docType: string;
 
+  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   name: string;
 }
 
@@ -37,33 +52,47 @@ export class DocumentsDto {
 }
 
 export class PersonalInfoDto {
+  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   personalPanNumber: string;
 
-  @IsString()
+  @ApiProperty()
+  @IsEmail()
+  @IsNotEmpty()
   email: string;
 
+  @ApiProperty({ enum: DESIGNATION })
   @IsEnum(DESIGNATION)
+  @IsNotEmpty()
   designation: string;
 }
 
 export class BusinessStructureDto {
+  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   businessName: string;
 
+  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   registeredBusinessNumber: string;
 
+  @ApiProperty({ enum: BUSINESS_ENTITY_TYPE })
   @IsEnum(BUSINESS_ENTITY_TYPE)
   @Type(() => Number)
+  @IsPositive()
   typeOfBusiness: number;
 
+  @ApiProperty({ enum: BUSINESS_INDUSTRIES })
   @IsEnum(BUSINESS_INDUSTRIES)
-  @Type(() => Number)
+  @IsPositive()
   industryName: string;
 
+  @ApiProperty({ enum: TURNOVER_TYPE })
   @IsEnum(TURNOVER_TYPE)
-  @Type(() => Number)
+  @IsPositive()
   turnover: number;
 }
 

@@ -14,7 +14,6 @@ import {
   DESIGNATION,
   ID_TYPE,
   TURNOVER_TYPE,
-  KYC_STATUS,
 } from "@/enums";
 import { BUSINESS_INDUSTRIES } from "@/constants/business-industries.constant";
 
@@ -23,23 +22,16 @@ export class UserBusinessDetailsEntity {
   @PrimaryColumn()
   id: string;
 
-  @Column({})
-  personalPan: string;
-
-  @Column({})
-  personalEmailId: string;
-
   @Column({ nullable: true })
-  businessType: string;
+  businessPan: string;
 
-  @Column({})
   @Column({ enum: BUSINESS_ENTITY_TYPE })
   businessEntityType: number;
 
-  @Column({})
+  @Column()
   businessName: string;
 
-  @Column({})
+  @Column()
   registerBusinessNumber: string;
 
   @Column({ enum: DESIGNATION })
@@ -51,14 +43,10 @@ export class UserBusinessDetailsEntity {
   @Column({ enum: BUSINESS_INDUSTRIES })
   businessIndustry: string;
 
-  @Column({ type: "int", enum: KYC_STATUS, default: KYC_STATUS.PENDING })
-  kycStatus: number;
-
-  @Column({ nullable: true })
-  businessPan: string;
-
   // Relations
-  @OneToOne(() => UsersEntity, ({ businessDetails }) => businessDetails)
+  @OneToOne(() => UsersEntity, ({ businessDetails }) => businessDetails, {
+    onDelete: "CASCADE",
+  })
   user: UsersEntity;
 
   @CreateDateColumn({ type: "timestamptz" })
