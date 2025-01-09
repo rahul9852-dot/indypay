@@ -49,6 +49,9 @@ export class PayInOrdersEntity {
   @Column({ nullable: true })
   intent: string;
 
+  @Column({ nullable: true })
+  paymentLink: string;
+
   @Column({ type: "numeric", precision: 10, scale: 2, default: 4.5 })
   commissionInPercentage: number;
 
