@@ -40,6 +40,7 @@ import { AddAddressAdminDto, AddAddressDto } from "./dto/add-address.dto";
 import { User } from "@/decorators/user.decorator";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import {
+  ChangeOnboardingStatusDto,
   ResetPasswordDto,
   UserProfileResDto,
 } from "@/modules/users/dto/user-profile.dto";
@@ -67,6 +68,17 @@ export class UsersController {
   @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN, USERS_ROLE.OPS)
   async addAddressAdmin(@Body() { userId, ...rest }: AddAddressAdminDto) {
     return this.usersService.addUserAddress(userId, rest);
+  }
+
+  @UseGuards(ChangeRoleGuard)
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN)
+  @ApiOperation({ summary: "Change user onboarding status" })
+  @Patch("change-onboarding-status")
+  @HttpCode(HttpStatus.OK)
+  async changeOnboardingStatus(
+    @Body() changeOnboardingStatusDto: ChangeOnboardingStatusDto,
+  ) {
+    return this.usersService.changeOnboardingStatus(changeOnboardingStatusDto);
   }
 
   @ApiOperation({

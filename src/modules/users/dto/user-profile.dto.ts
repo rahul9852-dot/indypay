@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from "class-validator";
+import { IsEnum, IsNotEmpty, IsString } from "class-validator";
 import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
 import {
   ACCOUNT_STATUS,
@@ -57,4 +57,17 @@ export class ResetPasswordDto {
   @IsString()
   @IsNotEmpty()
   confirmPassword: string;
+}
+
+export class ChangeOnboardingStatusDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  userId: string;
+  @ApiProperty({
+    enum: ONBOARDING_STATUS,
+  })
+  @IsNotEmpty()
+  @IsEnum(ONBOARDING_STATUS)
+  onboardingStatus: ONBOARDING_STATUS;
 }

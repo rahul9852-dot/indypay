@@ -14,7 +14,10 @@ import { Cache } from "cache-manager";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AddBusinessDetailsDto } from "./dto/add-business-details.dto";
 import { WebhookUrlDto } from "./dto/webhook.dto";
-import { ResetPasswordDto } from "./dto/user-profile.dto";
+import {
+  ChangeOnboardingStatusDto,
+  ResetPasswordDto,
+} from "./dto/user-profile.dto";
 import { ChangeStatusDto } from "./dto/change-status.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
 import { AddAddressDto } from "./dto/add-address.dto";
@@ -63,6 +66,25 @@ export class UsersService {
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
   ) {}
+
+  async changeOnboardingStatus({
+    userId,
+    onboardingStatus,
+  }: ChangeOnboardingStatusDto) {
+    const dbUser = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+    if (!dbUser) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+    const user = this.usersRepository.create({
+      onboardingStatus,
+    });
+    await this.usersRepository.update({ id: userId }, user);
+    await this.cacheManager.del(REDIS_KEYS.USER_KEY(userId));
+
+    return new MessageResponseDto("Onboarding status updated successfully");
+  }
 
   async getBusinessDetails(user: UsersEntity) {
     return this.usersRepository.findOne({
