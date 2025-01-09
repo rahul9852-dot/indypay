@@ -3,6 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { Module } from "@nestjs/common";
 import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
+import { SESService } from "../aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { UsersService } from "@/modules/users/users.service";
@@ -42,6 +43,7 @@ import { SNSService } from "@/modules/aws/sns.service";
     BcryptService,
     JwtService,
     SNSService,
+    SESService,
   ],
   controllers: [PaymentsController],
 })

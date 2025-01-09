@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { SsoService } from "./sso.service";
 import { SsoController } from "./sso.controller";
+import { SESService } from "../aws/ses.service";
 import { UsersEntity } from "@/entities/user.entity";
 import { UsersService } from "@/modules/users/users.service";
 import { UserApiKeysEntity } from "@/entities/user-api-key.entity";
@@ -32,6 +33,7 @@ import { SNSService } from "@/modules/aws/sns.service";
     BcryptService,
     JwtService,
     SNSService,
+    SESService,
   ],
   controllers: [SsoController],
 })

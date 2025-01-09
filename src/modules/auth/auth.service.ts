@@ -47,6 +47,7 @@ import {
   LOCK_TIME_MS,
 } from "@/constants/redis-cache.constant";
 import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
+import { SESService } from "@/modules/aws/ses.service";
 
 const {
   jwtConfig: {
@@ -76,6 +77,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly snsService: SNSService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly sesService: SESService,
   ) {}
 
   async login(loginUserDto: LoginUserDto, res: Response) {
@@ -427,7 +429,6 @@ export class AuthService {
   async sendSignupOtp(sendSignupOtpDto: SendSignupOtpDto) {
     const { email, mobile } = sendSignupOtpDto;
 
-    // Check if user already exists
     const existingUser = await this.usersRepository.findOne({
       where: [{ mobile }, { email }],
     });
@@ -438,16 +439,13 @@ export class AuthService {
       );
     }
 
-    // Generate OTPs
     const mobileOtp = generateOtp();
     const emailOtp = generateOtp();
 
     const otpKey = REDIS_KEYS.OTP_KEY(mobile + email);
 
-    // Format phone number for SNS
     const formattedPhone = mobile.startsWith("+") ? mobile : `+91${mobile}`;
 
-    // Send OTP via SMS
     const smsSent = await this.snsService.sendSMS(
       formattedPhone,
       `Your PayBolt verification code is: ${mobileOtp}`,
@@ -459,7 +457,14 @@ export class AuthService {
       );
     }
 
-    // Store both OTPs in Redis with 15 minutes expiry
+    const emailSent = await this.sesService.sendEmailOtp(email, emailOtp);
+
+    if (!emailSent.success) {
+      throw new BadRequestException(
+        new MessageResponseDto("Failed to send email OTP"),
+      );
+    }
+
     await this.cacheManager.set(
       otpKey,
       {
@@ -470,9 +475,6 @@ export class AuthService {
       },
       1000 * 60 * 15, // 15 minutes in seconds
     );
-
-    // FIXME: Implement email OTP sending here
-    // await this.emailService.sendOtp(email, emailOtp);
 
     return {
       message: "OTPs sent successfully",
