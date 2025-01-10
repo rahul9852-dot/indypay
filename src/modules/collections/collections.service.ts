@@ -105,8 +105,8 @@ export class CollectionsService {
       sort = "id",
       order = "DESC",
       search = "",
-      startDate,
-      endDate,
+      startDate = todayStartDate(),
+      endDate = todayEndDate(),
     }: PaginationWithDateDto,
   ) {
     const whereQuery:
@@ -178,18 +178,18 @@ export class CollectionsService {
     });
 
     const todayCollectionsPromise = this.payInOrdersRepository.sum("amount", {
-      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+      createdAt: Between(new Date(startDate), new Date(endDate)),
       user: { id: userId },
     });
 
     const todaySuccessPromise = this.payInOrdersRepository.sum("amount", {
-      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+      createdAt: Between(new Date(startDate), new Date(endDate)),
       status: PAYMENT_STATUS.SUCCESS,
       user: { id: userId },
     });
 
     const todayFailedPromise = this.payInOrdersRepository.sum("amount", {
-      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+      createdAt: Between(new Date(startDate), new Date(endDate)),
       status: PAYMENT_STATUS.FAILED,
       user: { id: userId },
     });
