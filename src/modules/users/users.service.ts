@@ -636,6 +636,8 @@ export class UsersService {
 
     await this.usersRepository.update({ id: userId }, user);
 
+    await this.cacheManager.del(REDIS_KEYS.USER_KEY(userId));
+
     return new MessageResponseDto("Role updated successfully");
   }
 

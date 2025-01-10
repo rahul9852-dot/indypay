@@ -4,7 +4,6 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Res,
   UseGuards,
   Get,
   Query,
@@ -15,16 +14,18 @@ import {
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
-import { Response } from "express";
 import { PaymentsService } from "./payments.service";
 import {
   CreatePayinPaymentResponseDto,
   PayinStatusDto,
-  CreatePayinTransactionPayNProDto,
+  CreatePayinTransactionIsmartDto,
 } from "./dto/create-payin-payment.dto";
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
-import { PayoutStatusDto } from "./dto/create-payout-payment.dto";
-import { ExternalPayinWebhookPayNProDto } from "./dto/external-webhook-payin.dto";
+import {
+  CreatePayoutIsmartDto,
+  PayoutStatusDto,
+} from "./dto/create-payout-payment.dto";
+import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
 import { ExternalPayOutWebhookPayNProDto } from "./dto/external-webhook-payout.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
@@ -50,15 +51,33 @@ export class PaymentsController {
   @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })
   @Post("payin/create")
   async createPayInTransaction(
-    @Body() createTransactionDto: CreatePayinTransactionPayNProDto,
+    @Body() createTransactionDto: CreatePayinTransactionIsmartDto,
     @User() user: UsersEntity,
-    @Res() res: Response,
   ) {
-    return this.paymentsService.createTransactionPayinPayNPro(
+    return this.paymentsService.createTransactionPayinIsmart(
       createTransactionDto,
       user,
-      res,
     );
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Create pay-out transaction" })
+  @UseGuards(ApiKeyGuard)
+  @Post("payout/create")
+  async createPayoutIsmart(
+    @Body() createPayoutIsmartDto: CreatePayoutIsmartDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutIsmart(createPayoutIsmartDto, user);
+  }
+
+  @ApiOperation({ summary: "Create pay-out transaction for dashboard" })
+  @Post("payout/dashboard")
+  async createPayoutDashboardIsmart(
+    @Body() createPayoutIsmartDto: CreatePayoutIsmartDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutIsmart(createPayoutIsmartDto, user);
   }
 
   @Public()
@@ -86,11 +105,9 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
   async externalWebhookPayin(
-    @Body() externalPayinWebhookDto: ExternalPayinWebhookPayNProDto,
+    @Body() externalPayinWebhookDto: ExternalPayinWebhookIsmartDto,
   ) {
-    return this.paymentsService.externalWebhookPayinPayNPro(
-      externalPayinWebhookDto,
-    );
+    return this.paymentsService.externalWebhookPayin(externalPayinWebhookDto);
   }
 
   @Public()
@@ -115,4 +132,30 @@ export class PaymentsController {
   ) {
     return this.paymentsService.getTransactionsDetails(user, paginationDto);
   }
+
+  // this api is used to redirect user to payment link UI
+  // @Public()
+  // @IgnoreBusinessDetails()
+  // @IgnoreKyc()
+  // @IgnoreMobileVerification()
+  // @Get("redirect/payment-link/:payinId")
+  // async redirectPaymentLink(
+  //   @Param("payinId") payinId: string,
+  //   @Res() res: Response,
+  // ) {
+  //   return this.paymentsService.redirectPaymentLink(payinId, res);
+  // }
+
+  // this api is used to check payment status from payment link UI
+  // @Public()
+  // @IgnoreBusinessDetails()
+  // @IgnoreKyc()
+  // @IgnoreMobileVerification()
+  // @Get("redirect/payment-link/status/:orderId")
+  // async checkPaymentStatus(
+  //   @Param("orderId") orderId: string,
+  //   @Req() req: Request,
+  // ) {
+  //   return this.paymentsService.checkPaymentStatus(orderId, req);
+  // }
 }

@@ -1,4 +1,5 @@
 export const ISMART_PAY = {
+  BASE_URL: "https://pay.ismartpay.co.in",
   PAYIN: "api/create/order",
   PAYOUT: "api/create/payout",
   PAYOUT_STATUS: "api/payout/status", // api/payout/status/{{transaction_id}}

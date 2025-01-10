@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsNumber,
   IsNumberString,
+  IsOptional,
   IsPositive,
   IsString,
   Length,
@@ -71,7 +72,8 @@ export class CreatePayinTransactionIsmartDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  vpa: string;
+  @IsOptional()
+  vpa?: string;
 }
 
 export class CreatePayinTransactionPayNProDto {

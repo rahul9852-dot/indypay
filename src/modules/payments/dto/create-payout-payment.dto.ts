@@ -1,13 +1,17 @@
 import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
   IsNumber,
   IsNumberString,
+  IsOptional,
   IsPositive,
   IsString,
   Length,
+  ValidateNested,
 } from "class-validator";
 import { PAYMENT_STATUS, PAYOUT_PAYMENT_MODE } from "@/enums/payment.enum";
 
@@ -85,4 +89,54 @@ export class CreatePayoutPaymentResponseDto {
 
   @ApiResponseProperty()
   transferId: string;
+}
+
+// Ismart
+
+export class SinglePayoutIsmartDto {
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  purpose: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  beneficiaryName: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  accountNumber: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  ifscCode: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  remarks: string;
+
+  @ApiProperty({ enum: PAYOUT_PAYMENT_MODE })
+  @IsEnum(PAYOUT_PAYMENT_MODE)
+  @IsNotEmpty()
+  @IsOptional()
+  paymentMode?: PAYOUT_PAYMENT_MODE;
+}
+export class CreatePayoutIsmartDto {
+  @ApiProperty({
+    type: [SinglePayoutIsmartDto],
+    description: "Array of payout data",
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SinglePayoutIsmartDto)
+  data: SinglePayoutIsmartDto[];
 }

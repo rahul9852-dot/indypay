@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsNumberString,
   IsObject,
+  IsOptional,
   IsPositive,
   IsString,
 } from "class-validator";
@@ -119,6 +120,7 @@ export class ExternalPayinWebhookIsmartDto {
 
   @ApiProperty()
   @IsString()
+  @IsOptional()
   bank_id?: string;
 
   @ApiProperty()
@@ -128,15 +130,18 @@ export class ExternalPayinWebhookIsmartDto {
 
   @ApiProperty()
   @IsString()
+  @IsOptional()
   transaction_id?: string;
 }
 
 export class ExternalPayinWebhookPayNProDto {
   @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   data: string;
 
   @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   key_id: string;
 }

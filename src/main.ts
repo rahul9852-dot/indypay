@@ -2,6 +2,8 @@ import { HttpAdapterHost, NestFactory } from "@nestjs/core";
 import { ValidationPipe, VersioningType } from "@nestjs/common";
 import * as cookieParser from "cookie-parser";
 import helmet from "helmet";
+import { NestExpressApplication } from "@nestjs/platform-express";
+import * as path from "path";
 
 import { AppModule } from "./app.module";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
@@ -15,11 +17,18 @@ const { port, isProduction, allowedOrigins } = appConfig();
 
 async function bootstrap() {
   const logger = new CustomLogger();
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const { httpAdapter } = app.get(HttpAdapterHost);
 
   // Add cookie parser
   app.use(cookieParser());
+
+  // Fix the path to point to the project root's public folder instead of dist
+  const publicPath = path.join(process.cwd(), "public");
+
+  app.useStaticAssets(publicPath, {
+    prefix: "/static/", // Using a prefix for clarity
+  });
 
   // Enable cors
   app.enableCors({

@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -41,8 +42,11 @@ export class ChangeRoleGuard implements CanActivate {
 
       const user = await this.usersRepository.findOne({
         where: { id: request.body.userId || "" },
-        relations: ["kyc"],
       });
+
+      if (!user) {
+        throw new NotFoundException("User not found");
+      }
 
       const newRole = request.body.role;
       const requesterRole = payload.role;

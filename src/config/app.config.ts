@@ -26,6 +26,7 @@ export const appConfig = registerAs("appConfig", () => ({
     refreshTokenSecret: getOsEnv("JWT_REFRESH_TOKEN_SECRET"),
     accessTokenExpiresIn: getOsEnv("JWT_ACCESS_TOKEN_EXPIRES_IN"),
     refreshTokenExpiresIn: getOsEnv("JWT_REFRESH_TOKEN_EXPIRES_IN"),
+    paymentLinkSecret: getOsEnv("JWT_PAYMENT_LINK_SECRET"),
   },
   // oauthGoogle: {
   //   clientId: getOsEnv("OAUTH_GOOGLE_CLIENT_ID"),
@@ -44,11 +45,6 @@ export const appConfig = registerAs("appConfig", () => ({
   externalPaymentConfig: {
     clientId: getOsEnv("EXTERNAL_PAYMENT_CLIENT_ID"),
     clientSecret: getOsEnv("EXTERNAL_PAYMENT_CLIENT_SECRET"),
-    encryptionSalt: getOsEnv("EXTERNAL_PAYMENT_ENCRYPTION_SALT"),
-    aesSecretKey: getOsEnv("EXTERNAL_PAYMENT_AES_SECRET_KEY"),
-    payoutSignature: getOsEnv("EXTERNAL_PAYMENT_PAYOUT_SIGNATURE"),
-    payoutClientId: getOsEnv("EXTERNAL_PAYMENT_PAYOUT_CLIENT_ID"),
-    payoutClientSecret: getOsEnv("EXTERNAL_PAYMENT_PAYOUT_CLIENT_SECRET"),
     webhookIps: getOsEnv("EXTERNAL_PAYMENT_WEBHOOK_IPS").split(","),
   },
   transactionConfig: {

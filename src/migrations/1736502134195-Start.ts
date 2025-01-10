@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class Init1736500004749 implements MigrationInterface {
-  name = "Init1736500004749";
+export class Start1736502134195 implements MigrationInterface {
+  name = "Start1736502134195";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -62,10 +62,10 @@ export class Init1736500004749 implements MigrationInterface {
       `CREATE TABLE "auth_otp" ("id" character varying NOT NULL, "code" character varying(6) NOT NULL, "mobile" character varying NOT NULL, "expiredAt" TIMESTAMP WITH TIME ZONE NOT NULL, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "UQ_2c699378068abaea9eff84e9ec3" UNIQUE ("mobile"), CONSTRAINT "PK_06c70acc09e7cb64b282d37e139" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE TABLE "media_kyc" ("id" character varying NOT NULL, "kycStatus" integer NOT NULL DEFAULT '1', "fileName" character varying, "fileType" character varying, "url" character varying, "documentType" character varying, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "userKycId" character varying, CONSTRAINT "PK_c5445c0fe72ddf3947fa0fe720c" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "kyc" ("id" SERIAL NOT NULL, "kycStatus" character varying, "panId" character varying, "aadharId" character varying, "addressProofId" character varying, "bankStatementId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" character varying, CONSTRAINT "REL_ca948073ed4a3ba22030d37b3d" UNIQUE ("userId"), CONSTRAINT "PK_84ab2e81ea9700d29dda719f3be" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE TABLE "kyc" ("id" SERIAL NOT NULL, "kycStatus" character varying, "panId" character varying, "aadharId" character varying, "addressProofId" character varying, "bankStatementId" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "userId" character varying, CONSTRAINT "REL_ca948073ed4a3ba22030d37b3d" UNIQUE ("userId"), CONSTRAINT "PK_84ab2e81ea9700d29dda719f3be" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "media_kyc" ("id" character varying NOT NULL, "kycStatus" integer NOT NULL DEFAULT '1', "fileName" character varying, "fileType" character varying, "url" character varying, "documentType" character varying, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "userKycId" character varying, CONSTRAINT "PK_c5445c0fe72ddf3947fa0fe720c" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `ALTER TABLE "user_api_keys" ADD CONSTRAINT "FK_e131705cbbc8fb589889b02d457" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
@@ -122,19 +122,19 @@ export class Init1736500004749 implements MigrationInterface {
       `ALTER TABLE "users" ADD CONSTRAINT "FK_8d7891ecc41ac3858a5f477afc7" FOREIGN KEY ("kycId") REFERENCES "user_kyc"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
-      `ALTER TABLE "media_kyc" ADD CONSTRAINT "FK_283cce8ee2a4c77f32c1a5f11eb" FOREIGN KEY ("userKycId") REFERENCES "user_kyc"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `ALTER TABLE "kyc" ADD CONSTRAINT "FK_ca948073ed4a3ba22030d37b3db" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
-      `ALTER TABLE "kyc" ADD CONSTRAINT "FK_ca948073ed4a3ba22030d37b3db" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+      `ALTER TABLE "media_kyc" ADD CONSTRAINT "FK_283cce8ee2a4c77f32c1a5f11eb" FOREIGN KEY ("userKycId") REFERENCES "user_kyc"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "kyc" DROP CONSTRAINT "FK_ca948073ed4a3ba22030d37b3db"`,
+      `ALTER TABLE "media_kyc" DROP CONSTRAINT "FK_283cce8ee2a4c77f32c1a5f11eb"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "media_kyc" DROP CONSTRAINT "FK_283cce8ee2a4c77f32c1a5f11eb"`,
+      `ALTER TABLE "kyc" DROP CONSTRAINT "FK_ca948073ed4a3ba22030d37b3db"`,
     );
     await queryRunner.query(
       `ALTER TABLE "users" DROP CONSTRAINT "FK_8d7891ecc41ac3858a5f477afc7"`,
@@ -190,8 +190,8 @@ export class Init1736500004749 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "user_api_keys" DROP CONSTRAINT "FK_e131705cbbc8fb589889b02d457"`,
     );
-    await queryRunner.query(`DROP TABLE "kyc"`);
     await queryRunner.query(`DROP TABLE "media_kyc"`);
+    await queryRunner.query(`DROP TABLE "kyc"`);
     await queryRunner.query(`DROP TABLE "auth_otp"`);
     await queryRunner.query(`DROP TABLE "wallets"`);
     await queryRunner.query(

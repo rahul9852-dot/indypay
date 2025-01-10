@@ -16,7 +16,7 @@ export class AppController {
   @ApiOperation({ summary: "Health Check" })
   @ApiResponse({ status: 200, description: SUCCESS_MESSAGES.HEALTHY })
   @Get("health-check")
-  healthCheck(): string {
+  healthCheck() {
     return SUCCESS_MESSAGES.HEALTHY;
   }
 }

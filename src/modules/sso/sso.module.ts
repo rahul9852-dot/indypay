@@ -14,6 +14,7 @@ import { AuthService } from "@/modules/auth/auth.service";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { AuthOtpEntity } from "@/entities/otp.entity";
 import { SNSService } from "@/modules/aws/sns.service";
+import { WalletEntity } from "@/entities/wallet.entity";
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { SNSService } from "@/modules/aws/sns.service";
       UserWhitelistIpsEntity,
       UserAddressEntity,
       AuthOtpEntity,
+      WalletEntity,
     ]),
   ],
   providers: [

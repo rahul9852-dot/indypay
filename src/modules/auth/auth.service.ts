@@ -48,6 +48,7 @@ import {
 } from "@/constants/redis-cache.constant";
 import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 import { SESService } from "@/modules/aws/ses.service";
+import { WalletEntity } from "@/entities/wallet.entity";
 
 const {
   jwtConfig: {
@@ -72,6 +73,8 @@ export class AuthService {
     private readonly usersRepository: Repository<UsersEntity>,
     @InjectRepository(AuthOtpEntity)
     private readonly authOtpRepository: Repository<AuthOtpEntity>,
+    @InjectRepository(WalletEntity)
+    private readonly walletRepository: Repository<WalletEntity>,
 
     private readonly bcryptService: BcryptService,
     private readonly jwtService: JwtService,
@@ -233,7 +236,13 @@ export class AuthService {
       role: USERS_ROLE.MERCHANT,
     });
 
-    await this.usersRepository.save(user);
+    const savedUser = await this.usersRepository.save(user);
+
+    await this.walletRepository.save(
+      this.walletRepository.create({
+        user: savedUser,
+      }),
+    );
 
     return new MessageResponseDto("User registered successfully");
   }
@@ -560,6 +569,8 @@ export class AuthService {
       });
 
       const user = await this.usersRepository.save(newUser);
+
+      await this.walletRepository.save(this.walletRepository.create({ user }));
 
       // Clear OTPs from Redis after successful verification
       await this.cacheManager.del(otpKey);

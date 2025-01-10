@@ -9,7 +9,7 @@ import { appConfig } from "@/config/app.config";
 import { CustomLogger } from "@/logger";
 
 const {
-  externalPaymentConfig: { webhookIps, encryptionSalt, aesSecretKey },
+  externalPaymentConfig: { webhookIps },
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {

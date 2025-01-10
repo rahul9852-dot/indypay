@@ -34,18 +34,22 @@ export class DocumentDto {
 }
 
 export class DocumentsDto {
+  @ApiProperty()
   @ValidateNested()
   @Type(() => DocumentDto)
   panCard: DocumentDto;
 
+  @ApiProperty()
   @ValidateNested()
   @Type(() => DocumentDto)
   aadharNumber: DocumentDto;
 
+  @ApiProperty()
   @ValidateNested()
   @Type(() => DocumentDto)
   bankStatement: DocumentDto;
 
+  @ApiProperty()
   @ValidateNested()
   @Type(() => DocumentDto)
   addressProof: DocumentDto;
@@ -97,16 +101,19 @@ export class BusinessStructureDto {
 }
 
 export class KycSubmissionDto {
+  @ApiProperty()
   @ValidateNested()
   @Type(() => PersonalInfoDto)
   @IsObject()
   personalInfo: PersonalInfoDto;
 
+  @ApiProperty()
   @ValidateNested()
   @Type(() => BusinessStructureDto)
   @IsObject()
   businessStructure: BusinessStructureDto;
 
+  @ApiProperty()
   @ValidateNested()
   @Type(() => DocumentsDto)
   @IsObject()

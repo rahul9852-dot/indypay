@@ -7,6 +7,7 @@ export enum NODE_ENV {
 export enum COOKIE_KEYS {
   ACCESS_TOKEN = "atk",
   MOBILE_INFO_KEY = "utk",
+  PAYMENT_LINK_TOKEN = "_xplink",
   REFRESH_TOKEN = "rtk",
   VERIFY_TOKEN = "vtk",
 }
@@ -74,6 +75,7 @@ export enum ID_TYPE {
   BUSINESS_DETAILS = "bsd",
   INTERNAL_USER = "itu",
   MEDIA_KYC = "mda",
+  MERCHANT_PAYOUT = "mpout",
   ONBOARDING_USER = "onu",
   ORDER = "ord",
   OTP = "otp",
@@ -83,13 +85,13 @@ export enum ID_TYPE {
   SETTLEMENT_PAYOUT = "stl",
   TRANSACTIONS_KEY = "txn",
   USER = "usr",
-  USER_ADDRESS = "uad",
   USER_API_KEY = "apik",
   USER_BANK_DETAILS_KEY = "ubank",
   USER_KYC = "ukyc",
   USER_MULTI_FACTOR_AUTH = "umfa",
   USER_WHITELIST_IP = "uwip",
   WALLET = "wlt",
+  USER_ADDRESS = "uad",
 }
 
 export enum ONBOARDING_STATUS {
