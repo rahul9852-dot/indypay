@@ -359,49 +359,82 @@ export class TransactionsService {
     });
   }
 
-  async getStatsForAdmin() {
-    const totalAmount = await this.payInOrdersRepository.sum("amount", {});
-    const totalCount = await this.payInOrdersRepository.count({});
+  async getStatsForAdmin({
+    startDate = todayStartDate(),
+    endDate = todayEndDate(),
+  }: DateDto) {
+    const totalAmount = await this.payInOrdersRepository.sum("amount", {
+      createdAt: Between(new Date(startDate), new Date(endDate)),
+    });
+    const totalCount = await this.payInOrdersRepository.count({
+      where: {
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
+    });
 
     const successAmount = await this.payInOrdersRepository.sum("amount", {
       status: PAYMENT_STATUS.SUCCESS,
+      createdAt: Between(new Date(startDate), new Date(endDate)),
     });
     const successCount = await this.payInOrdersRepository.count({
-      where: { status: PAYMENT_STATUS.SUCCESS },
+      where: {
+        status: PAYMENT_STATUS.SUCCESS,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
     const failedAmount = await this.payInOrdersRepository.sum("amount", {
       status: PAYMENT_STATUS.FAILED,
+      createdAt: Between(new Date(startDate), new Date(endDate)),
     });
     const failedCount = await this.payInOrdersRepository.count({
-      where: { status: PAYMENT_STATUS.FAILED },
+      where: {
+        status: PAYMENT_STATUS.FAILED,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
-    const initiatedSettlementAmount =
-      await this.settlementsRepository.sum("amount");
+    const initiatedSettlementAmount = await this.settlementsRepository.sum(
+      "amount",
+      {
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
+    );
 
-    const initiatedSettlementCount = await this.settlementsRepository.count();
+    const initiatedSettlementCount = await this.settlementsRepository.count({
+      where: {
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
+    });
 
     const successSettlementAmount = await this.settlementsRepository.sum(
       "amount",
       {
         status: PAYMENT_STATUS.SUCCESS,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
       },
     );
 
     const successSettlementCount = await this.settlementsRepository.count({
-      where: { status: PAYMENT_STATUS.SUCCESS },
+      where: {
+        status: PAYMENT_STATUS.SUCCESS,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
     const failedSettlementAmount = await this.settlementsRepository.sum(
       "amount",
       {
         status: PAYMENT_STATUS.FAILED,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
       },
     );
 
     const failedSettlementCount = await this.settlementsRepository.count({
-      where: { status: PAYMENT_STATUS.FAILED },
+      where: {
+        status: PAYMENT_STATUS.FAILED,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
     });
 
     return {

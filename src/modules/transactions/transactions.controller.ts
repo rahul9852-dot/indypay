@@ -97,8 +97,8 @@ export class TransactionsController {
   @Get("stats/admin")
   @IgnoreBusinessDetails()
   @IgnoreKyc()
-  async getStatsForAdmin() {
-    return await this.transactionsService.getStatsForAdmin();
+  async getStatsForAdmin(@Query() dateDto: DateDto) {
+    return await this.transactionsService.getStatsForAdmin(dateDto);
   }
 
   @ApiOperation({
