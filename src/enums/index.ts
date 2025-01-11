@@ -173,5 +173,5 @@ export enum VERIFICATION_GATEWAY_EVENT {
 export enum THIRDPARTY_PG {
   FLAK_PAY = "flakpay",
   ISMART_PAY = "ismartpay",
-  PAYNPRO = "paynpro"
+  PAYNPRO = "paynpro",
 }

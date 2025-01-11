@@ -1059,17 +1059,22 @@ export class PaymentsService {
       );
 
     // update payout order
-    await this.payOutOrdersRepository.update(
-      { orderId },
-      {
-        status: flakPayResponse.data.status,
+
+    const status = convertExternalPaymentStatusToInternal(
+      flakPayResponse.data.status.toUpperCase(),
+    );
+
+    await this.payOutOrdersRepository.save(
+      this.payOutOrdersRepository.create({
+        ...payoutOrder,
+        status,
         transferId: flakPayResponse.data.transferId,
-      },
+      }),
     );
 
     return {
       orderId: payoutOrder.orderId,
-      status: flakPayResponse.data.status,
+      status,
       transferId: flakPayResponse.data.transferId,
     };
   }
