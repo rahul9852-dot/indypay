@@ -201,3 +201,71 @@ export interface IWebhookDataPayNPro {
   email: string;
   status: string;
 }
+
+// flakpay
+
+export interface IExternalPayinPaymentRequestFlakPay {
+  orderId: string;
+  pgReturnSuccessUrl: string;
+  pgReturnErrorUrl: string;
+  amount: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+}
+
+export interface IExternalPayinPaymentResponseFlakPay {
+  timestamp: string;
+  statusCode: number;
+  status: string;
+  message: string;
+  success: boolean;
+  data: {
+    orderId: string;
+    txnRefId: string;
+    paymentUrl: string;
+  };
+}
+
+export interface IExternalPayoutRequestFlakPay {
+  orderId: string;
+  amount: number;
+  transferMode: string;
+  industryType?: string;
+  beneDetails: {
+    beneBankName: string;
+    beneAccountNo: string;
+    beneIfsc: string;
+    beneName: string;
+    beneEmail?: string;
+    benePhone?: string;
+  };
+}
+
+export interface IExternalPayoutResponseFlakPay {
+  timestamp: string;
+  statusCode: number;
+  status: string;
+  message: string;
+  data: {
+    status: string;
+    transferId: string;
+  };
+}
+
+export interface IExternalPayoutStatusRequestFlakPay {
+  orderId: string;
+}
+
+export interface IExternalPayoutStatusResponseFlakPay {
+  timestamp: string;
+  statusCode: number;
+  status: string;
+  message: string;
+  success: boolean;
+  data: {
+    status: string;
+    transferId: string;
+  };
+}

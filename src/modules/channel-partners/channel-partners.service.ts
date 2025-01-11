@@ -27,23 +27,14 @@ import { SettlementsEntity } from "@/entities/settlements.entity";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
 import { IExternalPayoutStatusResponseIsmart } from "@/interface/external-api.interface";
-import { ISMART_PAY, PAYNPRO } from "@/constants/external-api.constant";
+import { ISMART_PAY } from "@/constants/external-api.constant";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
+import { getIsmartPayPgConfig } from "@/utils/pg-config.utils";
 
-const {
-  externalPaymentConfig: { clientId, clientSecret },
-} = appConfig();
+const { externalPaymentConfig } = appConfig();
 
 @Injectable()
 export class ChannelPartnersService {
-  private readonly axiosService = new AxiosService(PAYNPRO.PAYIN.BASE_URL, {
-    headers: {
-      "Content-Type": "application/json",
-      mid: clientId,
-      key: clientSecret,
-    },
-  });
-
   constructor(
     @InjectRepository(UsersEntity)
     private readonly usersRepository: Repository<UsersEntity>,
@@ -583,9 +574,17 @@ export class ChannelPartnersService {
       };
     }
 
+    const axiosServiceIsmart = new AxiosService(
+      ISMART_PAY.BASE_URL,
+      getIsmartPayPgConfig({
+        clientId: externalPaymentConfig.ismart.clientId,
+        clientSecret: externalPaymentConfig.ismart.clientSecret,
+      }),
+    );
+
     // call third party api
     const response =
-      await this.axiosService.getRequest<IExternalPayoutStatusResponseIsmart>(
+      await axiosServiceIsmart.getRequest<IExternalPayoutStatusResponseIsmart>(
         `${ISMART_PAY.PAYOUT_STATUS}/${settlement.transferId}`,
       );
 

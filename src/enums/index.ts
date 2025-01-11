@@ -82,16 +82,17 @@ export enum ID_TYPE {
   PAYIN_KEY = "pin",
   PAYOUT_BATCH_KEY = "pbatch",
   PAYOUT_KEY = "pout",
+  PG_CONFIG = "conf",
   SETTLEMENT_PAYOUT = "stl",
   TRANSACTIONS_KEY = "txn",
   USER = "usr",
+  USER_ADDRESS = "uad",
   USER_API_KEY = "apik",
   USER_BANK_DETAILS_KEY = "ubank",
   USER_KYC = "ukyc",
   USER_MULTI_FACTOR_AUTH = "umfa",
   USER_WHITELIST_IP = "uwip",
   WALLET = "wlt",
-  USER_ADDRESS = "uad",
 }
 
 export enum ONBOARDING_STATUS {
@@ -167,4 +168,10 @@ export enum OAUTH_PROVIDER {
 export enum VERIFICATION_GATEWAY_EVENT {
   MOBILE_VERIFY = "mobileVerify",
   ON_MOBILE_VERIFY = "onMobileVerify",
+}
+
+export enum THIRDPARTY_PG {
+  FLAK_PAY = "flakpay",
+  ISMART_PAY = "ismartpay",
+  PAYNPRO = "paynpro"
 }

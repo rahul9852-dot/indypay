@@ -9,7 +9,7 @@ import { appConfig } from "@/config/app.config";
 import { CustomLogger } from "@/logger";
 
 const {
-  externalPaymentConfig: { webhookIps },
+  externalPaymentConfig: { flakPay, ismart, paynpro },
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -22,6 +22,12 @@ export class WebhookGuard implements CanActivate {
     const requestIp = this.parseIp(request);
 
     this.logger.info(`request ip: ${requestIp}`);
+
+    const webhookIps = [
+      ...flakPay.webhookIps,
+      ...ismart.webhookIps,
+      ...paynpro.webhookIps,
+    ];
 
     if (!webhookIps.includes(requestIp)) {
       throw new ForbiddenException("Invalid IP address");

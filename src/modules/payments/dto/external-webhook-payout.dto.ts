@@ -116,3 +116,22 @@ export class ExternalPayOutWebhookPayNProDto {
   @IsString()
   RRN: string;
 }
+
+export class ExternalPayOutWebhookFlakPayDto {
+  @ApiProperty()
+  @IsString()
+  orderId: string;
+
+  @ApiProperty()
+  @IsString()
+  status: string;
+
+  @ApiProperty()
+  @IsString()
+  transferId: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+}

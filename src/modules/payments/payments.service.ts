@@ -18,17 +18,16 @@ import {
   MoreThanOrEqual,
   Repository,
 } from "typeorm";
-import { JwtService } from "@nestjs/jwt";
 import {
-  CreatePayinTransactionAnviNeoDto,
+  CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionIsmartDto,
   PayinStatusDto,
 } from "./dto/create-payin-payment.dto";
 import {
-  CreatePayoutIsmartDto,
+  CreatePayoutDto,
   PayoutStatusDto,
 } from "./dto/create-payout-payment.dto";
-import { ExternalPayOutWebhookPayNProDto } from "./dto/external-webhook-payout.dto";
+import { ExternalPayOutWebhookFlakPayDto } from "./dto/external-webhook-payout.dto";
 import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
@@ -47,38 +46,34 @@ import {
   convertExternalPaymentStatusToInternal,
   getUlidId,
 } from "@/utils/helperFunctions.utils";
-import { ANVITAPAY, ISMART_PAY } from "@/constants/external-api.constant";
+import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { getCommissions } from "@/utils/commissions.utils";
 import {
-  IExternalPayinPaymentRequestAnviNeo,
+  IExternalPayinPaymentRequestFlakPay,
   IExternalPayinPaymentRequestIsmart,
-  IExternalPayinPaymentResponseAnviNeo,
+  IExternalPayinPaymentResponseFlakPay,
   IExternalPayinPaymentResponseIsmart,
+  IExternalPayoutRequestFlakPay,
   IExternalPayoutRequestIsmart,
+  IExternalPayoutResponseFlakPay,
   IExternalPayoutResponseIsmart,
+  IExternalPayoutStatusResponseFlakPay,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
 import { ID_TYPE, USERS_ROLE } from "@/enums";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
+import {
+  getFlakPayPgConfig,
+  getIsmartPayPgConfig,
+} from "@/utils/pg-config.utils";
 
-const {
-  beBaseUrl,
-  jwtConfig: { paymentLinkSecret },
-  externalPaymentConfig: { clientId, clientSecret },
-} = appConfig();
+const { beBaseUrl, externalPaymentConfig } = appConfig();
 
 @Injectable()
 export class PaymentsService {
   private readonly logger = new CustomLogger(PaymentsService.name);
-  private readonly axiosService = new AxiosService(ISMART_PAY.BASE_URL, {
-    headers: {
-      "Content-Type": "application/json",
-      mid: clientId,
-      key: clientSecret,
-    },
-  });
 
   constructor(
     @InjectRepository(TransactionsEntity)
@@ -92,141 +87,22 @@ export class PaymentsService {
     @InjectRepository(SettlementsEntity)
     private readonly settlementRepository: Repository<SettlementsEntity>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    private readonly jwtService: JwtService,
 
     private readonly dataSource: DataSource,
   ) {}
-
-  async createTransactionPayinAnviNeo(
-    createPayinTransactionDto: CreatePayinTransactionAnviNeoDto,
-    user: UsersEntity,
-  ) {
-    const queryRunner = this.dataSource.createQueryRunner();
-
-    // Start transaction
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const existingOrder = await this.payInOrdersRepository.exists({
-        where: {
-          orderId: createPayinTransactionDto.orderId,
-        },
-      });
-
-      if (existingOrder) {
-        throw new BadRequestException(
-          new MessageResponseDto(
-            "Payin Order id already exists. Please with different order id.",
-          ),
-        );
-      }
-      const wallet = await this.walletRepository.findOne({
-        where: {
-          user: {
-            id: user.id,
-          },
-        },
-        relations: {
-          user: true,
-        },
-      });
-
-      if (!wallet) {
-        await queryRunner.manager.save(
-          this.walletRepository.create({
-            user,
-          }),
-        );
-      }
-
-      // 1. create pay-in order
-      const payinOrder = this.payInOrdersRepository.create({
-        user,
-        ...createPayinTransactionDto,
-      });
-
-      // 2. save pay-in order
-      const savedPayinOrder = await queryRunner.manager.save(payinOrder);
-
-      // 3. create transaction
-      const transaction = this.transactionsRepository.create({
-        user,
-        payInOrder: savedPayinOrder,
-        transactionType: PAYMENT_TYPE.PAYIN,
-      });
-
-      // 4. save transaction
-      const savedTransaction = await queryRunner.manager.save(transaction);
-
-      this.logger.info(
-        `PAYIN - createTransaction - transaction: ${LoggerPlaceHolder.Json}`,
-        savedTransaction,
-      );
-
-      // 5. create external payment
-      const payload: IExternalPayinPaymentRequestAnviNeo = {
-        amount: createPayinTransactionDto.amount.toFixed(2),
-        ref_no: createPayinTransactionDto.orderId,
-        customer_email: createPayinTransactionDto.email,
-        customer_mobile: createPayinTransactionDto.mobile,
-        customer_name: createPayinTransactionDto.name,
-      };
-
-      this.logger.info(
-        `PAYIN - calling external (${ANVITAPAY.PAYIN}) API with payload: ${LoggerPlaceHolder.Json}`,
-        payload,
-      );
-
-      const externalPaymentResponse =
-        await this.axiosService.postRequest<IExternalPayinPaymentResponseAnviNeo>(
-          ANVITAPAY.PAYIN,
-          payload,
-        );
-
-      this.logger.info(
-        `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
-        externalPaymentResponse,
-      );
-
-      if (externalPaymentResponse.res_code !== "101") {
-        throw new BadRequestException(externalPaymentResponse.msg);
-      }
-      // 6. save external payment
-      const savedOrder = await queryRunner.manager.save(
-        this.payInOrdersRepository.create({
-          ...savedPayinOrder,
-          intent: externalPaymentResponse.data.qr,
-          mobile: createPayinTransactionDto.mobile,
-        }),
-      );
-
-      await queryRunner.commitTransaction();
-
-      return {
-        orderId: createPayinTransactionDto.orderId,
-        intent: externalPaymentResponse.data.qr,
-      };
-
-      // Commit transaction
-    } catch (err: any) {
-      this.logger.error(
-        `PAYIN - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
-        err,
-      );
-      // Rollback transaction if any operation fails
-      await queryRunner.rollbackTransaction();
-      throw new BadRequestException(err.message);
-    } finally {
-      // Release the queryRunner to avoid memory leaks
-      await queryRunner.release();
-    }
-  }
 
   async createTransactionPayinIsmart(
     createPayinTransactionDto: CreatePayinTransactionIsmartDto,
     user: UsersEntity,
   ) {
+    const axiosServiceIsmart = new AxiosService(
+      ISMART_PAY.BASE_URL,
+      getIsmartPayPgConfig({
+        clientId: externalPaymentConfig.ismart.clientId,
+        clientSecret: externalPaymentConfig.ismart.clientSecret,
+      }),
+    );
+
     const { amount, email, mobile, name, orderId, vpa } =
       createPayinTransactionDto;
     const queryRunner = this.dataSource.createQueryRunner();
@@ -330,7 +206,7 @@ export class PaymentsService {
         | undefined;
       try {
         externalPaymentResponse =
-          await this.axiosService.postRequest<IExternalPayinPaymentResponseIsmart>(
+          await axiosServiceIsmart.postRequest<IExternalPayinPaymentResponseIsmart>(
             ISMART_PAY.PAYIN,
             payload,
           );
@@ -428,7 +304,7 @@ export class PaymentsService {
         ...(externalPaymentResponse?.intent && {
           intent: externalPaymentResponse?.intent,
         }),
-        paymentLink: externalPaymentResponse?.payment_url,
+        // paymentLink: externalPaymentResponse?.payment_url,
       };
 
       // Commit transaction
@@ -446,10 +322,168 @@ export class PaymentsService {
     }
   }
 
-  async createPayoutIsmart(
-    createPayoutIsmartDto: CreatePayoutIsmartDto,
+  async createTransactionPayinFlakPay(
+    createPayinTransactionDto: CreatePayinTransactionFlaPayDto,
     user: UsersEntity,
   ) {
+    const axiosServiceFlakPay = new AxiosService(
+      FALKPAY.BASE_URL,
+      getFlakPayPgConfig({
+        clientId: externalPaymentConfig.flakPay.clientId,
+        clientSecret: externalPaymentConfig.flakPay.clientSecret,
+      }),
+    );
+
+    const { amount, email, mobile, name, orderId } = createPayinTransactionDto;
+
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    // Start transaction
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+        amount,
+        commissionInPercentage: user.commissionInPercentagePayin,
+        gstInPercentage: user.gstInPercentagePayin,
+      });
+      // 1. create pay-in order
+      const payinOrder = this.payInOrdersRepository.create({
+        user,
+        amount,
+        email,
+        name,
+        mobile,
+        commissionAmount,
+        gstAmount,
+        netPayableAmount,
+        orderId,
+      });
+
+      // 2. save pay-in order
+      const savedPayinOrder = await queryRunner.manager.save(payinOrder);
+
+      // 3. create transaction
+      const transaction = this.transactionsRepository.create({
+        user,
+        payInOrder: savedPayinOrder,
+        transactionType: PAYMENT_TYPE.PAYIN,
+      });
+
+      // 4. save transaction
+      await queryRunner.manager.save(transaction);
+
+      // this.logger.info(
+      //   `PAYIN - createTransaction - transaction: ${LoggerPlaceHolder.Json}`,
+      //   savedTransaction,
+      // );
+
+      const [firstName, lastName = " "] =
+        createPayinTransactionDto.name.split(" ");
+
+      const frontendUrl = `https://dash.${new URL(beBaseUrl).host.replace("api.", "")}`;
+
+      // 5. create external payment
+      const payload: IExternalPayinPaymentRequestFlakPay = {
+        amount: +createPayinTransactionDto.amount.toFixed(2),
+        email: createPayinTransactionDto.email,
+        phone: createPayinTransactionDto.mobile,
+        firstName,
+        lastName,
+        orderId,
+        pgReturnSuccessUrl: frontendUrl,
+        pgReturnErrorUrl: frontendUrl,
+      };
+
+      this.logger.info(
+        `PAYIN - calling external (${FALKPAY.BASE_URL}${FALKPAY.PAYIN.LIVE}) API with payload: ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
+
+      const externalPaymentResponse =
+        await axiosServiceFlakPay.postRequest<IExternalPayinPaymentResponseFlakPay>(
+          FALKPAY.PAYIN.LIVE,
+          payload,
+        );
+
+      this.logger.info(
+        `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
+        externalPaymentResponse,
+      );
+
+      if (!externalPaymentResponse) {
+        throw new BadRequestException(
+          new MessageResponseDto("Something went wrong"),
+        );
+      }
+
+      if (!externalPaymentResponse.success) {
+        this.logger.error(
+          `PAYIN - createTransaction - ERROR: ${externalPaymentResponse?.statusCode} ${externalPaymentResponse?.message}`,
+        );
+        throw new BadRequestException(
+          externalPaymentResponse.message || "Something went wrong",
+        );
+      }
+
+      // 6. save external payment
+      await queryRunner.manager.save(
+        this.payInOrdersRepository.create({
+          ...savedPayinOrder,
+          ...(externalPaymentResponse?.data?.paymentUrl && {
+            intent: externalPaymentResponse?.data?.paymentUrl,
+          }),
+          txnRefId: externalPaymentResponse.data.txnRefId,
+        }),
+      );
+
+      if (!externalPaymentResponse?.data?.paymentUrl?.trim()) {
+        throw new BadRequestException(
+          new MessageResponseDto("Something went wrong"),
+        );
+      }
+
+      this.logger.info(
+        `PAYIN - createTransaction - Created transaction successfully`,
+      );
+
+      // Commit transaction
+      await queryRunner.commitTransaction();
+
+      return {
+        orderId: externalPaymentResponse?.data?.orderId,
+        ...(externalPaymentResponse?.data?.paymentUrl && {
+          intent: externalPaymentResponse?.data?.paymentUrl,
+        }),
+        message: "Payin created successfully",
+      };
+    } catch (err: any) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
+        err,
+      );
+      // Rollback transaction if any operation fails
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      // Release the queryRunner to avoid memory leaks
+      await queryRunner.release();
+    }
+  }
+
+  async createPayoutIsmart(
+    createPayoutIsmartDto: CreatePayoutDto,
+    user: UsersEntity,
+  ) {
+    const axiosServiceIsmart = new AxiosService(
+      ISMART_PAY.BASE_URL,
+      getIsmartPayPgConfig({
+        clientId: externalPaymentConfig.ismart.clientId,
+        clientSecret: externalPaymentConfig.ismart.clientSecret,
+      }),
+    );
+
     const queryRunner = this.dataSource.createQueryRunner();
 
     // Start transaction
@@ -549,7 +583,7 @@ export class PaymentsService {
           },
         };
 
-        return this.axiosService.postRequest<IExternalPayoutResponseIsmart>(
+        return axiosServiceIsmart.postRequest<IExternalPayoutResponseIsmart>(
           ISMART_PAY.PAYOUT,
           payload,
         );
@@ -592,6 +626,171 @@ export class PaymentsService {
       return {
         message: "Payout created successfully",
         data: externalPayoutResponses,
+      };
+    } catch (err: any) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
+        err,
+      );
+      // Rollback transaction if any operation fails
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      // Release the queryRunner to avoid memory leaks
+      await queryRunner.release();
+    }
+  }
+
+  async createPayoutFlakPay(
+    createPayoutDto: CreatePayoutDto,
+    user: UsersEntity,
+  ) {
+    const axiosServiceFlakPay = new AxiosService(
+      FALKPAY.BASE_URL,
+      getFlakPayPgConfig({
+        clientId: externalPaymentConfig.flakPay.clientId,
+        clientSecret: externalPaymentConfig.flakPay.clientSecret,
+      }),
+    );
+
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    // Start transaction
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const { data } = createPayoutDto;
+      if (data.length > 100) {
+        throw new BadRequestException("Maximum 100 payouts allowed");
+      }
+
+      const totalAmount = data.reduce((acc, curr) => {
+        if (curr.amount <= 0) {
+          throw new BadRequestException("Amount should be greater than 0");
+        }
+
+        return acc + +curr.amount;
+      }, 0);
+
+      let userWallet = await this.walletRepository.findOne({
+        where: {
+          user: {
+            id: user.id,
+          },
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (!userWallet) {
+        userWallet = await queryRunner.manager.save(
+          this.walletRepository.create({
+            user,
+          }),
+        );
+      }
+
+      const { totalServiceChange } = getCommissions({
+        amount: totalAmount,
+        commissionInPercentage: user.commissionInPercentagePayout,
+        gstInPercentage: user.gstInPercentagePayout,
+      });
+
+      const grossTotalAmount = totalAmount + totalServiceChange;
+
+      if (grossTotalAmount > +userWallet.availablePayoutBalance) {
+        throw new BadRequestException(
+          `Insufficient balance. Gross Total Amount: ${grossTotalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
+        );
+      }
+
+      await queryRunner.manager.save(
+        this.walletRepository.create({
+          id: userWallet.id,
+          availablePayoutBalance:
+            +userWallet.availablePayoutBalance - grossTotalAmount,
+          totalPayout: +userWallet.totalPayout + totalAmount,
+          payoutServiceCharge:
+            +userWallet.payoutServiceCharge + totalServiceChange,
+        }),
+      );
+
+      const orderIds: string[] = [];
+
+      for await (const payment of data) {
+        const commissions = getCommissions({
+          amount: +payment.amount,
+          commissionInPercentage: user.commissionInPercentagePayout,
+          gstInPercentage: user.gstInPercentagePayout,
+        });
+
+        const payOutOrder = await queryRunner.manager.save(
+          this.payOutOrdersRepository.create({
+            amount: +payment.amount,
+            transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
+            orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
+            user,
+            commissionAmount: +commissions.commissionAmount,
+            commissionInPercentage: +user.commissionInPercentagePayout,
+            gstAmount: +commissions.gstAmount,
+            gstInPercentage: +user.gstInPercentagePayout,
+            netPayableAmount: +commissions.netPayableAmount,
+          }),
+        );
+
+        await queryRunner.manager.save(
+          this.transactionsRepository.create({
+            user,
+            payOutOrder,
+            transactionType: PAYMENT_TYPE.PAYOUT,
+          }),
+        );
+
+        orderIds.push(payOutOrder.orderId);
+
+        const payload: IExternalPayoutRequestFlakPay = {
+          amount: +payment.amount,
+          orderId: payOutOrder.orderId,
+          transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
+          beneDetails: {
+            beneBankName: payment.beneficiaryName,
+            beneAccountNo: payment.accountNumber,
+            beneIfsc: payment.ifscCode,
+            beneName: payment.beneficiaryName,
+          },
+        };
+
+        this.logger.info(
+          `Preparing to create payout with payload: ${LoggerPlaceHolder.Json}`,
+          payload,
+        );
+
+        axiosServiceFlakPay
+          .postRequest<IExternalPayoutResponseFlakPay>(
+            FALKPAY.PAYOUT.LIVE,
+            payload,
+          )
+          .then((res) => {
+            res.data["orderId"] = payOutOrder.orderId;
+            this.logger.info(
+              `Payout created successfully ${payOutOrder.orderId} with response: ${LoggerPlaceHolder.Json}`,
+              res,
+            );
+          })
+          .catch((err) => {
+            this.logger.error(
+              `Payout creation failed ${payOutOrder.orderId} with error: ${LoggerPlaceHolder.Json}`,
+              err,
+            );
+          });
+      }
+
+      await queryRunner.commitTransaction();
+
+      return {
+        message: "Payout created successfully",
       };
     } catch (err: any) {
       this.logger.error(
@@ -822,7 +1021,7 @@ export class PaymentsService {
     };
   }
 
-  async checkPayOutStatusTransaction({ orderId }: PayoutStatusDto) {
+  async checkPayOutStatusTransactionFlakPay({ orderId }: PayoutStatusDto) {
     const payoutOrder = await this.payOutOrdersRepository.findOne({
       where: { orderId },
     });
@@ -833,10 +1032,45 @@ export class PaymentsService {
       );
     }
 
+    if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
+      return {
+        orderId: payoutOrder.orderId,
+        status: payoutOrder.status,
+        transferId: payoutOrder.transferId,
+      };
+    }
+
+    // call api
+
+    const axiosServiceFlakPay = new AxiosService(
+      FALKPAY.BASE_URL,
+      getFlakPayPgConfig({
+        clientId: externalPaymentConfig.flakPay.clientId,
+        clientSecret: externalPaymentConfig.flakPay.clientSecret,
+      }),
+    );
+
+    const flakPayResponse =
+      await axiosServiceFlakPay.postRequest<IExternalPayoutStatusResponseFlakPay>(
+        FALKPAY.PAYOUT.STATUS_CHECK,
+        {
+          orderId,
+        },
+      );
+
+    // update payout order
+    await this.payOutOrdersRepository.update(
+      { orderId },
+      {
+        status: flakPayResponse.data.status,
+        transferId: flakPayResponse.data.transferId,
+      },
+    );
+
     return {
       orderId: payoutOrder.orderId,
-      status: payoutOrder.status,
-      transferId: payoutOrder.transferId,
+      status: flakPayResponse.data.status,
+      transferId: flakPayResponse.data.transferId,
     };
   }
 
@@ -1113,12 +1347,12 @@ export class PaymentsService {
   //   return new MessageResponseDto("Transaction status updated successfully.");
   // }
 
-  async externalWebhookPayout({
-    STATUS: status_code,
-    PAYOUT_REF: order_id,
-    TXN_ID: transaction_id,
-    AMOUNT: amount,
-  }: ExternalPayOutWebhookPayNProDto) {
+  async externalWebhookPayoutFlaPay({
+    status: status_code,
+    orderId: order_id,
+    transferId: transaction_id,
+    amount,
+  }: ExternalPayOutWebhookFlakPayDto) {
     const status = convertExternalPaymentStatusToInternal(
       status_code.toUpperCase(),
     );
@@ -1130,91 +1364,207 @@ export class PaymentsService {
       AMOUNT: amount,
     });
 
-    const settlement = await this.settlementRepository.findOne({
-      where: {
-        id: order_id,
-      },
-      relations: {
-        user: true,
-      },
-    });
+    const [idPrefix] = order_id.split("_");
 
-    if (!settlement) {
-      throw new BadRequestException(
-        new MessageResponseDto("No Settlement Found"),
-      );
-    }
+    const isSettlement = idPrefix === ID_TYPE.SETTLEMENT_PAYOUT;
 
-    if (settlement.status === status) {
-      throw new BadRequestException(
-        new MessageResponseDto(
-          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
-        ),
-      );
-    }
-
-    if (status === PAYMENT_STATUS.SUCCESS) {
-      const settlementRaw = this.settlementRepository.create({
-        id: order_id,
-        status,
-        successAt: new Date(),
-        transferId: transaction_id,
-      });
-
-      await this.settlementRepository.save(settlementRaw);
-    }
-
-    if (status === PAYMENT_STATUS.FAILED) {
-      const settlementRaw = this.settlementRepository.create({
-        id: order_id,
-        status,
-        failureAt: new Date(),
-        transferId: transaction_id,
-      });
-
-      await this.settlementRepository.save(settlementRaw);
-
-      const userId = settlement.user.id;
-
-      const wallet = await this.walletRepository.findOne({
+    if (isSettlement) {
+      const settlement = await this.settlementRepository.findOne({
         where: {
-          user: {
-            id: userId,
-          },
+          id: order_id,
         },
         relations: {
           user: true,
         },
       });
 
-      const { commissionInPercentagePayin, gstInPercentagePayin } = wallet.user;
+      if (!settlement) {
+        throw new BadRequestException(
+          new MessageResponseDto("No Settlement Found"),
+        );
+      }
 
-      const { totalCollections, unsettledAmount } = wallet ?? {};
+      if (settlement.status === status) {
+        this.logger.info(
+          `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
+        );
 
-      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
-        amount: +amount,
-        commissionInPercentage: +commissionInPercentagePayin,
-        gstInPercentage: +gstInPercentagePayin,
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+        );
+      }
+
+      if (status === PAYMENT_STATUS.SUCCESS) {
+        const settlementRaw = this.settlementRepository.create({
+          id: order_id,
+          status,
+          successAt: new Date(),
+          transferId: transaction_id,
+        });
+
+        await this.settlementRepository.save(settlementRaw);
+      }
+
+      if (status === PAYMENT_STATUS.FAILED) {
+        const settlementRaw = this.settlementRepository.create({
+          id: order_id,
+          status,
+          failureAt: new Date(),
+          transferId: transaction_id,
+        });
+
+        await this.settlementRepository.save(settlementRaw);
+
+        const userId = settlement.user.id;
+
+        const wallet = await this.walletRepository.findOne({
+          where: {
+            user: {
+              id: userId,
+            },
+          },
+          relations: {
+            user: true,
+          },
+        });
+
+        const { commissionInPercentagePayin, gstInPercentagePayin } =
+          wallet.user;
+
+        const { totalCollections, unsettledAmount } = wallet ?? {};
+
+        const { commissionAmount, gstAmount, netPayableAmount } =
+          getCommissions({
+            amount: +amount,
+            commissionInPercentage: +commissionInPercentagePayin,
+            gstInPercentage: +gstInPercentagePayin,
+          });
+
+        const walletRaw = this.walletRepository.create({
+          ...(wallet?.id && { id: wallet.id }),
+          totalCollections:
+            (totalCollections ? +totalCollections : 0) + +amount,
+          unsettledAmount: (unsettledAmount ? +unsettledAmount : 0) + +amount,
+          commissionAmount:
+            (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
+            +commissionAmount,
+          gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
+          netPayableAmount:
+            (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
+            +netPayableAmount,
+          user: wallet.user,
+        });
+
+        await this.walletRepository.save(walletRaw);
+      }
+
+      return new MessageResponseDto("Transaction status updated successfully.");
+    } else {
+      const payOutOrder = await this.payOutOrdersRepository.findOne({
+        where: {
+          orderId: order_id,
+        },
+        relations: ["user"],
       });
 
-      const walletRaw = this.walletRepository.create({
-        ...(wallet?.id && { id: wallet.id }),
-        totalCollections: (totalCollections ? +totalCollections : 0) + +amount,
-        unsettledAmount: (unsettledAmount ? +unsettledAmount : 0) + +amount,
-        commissionAmount:
-          (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
-          +commissionAmount,
-        gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
-        netPayableAmount:
-          (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
-          +netPayableAmount,
-        user: wallet.user,
-      });
+      if (!payOutOrder) {
+        throw new NotFoundException(
+          new MessageResponseDto("Payin order not found"),
+        );
+      }
 
-      await this.walletRepository.save(walletRaw);
+      if (payOutOrder.status === status) {
+        this.logger.info(
+          `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
+        );
+
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+        );
+      }
+
+      if (status === PAYMENT_STATUS.SUCCESS) {
+        const payOutOrderRaw = this.payOutOrdersRepository.create({
+          id: payOutOrder.id,
+          status,
+          successAt: new Date(),
+          transferId: transaction_id,
+        });
+
+        await this.payOutOrdersRepository.save(payOutOrderRaw);
+      }
+
+      if (status === PAYMENT_STATUS.FAILED) {
+        const payOutOrderRaw = this.payOutOrdersRepository.create({
+          id: payOutOrder.id,
+          status,
+          failureAt: new Date(),
+          transferId: transaction_id,
+        });
+
+        await this.payOutOrdersRepository.save(payOutOrderRaw);
+
+        const wallet = await this.walletRepository.findOne({
+          where: {
+            user: {
+              id: payOutOrder.user.id,
+            },
+          },
+          relations: {
+            user: true,
+          },
+        });
+
+        const commissionRate = +wallet.user.commissionInPercentagePayout / 100;
+        const gstRate =
+          (commissionRate * +wallet.user.gstInPercentagePayout) / 100;
+
+        const totalDeductionRate = commissionRate + gstRate;
+
+        if (totalDeductionRate >= 1) {
+          throw new BadRequestException(
+            "Invalid rates: Total deduction cannot be equal or greater than 1.",
+          );
+        }
+        const actualAmount = +amount / (1 + totalDeductionRate / 100);
+        const serviceCharge = +amount - actualAmount;
+
+        // update wallet
+        await this.walletRepository.save(
+          this.walletRepository.create({
+            id: wallet.id,
+            availablePayoutBalance: +wallet.availablePayoutBalance + amount, // 600
+            totalPayout: +wallet.totalPayout - +actualAmount, // 500
+            payoutServiceCharge: +wallet.payoutServiceCharge + serviceCharge, // 100
+          }),
+        );
+      }
+
+      // send webhook
+      if (payOutOrder.user.payOutWebhookUrl) {
+        axios
+          .post(payOutOrder.user.payOutWebhookUrl, {
+            orderId: order_id,
+            status,
+            amount,
+            txnRefId: transaction_id,
+          })
+          .then(() => {
+            this.logger.info(
+              `PAYOUT - User webhook (${payOutOrder.user.payOutWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
+              payOutOrder,
+            );
+          })
+          .catch((err) => {
+            this.logger.error(
+              `PAYOUT - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+              err,
+            );
+          });
+      }
+
+      return new MessageResponseDto("Payout status updated successfully.");
     }
-
-    return new MessageResponseDto("Transaction status updated successfully.");
   }
 
   async getTransactionsDetails(

@@ -29,3 +29,15 @@ export const PAYNPRO = {
     BALANCE: "payout/v1/fetchBalance",
   },
 };
+
+export const FALKPAY = {
+  BASE_URL: "https://api.flakpay.com",
+  PAYIN: {
+    LIVE: "fundsweep-payin-svc/api/v1/payin/ext/txn/initiate-intent",
+    STATUS_CHECK: "fundsweep-payin-svc/api/v1/payin/ext/txn/status",
+  },
+  PAYOUT: {
+    LIVE: "digi-payout/api/v1/external/payout/ft",
+    STATUS_CHECK: "digi-payout/api/v1/external/transaction-status",
+  },
+};

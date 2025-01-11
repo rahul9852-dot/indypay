@@ -43,9 +43,30 @@ export const appConfig = registerAs("appConfig", () => ({
   },
 
   externalPaymentConfig: {
-    clientId: getOsEnv("EXTERNAL_PAYMENT_CLIENT_ID"),
-    clientSecret: getOsEnv("EXTERNAL_PAYMENT_CLIENT_SECRET"),
-    webhookIps: getOsEnv("EXTERNAL_PAYMENT_WEBHOOK_IPS").split(","),
+    ismart: {
+      clientId: getOsEnv("ISMART_PAYMENT_CLIENT_ID"),
+      clientSecret: getOsEnv("ISMART_PAYMENT_CLIENT_SECRET"),
+      webhookIps: getOsEnv("ISMART_PAYMENT_WEBHOOK_IPS").split(","),
+    },
+    flakPay: {
+      clientId: getOsEnv("FLAKPAY_PAYMENT_CLIENT_ID"),
+      clientSecret: getOsEnv("FLAKPAY_PAYMENT_CLIENT_SECRET"),
+      webhookIps: getOsEnv("FLAKPAY_PAYMENT_WEBHOOK_IPS").split(","),
+    },
+    paynpro: {
+      payin: {
+        clientId: getOsEnv("PAYNPRO_PAYIN_PAYMENT_CLIENT_ID"),
+        clientSecret: getOsEnv("PAYNPRO_PAYIN_PAYMENT_CLIENT_SECRET"),
+        encryptionSalt: getOsEnv("PAYNPRO_PAYIN_PAYMENT_ENCRYPTION_SALT"),
+        aesSecretKey: getOsEnv("PAYNPRO_PAYIN_PAYMENT_AES_SECRET_KEY"),
+      },
+      payout: {
+        clientId: getOsEnv("PAYNPRO_PAYOUT_PAYMENT_CLIENT_ID"),
+        clientSecret: getOsEnv("PAYNPRO_PAYOUT_PAYMENT_CLIENT_SECRET"),
+        signature: getOsEnv("PAYNPRO_PAYOUT_PAYMENT_SIGNATURE"),
+      },
+      webhookIps: getOsEnv("PAYNPRO_PAYMENT_WEBHOOK_IPS").split(","),
+    },
   },
   transactionConfig: {
     commissionInPercentagePayIn:

@@ -121,3 +121,35 @@ export class CreatePayinPaymentResponseDto {
   @ApiResponseProperty()
   qr: string;
 }
+
+// flakpay
+
+export class CreatePayinTransactionFlaPayDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
+  @ApiProperty()
+  @IsNumber({
+    maxDecimalPlaces: 2,
+  })
+  @IsPositive()
+  amount: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty()
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty()
+  @IsNumberString()
+  @IsNotEmpty()
+  @Length(10, 10)
+  mobile: string;
+}

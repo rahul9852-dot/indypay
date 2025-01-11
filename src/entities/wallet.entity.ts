@@ -64,6 +64,30 @@ export class WalletEntity {
   })
   netPayableAmount: number;
 
+  @Column({
+    type: "numeric",
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  availablePayoutBalance: number;
+
+  @Column({
+    type: "numeric",
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  totalPayout: number;
+
+  @Column({
+    type: "numeric",
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  payoutServiceCharge: number;
+
   // Relations
   @OneToOne(() => UsersEntity, ({ wallet }) => wallet, {
     onDelete: "CASCADE",

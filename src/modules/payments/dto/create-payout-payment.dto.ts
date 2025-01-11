@@ -93,7 +93,7 @@ export class CreatePayoutPaymentResponseDto {
 
 // Ismart
 
-export class SinglePayoutIsmartDto {
+export class SinglePayoutDto {
   @ApiProperty()
   @IsNumber()
   @IsPositive()
@@ -130,13 +130,13 @@ export class SinglePayoutIsmartDto {
   @IsOptional()
   paymentMode?: PAYOUT_PAYMENT_MODE;
 }
-export class CreatePayoutIsmartDto {
+export class CreatePayoutDto {
   @ApiProperty({
-    type: [SinglePayoutIsmartDto],
+    type: [SinglePayoutDto],
     description: "Array of payout data",
   })
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => SinglePayoutIsmartDto)
-  data: SinglePayoutIsmartDto[];
+  @Type(() => SinglePayoutDto)
+  data: SinglePayoutDto[];
 }

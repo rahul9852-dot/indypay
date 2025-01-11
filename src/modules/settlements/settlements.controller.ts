@@ -61,7 +61,7 @@ export class SettlementsController {
     @Body() initiateSettlementAdminDto: InitiateSettlementAdminDto,
     @User() user: UsersEntity,
   ) {
-    return this.settlementsService.initiateSettlementIsmart(
+    return this.settlementsService.initiateSettlementFalkPay(
       initiateSettlementAdminDto,
       user,
     );
