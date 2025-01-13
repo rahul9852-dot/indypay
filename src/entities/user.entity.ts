@@ -174,5 +174,6 @@ export class UsersEntity {
   @BeforeInsert()
   beforeInsertHook() {
     this.id = getUlidId(ID_TYPE.USER);
+    this.fullName = `${this.firstName} ${this.lastName}`;
   }
 }
