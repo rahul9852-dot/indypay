@@ -281,7 +281,7 @@ export class PayoutService {
         pagination,
       };
     } else {
-      const { todayCollections, todaySuccess, todayFailed } =
+      const { todayPayouts, todaySuccess, todayFailed } =
         await this.calculateStats(userId, {
           startDate,
           endDate,
@@ -291,7 +291,7 @@ export class PayoutService {
         data: collections,
         pagination,
         stats: {
-          totalPayouts: +todayCollections,
+          totalPayouts: +todayPayouts,
           totalSuccess: +todaySuccess,
           totalFailed: +todayFailed,
         },
@@ -303,7 +303,7 @@ export class PayoutService {
     userId: string,
     { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
   ) {
-    const todayCollectionsPromise = this.payoutRepository.sum("amount", {
+    const todayPayoutsPromise = this.payoutRepository.sum("amount", {
       createdAt: Between(new Date(startDate), new Date(endDate)),
       user: { id: userId },
     });
@@ -320,14 +320,14 @@ export class PayoutService {
       user: { id: userId },
     });
 
-    const [todayCollections, todaySuccess, todayFailed] = await Promise.all([
-      todayCollectionsPromise,
+    const [todayPayouts, todaySuccess, todayFailed] = await Promise.all([
+      todayPayoutsPromise,
       todaySuccessPromise,
       todayFailedPromise,
     ]);
 
     return {
-      todayCollections: +todayCollections,
+      todayPayouts: +todayPayouts,
       todaySuccess: +todaySuccess,
       todayFailed: +todayFailed,
     };

@@ -14,6 +14,7 @@ import {
 } from "typeorm";
 import { UsersEntity } from "@/entities/user.entity";
 import {
+  DateDto,
   MessageResponseDto,
   PaginationDto,
   PaginationWithDateDto,
@@ -30,6 +31,8 @@ import { IExternalPayoutStatusResponseIsmart } from "@/interface/external-api.in
 import { ISMART_PAY } from "@/constants/external-api.constant";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { getIsmartPayPgConfig } from "@/utils/pg-config.utils";
+import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
+import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 
 const { externalPaymentConfig } = appConfig();
 
@@ -40,6 +43,8 @@ export class ChannelPartnersService {
     private readonly usersRepository: Repository<UsersEntity>,
     @InjectRepository(PayInOrdersEntity)
     private readonly payInOrdersRepository: Repository<PayInOrdersEntity>,
+    @InjectRepository(PayOutOrdersEntity)
+    private readonly payOutOrdersRepository: Repository<PayOutOrdersEntity>,
     @InjectRepository(SettlementsEntity)
     private readonly settlementsRepository: Repository<SettlementsEntity>,
   ) {}
@@ -271,34 +276,45 @@ export class ChannelPartnersService {
     });
   }
 
-  async getStatsForCP(cpId: string) {
-    const [payinStats, settlementStats] = await Promise.all([
+  async getStatsForCP(
+    cpId: string,
+    { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
+  ) {
+    const [payinStats, settlementStats, payoutStats] = await Promise.all([
       // PayIn Stats
       Promise.all([
         this.payInOrdersRepository.sum("amount", {
           user: { channelPartnerId: cpId },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
         this.payInOrdersRepository.count({
-          where: { user: { channelPartnerId: cpId } },
+          where: {
+            user: { channelPartnerId: cpId },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
+          },
         }),
         this.payInOrdersRepository.sum("amount", {
           status: PAYMENT_STATUS.SUCCESS,
           user: { channelPartnerId: cpId },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
         this.payInOrdersRepository.count({
           where: {
             status: PAYMENT_STATUS.SUCCESS,
             user: { channelPartnerId: cpId },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
           },
         }),
         this.payInOrdersRepository.sum("amount", {
           status: PAYMENT_STATUS.FAILED,
           user: { channelPartnerId: cpId },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
         this.payInOrdersRepository.count({
           where: {
             status: PAYMENT_STATUS.FAILED,
             user: { channelPartnerId: cpId },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
           },
         }),
       ]),
@@ -306,30 +322,73 @@ export class ChannelPartnersService {
       Promise.all([
         this.settlementsRepository.sum("amount", {
           user: { channelPartnerId: cpId },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
         this.settlementsRepository.count({
           where: {
             user: { channelPartnerId: cpId },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
           },
         }),
         this.settlementsRepository.sum("amount", {
           status: PAYMENT_STATUS.SUCCESS,
           user: { channelPartnerId: cpId },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
         this.settlementsRepository.count({
           where: {
             status: PAYMENT_STATUS.SUCCESS,
             user: { channelPartnerId: cpId },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
           },
         }),
         this.settlementsRepository.sum("amount", {
           status: PAYMENT_STATUS.FAILED,
           user: { channelPartnerId: cpId },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
         this.settlementsRepository.count({
           where: {
             status: PAYMENT_STATUS.FAILED,
             user: { channelPartnerId: cpId },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
+          },
+        }),
+      ]),
+      // Payout Stats
+      Promise.all([
+        this.payOutOrdersRepository.sum("amount", {
+          user: { channelPartnerId: cpId },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
+        }),
+        this.payOutOrdersRepository.count({
+          where: {
+            user: { channelPartnerId: cpId },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
+          },
+        }),
+        this.payOutOrdersRepository.sum("amount", {
+          status: PAYMENT_STATUS.SUCCESS,
+          user: { channelPartnerId: cpId },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
+        }),
+        this.payOutOrdersRepository.count({
+          where: {
+            status: PAYMENT_STATUS.SUCCESS,
+            user: { channelPartnerId: cpId },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
+          },
+        }),
+        this.payOutOrdersRepository.sum("amount", {
+          status: PAYMENT_STATUS.FAILED,
+          user: { channelPartnerId: cpId },
+          createdAt: Between(new Date(startDate), new Date(endDate)),
+        }),
+        this.payOutOrdersRepository.count({
+          where: {
+            status: PAYMENT_STATUS.FAILED,
+            user: { channelPartnerId: cpId },
+            createdAt: Between(new Date(startDate), new Date(endDate)),
           },
         }),
       ]),
@@ -353,6 +412,15 @@ export class ChannelPartnersService {
       failedSettlementCount,
     ] = settlementStats;
 
+    const [
+      initiatedPayoutAmount,
+      initiatedPayoutCount,
+      successPayoutAmount,
+      successPayoutCount,
+      failedPayoutAmount,
+      failedPayoutCount,
+    ] = payoutStats;
+
     return {
       payin: {
         totalAmount,
@@ -362,7 +430,14 @@ export class ChannelPartnersService {
         failedAmount,
         failedCount,
       },
-      payout: {},
+      payout: {
+        totalAmount: initiatedPayoutAmount,
+        totalCount: initiatedPayoutCount,
+        successAmount: successPayoutAmount,
+        successCount: successPayoutCount,
+        failedAmount: failedPayoutAmount,
+        failedCount: failedPayoutCount,
+      },
       settlement: {
         totalAmount: initiatedSettlementAmount,
         totalCount: initiatedSettlementCount,

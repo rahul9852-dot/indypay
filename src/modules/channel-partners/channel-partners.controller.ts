@@ -3,7 +3,11 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { ChannelPartnersService } from "./channel-partners.service";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
-import { PaginationDto, PaginationWithDateDto } from "@/dtos/common.dto";
+import {
+  DateDto,
+  PaginationDto,
+  PaginationWithDateDto,
+} from "@/dtos/common.dto";
 import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 
@@ -70,8 +74,8 @@ export class ChannelPartnersController {
 
   @Get("stats")
   @ApiOperation({ summary: "Get stats" })
-  async getStatsForCP(@User() { id }: UsersEntity) {
-    return this.channelPartnersService.getStatsForCP(id);
+  async getStatsForCP(@User() { id }: UsersEntity, @Query() query: DateDto) {
+    return this.channelPartnersService.getStatsForCP(id, query);
   }
 
   @Get("settlements")

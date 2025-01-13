@@ -5,12 +5,14 @@ import { TransactionsController } from "./transactions.controller";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { SettlementsEntity } from "@/entities/settlements.entity";
+import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       TransactionsEntity,
       PayInOrdersEntity,
+      PayOutOrdersEntity,
       SettlementsEntity,
     ]),
   ],
