@@ -112,6 +112,11 @@ export class SinglePayoutDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  bankName: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
   accountNumber: string;
 
   @ApiProperty()

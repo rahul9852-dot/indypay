@@ -1,5 +1,5 @@
 import { Process, Processor } from "@nestjs/bull";
-import { HttpStatus } from "@nestjs/common";
+import { BadRequestException, HttpStatus } from "@nestjs/common";
 import { Job } from "bull";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -12,6 +12,7 @@ import { IExternalPayoutResponseFlakPay } from "@/interface/external-api.interfa
 import { CustomLogger } from "@/logger";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { WalletEntity } from "@/entities/wallet.entity";
 
 const { externalPaymentConfig } = appConfig();
 
@@ -21,12 +22,14 @@ export class PayoutProcessor {
   constructor(
     @InjectRepository(PayOutOrdersEntity)
     private readonly payOutOrdersRepository: Repository<PayOutOrdersEntity>,
+    @InjectRepository(WalletEntity)
+    private readonly walletRepository: Repository<WalletEntity>,
   ) {}
 
   @Process("process-payouts")
   async handlePayouts(
     job: Job<{
-      payoutOrders: any[];
+      payoutOrders: PayOutOrdersEntity[];
       userId: string;
       batchId: string;
     }>,
@@ -59,10 +62,10 @@ export class PayoutProcessor {
               orderId: order.orderId,
               transferMode: order.transferMode,
               beneDetails: {
-                beneBankName: order.beneficiaryName,
-                beneAccountNo: order.accountNumber,
-                beneIfsc: order.ifscCode,
-                beneName: order.beneficiaryName,
+                beneBankName: order.bankName,
+                beneAccountNo: order.bankAccountNumber,
+                beneIfsc: order.bankIfsc,
+                beneName: order.name,
               },
             };
 
@@ -85,6 +88,10 @@ export class PayoutProcessor {
               response.data.status.toUpperCase(),
             );
 
+            if (status === PAYMENT_STATUS.FAILED) {
+              throw new Error(response.message || "Payout failed");
+            }
+
             await this.payOutOrdersRepository.update(
               { id: order.id },
               {
@@ -93,13 +100,7 @@ export class PayoutProcessor {
                   status,
                   successAt: new Date(),
                 }),
-                ...(status === PAYMENT_STATUS.FAILED && {
-                  status,
-                  failureAt: new Date(),
-                }),
-                ...(![PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.FAILED].includes(
-                  status,
-                ) && { status }),
+                ...(![PAYMENT_STATUS.SUCCESS].includes(status) && { status }),
               },
             );
 
@@ -109,6 +110,42 @@ export class PayoutProcessor {
               `Payout failed for order: ${order.orderId}`,
               error,
             );
+
+            const { amount } = order;
+
+            // Update wallet
+            const wallet = await this.walletRepository.findOne({
+              where: { user: { id: userId } },
+              relations: { user: true },
+            });
+
+            if (wallet) {
+              const commissionRate =
+                +wallet.user.commissionInPercentagePayout / 100;
+              const gstRate =
+                (commissionRate * +wallet.user.gstInPercentagePayout) / 100;
+
+              const totalDeductionRate = commissionRate + gstRate;
+
+              if (totalDeductionRate >= 1) {
+                throw new BadRequestException(
+                  "Invalid rates: Total deduction cannot be equal or greater than 1.",
+                );
+              }
+              const actualAmount = +amount / (1 + totalDeductionRate / 100);
+              const serviceCharge = +amount - actualAmount;
+
+              await this.walletRepository.save(
+                this.walletRepository.create({
+                  id: wallet.id,
+                  availablePayoutBalance:
+                    +wallet.availablePayoutBalance + amount,
+                  totalPayout: +wallet.totalPayout - +actualAmount,
+                  payoutServiceCharge:
+                    +wallet.payoutServiceCharge + serviceCharge,
+                }),
+              );
+            }
 
             await this.payOutOrdersRepository.update(
               { id: order.id },

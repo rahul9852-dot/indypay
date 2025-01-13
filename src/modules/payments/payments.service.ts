@@ -29,6 +29,7 @@ import {
 import {
   CreatePayoutDto,
   PayoutStatusDto,
+  SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
 import { ExternalPayOutWebhookFlakPayDto } from "./dto/external-webhook-payout.dto";
 import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
@@ -643,205 +644,6 @@ export class PaymentsService {
     }
   }
 
-  // async createPayoutFlakPay(
-  //   createPayoutDto: CreatePayoutDto,
-  //   user: UsersEntity,
-  // ) {
-  //   const axiosServiceFlakPay = new AxiosService(
-  //     FALKPAY.BASE_URL,
-  //     getFlakPayPgConfig({
-  //       clientId: externalPaymentConfig.flakPay.clientId,
-  //       clientSecret: externalPaymentConfig.flakPay.clientSecret,
-  //     }),
-  //   );
-
-  //   const queryRunner = this.dataSource.createQueryRunner();
-
-  //   // Start transaction
-  //   await queryRunner.connect();
-  //   await queryRunner.startTransaction();
-
-  //   try {
-  //     const { data } = createPayoutDto;
-  //     if (data.length > 100) {
-  //       throw new BadRequestException("Maximum 100 payouts allowed");
-  //     }
-
-  //     // Validate amounts and calculate total
-  //     const totalAmount = data.reduce((acc, curr) => {
-  //       if (curr.amount <= 0) {
-  //         throw new BadRequestException("Amount should be greater than 0");
-  //       }
-
-  //       return acc + +curr.amount;
-  //     }, 0);
-
-  //     // Check wallet balance
-  //     let userWallet = await this.walletRepository.findOne({
-  //       where: {
-  //         user: {
-  //           id: user.id,
-  //         },
-  //       },
-  //       relations: {
-  //         user: true,
-  //       },
-  //     });
-
-  //     if (!userWallet) {
-  //       userWallet = await queryRunner.manager.save(
-  //         this.walletRepository.create({
-  //           user,
-  //         }),
-  //       );
-  //     }
-
-  //     const { totalServiceChange } = getCommissions({
-  //       amount: totalAmount,
-  //       commissionInPercentage: user.commissionInPercentagePayout,
-  //       gstInPercentage: user.gstInPercentagePayout,
-  //     });
-
-  //     const grossTotalAmount = totalAmount + totalServiceChange;
-
-  //     if (grossTotalAmount > +userWallet.availablePayoutBalance) {
-  //       throw new BadRequestException(
-  //         `Insufficient balance. Gross Total Amount: ${grossTotalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
-  //       );
-  //     }
-
-  //     // Update wallet balance
-  //     await queryRunner.manager.save(
-  //       this.walletRepository.create({
-  //         id: userWallet.id,
-  //         availablePayoutBalance:
-  //           +userWallet.availablePayoutBalance - grossTotalAmount,
-  //         totalPayout: +userWallet.totalPayout + totalAmount,
-  //         payoutServiceCharge:
-  //           +userWallet.payoutServiceCharge + totalServiceChange,
-  //       }),
-  //     );
-
-  //     // Process in batches
-  //     const BATCH_SIZE = 10;
-  //     const batches = [];
-  //     for (let i = 0; i < data.length; i += BATCH_SIZE) {
-  //       batches.push(data.slice(i, i + BATCH_SIZE));
-  //     }
-
-  //     const failedPayouts: Array<{ orderId: string; error: string }> = [];
-  //     const successfulPayouts: string[] = [];
-
-  //     for (const batch of batches) {
-  //       // Prepare all payouts in the batch
-  //       const batchPromises = batch.map(async (payment) => {
-  //         try {
-  //           const commissions = getCommissions({
-  //             amount: +payment.amount,
-  //             commissionInPercentage: user.commissionInPercentagePayout,
-  //             gstInPercentage: user.gstInPercentagePayout,
-  //           });
-
-  //           const payOutOrder = await queryRunner.manager.save(
-  //             this.payOutOrdersRepository.create({
-  //               amount: +payment.amount,
-  //               transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
-  //               orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
-  //               user,
-  //               commissionAmount: +commissions.commissionAmount,
-  //               commissionInPercentage: +user.commissionInPercentagePayout,
-  //               gstAmount: +commissions.gstAmount,
-  //               gstInPercentage: +user.gstInPercentagePayout,
-  //               netPayableAmount: +commissions.netPayableAmount,
-  //             }),
-  //           );
-
-  //           await queryRunner.manager.save(
-  //             this.transactionsRepository.create({
-  //               user,
-  //               payOutOrder,
-  //               transactionType: PAYMENT_TYPE.PAYOUT,
-  //             }),
-  //           );
-
-  //           return {
-  //             payload: {
-  //               amount: +payment.amount,
-  //               orderId: payOutOrder.orderId,
-  //               transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
-  //               beneDetails: {
-  //                 beneBankName: payment.beneficiaryName,
-  //                 beneAccountNo: payment.accountNumber,
-  //                 beneIfsc: payment.ifscCode,
-  //                 beneName: payment.beneficiaryName,
-  //               },
-  //             },
-  //             payOutOrder,
-  //           };
-  //         } catch (error) {
-  //           this.logger.error(
-  //             `Failed to prepare payout for amount ${payment.amount}:`,
-  //             error,
-  //           );
-  //           throw error;
-  //         }
-  //       });
-
-  //       const batchResults = await Promise.all(batchPromises);
-
-  //       // Process each payout with delay
-  //       for (const result of batchResults) {
-  //         try {
-  //           await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  //           const response =
-  //             await axiosServiceFlakPay.postRequest<IExternalPayoutResponseFlakPay>(
-  //               FALKPAY.PAYOUT.LIVE,
-  //               result.payload,
-  //             );
-
-  //           this.logger.info(
-  //             `Payout created successfully ${result.payOutOrder.orderId}`,
-  //             response,
-  //           );
-  //           successfulPayouts.push(result.payOutOrder.orderId);
-  //         } catch (error) {
-  //           this.logger.error(
-  //             `Payout creation failed ${result.payOutOrder.orderId}:`,
-  //             error,
-  //           );
-  //           failedPayouts.push({
-  //             orderId: result.payOutOrder.orderId,
-  //             error: error.message,
-  //           });
-  //         }
-  //       }
-  //     }
-
-  //     await queryRunner.commitTransaction();
-
-  //     return {
-  //       message: "Payout process completed",
-  //       summary: {
-  //         total: data.length,
-  //         successful: successfulPayouts.length,
-  //         failed: failedPayouts.length,
-  //       },
-  //       failedPayouts: failedPayouts.length > 0 ? failedPayouts : undefined,
-  //       successfulPayouts,
-  //     };
-  //   } catch (err) {
-  //     this.logger.error(
-  //       `PAYOUT - createTransaction - Got error while creating transaction`,
-  //       err,
-  //     );
-  //     await queryRunner.rollbackTransaction();
-  //     throw new BadRequestException(err.message);
-  //   } finally {
-  //     await queryRunner.release();
-  //   }
-  // }
-
   async createPayoutFlakPay(
     createPayoutDto: CreatePayoutDto,
     user: UsersEntity,
@@ -956,7 +758,7 @@ export class PaymentsService {
 
   private async createPayoutOrders(
     queryRunner: QueryRunner,
-    payouts: Array<any>,
+    payouts: SinglePayoutDto[], // data
     user: UsersEntity,
     batchId: string,
   ) {
@@ -980,6 +782,10 @@ export class PaymentsService {
             gstAmount: +commissions.gstAmount,
             gstInPercentage: +user.gstInPercentagePayout,
             netPayableAmount: +commissions.netPayableAmount,
+            name: payment.beneficiaryName,
+            bankAccountNumber: payment.accountNumber,
+            bankIfsc: payment.ifscCode,
+            bankName: payment.bankName,
           }),
         );
 

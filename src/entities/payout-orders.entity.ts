@@ -43,6 +43,18 @@ export class PayOutOrdersEntity {
   @Column({ nullable: true })
   transferId: string;
 
+  @Column({ nullable: true })
+  name: string;
+
+  @Column({ nullable: true })
+  bankName: string;
+
+  @Column({ nullable: true })
+  bankAccountNumber: string;
+
+  @Column({ nullable: true })
+  bankIfsc: string;
+
   @Column({ type: "numeric", precision: 10, scale: 2 })
   commissionInPercentage: number;
 
