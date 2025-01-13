@@ -46,7 +46,6 @@ export class PayoutController {
   }
 
   @ApiOperation({ summary: "Check payout status" })
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @Post("status")
   async checkPayoutStatus(@Body() body: PayoutStatusDto) {
     return this.payoutService.checkPayOutStatusTransactionFlakPay(body);

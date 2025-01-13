@@ -6,7 +6,12 @@ import {
   MoreThanOrEqual,
   Repository,
 } from "typeorm";
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import {
@@ -226,7 +231,7 @@ export class PayoutService {
         },
       });
       query.push({
-        txnRefId: ILike(`%${search}%`),
+        transferId: ILike(`%${search}%`),
         user: {
           id: userId,
         },
@@ -252,6 +257,7 @@ export class PayoutService {
         transferId: true,
         orderId: true,
         netPayableAmount: true,
+        batchId: true,
         createdAt: true,
         user: {
           id: true,
@@ -285,9 +291,9 @@ export class PayoutService {
         data: collections,
         pagination,
         stats: {
-          todayCollections: +todayCollections,
-          todaySuccess: +todaySuccess,
-          todayFailed: +todayFailed,
+          totalPayouts: +todayCollections,
+          totalSuccess: +todaySuccess,
+          totalFailed: +todayFailed,
         },
       };
     }
@@ -345,9 +351,10 @@ export class PayoutService {
         orderId: true,
         amount: true,
         status: true,
-        createdAt: true,
         transferId: true,
         transferMode: true,
+        batchId: true,
+        createdAt: true,
       },
     });
 
@@ -394,6 +401,12 @@ export class PayoutService {
           orderId,
         },
       );
+
+    if (flakPayResponse.statusCode !== HttpStatus.OK) {
+      throw new BadRequestException(
+        new MessageResponseDto(flakPayResponse.message),
+      );
+    }
 
     // update payout order
 

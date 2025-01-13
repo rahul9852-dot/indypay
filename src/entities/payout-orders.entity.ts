@@ -31,6 +31,9 @@ export class PayOutOrdersEntity {
   @Column({ unique: true })
   orderId: string;
 
+  @Column({ nullable: true })
+  batchId: string;
+
   @Column()
   transferMode: string;
 

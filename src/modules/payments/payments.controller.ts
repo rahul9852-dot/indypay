@@ -64,14 +64,11 @@ export class PaymentsController {
   @ApiOperation({ summary: "Create pay-out transaction" })
   @UseGuards(ApiKeyGuard)
   @Post("payout/create")
-  async createPayoutIsmart(
-    @Body() createPayoutIsmartDto: CreatePayoutDto,
+  async createPayout(
+    @Body() createPayoutDto: CreatePayoutDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createPayoutFlakPay(
-      createPayoutIsmartDto,
-      user,
-    );
+    return this.paymentsService.createPayoutFlakPay(createPayoutDto, user);
   }
 
   @ApiOperation({ summary: "Create pay-out transaction for dashboard" })

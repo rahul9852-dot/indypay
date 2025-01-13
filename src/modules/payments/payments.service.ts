@@ -16,8 +16,11 @@ import {
   ILike,
   LessThanOrEqual,
   MoreThanOrEqual,
+  QueryRunner,
   Repository,
 } from "typeorm";
+import { Queue } from "bull";
+import { InjectQueue } from "@nestjs/bull";
 import {
   CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionIsmartDto,
@@ -54,9 +57,7 @@ import {
   IExternalPayinPaymentRequestIsmart,
   IExternalPayinPaymentResponseFlakPay,
   IExternalPayinPaymentResponseIsmart,
-  IExternalPayoutRequestFlakPay,
   IExternalPayoutRequestIsmart,
-  IExternalPayoutResponseFlakPay,
   IExternalPayoutResponseIsmart,
   IExternalPayoutStatusResponseFlakPay,
 } from "@/interface/external-api.interface";
@@ -86,6 +87,7 @@ export class PaymentsService {
     private readonly walletRepository: Repository<WalletEntity>,
     @InjectRepository(SettlementsEntity)
     private readonly settlementRepository: Repository<SettlementsEntity>,
+    @InjectQueue("payouts") private payoutQueue: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
     private readonly dataSource: DataSource,
@@ -641,30 +643,220 @@ export class PaymentsService {
     }
   }
 
+  // async createPayoutFlakPay(
+  //   createPayoutDto: CreatePayoutDto,
+  //   user: UsersEntity,
+  // ) {
+  //   const axiosServiceFlakPay = new AxiosService(
+  //     FALKPAY.BASE_URL,
+  //     getFlakPayPgConfig({
+  //       clientId: externalPaymentConfig.flakPay.clientId,
+  //       clientSecret: externalPaymentConfig.flakPay.clientSecret,
+  //     }),
+  //   );
+
+  //   const queryRunner = this.dataSource.createQueryRunner();
+
+  //   // Start transaction
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+
+  //   try {
+  //     const { data } = createPayoutDto;
+  //     if (data.length > 100) {
+  //       throw new BadRequestException("Maximum 100 payouts allowed");
+  //     }
+
+  //     // Validate amounts and calculate total
+  //     const totalAmount = data.reduce((acc, curr) => {
+  //       if (curr.amount <= 0) {
+  //         throw new BadRequestException("Amount should be greater than 0");
+  //       }
+
+  //       return acc + +curr.amount;
+  //     }, 0);
+
+  //     // Check wallet balance
+  //     let userWallet = await this.walletRepository.findOne({
+  //       where: {
+  //         user: {
+  //           id: user.id,
+  //         },
+  //       },
+  //       relations: {
+  //         user: true,
+  //       },
+  //     });
+
+  //     if (!userWallet) {
+  //       userWallet = await queryRunner.manager.save(
+  //         this.walletRepository.create({
+  //           user,
+  //         }),
+  //       );
+  //     }
+
+  //     const { totalServiceChange } = getCommissions({
+  //       amount: totalAmount,
+  //       commissionInPercentage: user.commissionInPercentagePayout,
+  //       gstInPercentage: user.gstInPercentagePayout,
+  //     });
+
+  //     const grossTotalAmount = totalAmount + totalServiceChange;
+
+  //     if (grossTotalAmount > +userWallet.availablePayoutBalance) {
+  //       throw new BadRequestException(
+  //         `Insufficient balance. Gross Total Amount: ${grossTotalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
+  //       );
+  //     }
+
+  //     // Update wallet balance
+  //     await queryRunner.manager.save(
+  //       this.walletRepository.create({
+  //         id: userWallet.id,
+  //         availablePayoutBalance:
+  //           +userWallet.availablePayoutBalance - grossTotalAmount,
+  //         totalPayout: +userWallet.totalPayout + totalAmount,
+  //         payoutServiceCharge:
+  //           +userWallet.payoutServiceCharge + totalServiceChange,
+  //       }),
+  //     );
+
+  //     // Process in batches
+  //     const BATCH_SIZE = 10;
+  //     const batches = [];
+  //     for (let i = 0; i < data.length; i += BATCH_SIZE) {
+  //       batches.push(data.slice(i, i + BATCH_SIZE));
+  //     }
+
+  //     const failedPayouts: Array<{ orderId: string; error: string }> = [];
+  //     const successfulPayouts: string[] = [];
+
+  //     for (const batch of batches) {
+  //       // Prepare all payouts in the batch
+  //       const batchPromises = batch.map(async (payment) => {
+  //         try {
+  //           const commissions = getCommissions({
+  //             amount: +payment.amount,
+  //             commissionInPercentage: user.commissionInPercentagePayout,
+  //             gstInPercentage: user.gstInPercentagePayout,
+  //           });
+
+  //           const payOutOrder = await queryRunner.manager.save(
+  //             this.payOutOrdersRepository.create({
+  //               amount: +payment.amount,
+  //               transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
+  //               orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
+  //               user,
+  //               commissionAmount: +commissions.commissionAmount,
+  //               commissionInPercentage: +user.commissionInPercentagePayout,
+  //               gstAmount: +commissions.gstAmount,
+  //               gstInPercentage: +user.gstInPercentagePayout,
+  //               netPayableAmount: +commissions.netPayableAmount,
+  //             }),
+  //           );
+
+  //           await queryRunner.manager.save(
+  //             this.transactionsRepository.create({
+  //               user,
+  //               payOutOrder,
+  //               transactionType: PAYMENT_TYPE.PAYOUT,
+  //             }),
+  //           );
+
+  //           return {
+  //             payload: {
+  //               amount: +payment.amount,
+  //               orderId: payOutOrder.orderId,
+  //               transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
+  //               beneDetails: {
+  //                 beneBankName: payment.beneficiaryName,
+  //                 beneAccountNo: payment.accountNumber,
+  //                 beneIfsc: payment.ifscCode,
+  //                 beneName: payment.beneficiaryName,
+  //               },
+  //             },
+  //             payOutOrder,
+  //           };
+  //         } catch (error) {
+  //           this.logger.error(
+  //             `Failed to prepare payout for amount ${payment.amount}:`,
+  //             error,
+  //           );
+  //           throw error;
+  //         }
+  //       });
+
+  //       const batchResults = await Promise.all(batchPromises);
+
+  //       // Process each payout with delay
+  //       for (const result of batchResults) {
+  //         try {
+  //           await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  //           const response =
+  //             await axiosServiceFlakPay.postRequest<IExternalPayoutResponseFlakPay>(
+  //               FALKPAY.PAYOUT.LIVE,
+  //               result.payload,
+  //             );
+
+  //           this.logger.info(
+  //             `Payout created successfully ${result.payOutOrder.orderId}`,
+  //             response,
+  //           );
+  //           successfulPayouts.push(result.payOutOrder.orderId);
+  //         } catch (error) {
+  //           this.logger.error(
+  //             `Payout creation failed ${result.payOutOrder.orderId}:`,
+  //             error,
+  //           );
+  //           failedPayouts.push({
+  //             orderId: result.payOutOrder.orderId,
+  //             error: error.message,
+  //           });
+  //         }
+  //       }
+  //     }
+
+  //     await queryRunner.commitTransaction();
+
+  //     return {
+  //       message: "Payout process completed",
+  //       summary: {
+  //         total: data.length,
+  //         successful: successfulPayouts.length,
+  //         failed: failedPayouts.length,
+  //       },
+  //       failedPayouts: failedPayouts.length > 0 ? failedPayouts : undefined,
+  //       successfulPayouts,
+  //     };
+  //   } catch (err) {
+  //     this.logger.error(
+  //       `PAYOUT - createTransaction - Got error while creating transaction`,
+  //       err,
+  //     );
+  //     await queryRunner.rollbackTransaction();
+  //     throw new BadRequestException(err.message);
+  //   } finally {
+  //     await queryRunner.release();
+  //   }
+  // }
+
   async createPayoutFlakPay(
     createPayoutDto: CreatePayoutDto,
     user: UsersEntity,
   ) {
-    const axiosServiceFlakPay = new AxiosService(
-      FALKPAY.BASE_URL,
-      getFlakPayPgConfig({
-        clientId: externalPaymentConfig.flakPay.clientId,
-        clientSecret: externalPaymentConfig.flakPay.clientSecret,
-      }),
-    );
+    const { data } = createPayoutDto;
+
+    if (data.length > 1000) {
+      throw new BadRequestException("Maximum 1000 payouts allowed");
+    }
 
     const queryRunner = this.dataSource.createQueryRunner();
-
-    // Start transaction
     await queryRunner.connect();
     await queryRunner.startTransaction();
-
     try {
-      const { data } = createPayoutDto;
-      if (data.length > 100) {
-        throw new BadRequestException("Maximum 100 payouts allowed");
-      }
-
+      // Validate amounts and calculate total
       const totalAmount = data.reduce((acc, curr) => {
         if (curr.amount <= 0) {
           throw new BadRequestException("Amount should be greater than 0");
@@ -673,64 +865,115 @@ export class PaymentsService {
         return acc + +curr.amount;
       }, 0);
 
-      let userWallet = await this.walletRepository.findOne({
-        where: {
-          user: {
-            id: user.id,
-          },
-        },
-        relations: {
-          user: true,
-        },
-      });
-
-      if (!userWallet) {
-        userWallet = await queryRunner.manager.save(
-          this.walletRepository.create({
-            user,
-          }),
-        );
-      }
-
-      const { totalServiceChange } = getCommissions({
-        amount: totalAmount,
-        commissionInPercentage: user.commissionInPercentagePayout,
-        gstInPercentage: user.gstInPercentagePayout,
-      });
-
-      const grossTotalAmount = totalAmount + totalServiceChange;
-
-      if (grossTotalAmount > +userWallet.availablePayoutBalance) {
-        throw new BadRequestException(
-          `Insufficient balance. Gross Total Amount: ${grossTotalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
-        );
-      }
-
-      await queryRunner.manager.save(
-        this.walletRepository.create({
-          id: userWallet.id,
-          availablePayoutBalance:
-            +userWallet.availablePayoutBalance - grossTotalAmount,
-          totalPayout: +userWallet.totalPayout + totalAmount,
-          payoutServiceCharge:
-            +userWallet.payoutServiceCharge + totalServiceChange,
-        }),
+      // Check and update wallet balance
+      const walletAfterDeduction = await this.validateAndUpdateWallet(
+        queryRunner,
+        user,
+        totalAmount,
       );
 
-      const orderIds: string[] = [];
+      // Create batch job identifier
+      const batchId = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
 
-      for await (const payment of data) {
+      // Create payout orders in DB
+      const payoutOrders = await this.createPayoutOrders(
+        queryRunner,
+        data,
+        user,
+        batchId,
+      );
+
+      // Add to processing queue
+      await this.payoutQueue.add("process-payouts", {
+        payoutOrders,
+        userId: user.id,
+        batchId,
+      });
+
+      await queryRunner.commitTransaction();
+
+      return {
+        message: "Payout process initiated",
+        batchId,
+        summary: {
+          total: data.length,
+          status: "PROCESSING",
+        },
+      };
+    } catch (err) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Error initiating payouts`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  private async validateAndUpdateWallet(
+    queryRunner: QueryRunner,
+    user: UsersEntity,
+    totalAmount: number,
+  ) {
+    let userWallet = await this.walletRepository.findOne({
+      where: { user: { id: user.id } },
+      relations: { user: true },
+    });
+
+    if (!userWallet) {
+      userWallet = await queryRunner.manager.save(
+        this.walletRepository.create({ user }),
+      );
+    }
+
+    const { totalServiceChange } = getCommissions({
+      amount: totalAmount,
+      commissionInPercentage: user.commissionInPercentagePayout,
+      gstInPercentage: user.gstInPercentagePayout,
+    });
+
+    const grossTotalAmount = totalAmount + totalServiceChange;
+
+    if (grossTotalAmount > +userWallet.availablePayoutBalance) {
+      throw new BadRequestException(
+        `Insufficient balance. Gross Total Amount: ${grossTotalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
+      );
+    }
+
+    return await queryRunner.manager.save(
+      this.walletRepository.create({
+        id: userWallet.id,
+        availablePayoutBalance:
+          +userWallet.availablePayoutBalance - grossTotalAmount,
+        totalPayout: +userWallet.totalPayout + totalAmount,
+        payoutServiceCharge:
+          +userWallet.payoutServiceCharge + totalServiceChange,
+      }),
+    );
+  }
+
+  private async createPayoutOrders(
+    queryRunner: QueryRunner,
+    payouts: Array<any>,
+    user: UsersEntity,
+    batchId: string,
+  ) {
+    return Promise.all(
+      payouts.map(async (payment) => {
         const commissions = getCommissions({
           amount: +payment.amount,
           commissionInPercentage: user.commissionInPercentagePayout,
           gstInPercentage: user.gstInPercentagePayout,
         });
 
-        const payOutOrder = await queryRunner.manager.save(
+        const payoutOrder = await queryRunner.manager.save(
           this.payOutOrdersRepository.create({
             amount: +payment.amount,
             transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
             orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
+            batchId,
             user,
             commissionAmount: +commissions.commissionAmount,
             commissionInPercentage: +user.commissionInPercentagePayout,
@@ -743,265 +986,15 @@ export class PaymentsService {
         await queryRunner.manager.save(
           this.transactionsRepository.create({
             user,
-            payOutOrder,
+            payOutOrder: payoutOrder,
             transactionType: PAYMENT_TYPE.PAYOUT,
           }),
         );
 
-        orderIds.push(payOutOrder.orderId);
-
-        const payload: IExternalPayoutRequestFlakPay = {
-          amount: +payment.amount,
-          orderId: payOutOrder.orderId,
-          transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
-          beneDetails: {
-            beneBankName: payment.beneficiaryName,
-            beneAccountNo: payment.accountNumber,
-            beneIfsc: payment.ifscCode,
-            beneName: payment.beneficiaryName,
-          },
-        };
-
-        this.logger.info(
-          `Preparing to create payout with payload: ${LoggerPlaceHolder.Json}`,
-          payload,
-        );
-
-        axiosServiceFlakPay
-          .postRequest<IExternalPayoutResponseFlakPay>(
-            FALKPAY.PAYOUT.LIVE,
-            payload,
-          )
-          .then((res) => {
-            res.data["orderId"] = payOutOrder.orderId;
-            this.logger.info(
-              `Payout created successfully ${payOutOrder.orderId} with response: ${LoggerPlaceHolder.Json}`,
-              res,
-            );
-          })
-          .catch((err) => {
-            this.logger.error(
-              `Payout creation failed ${payOutOrder.orderId} with error: ${LoggerPlaceHolder.Json}`,
-              err,
-            );
-          });
-      }
-
-      await queryRunner.commitTransaction();
-
-      return {
-        message: "Payout created successfully",
-      };
-    } catch (err: any) {
-      this.logger.error(
-        `PAYOUT - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
-        err,
-      );
-      // Rollback transaction if any operation fails
-      await queryRunner.rollbackTransaction();
-      throw new BadRequestException(err.message);
-    } finally {
-      // Release the queryRunner to avoid memory leaks
-      await queryRunner.release();
-    }
+        return payoutOrder;
+      }),
+    );
   }
-
-  // async createTransactionPayinPayNPro(
-  //   createPayinTransactionDto: CreatePayinTransactionPayNProDto,
-  //   user: UsersEntity,
-  //   res: Response,
-  // ) {
-  //   const { amount, email, mobile, name } = createPayinTransactionDto;
-  //   const queryRunner = this.dataSource.createQueryRunner();
-
-  //   // Start transaction
-  //   await queryRunner.connect();
-  //   await queryRunner.startTransaction();
-
-  //   try {
-  //     const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
-  //       amount,
-  //       commissionInPercentage: user.commissionInPercentagePayin,
-  //       gstInPercentage: user.gstInPercentagePayin,
-  //     });
-
-  //     const wallet = await this.walletRepository.findOne({
-  //       where: {
-  //         user: {
-  //           id: user.id,
-  //         },
-  //       },
-  //       relations: {
-  //         user: true,
-  //       },
-  //     });
-
-  //     if (!wallet) {
-  //       await queryRunner.manager.save(
-  //         this.walletRepository.create({
-  //           user,
-  //         }),
-  //       );
-  //     }
-
-  //     // 1. create pay-in order
-  //     const payinOrder = this.payInOrdersRepository.create({
-  //       user,
-  //       amount,
-  //       email,
-  //       name,
-  //       mobile,
-  //       commissionAmount,
-  //       gstAmount,
-  //       netPayableAmount,
-  //       orderId: getUlidId("odr"), // add dummy order id - we will update once order will create
-  //     });
-
-  //     // 2. save pay-in order
-  //     const savedPayinOrder = await queryRunner.manager.save(payinOrder);
-
-  //     // 3. create transaction
-  //     const transaction = this.transactionsRepository.create({
-  //       user,
-  //       payInOrder: savedPayinOrder,
-  //       transactionType: PAYMENT_TYPE.PAYIN,
-  //     });
-
-  //     // 4. save transaction
-  //     const savedTransaction = await queryRunner.manager.save(transaction);
-
-  //     this.logger.info(
-  //       `PAYIN - createTransaction - transaction: ${LoggerPlaceHolder.Json}`,
-  //       savedTransaction,
-  //     );
-
-  //     // 5. create external payment
-  //     const payload: IExternalPayinPaymentRequestPayNPro = {
-  //       amount: createPayinTransactionDto.amount.toFixed(2),
-  //       txnCurr: "INR",
-  //       email: createPayinTransactionDto.email,
-  //       mobile: createPayinTransactionDto.mobile,
-  //       name: createPayinTransactionDto.name,
-  //       key_id: clientId,
-  //       key_secret: clientSecret,
-  //     };
-
-  //     const signature = generateSignature(payload);
-
-  //     const payloadWithSignature: IEncryptData = {
-  //       ...payload,
-  //       signature,
-  //     };
-
-  //     const encryptedData = encryptPayNPro(
-  //       payloadWithSignature,
-  //       encryptionSalt,
-  //       aesSecretKey,
-  //     );
-
-  //     this.logger.info(
-  //       `PAYIN - calling external (${PAYNPRO.PAYIN.LIVE_ENDPOINT}) API with payload: ${LoggerPlaceHolder.Json}`,
-  //       payload,
-  //     );
-
-  //     const externalEncryptedResponse =
-  //       await this.axiosService.postRequest<IExternalPayinPaymentResponsePayNPro>(
-  //         PAYNPRO.PAYIN.LIVE_ENDPOINT,
-  //         {
-  //           key_id: clientId,
-  //           data: encryptedData,
-  //         },
-  //       );
-
-  //     if (
-  //       externalEncryptedResponse?.data?.trim() === "" &&
-  //       externalEncryptedResponse?.statusCode !== "200"
-  //     ) {
-  //       this.logger.error(
-  //         `PAYIN - createTransaction - ERROR: ${externalEncryptedResponse?.statusCode} ${externalEncryptedResponse?.Description}`,
-  //       );
-  //       throw new BadRequestException(externalEncryptedResponse.Description);
-  //     }
-
-  //     const externalPaymentResponse = decryptPayNPro(
-  //       externalEncryptedResponse.data,
-  //       encryptionSalt,
-  //       aesSecretKey,
-  //     );
-
-  //     this.logger.info(
-  //       `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
-  //       externalPaymentResponse,
-  //     );
-
-  //     if (
-  //       externalPaymentResponse.status.toLowerCase() !== "success" ||
-  //       externalPaymentResponse.statusCode !== "200"
-  //     ) {
-  //       throw new BadRequestException(
-  //         externalPaymentResponse?.description || "Something went wrong",
-  //       );
-  //     }
-
-  //     // const internalStatus = convertExternalPaymentStatusToInternal(
-  //     //   externalPaymentResponse.status?.toUpperCase(),
-  //     // );
-  //     // 6. save external payment
-  //     const savedOrder = await queryRunner.manager.save(
-  //       this.payInOrdersRepository.create({
-  //         ...savedPayinOrder,
-  //         ...(externalPaymentResponse?.upiIntent && {
-  //           intent: externalPaymentResponse?.upiIntent,
-  //         }),
-  //         // status: internalStatus,
-  //         txnRefId: externalPaymentResponse.transactionId,
-  //         orderId: externalPaymentResponse.orderId, // here we are updating dummy => real order id generated by bank
-  //       }),
-  //     );
-
-  //     if (!externalPaymentResponse?.upiIntent?.trim()) {
-  //       throw new BadRequestException(
-  //         new MessageResponseDto("Something went wrong"),
-  //       );
-  //     }
-
-  //     const qr = await generateQrCode(externalPaymentResponse.upiIntent); // base64 qr image
-  //     const img = qr.replace(/^data:image\/png;base64,/, "");
-  //     const imageBuffer = Buffer.from(img, "base64");
-
-  //     await queryRunner.commitTransaction();
-
-  //     res.setHeader("Content-Type", "image/png");
-  //     res.setHeader("Content-Disposition", "attachment; filename=qr.png");
-  //     res.setHeader("Content-Length", imageBuffer.length);
-
-  //     this.logger.info(
-  //       `PAYIN - createTransaction - Created transaction successfully`,
-  //     );
-
-  //     return res.send(imageBuffer);
-
-  //     // return {
-  //     //   orderId: externalPaymentResponse.orderId,
-  //     // ...(externalPaymentResponse?.upiIntent && {
-  //     //   intent: externalPaymentResponse?.upiIntent,
-  //     // }),
-  //     // };
-
-  //     // Commit transaction
-  //   } catch (err: any) {
-  //     this.logger.error(
-  //       `PAYIN - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
-  //       err,
-  //     );
-  //     // Rollback transaction if any operation fails
-  //     await queryRunner.rollbackTransaction();
-  //     throw new BadRequestException(err.message);
-  //   } finally {
-  //     // Release the queryRunner to avoid memory leaks
-  //     await queryRunner.release();
-  //   }
-  // }
 
   async checkPayInStatusTransaction({ orderId }: PayinStatusDto) {
     const payinOrder = await this.payInOrdersRepository.findOne({
@@ -1212,145 +1205,6 @@ export class PaymentsService {
 
     return new MessageResponseDto("Transaction status updated successfully.");
   }
-
-  // async externalWebhookPayinPayNPro(
-  //   externalPayinWebhookDto: ExternalPayinWebhookPayNProDto,
-  // ) {
-  //   const decryptedData = decryptPayNPro(
-  //     externalPayinWebhookDto.data,
-  //     encryptionSalt,
-  //     aesSecretKey,
-  //   ) as unknown as IWebhookDataPayNPro;
-
-  //   const {
-  //     orderId,
-  //     status: status_code,
-  //     transactionId: txnRefId,
-  //     description,
-  //   } = decryptedData;
-
-  //   this.logger.info(
-  //     `WEBHOOK: decrypted data: ${LoggerPlaceHolder.Json}`,
-  //     decryptedData,
-  //   );
-
-  //   const status = convertExternalPaymentStatusToInternal(status_code);
-
-  //   const isSuccess =
-  //     description === "Transaction Success" &&
-  //     status === PAYMENT_STATUS.SUCCESS;
-  //   const isFailed =
-  //     description === "Transaction Failed" && status === "FAILED";
-
-  //   const payinOrder = await this.payInOrdersRepository.findOne({
-  //     where: {
-  //       orderId,
-  //     },
-  //     relations: ["user"],
-  //   });
-
-  //   if (!payinOrder) {
-  //     throw new NotFoundException(
-  //       new MessageResponseDto("Payin order not found"),
-  //     );
-  //   }
-
-  //   if (status === payinOrder.status) {
-  //     this.logger.info(
-  //       `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
-  //     );
-
-  //     return new MessageResponseDto("Status updated successfully.");
-  //   }
-
-  //   const { user } = payinOrder;
-
-  //   const payinOrderRaw = this.payInOrdersRepository.create({
-  //     id: payinOrder.id,
-  //     status,
-  //     txnRefId,
-  //     ...(isSuccess && {
-  //       successAt: new Date(),
-  //     }),
-  //     ...(isFailed && {
-  //       failureAt: new Date(),
-  //     }),
-  //   });
-
-  //   await this.payInOrdersRepository.save(payinOrderRaw);
-
-  //   // update wallet
-  //   if (isSuccess) {
-  //     const wallet = await this.walletRepository.findOne({
-  //       where: { user: { id: user.id } },
-  //       relations: ["user"],
-  //     });
-
-  //     const { totalCollections, unsettledAmount } = wallet ?? {};
-
-  //     const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
-  //       amount: +payinOrder.amount,
-  //       commissionInPercentage: +user.commissionInPercentagePayin,
-  //       gstInPercentage: +user.gstInPercentagePayin,
-  //     });
-
-  //     const walletRaw = this.walletRepository.create({
-  //       ...(wallet?.id && { id: wallet.id }),
-  //       totalCollections:
-  //         (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
-  //       unsettledAmount:
-  //         (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
-  //       commissionAmount:
-  //         (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
-  //         +commissionAmount,
-  //       gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
-  //       netPayableAmount:
-  //         (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
-  //         +netPayableAmount,
-  //       user,
-  //     });
-
-  //     await this.walletRepository.save(walletRaw);
-
-  //     this.logger.info(
-  //       `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
-  //       walletRaw,
-  //     );
-  //   }
-
-  //   if (user?.payInWebhookUrl) {
-  //     const webhookPayload = {
-  //       orderId,
-  //       status,
-  //       amount: payinOrder.amount,
-  //       txnRefId: payinOrder.txnRefId, // utr
-  //     };
-  //     this.logger.info(
-  //       `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
-  //       webhookPayload,
-  //     );
-  //     axios
-  //       .post(user.payInWebhookUrl, webhookPayload, {
-  //         headers: {
-  //           "Content-Type": "application/json",
-  //         },
-  //       })
-  //       .then(() => {
-  //         this.logger.info(
-  //           `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
-  //           user,
-  //         );
-  //       })
-  //       .catch((err) => {
-  //         this.logger.error(
-  //           `PAYIN - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
-  //           err,
-  //         );
-  //       });
-  //   }
-
-  //   return new MessageResponseDto("Transaction status updated successfully.");
-  // }
 
   async externalWebhookPayoutFlaPay({
     status: status_code,

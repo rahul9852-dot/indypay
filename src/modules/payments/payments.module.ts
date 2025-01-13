@@ -1,9 +1,12 @@
 import { JwtService } from "@nestjs/jwt";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Module } from "@nestjs/common";
+import { BullModule } from "@nestjs/bull";
+
 import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
-import { SESService } from "../aws/ses.service";
+import { PayoutProcessor } from "./payments.processor";
+import { SESService } from "@/modules/aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { UsersService } from "@/modules/users/users.service";
@@ -35,6 +38,9 @@ import { SNSService } from "@/modules/aws/sns.service";
       WalletEntity,
       SettlementsEntity,
     ]),
+    BullModule.registerQueue({
+      name: "payouts",
+    }),
   ],
   providers: [
     PaymentsService,
@@ -44,6 +50,7 @@ import { SNSService } from "@/modules/aws/sns.service";
     JwtService,
     SNSService,
     SESService,
+    PayoutProcessor,
   ],
   controllers: [PaymentsController],
 })
