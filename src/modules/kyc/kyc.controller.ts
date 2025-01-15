@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Res } from "@nestjs/common";
+import { Controller, Get, Post, Body, Res, Param } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Response } from "express";
 import { KycService } from "./kyc.service";
@@ -9,6 +9,8 @@ import { User } from "@/decorators/user.decorator";
 import { IAccessTokenPayload } from "@/interface/common.interface";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { UsersEntity } from "@/entities/user.entity";
+import { Role } from "@/decorators/role.decorator";
+import { USERS_ROLE } from "@/enums";
 
 @ApiTags("KYC")
 @IgnoreKyc()
@@ -45,5 +47,23 @@ export class KycController {
     @Body() documentInfo: DocumentUploadDto,
   ) {
     return this.kycService.getDocumentUploadUrl(user.id, documentInfo);
+  }
+
+  @Get("documents")
+  @Role(USERS_ROLE.MERCHANT)
+  @ApiOperation({ summary: "Get KYC Documents" })
+  @ApiOkResponse({ type: DocumentUploadDto, isArray: true })
+  @IgnoreKyc()
+  async getKycDocuments(@User() user: IAccessTokenPayload) {
+    return this.kycService.getKycDocumentsByUserId(user.id);
+  }
+
+  @Get("documents/:userId")
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Get KYC Documents by user - Admin" })
+  @ApiOkResponse({ type: DocumentUploadDto, isArray: true })
+  @IgnoreKyc()
+  async getKycDocumentsByUserId(@Param("userId") userId: string) {
+    return this.kycService.getKycDocumentsByUserId(userId);
   }
 }

@@ -866,7 +866,6 @@ export class UsersService {
         onboardingStatus: true,
         accountStatus: true,
         createdAt: true,
-        updatedAt: true,
       },
       take: limit,
       skip: (page - 1) * limit,

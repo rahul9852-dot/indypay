@@ -199,4 +199,19 @@ export class KycService {
       },
     };
   }
+
+  async getKycDocumentsByUserId(userId: string) {
+    const kyc = await this.userKycRepository.findOne({
+      where: { user: { id: userId } },
+      relations: {
+        media: true,
+      },
+    });
+
+    if (!kyc) {
+      throw new NotFoundException("KYC not found");
+    }
+
+    return kyc.media;
+  }
 }
