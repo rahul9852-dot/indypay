@@ -883,4 +883,28 @@ export class UsersService {
       pagination,
     };
   }
+
+  async getUserById(id: string) {
+    return this.usersRepository.findOne({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        mobile: true,
+        role: true,
+        onboardingStatus: true,
+        accountStatus: true,
+        createdAt: true,
+      },
+      relations: {
+        businessDetails: true,
+        channelPartner: true,
+        address: true,
+        bankDetails: true,
+      },
+    });
+  }
 }

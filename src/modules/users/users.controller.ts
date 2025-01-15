@@ -438,6 +438,13 @@ export class UsersController {
     return this.usersService.getPaginatedUsers(query);
   }
 
+  @ApiOperation({ summary: "Get user by id - Admin Only" })
+  @Get("list/:userId")
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  async getUserByUserId(@Param("userId") userId: string) {
+    return this.usersService.getUserById(userId);
+  }
+
   @ApiOperation({ summary: "Reset password - Admin Only" })
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @IgnoreKyc()
