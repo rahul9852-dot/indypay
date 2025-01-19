@@ -55,6 +55,12 @@ export class PayOutOrdersEntity {
   @Column({ nullable: true })
   bankIfsc: string;
 
+  @Column({ nullable: true, default: "DEFAULT" })
+  purpose: string;
+
+  @Column({ nullable: true, default: "DEFAULT" })
+  remarks: string;
+
   @Column({ type: "numeric", precision: 10, scale: 2 })
   commissionInPercentage: number;
 

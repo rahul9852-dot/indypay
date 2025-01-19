@@ -1,17 +1,20 @@
 import { Process, Processor } from "@nestjs/bull";
-import { BadRequestException, HttpStatus } from "@nestjs/common";
+import { BadRequestException } from "@nestjs/common";
 import { Job } from "bull";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
-import { FALKPAY } from "@/constants/external-api.constant";
-import { getFlakPayPgConfig } from "@/utils/pg-config.utils";
+import { ISMART_PAY } from "@/constants/external-api.constant";
+import { getIsmartPayPgConfig } from "@/utils/pg-config.utils";
 import { appConfig } from "@/config/app.config";
 import { AxiosService } from "@/shared/axios/axios.service";
-import { IExternalPayoutResponseFlakPay } from "@/interface/external-api.interface";
+import {
+  IExternalPayoutRequestIsmart,
+  IExternalPayoutResponseIsmart,
+} from "@/interface/external-api.interface";
 import { CustomLogger } from "@/logger";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
-import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { PAYMENT_STATUS, PAYOUT_PAYMENT_MODE } from "@/enums/payment.enum";
 import { WalletEntity } from "@/entities/wallet.entity";
 
 const { externalPaymentConfig } = appConfig();
@@ -38,11 +41,19 @@ export class PayoutProcessor {
     const BATCH_SIZE = 10;
     const DELAY_BETWEEN_REQUESTS = 1000; // 1 second
 
-    const axiosServiceFlakPay = new AxiosService(
-      FALKPAY.BASE_URL,
-      getFlakPayPgConfig({
-        clientId: externalPaymentConfig.flakPay.clientId,
-        clientSecret: externalPaymentConfig.flakPay.clientSecret,
+    // const axiosServiceFlakPay = new AxiosService(
+    //   FALKPAY.BASE_URL,
+    //   getFlakPayPgConfig({
+    //     clientId: externalPaymentConfig.flakPay.clientId,
+    //     clientSecret: externalPaymentConfig.flakPay.clientSecret,
+    //   }),
+    // );
+
+    const axiosServiceIsmart = new AxiosService(
+      ISMART_PAY.BASE_URL,
+      getIsmartPayPgConfig({
+        clientId: externalPaymentConfig.ismart.clientId,
+        clientSecret: externalPaymentConfig.ismart.clientSecret,
       }),
     );
 
@@ -57,22 +68,44 @@ export class PayoutProcessor {
               setTimeout(resolve, DELAY_BETWEEN_REQUESTS),
             );
 
-            const payload = {
+            // const payloadFlakPay = {
+            //   amount: order.amount,
+            //   orderId: order.orderId,
+            //   transferMode: order.transferMode,
+            //   beneDetails: {
+            //     beneBankName: order.bankName,
+            //     beneAccountNo: order.bankAccountNumber,
+            //     beneIfsc: order.bankIfsc,
+            //     beneName: order.name,
+            //   },
+            // };
+
+            const payloadIsmart: IExternalPayoutRequestIsmart = {
               amount: order.amount,
-              orderId: order.orderId,
-              transferMode: order.transferMode,
-              beneDetails: {
-                beneBankName: order.bankName,
-                beneAccountNo: order.bankAccountNumber,
-                beneIfsc: order.bankIfsc,
-                beneName: order.name,
+              currency: "INR",
+              narration: order.remarks,
+              order_id: order.orderId,
+              phone_number: order.user.mobile,
+              purpose: order.purpose,
+              payment_details: {
+                account_number: order.bankAccountNumber,
+                ifsc_code: order.bankIfsc,
+                beneficiary_name: order.name,
+                type: "NB",
+                mode: order.transferMode as PAYOUT_PAYMENT_MODE,
               },
             };
 
+            // const response =
+            //   await axiosServiceFlakPay.postRequest<IExternalPayoutResponseFlakPay>(
+            //     FALKPAY.PAYOUT.LIVE,
+            //     payloadFlakPay,
+            //   );
+
             const response =
-              await axiosServiceFlakPay.postRequest<IExternalPayoutResponseFlakPay>(
-                FALKPAY.PAYOUT.LIVE,
-                payload,
+              await axiosServiceIsmart.postRequest<IExternalPayoutResponseIsmart>(
+                ISMART_PAY.PAYOUT,
+                payloadIsmart,
               );
 
             this.logger.info(
@@ -80,12 +113,12 @@ export class PayoutProcessor {
               response,
             );
 
-            if (response.statusCode !== HttpStatus.OK) {
+            if (!response.status) {
               throw new Error(response.message);
             }
 
             const status = convertExternalPaymentStatusToInternal(
-              response.data.status.toUpperCase(),
+              response.status_code.toUpperCase(),
             );
 
             if (status === PAYMENT_STATUS.FAILED) {
@@ -95,7 +128,7 @@ export class PayoutProcessor {
             await this.payOutOrdersRepository.update(
               { id: order.id },
               {
-                transferId: response.data.transferId,
+                transferId: response.transaction_id,
                 ...(status === PAYMENT_STATUS.SUCCESS && {
                   status,
                   successAt: new Date(),

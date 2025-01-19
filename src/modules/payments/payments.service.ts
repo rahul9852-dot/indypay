@@ -58,8 +58,6 @@ import {
   IExternalPayinPaymentRequestIsmart,
   IExternalPayinPaymentResponseFlakPay,
   IExternalPayinPaymentResponseIsmart,
-  IExternalPayoutRequestIsmart,
-  IExternalPayoutResponseIsmart,
   IExternalPayoutStatusResponseFlakPay,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
@@ -475,182 +473,13 @@ export class PaymentsService {
     }
   }
 
-  async createPayoutIsmart(
-    createPayoutIsmartDto: CreatePayoutDto,
-    user: UsersEntity,
-  ) {
-    const axiosServiceIsmart = new AxiosService(
-      ISMART_PAY.BASE_URL,
-      getIsmartPayPgConfig({
-        clientId: externalPaymentConfig.ismart.clientId,
-        clientSecret: externalPaymentConfig.ismart.clientSecret,
-      }),
-    );
-
-    const queryRunner = this.dataSource.createQueryRunner();
-
-    // Start transaction
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const { data } = createPayoutIsmartDto;
-      if (data.length > 1000) {
-        throw new BadRequestException("Maximum 1000 payouts allowed");
-      }
-
-      const totalAmount = data.reduce((acc, curr) => {
-        if (curr.amount <= 0) {
-          throw new BadRequestException("Amount should be greater than 0");
-        }
-
-        return acc + curr.amount;
-      }, 0);
-
-      let userWallet = await this.walletRepository.findOne({
-        where: {
-          user: {
-            id: user.id,
-          },
-        },
-        relations: {
-          user: true,
-        },
-      });
-
-      if (!userWallet) {
-        userWallet = await queryRunner.manager.save(
-          this.walletRepository.create({
-            user,
-          }),
-        );
-      }
-
-      const { totalServiceChange } = getCommissions({
-        amount: totalAmount,
-        commissionInPercentage: user.commissionInPercentagePayout,
-        gstInPercentage: user.gstInPercentagePayout,
-      });
-
-      const grossTotalAmount = totalAmount + totalServiceChange;
-
-      if (grossTotalAmount > userWallet.netPayableAmount) {
-        throw new BadRequestException(
-          `Insufficient balance. Gross Total Amount: ${grossTotalAmount} exceeds Net Payable Amount: ${userWallet.netPayableAmount}`,
-        );
-      }
-
-      const allPromises = data.map(async (payment) => {
-        const commissions = getCommissions({
-          amount: +payment.amount,
-          commissionInPercentage: user.commissionInPercentagePayout,
-          gstInPercentage: user.gstInPercentagePayout,
-        });
-
-        const payOutOrder = await queryRunner.manager.save(
-          this.payOutOrdersRepository.create({
-            amount: +payment.amount,
-            transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
-            orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
-            user,
-            commissionAmount: +commissions.commissionAmount,
-            commissionInPercentage: +user.commissionInPercentagePayout,
-            gstAmount: +commissions.gstAmount,
-            gstInPercentage: +user.gstInPercentagePayout,
-            netPayableAmount: +commissions.netPayableAmount,
-          }),
-        );
-
-        await queryRunner.manager.save(
-          this.transactionsRepository.create({
-            user,
-            payOutOrder,
-            transactionType: PAYMENT_TYPE.PAYOUT,
-          }),
-        );
-
-        const payload: IExternalPayoutRequestIsmart = {
-          amount: +payment.amount,
-          currency: "INR",
-          narration: payment.remarks,
-          order_id: payOutOrder.orderId,
-          phone_number: user.mobile,
-          purpose: "Payout to " + payment.beneficiaryName,
-
-          payment_details: {
-            account_number: payment.accountNumber,
-            ifsc_code: payment.ifscCode,
-            beneficiary_name: payment.beneficiaryName,
-            type: "NB",
-            mode: payment.paymentMode || PAYOUT_PAYMENT_MODE.RTGS,
-          },
-        };
-
-        return axiosServiceIsmart.postRequest<IExternalPayoutResponseIsmart>(
-          ISMART_PAY.PAYOUT,
-          payload,
-        );
-      });
-
-      const externalPayoutResponses = await Promise.all(allPromises);
-
-      for await (const externalPayoutResponse of externalPayoutResponses) {
-        if (!externalPayoutResponse.status) {
-          throw new BadRequestException(
-            externalPayoutResponse?.errors || "Something went wrong",
-          );
-        }
-
-        const status = convertExternalPaymentStatusToInternal(
-          externalPayoutResponse.status_code,
-        );
-
-        const payOutOrder = await this.payOutOrdersRepository.findOne({
-          where: {
-            orderId: externalPayoutResponse.order_id,
-          },
-        });
-
-        if (!payOutOrder) {
-          throw new BadRequestException("Payout order not found");
-        }
-
-        await queryRunner.manager.save(
-          this.payOutOrdersRepository.create({
-            id: payOutOrder.id,
-            status,
-            transferId: externalPayoutResponse.transaction_id,
-          }),
-        );
-      }
-
-      await queryRunner.commitTransaction();
-
-      return {
-        message: "Payout created successfully",
-        data: externalPayoutResponses,
-      };
-    } catch (err: any) {
-      this.logger.error(
-        `PAYOUT - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
-        err,
-      );
-      // Rollback transaction if any operation fails
-      await queryRunner.rollbackTransaction();
-      throw new BadRequestException(err.message);
-    } finally {
-      // Release the queryRunner to avoid memory leaks
-      await queryRunner.release();
-    }
-  }
-
   async createPayoutFlakPay(
     createPayoutDto: CreatePayoutDto,
     user: UsersEntity,
   ) {
-    const { data } = createPayoutDto;
+    const { data: payoutDataArr } = createPayoutDto;
 
-    if (data.length > 1000) {
+    if (payoutDataArr.length > 1000) {
       throw new BadRequestException("Maximum 1000 payouts allowed");
     }
 
@@ -659,7 +488,7 @@ export class PaymentsService {
     await queryRunner.startTransaction();
     try {
       // Validate amounts and calculate total
-      const totalAmount = data.reduce((acc, curr) => {
+      const totalAmount = payoutDataArr.reduce((acc, curr) => {
         if (curr.amount <= 0) {
           throw new BadRequestException("Amount should be greater than 0");
         }
@@ -680,7 +509,7 @@ export class PaymentsService {
       // Create payout orders in DB
       const payoutOrders = await this.createPayoutOrders(
         queryRunner,
-        data,
+        payoutDataArr,
         user,
         batchId,
       );
@@ -698,7 +527,77 @@ export class PaymentsService {
         message: "Payout process initiated",
         batchId,
         summary: {
-          total: data.length,
+          total: payoutDataArr.length,
+          status: "PROCESSING",
+        },
+      };
+    } catch (err) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Error initiating payouts`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createPayoutIsmart(
+    createPayoutDto: CreatePayoutDto,
+    user: UsersEntity,
+  ) {
+    const { data: payoutDataArr } = createPayoutDto;
+
+    if (payoutDataArr.length > 1000) {
+      throw new BadRequestException("Maximum 1000 payouts allowed");
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      // Validate amounts and calculate total
+      const totalAmount = payoutDataArr.reduce((acc, curr) => {
+        if (curr.amount <= 0) {
+          throw new BadRequestException("Amount should be greater than 0");
+        }
+
+        return acc + +curr.amount;
+      }, 0);
+
+      // Check and update wallet balance
+      const walletAfterDeduction = await this.validateAndUpdateWallet(
+        queryRunner,
+        user,
+        totalAmount,
+      );
+
+      // Create batch job identifier
+      const batchId = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
+
+      // Create payout orders in DB
+      const payoutOrders = await this.createPayoutOrders(
+        queryRunner,
+        payoutDataArr,
+        user,
+        batchId,
+      );
+
+      // Add to processing queue
+      await this.payoutQueue.add("process-payouts", {
+        payoutOrders,
+        userId: user.id,
+        batchId,
+      });
+
+      await queryRunner.commitTransaction();
+
+      return {
+        message: "Payout process initiated",
+        batchId,
+        summary: {
+          total: payoutDataArr.length,
           status: "PROCESSING",
         },
       };
@@ -786,6 +685,8 @@ export class PaymentsService {
             bankAccountNumber: payment.accountNumber,
             bankIfsc: payment.ifscCode,
             bankName: payment.bankName,
+            remarks: payment.remarks,
+            purpose: payment.purpose,
           }),
         );
 
