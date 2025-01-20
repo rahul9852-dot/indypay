@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { ILike, In, Repository } from "typeorm";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { Response } from "express";
 import { KycSubmissionDto } from "./dto/kyc.dto";
@@ -18,6 +18,8 @@ import {
 } from "@/utils/cookies.utils";
 import { appConfig } from "@/config/app.config";
 import { getOnboardingStatus } from "@/utils/helperFunctions.utils";
+import { PaginationDto } from "@/dtos/common.dto";
+import { getPagination } from "@/utils/pagination.utils";
 
 const {
   jwtConfig: {
@@ -213,5 +215,40 @@ export class KycService {
     }
 
     return kyc.media;
+  }
+
+  async getPendingKycUsers({
+    page = 1,
+    limit = 10,
+    search = "",
+    sort = "id",
+    order = "DESC",
+  }: PaginationDto) {
+    const [users, totalItems] = await this.userRepository.findAndCount({
+      where: {
+        ...(search && { fullName: ILike(`%${search}%`) }),
+        onboardingStatus: In([
+          ONBOARDING_STATUS.KYC_PENDING,
+          ONBOARDING_STATUS.SIGN_UP,
+          ONBOARDING_STATUS.KYC_REJECTED,
+        ]),
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      order: {
+        [sort]: order,
+      },
+    });
+
+    const pagination = getPagination({
+      totalItems,
+      limit,
+      page,
+    });
+
+    return {
+      data: users,
+      pagination,
+    };
   }
 }

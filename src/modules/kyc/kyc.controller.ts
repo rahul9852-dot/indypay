@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Res, Param } from "@nestjs/common";
+import { Controller, Get, Post, Body, Res, Param, Query } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Response } from "express";
 import { KycService } from "./kyc.service";
@@ -11,6 +11,7 @@ import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
+import { PaginationDto } from "@/dtos/common.dto";
 
 @ApiTags("KYC")
 @IgnoreKyc()
@@ -65,5 +66,14 @@ export class KycController {
   @IgnoreKyc()
   async getKycDocumentsByUserId(@Param("userId") userId: string) {
     return this.kycService.getKycDocumentsByUserId(userId);
+  }
+
+  @Get("pending")
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Get KYC pending users - Admin" })
+  @ApiOkResponse({ type: UsersEntity, isArray: true })
+  @IgnoreKyc()
+  async getPendingKycUsers(@Query() query: PaginationDto) {
+    return this.kycService.getPendingKycUsers(query);
   }
 }
