@@ -6,6 +6,7 @@ import {
   MoreThanOrEqual,
   Repository,
 } from "typeorm";
+import axios from "axios";
 import {
   BadRequestException,
   HttpStatus,
@@ -25,18 +26,26 @@ import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { UsersEntity } from "@/entities/user.entity";
 import { USERS_ROLE } from "@/enums";
-import { FALKPAY } from "@/constants/external-api.constant";
-import { getFlakPayPgConfig } from "@/utils/pg-config.utils";
+import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
+import {
+  getFlakPayPgConfig,
+  getIsmartPayPgConfig,
+} from "@/utils/pg-config.utils";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
-import { IExternalPayoutStatusResponseFlakPay } from "@/interface/external-api.interface";
+import {
+  IExternalPayoutStatusResponseFlakPay,
+  IExternalPayoutStatusResponseIsmart,
+} from "@/interface/external-api.interface";
 import { PayoutStatusDto } from "@/modules/payments/dto/create-payout-payment.dto";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
+import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 const { externalPaymentConfig } = appConfig();
 
 @Injectable()
 export class PayoutService {
+  private readonly logger = new CustomLogger(PayoutService.name);
   constructor(
     @InjectRepository(PayOutOrdersEntity)
     private readonly payoutRepository: Repository<PayOutOrdersEntity>,
@@ -426,6 +435,97 @@ export class PayoutService {
       orderId: payoutOrder.orderId,
       status,
       transferId: flakPayResponse.data.transferId,
+    };
+  }
+
+  async checkPayOutStatusTransactionIsmart({ orderId }: PayoutStatusDto) {
+    const payoutOrder = await this.payoutRepository.findOne({
+      where: { orderId },
+      relations: {
+        user: true,
+      },
+    });
+
+    if (!payoutOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payout order not found"),
+      );
+    }
+
+    if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
+      return {
+        orderId: payoutOrder.orderId,
+        status: payoutOrder.status,
+        transferId: payoutOrder.transferId,
+      };
+    }
+
+    // call api
+
+    const axiosServiceIsmart = new AxiosService(
+      ISMART_PAY.BASE_URL,
+      getIsmartPayPgConfig({
+        clientId: externalPaymentConfig.ismart.clientId,
+        clientSecret: externalPaymentConfig.ismart.clientSecret,
+      }),
+    );
+
+    const ismartPayResponse =
+      await axiosServiceIsmart.getRequest<IExternalPayoutStatusResponseIsmart>(
+        `${ISMART_PAY.PAYOUT_STATUS}/${payoutOrder.transferId}`,
+      );
+
+    if (!ismartPayResponse.status) {
+      throw new BadRequestException(
+        new MessageResponseDto(ismartPayResponse.message),
+      );
+    }
+
+    // update payout order
+
+    const status = convertExternalPaymentStatusToInternal(
+      ismartPayResponse.status_code.toUpperCase(),
+    );
+
+    await this.payoutRepository.save(
+      this.payoutRepository.create({
+        ...payoutOrder,
+        status,
+        transferId: ismartPayResponse.transaction_id,
+      }),
+    );
+
+    if (status !== payoutOrder.status) {
+      // send callback
+      const payoutCallbackUrl = payoutOrder.user.payOutWebhookUrl;
+
+      if (payoutCallbackUrl) {
+        axios
+          .post(payoutCallbackUrl, {
+            orderId: payoutOrder.orderId,
+            status,
+            amount: payoutOrder.amount,
+            txnRefId: ismartPayResponse.transaction_id,
+          })
+          .then(() => {
+            this.logger.info(
+              `PAYOUT - User webhook (${payoutOrder.user.payOutWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
+              payoutOrder,
+            );
+          })
+          .catch((err) => {
+            this.logger.error(
+              `PAYOUT - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+              err,
+            );
+          });
+      }
+    }
+
+    return {
+      orderId: payoutOrder.orderId,
+      status,
+      transferId: ismartPayResponse.transaction_id,
     };
   }
 }

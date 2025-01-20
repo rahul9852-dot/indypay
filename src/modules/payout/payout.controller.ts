@@ -48,7 +48,7 @@ export class PayoutController {
   @ApiOperation({ summary: "Check payout status" })
   @Post("status")
   async checkPayoutStatus(@Body() body: PayoutStatusDto) {
-    return this.payoutService.checkPayOutStatusTransactionFlakPay(body);
+    return this.payoutService.checkPayOutStatusTransactionIsmart(body);
   }
 
   @ApiOperation({ summary: "Get payout by id" })
