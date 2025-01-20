@@ -34,7 +34,10 @@ import {
 import { ExternalPayOutWebhookFlakPayDto } from "./dto/external-webhook-payout.dto";
 import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
-import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
+import {
+  MessageResponseDto,
+  PaginationWithDateAndStatusDto,
+} from "@/dtos/common.dto";
 import {
   PAYMENT_STATUS,
   PAYMENT_TYPE,
@@ -1143,7 +1146,8 @@ export class PaymentsService {
       search = "",
       startDate,
       endDate,
-    }: PaginationWithDateDto,
+      status,
+    }: PaginationWithDateAndStatusDto,
   ) {
     const whereQuery:
       | FindOptionsWhere<PayInOrdersEntity>
@@ -1158,6 +1162,12 @@ export class PaymentsService {
       whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
     }
     const query = [];
+
+    if (status) {
+      query.push({
+        status: status.toUpperCase(),
+      });
+    }
 
     if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
       if (search) {

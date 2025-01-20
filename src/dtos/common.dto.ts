@@ -1,6 +1,7 @@
 import { ApiPropertyOptional, ApiResponseProperty } from "@nestjs/swagger";
 import {
   IsDateString,
+  IsEnum,
   IsNumberString,
   IsOptional,
   IsString,
@@ -64,6 +65,15 @@ export class PaginationWithDateDto extends PaginationDto {
   @IsDateString()
   @IsOptional()
   endDate?: Date;
+}
+
+export class PaginationWithDateAndStatusDto extends PaginationWithDateDto {
+  @ApiPropertyOptional({
+    enum: ["pending", "success", "failed"],
+  })
+  @IsEnum(["pending", "success", "failed"])
+  @IsOptional()
+  status?: "pending" | "success" | "failed";
 }
 
 export class DateDto {

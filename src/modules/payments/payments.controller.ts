@@ -33,7 +33,10 @@ import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.deco
 import { Public } from "@/decorators/public.decorator";
 import { ApiKeyGuard } from "@/guard/api-key.guard";
 import { UsersEntity } from "@/entities/user.entity";
-import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
+import {
+  MessageResponseDto,
+  PaginationWithDateAndStatusDto,
+} from "@/dtos/common.dto";
 import { WebhookGuard } from "@/guard/webhook.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
@@ -132,7 +135,7 @@ export class PaymentsController {
   @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   async getTransactionsForDashboard(
     @User() user: UsersEntity,
-    @Query() paginationDto: PaginationWithDateDto,
+    @Query() paginationDto: PaginationWithDateAndStatusDto,
   ) {
     return this.paymentsService.getTransactionsDetails(user, paginationDto);
   }
