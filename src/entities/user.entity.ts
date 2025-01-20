@@ -23,6 +23,7 @@ import { TransactionsEntity } from "./transaction.entity";
 import { UserWhitelistIpsEntity } from "./user-whitelist-ip.entity";
 import { SettlementsEntity } from "./settlements.entity";
 import { WalletEntity } from "./wallet.entity";
+import { WalletTopupEntity } from "./wallet-topup.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import {
   ONBOARDING_STATUS,
@@ -161,6 +162,9 @@ export class UsersEntity {
 
   @OneToMany(() => UserBankDetailsEntity, ({ user }) => user, { cascade: true })
   bankDetails: UserBankDetailsEntity[];
+
+  @OneToMany(() => WalletTopupEntity, ({ user }) => user, { cascade: true })
+  walletTopup: WalletTopupEntity[];
 
   @OneToMany(() => UserApiKeysEntity, ({ user }) => user, { cascade: true })
   apiKeys: UserApiKeysEntity[];

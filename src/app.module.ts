@@ -10,6 +10,7 @@ import { PaginationGuard } from "./guard/pagination.guard";
 import { AppController } from "./app.controller";
 import { migrationConfig } from "./config/migration.config";
 import { PayoutModule } from "./modules/payout/payout.module";
+import { WalletsModule } from "./modules/wallets/wallets.module";
 import { appConfig } from "@/config/app.config";
 import { dbConfig } from "@/config/db.config";
 import { AuthModule } from "@/modules/auth/auth.module";
@@ -47,6 +48,7 @@ import { ChannelPartnersModule } from "@/modules/channel-partners/channel-partne
     SsoModule,
     ChannelPartnersModule,
     PayoutModule,
+    WalletsModule,
   ],
   controllers: [AppController],
   providers: [

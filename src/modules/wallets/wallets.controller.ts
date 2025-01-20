@@ -1,0 +1,50 @@
+import { ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { WalletsService } from "./wallets.service";
+import { WalletTopUpDto } from "./dto/wallet.dto";
+import { User } from "@/decorators/user.decorator";
+import { UsersEntity } from "@/entities/user.entity";
+import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
+import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
+import { Role } from "@/decorators/role.decorator";
+import { USERS_ROLE } from "@/enums";
+import { PaginationDto } from "@/dtos/common.dto";
+
+@ApiTags("Wallets")
+@IgnoreBusinessDetails()
+@IgnoreKyc()
+@Controller("wallets")
+export class WalletsController {
+  constructor(private readonly walletsService: WalletsService) {}
+
+  @Get()
+  getWallet(@User() user: UsersEntity) {
+    return this.walletsService.getWallet(user.id);
+  }
+
+  @Get("/admin/:userId")
+  async getWalletAdmin(@Param("userId") userId: string) {
+    return this.walletsService.getWallet(userId);
+  }
+
+  @Get("transactions")
+  getTransactions(
+    @User() user: UsersEntity,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
+      return this.walletsService.getTopupTransactionsAdmin(paginationDto);
+    } else {
+      return this.walletsService.getTopupTransactions(user.id, paginationDto);
+    }
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Post("top-up")
+  topUpWallet(
+    @User() user: UsersEntity,
+    @Body() { amount, userId: merchantUserId }: WalletTopUpDto,
+  ) {
+    return this.walletsService.topUpWallet(merchantUserId, user, amount);
+  }
+}

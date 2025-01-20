@@ -45,6 +45,7 @@ export class SettlementsEntity {
 
   @ManyToOne(() => UserBankDetailsEntity, ({ settlements }) => settlements, {
     onDelete: "CASCADE",
+    nullable: true,
   })
   bankDetails: UserBankDetailsEntity;
 
