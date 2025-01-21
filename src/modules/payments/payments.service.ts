@@ -600,12 +600,11 @@ export class PaymentsService {
         message: "Payout process initiated",
         batchId,
         payoutOrders: payoutOrders.map((payout) => ({
-          id: payout.id,
           orderId: payout.orderId,
           name: payout.name,
           amount: payout.amount,
           status: payout.status,
-          bankAccountNumber: payout.bankAccountNumber,
+          accountNumber: payout.bankAccountNumber,
           bankName: payout.bankName,
           ifscCode: payout.bankIfsc,
         })),
