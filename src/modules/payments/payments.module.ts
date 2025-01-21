@@ -22,6 +22,7 @@ import { UserAddressEntity } from "@/entities/user-address.entity";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { SNSService } from "@/modules/aws/sns.service";
+import { PayoutService } from "@/modules/payout/payout.service";
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { SNSService } from "@/modules/aws/sns.service";
     SNSService,
     SESService,
     PayoutProcessor,
+    PayoutService,
   ],
   controllers: [PaymentsController],
 })

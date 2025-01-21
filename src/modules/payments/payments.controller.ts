@@ -40,13 +40,17 @@ import {
 import { WebhookGuard } from "@/guard/webhook.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
+import { PayoutService } from "@/modules/payout/payout.service";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
 @ApiTags("Payments")
 @Controller("payments")
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(
+    private readonly paymentsService: PaymentsService,
+    private readonly payoutService: PayoutService,
+  ) {}
 
   @Public()
   @ApiOperation({ summary: "Create pay-in transaction" })
@@ -98,7 +102,7 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @Post("payout/status")
   async checkStatusTransactionPayout(@Body() payoutStatusDto: PayoutStatusDto) {
-    return this.paymentsService.checkPayOutStatusTransactionFlakPay(
+    return this.payoutService.checkPayOutStatusTransactionIsmart(
       payoutStatusDto,
     );
   }
