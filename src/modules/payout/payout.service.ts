@@ -507,10 +507,19 @@ export class PayoutService {
             amount: payoutOrder.amount,
             txnRefId: ismartPayResponse.transaction_id,
           })
-          .then(() => {
+          .then((res) => {
             this.logger.info(
               `PAYOUT - User webhook (${payoutOrder.user.payOutWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
-              payoutOrder,
+              {
+                orderId: payoutOrder.orderId,
+                status,
+                amount: payoutOrder.amount,
+                txnRefId: ismartPayResponse.transaction_id,
+              },
+            );
+            this.logger.info(
+              `PAYOUT - externalPayinWebhookUpdateStatus - webhook response: ${LoggerPlaceHolder.Json}`,
+              res.data,
             );
           })
           .catch((err) => {
