@@ -1390,37 +1390,40 @@ export class PaymentsService {
     }
     const query = [];
 
-    if (status) {
-      query.push({
-        status: status.toUpperCase(),
-      });
-    }
+    const internalStatus = status
+      ? convertExternalPaymentStatusToInternal(status.toUpperCase())
+      : undefined;
 
     if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
       if (search) {
         const orderIdSearch = {
           orderId: ILike(`%${search}%`),
+          status: internalStatus,
         };
 
         const txnRefSearch = {
           txnRefId: ILike(`%${search}%`),
+          status: internalStatus,
         };
 
         const userIdSearch = {
           user: {
             id: ILike(`%${search}%`),
+            status: internalStatus,
           },
         };
 
         const nameSearch = {
           user: {
             fullName: ILike(`%${search}%`),
+            status: internalStatus,
           },
         };
 
         const emailSearch = {
           user: {
             email: ILike(`%${search}%`),
+            status: internalStatus,
           },
         };
 
@@ -1428,6 +1431,7 @@ export class PaymentsService {
           user: {
             mobile: ILike(`%${search}%`),
           },
+          status: internalStatus,
         };
 
         query.push(orderIdSearch);
@@ -1443,6 +1447,7 @@ export class PaymentsService {
           user: {
             id: user.id,
           },
+          status: internalStatus,
         };
 
         const orderIdSearch = {
@@ -1450,6 +1455,7 @@ export class PaymentsService {
             id: user.id,
           },
           orderId: ILike(`%${search}%`),
+          status: internalStatus,
         };
 
         const txnRefSearch = {
@@ -1457,6 +1463,7 @@ export class PaymentsService {
             id: user.id,
           },
           txnRefId: ILike(`%${search}%`),
+          status: internalStatus,
         };
 
         const nameSearch = {
@@ -1464,6 +1471,7 @@ export class PaymentsService {
             id: user.id,
             fullName: ILike(`%${search}%`),
           },
+          status: internalStatus,
         };
 
         const emailSearch = {
@@ -1471,6 +1479,7 @@ export class PaymentsService {
             id: user.id,
             email: ILike(`%${search}%`),
           },
+          status: internalStatus,
         };
 
         const mobileSearch = {
@@ -1478,6 +1487,7 @@ export class PaymentsService {
             id: user.id,
             mobile: ILike(`%${search}%`),
           },
+          status: internalStatus,
         };
 
         query.push(userIdSearch);
@@ -1491,6 +1501,7 @@ export class PaymentsService {
           user: {
             id: user.id,
           },
+          status: internalStatus,
         });
       }
     }
