@@ -26,7 +26,7 @@ import {
   PayoutStatusDto,
 } from "./dto/create-payout-payment.dto";
 import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
-import { ExternalPayOutWebhookFlakPayDto } from "./dto/external-webhook-payout.dto";
+import { ExternalPayoutWebhookIsmartDto } from "./dto/external-webhook-payout.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -126,9 +126,9 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payout/webhook")
   async externalWebhookPayout(
-    @Body() externalWebhookPayout: ExternalPayOutWebhookFlakPayDto,
+    @Body() externalWebhookPayout: ExternalPayoutWebhookIsmartDto,
   ) {
-    return this.paymentsService.externalWebhookPayoutFlaPay(
+    return this.paymentsService.externalWebhookPayoutIsmart(
       externalWebhookPayout,
     );
   }

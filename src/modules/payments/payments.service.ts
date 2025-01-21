@@ -31,7 +31,10 @@ import {
   PayoutStatusDto,
   SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
-import { ExternalPayOutWebhookFlakPayDto } from "./dto/external-webhook-payout.dto";
+import {
+  ExternalPayOutWebhookFlakPayDto,
+  ExternalPayoutWebhookIsmartDto,
+} from "./dto/external-webhook-payout.dto";
 import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import {
@@ -1038,6 +1041,221 @@ export class PaymentsService {
 
       return new MessageResponseDto("Transaction status updated successfully.");
     } else {
+      const payOutOrder = await this.payOutOrdersRepository.findOne({
+        where: {
+          orderId: order_id,
+        },
+        relations: ["user"],
+      });
+
+      if (!payOutOrder) {
+        throw new NotFoundException(
+          new MessageResponseDto("Payin order not found"),
+        );
+      }
+
+      if (payOutOrder.status === status) {
+        this.logger.info(
+          `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
+        );
+
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+        );
+      }
+
+      if (status === PAYMENT_STATUS.SUCCESS) {
+        const payOutOrderRaw = this.payOutOrdersRepository.create({
+          id: payOutOrder.id,
+          status,
+          successAt: new Date(),
+          transferId: transaction_id,
+        });
+
+        await this.payOutOrdersRepository.save(payOutOrderRaw);
+      }
+
+      if (status === PAYMENT_STATUS.FAILED) {
+        const payOutOrderRaw = this.payOutOrdersRepository.create({
+          id: payOutOrder.id,
+          status,
+          failureAt: new Date(),
+          transferId: transaction_id,
+        });
+
+        await this.payOutOrdersRepository.save(payOutOrderRaw);
+
+        const wallet = await this.walletRepository.findOne({
+          where: {
+            user: {
+              id: payOutOrder.user.id,
+            },
+          },
+          relations: {
+            user: true,
+          },
+        });
+
+        const commissionRate = +wallet.user.commissionInPercentagePayout / 100;
+        const gstRate =
+          (commissionRate * +wallet.user.gstInPercentagePayout) / 100;
+
+        const totalDeductionRate = commissionRate + gstRate;
+
+        if (totalDeductionRate >= 1) {
+          throw new BadRequestException(
+            "Invalid rates: Total deduction cannot be equal or greater than 1.",
+          );
+        }
+        const actualAmount = +amount / (1 + totalDeductionRate / 100);
+        const serviceCharge = +amount - actualAmount;
+
+        // update wallet
+        await this.walletRepository.save(
+          this.walletRepository.create({
+            id: wallet.id,
+            availablePayoutBalance: +wallet.availablePayoutBalance + amount, // 600
+            totalPayout: +wallet.totalPayout - +actualAmount, // 500
+            payoutServiceCharge: +wallet.payoutServiceCharge + serviceCharge, // 100
+          }),
+        );
+      }
+
+      // send webhook
+      if (payOutOrder.user.payOutWebhookUrl) {
+        axios
+          .post(payOutOrder.user.payOutWebhookUrl, {
+            orderId: order_id,
+            status,
+            amount,
+            txnRefId: transaction_id,
+          })
+          .then(() => {
+            this.logger.info(
+              `PAYOUT - User webhook (${payOutOrder.user.payOutWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
+              payOutOrder,
+            );
+          })
+          .catch((err) => {
+            this.logger.error(
+              `PAYOUT - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+              err,
+            );
+          });
+      }
+
+      return new MessageResponseDto("Payout status updated successfully.");
+    }
+  }
+
+  async externalWebhookPayoutIsmart({
+    status_code,
+    order_id,
+    transaction_id,
+    amount,
+  }: ExternalPayoutWebhookIsmartDto) {
+    const status = convertExternalPaymentStatusToInternal(
+      status_code.toUpperCase(),
+    );
+
+    const [idPrefix] = order_id.split("_");
+
+    const isSettlement = idPrefix === ID_TYPE.SETTLEMENT_PAYOUT;
+
+    // for settlement payouts
+    if (isSettlement) {
+      const settlement = await this.settlementRepository.findOne({
+        where: {
+          id: order_id,
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (!settlement) {
+        throw new BadRequestException(
+          new MessageResponseDto("No Settlement Found"),
+        );
+      }
+
+      if (settlement.status === status) {
+        this.logger.info(
+          `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
+        );
+
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+        );
+      }
+
+      if (status === PAYMENT_STATUS.SUCCESS) {
+        const settlementRaw = this.settlementRepository.create({
+          id: order_id,
+          status,
+          successAt: new Date(),
+          transferId: transaction_id,
+        });
+
+        await this.settlementRepository.save(settlementRaw);
+      }
+
+      if (status === PAYMENT_STATUS.FAILED) {
+        const settlementRaw = this.settlementRepository.create({
+          id: order_id,
+          status,
+          failureAt: new Date(),
+          transferId: transaction_id,
+        });
+
+        await this.settlementRepository.save(settlementRaw);
+
+        const userId = settlement.user.id;
+
+        const wallet = await this.walletRepository.findOne({
+          where: {
+            user: {
+              id: userId,
+            },
+          },
+          relations: {
+            user: true,
+          },
+        });
+
+        const { commissionInPercentagePayin, gstInPercentagePayin } =
+          wallet.user;
+
+        const { totalCollections, unsettledAmount } = wallet ?? {};
+
+        const { commissionAmount, gstAmount, netPayableAmount } =
+          getCommissions({
+            amount: +amount,
+            commissionInPercentage: +commissionInPercentagePayin,
+            gstInPercentage: +gstInPercentagePayin,
+          });
+
+        const walletRaw = this.walletRepository.create({
+          ...(wallet?.id && { id: wallet.id }),
+          totalCollections:
+            (totalCollections ? +totalCollections : 0) + +amount,
+          unsettledAmount: (unsettledAmount ? +unsettledAmount : 0) + +amount,
+          commissionAmount:
+            (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
+            +commissionAmount,
+          gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
+          netPayableAmount:
+            (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
+            +netPayableAmount,
+          user: wallet.user,
+        });
+
+        await this.walletRepository.save(walletRaw);
+      }
+
+      return new MessageResponseDto("Transaction status updated successfully.");
+    } else {
+      // for merchant payouts
       const payOutOrder = await this.payOutOrdersRepository.findOne({
         where: {
           orderId: order_id,
