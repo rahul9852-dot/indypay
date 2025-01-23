@@ -231,6 +231,7 @@ export class KycService {
           ONBOARDING_STATUS.KYC_PENDING,
           ONBOARDING_STATUS.SIGN_UP,
           ONBOARDING_STATUS.KYC_REJECTED,
+          ONBOARDING_STATUS.KYC_ON_HOLD,
         ]),
       },
       skip: (page - 1) * limit,
