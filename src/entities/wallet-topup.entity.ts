@@ -41,6 +41,6 @@ export class WalletTopupEntity {
 
   @BeforeInsert()
   beforeInsertHook() {
-    this.id = getUlidId(ID_TYPE.WALLET);
+    this.id = getUlidId(ID_TYPE.WALLET_TOPUP);
   }
 }

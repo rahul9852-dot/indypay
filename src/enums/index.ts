@@ -93,6 +93,7 @@ export enum ID_TYPE {
   USER_MULTI_FACTOR_AUTH = "umfa",
   USER_WHITELIST_IP = "uwip",
   WALLET = "wlt",
+  WALLET_TOPUP = "wtop",
 }
 
 export enum ONBOARDING_STATUS {
