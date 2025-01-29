@@ -10,7 +10,9 @@ import { PaginationGuard } from "./guard/pagination.guard";
 import { AppController } from "./app.controller";
 import { migrationConfig } from "./config/migration.config";
 import { PayoutModule } from "./modules/payout/payout.module";
+import { InvoiceModule } from "./modules/invoices/invoice.module";
 import { WalletsModule } from "./modules/wallets/wallets.module";
+import { CustomerModule } from "./modules/customers/customer.module";
 import { appConfig } from "@/config/app.config";
 import { dbConfig } from "@/config/db.config";
 import { AuthModule } from "@/modules/auth/auth.module";
@@ -48,7 +50,9 @@ import { ChannelPartnersModule } from "@/modules/channel-partners/channel-partne
     SsoModule,
     ChannelPartnersModule,
     PayoutModule,
+    InvoiceModule,
     WalletsModule,
+    CustomerModule,
   ],
   controllers: [AppController],
   providers: [

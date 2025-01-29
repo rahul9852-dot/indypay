@@ -4,6 +4,7 @@ import * as handlebars from "handlebars";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { CustomLogger } from "@/logger";
+import { INVOICE_STATUS } from "@/enums";
 
 @Injectable()
 export class InvoiceService {
@@ -191,6 +192,35 @@ export class InvoiceService {
   </html>
   `;
 
+  private readonly customerInvoiceTemplate = `<!DOCTYPE html>
+    <html>
+      <head>
+        <title>Invoice for {{customer.name}}</title>
+        <style>
+          /* Add styles for your PDF here */
+        </style>
+      </head>
+      <body>
+        <div style="text-align: center;">
+          <img src="data:image/png;base64,{{logo}}" alt="Logo" />
+        </div>
+        <h1>Invoice</h1>
+        <p>Invoice Number: {{transferMode}}</p>
+        <p>Amount: ₹{{amount}}</p>
+        <p>Remarks: {{remarks}}</p>
+        <p>Status: {{status}}</p>
+        <p>Customer: {{customer.name}}</p>
+        <p>Date: {{dateTime}}</p>
+        <h2>Billing Address</h2>
+        <p>{{address.billing.name}}</p>
+        <p>{{address.billing.billingAddress}}</p>
+        <h2>Shipping Address</h2>
+        <p>{{address.shipping.name}}</p>
+        <p>{{address.shipping.shippingAddress}}</p>
+      </body>
+    </html>
+`;
+
   async generateInvoicePDF(data: {
     amount: number;
     transferMode: string;
@@ -275,6 +305,83 @@ export class InvoiceService {
       return Buffer.from(pdfBuffer);
     } catch (error) {
       this.logger.error("Error generating invoice PDF", error);
+      throw error;
+    }
+  }
+
+  async generateInvoiceToCustomer(data: {
+    amount: number;
+    userName: string;
+    remarks: string;
+    status: INVOICE_STATUS;
+    dateTime: Date;
+    address: {
+      billing: {
+        name: string;
+        billingAddress: string;
+      };
+      shipping: {
+        name: string;
+        shippingAddress: string;
+      };
+    };
+    customer: {
+      name: string;
+      email: string;
+    };
+  }): Promise<Buffer> {
+    try {
+      // Use process.cwd() to get the project root directory
+      const logoPath = path.join(
+        process.cwd(),
+        "src/assets/images/paybolt-icon.png",
+      );
+
+      let logoBase64 = "";
+      try {
+        const logo = await fs.readFile(logoPath);
+        logoBase64 = logo.toString("base64");
+      } catch (err) {
+        this.logger.warn("Could not load logo image, proceeding without it");
+      }
+
+      // Use a different template for the customer-specific invoice
+      const template = handlebars.compile(this.customerInvoiceTemplate);
+      const html = template({
+        ...data,
+        logo: logoBase64,
+      });
+
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
+
+      const page = await browser.newPage();
+      await page.setDefaultNavigationTimeout(this.TIMEOUT);
+      await page.setDefaultTimeout(this.TIMEOUT);
+
+      await page.setContent(html, {
+        waitUntil: ["domcontentloaded"],
+        timeout: this.TIMEOUT,
+      });
+
+      const pdfBuffer = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: {
+          top: "20px",
+          right: "20px",
+          bottom: "20px",
+          left: "20px",
+        },
+      });
+
+      await browser.close();
+
+      return Buffer.from(pdfBuffer);
+    } catch (error) {
+      this.logger.error("Error generating invoice to customer PDF", error);
       throw error;
     }
   }

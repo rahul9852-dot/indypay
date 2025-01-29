@@ -73,7 +73,9 @@ export enum DESIGNATION {
 
 export enum ID_TYPE {
   BUSINESS_DETAILS = "bsd",
+  CUSTOMER = "cst",
   INTERNAL_USER = "itu",
+  INVOICES = "inv",
   MEDIA_KYC = "mda",
   MERCHANT_PAYOUT = "mpout",
   ONBOARDING_USER = "onu",
@@ -175,4 +177,10 @@ export enum THIRDPARTY_PG {
   FLAK_PAY = "flakpay",
   ISMART_PAY = "ismartpay",
   PAYNPRO = "paynpro",
+}
+
+export enum INVOICE_STATUS {
+  DRAFT = 1,
+  SENT = 2,
+  FAILED = 3,
 }

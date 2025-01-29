@@ -24,6 +24,7 @@ import { UserWhitelistIpsEntity } from "./user-whitelist-ip.entity";
 import { SettlementsEntity } from "./settlements.entity";
 import { WalletEntity } from "./wallet.entity";
 import { WalletTopupEntity } from "./wallet-topup.entity";
+import { CustomerEntity } from "./invoice-customer.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import {
   ONBOARDING_STATUS,
@@ -31,6 +32,7 @@ import {
   USERS_ROLE,
   ID_TYPE,
 } from "@/enums";
+import { InvoiceEntity } from "@/entities/invoice.entity";
 
 @Entity("users")
 export class UsersEntity {
@@ -168,6 +170,14 @@ export class UsersEntity {
 
   @OneToMany(() => UserApiKeysEntity, ({ user }) => user, { cascade: true })
   apiKeys: UserApiKeysEntity[];
+
+  @OneToMany(() => InvoiceEntity, ({ user }) => user, { cascade: true })
+  invoices: InvoiceEntity[];
+
+  @OneToMany(() => CustomerEntity, ({ merchant }) => merchant, {
+    cascade: true,
+  })
+  customers: CustomerEntity[];
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
