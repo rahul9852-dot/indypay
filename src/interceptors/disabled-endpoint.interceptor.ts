@@ -3,7 +3,7 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
-  UnauthorizedException,
+  NotFoundException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { Observable } from "rxjs";
@@ -19,7 +19,7 @@ export class DisabledEndpointInterceptor implements NestInterceptor {
       context.getHandler(),
     );
     if (isDisabled) {
-      throw new UnauthorizedException(
+      throw new NotFoundException(
         "This API endpoint is disabled. Please contact support.",
       );
     }
