@@ -96,7 +96,7 @@ export class ApiKeyGuard implements CanActivate {
 
       this.logger.info(
         `user whitelist ips: ${LoggerPlaceHolder.Json}`,
-        userWhitelistIps,
+        userWhitelistIps.map((ip) => ip.ipAddress),
       );
 
       const isIpWhitelisted = userWhitelistIps.some(

@@ -35,7 +35,10 @@ import {
   ExternalPayOutWebhookFlakPayDto,
   ExternalPayoutWebhookIsmartDto,
 } from "./dto/external-webhook-payout.dto";
-import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
+import {
+  ExternalPayinWebhookFlakPayDto,
+  ExternalPayinWebhookIsmartDto,
+} from "./dto/external-webhook-payin.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import {
   MessageResponseDto,
@@ -532,6 +535,9 @@ export class PaymentsService {
       return {
         message: "Payout process initiated",
         batchId,
+        payoutOrders: payoutOrders.map((payout) => ({
+          orderId: payout.orderId,
+        })),
         summary: {
           total: payoutDataArr.length,
           status: "PROCESSING",
@@ -803,13 +809,139 @@ export class PaymentsService {
   }
 
   // Ismart
-  async externalWebhookPayin(
+  async externalWebhookPayinIsmart(
     externalPayinWebhookDto: ExternalPayinWebhookIsmartDto,
   ) {
     const {
       order_id: orderId,
       status_code,
       transaction_id: txnRefId,
+    } = externalPayinWebhookDto;
+
+    const status = convertExternalPaymentStatusToInternal(status_code);
+
+    const payinOrder = await this.payInOrdersRepository.findOne({
+      where: {
+        orderId,
+      },
+      relations: ["user"],
+    });
+
+    if (!payinOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payin order not found"),
+      );
+    }
+
+    if (status === payinOrder.status) {
+      this.logger.info(
+        `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+      );
+
+      return new MessageResponseDto("Status updated successfully.");
+    }
+
+    const { user } = payinOrder;
+
+    const payinOrderRaw = this.payInOrdersRepository.create({
+      id: payinOrder.id,
+      status,
+      txnRefId,
+      ...(status === PAYMENT_STATUS.SUCCESS && {
+        successAt: new Date(),
+      }),
+      ...(status === PAYMENT_STATUS.FAILED && {
+        failureAt: new Date(),
+      }),
+    });
+
+    await this.payInOrdersRepository.save(payinOrderRaw);
+
+    // update wallet
+    if (status === PAYMENT_STATUS.SUCCESS) {
+      const wallet = await this.walletRepository.findOne({
+        where: { user: { id: user.id } },
+        relations: ["user"],
+      });
+
+      await this.cacheManager.del(
+        REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
+      );
+
+      const { totalCollections, unsettledAmount } = wallet ?? {};
+
+      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+        amount: +payinOrder.amount,
+        commissionInPercentage: +user.commissionInPercentagePayin,
+        gstInPercentage: +user.gstInPercentagePayin,
+      });
+
+      const walletRaw = this.walletRepository.create({
+        ...(wallet?.id && { id: wallet.id }),
+        totalCollections:
+          (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
+        unsettledAmount:
+          (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
+        commissionAmount:
+          (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
+          +commissionAmount,
+        gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
+        netPayableAmount:
+          (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
+          +netPayableAmount,
+        user,
+      });
+
+      await this.walletRepository.save(walletRaw);
+
+      this.logger.info(
+        `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+        walletRaw,
+      );
+    }
+
+    if (user?.payInWebhookUrl) {
+      const webhookPayload = {
+        orderId,
+        status,
+        amount: payinOrder.amount,
+        txnRefId: payinOrder.txnRefId, // utr
+      };
+      this.logger.info(
+        `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+        webhookPayload,
+      );
+      axios
+        .post(user.payInWebhookUrl, webhookPayload, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+        .then(() => {
+          this.logger.info(
+            `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
+            user,
+          );
+        })
+        .catch((err) => {
+          this.logger.error(
+            `PAYIN - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+            err,
+          );
+        });
+    }
+
+    return new MessageResponseDto("Transaction status updated successfully.");
+  }
+
+  // Ismart
+  async externalWebhookPayinFlakPay(
+    externalPayinWebhookDto: ExternalPayinWebhookFlakPayDto,
+  ) {
+    const {
+      orderId,
+      status: status_code,
+      transactionRefId: txnRefId,
     } = externalPayinWebhookDto;
 
     const status = convertExternalPaymentStatusToInternal(status_code);

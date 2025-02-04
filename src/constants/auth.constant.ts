@@ -11,3 +11,5 @@ export const IGNORE_KYC_KEY = "ignoreKyc";
 export const ROLES_KEY = "roles";
 
 export const PUBLIC_KEY = "isPublic";
+
+export const DISABLED_ENDPOINT_KEY = "disabledEndpoint";

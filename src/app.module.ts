@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
 
 import { AuthGuard } from "./guard/auth.guard";
@@ -27,6 +27,7 @@ import { CollectionsModule } from "@/modules/collections/collections.module";
 import { BanksModule } from "@/modules/banks/banks.module";
 import { SsoModule } from "@/modules/sso/sso.module";
 import { ChannelPartnersModule } from "@/modules/channel-partners/channel-partners.module";
+import { DisabledEndpointInterceptor } from "@/interceptors/disabled-endpoint.interceptor";
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { ChannelPartnersModule } from "@/modules/channel-partners/channel-partne
   controllers: [AppController],
   providers: [
     JwtService,
+
     {
       provide: APP_GUARD,
       useClass: PaginationGuard,
@@ -68,6 +70,10 @@ import { ChannelPartnersModule } from "@/modules/channel-partners/channel-partne
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: DisabledEndpointInterceptor,
     },
 
     // {

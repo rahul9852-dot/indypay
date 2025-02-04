@@ -18,15 +18,15 @@ import { PaymentsService } from "./payments.service";
 import {
   CreatePayinPaymentResponseDto,
   PayinStatusDto,
-  CreatePayinTransactionIsmartDto,
+  CreatePayinTransactionFlaPayDto,
 } from "./dto/create-payin-payment.dto";
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
   CreatePayoutDto,
   PayoutStatusDto,
 } from "./dto/create-payout-payment.dto";
-import { ExternalPayinWebhookIsmartDto } from "./dto/external-webhook-payin.dto";
-import { ExternalPayoutWebhookIsmartDto } from "./dto/external-webhook-payout.dto";
+import { ExternalPayinWebhookFlakPayDto } from "./dto/external-webhook-payin.dto";
+import { ExternalPayOutWebhookFlakPayDto } from "./dto/external-webhook-payout.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -41,6 +41,7 @@ import { WebhookGuard } from "@/guard/webhook.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { PayoutService } from "@/modules/payout/payout.service";
+import { DisabledEndpoint } from "@/decorators/disabled-endpoint.decorator";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -58,37 +59,19 @@ export class PaymentsController {
   @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })
   @Post("payin/create")
   async createPayInTransaction(
-    @Body() createTransactionDto: CreatePayinTransactionIsmartDto,
+    @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createTransactionPayinIsmart(
+    return this.paymentsService.createTransactionPayinFlakPay(
       createTransactionDto,
       user,
     );
   }
 
   @Public()
-  @ApiOperation({ summary: "Create pay-out transaction" })
-  @UseGuards(ApiKeyGuard)
-  @Post("payout/create")
-  async createPayout(
-    @Body() createPayoutDto: CreatePayoutDto,
-    @User() user: UsersEntity,
-  ) {
-    return this.paymentsService.createPayoutIsmart(createPayoutDto, user);
-  }
-
-  @ApiOperation({ summary: "Create pay-out transaction for dashboard" })
-  @Post("payout/dashboard")
-  async createPayoutDashboardIsmart(
-    @Body() createPayoutIsmartDto: CreatePayoutDto,
-    @User() user: UsersEntity,
-  ) {
-    return this.paymentsService.createPayoutIsmart(createPayoutIsmartDto, user);
-  }
-
-  @Public()
-  @ApiOperation({ summary: "Check status of pay-in transaction" })
+  @ApiOperation({
+    summary: "Check status of pay-in transaction",
+  })
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)
   @Post("payin/status")
@@ -96,13 +79,48 @@ export class PaymentsController {
     return this.paymentsService.checkPayInStatusTransaction(payinStatusDto);
   }
 
+  // IMP: This endpoint is disabled
+  @DisabledEndpoint()
   @Public()
-  @ApiOperation({ summary: "Check status of pay-out transaction" })
+  @ApiOperation({ summary: "Create pay-out transaction", deprecated: true })
+  @UseGuards(ApiKeyGuard)
+  @Post("payout/create")
+  async createPayout(
+    @Body() createPayoutDto: CreatePayoutDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutFlakPay(createPayoutDto, user);
+  }
+
+  // IMP: This endpoint is disabled
+  @DisabledEndpoint()
+  @ApiOperation({
+    summary: "Create pay-out transaction for dashboard",
+    deprecated: true,
+  })
+  @Post("payout/dashboard")
+  async createPayoutDashboardIsmart(
+    @Body() createPayoutIsmartDto: CreatePayoutDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutFlakPay(
+      createPayoutIsmartDto,
+      user,
+    );
+  }
+
+  // IMP: This endpoint is disabled
+  @DisabledEndpoint()
+  @Public()
+  @ApiOperation({
+    summary: "Check status of pay-out transaction",
+    deprecated: true,
+  })
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)
   @Post("payout/status")
   async checkStatusTransactionPayout(@Body() payoutStatusDto: PayoutStatusDto) {
-    return this.payoutService.checkPayOutStatusTransactionIsmart(
+    return this.payoutService.checkPayOutStatusTransactionFlakPay(
       payoutStatusDto,
     );
   }
@@ -114,9 +132,11 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
   async externalWebhookPayin(
-    @Body() externalPayinWebhookDto: ExternalPayinWebhookIsmartDto,
+    @Body() externalPayinWebhookDto: ExternalPayinWebhookFlakPayDto,
   ) {
-    return this.paymentsService.externalWebhookPayin(externalPayinWebhookDto);
+    return this.paymentsService.externalWebhookPayinFlakPay(
+      externalPayinWebhookDto,
+    );
   }
 
   @Public()
@@ -126,9 +146,9 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payout/webhook")
   async externalWebhookPayout(
-    @Body() externalWebhookPayout: ExternalPayoutWebhookIsmartDto,
+    @Body() externalWebhookPayout: ExternalPayOutWebhookFlakPayDto,
   ) {
-    return this.paymentsService.externalWebhookPayoutIsmart(
+    return this.paymentsService.externalWebhookPayoutFlaPay(
       externalWebhookPayout,
     );
   }

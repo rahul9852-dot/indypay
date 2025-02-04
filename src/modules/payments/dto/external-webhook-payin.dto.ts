@@ -134,6 +134,28 @@ export class ExternalPayinWebhookIsmartDto {
   transaction_id?: string;
 }
 
+export class ExternalPayinWebhookFlakPayDto {
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  status: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  transactionRefId?: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+}
+
 export class ExternalPayinWebhookPayNProDto {
   @ApiProperty()
   @IsString()

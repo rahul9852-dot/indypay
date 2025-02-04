@@ -1426,7 +1426,7 @@ export class SettlementsService {
     return { data, pagination };
   }
 
-  async checkSettlementStatusIsmart(settlementId: string) {
+  async checkSettlementStatus(settlementId: string) {
     const settlement = await this.settlementsRepository.findOne({
       where: {
         id: settlementId,
