@@ -7,4 +7,5 @@ export const REDIS_KEYS = {
   SSO_TOKEN: (clientId: string) => `sso_token_entity_${clientId}`,
   OTP_KEY: (mobile: string) => `otp_to_${mobile}`,
   PAYMENT_STATUS: (orderId: string) => `payment_status_${orderId}`,
+  SUCCESS_COUNT: "pin_success_count",
 };

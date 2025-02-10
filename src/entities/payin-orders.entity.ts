@@ -52,6 +52,9 @@ export class PayInOrdersEntity {
   @Column({ nullable: true })
   paymentLink: string;
 
+  @Column({ default: false })
+  isMisspelled: boolean;
+
   @Column({ type: "numeric", precision: 10, scale: 2, default: 4.5 })
   commissionInPercentage: number;
 

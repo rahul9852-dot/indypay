@@ -82,6 +82,7 @@ export enum ID_TYPE {
   ONBOARDING_USER = "onu",
   ORDER = "ord",
   OTP = "otp",
+  PAYIN_KEY = "pin",
   PAYOUT_BATCH_KEY = "pbatch",
   PAYOUT_KEY = "pout",
   PG_CONFIG = "conf",
@@ -95,8 +96,7 @@ export enum ID_TYPE {
   USER_MULTI_FACTOR_AUTH = "umfa",
   USER_WHITELIST_IP = "uwip",
   WALLET = "wlt",
-  WALLET_TOPUP = "wtop",
-  PAYIN_KEY = "pin",
+  WALLET_TOPUP = "wtop"
 }
 
 export enum ONBOARDING_STATUS {
