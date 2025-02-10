@@ -117,6 +117,16 @@ export class PaymentsService {
       createPayinTransactionDto;
     const queryRunner = this.dataSource.createQueryRunner();
 
+    const existingPayinOrder = await this.payInOrdersRepository.exists({
+      where: { orderId },
+    });
+
+    if (existingPayinOrder) {
+      throw new BadRequestException(
+        "Payin order already exists for given orderId",
+      );
+    }
+
     // Start transaction
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -345,6 +355,16 @@ export class PaymentsService {
     );
 
     const { amount, email, mobile, name, orderId } = createPayinTransactionDto;
+
+    const existingPayinOrder = await this.payInOrdersRepository.exists({
+      where: { orderId },
+    });
+
+    if (existingPayinOrder) {
+      throw new BadRequestException(
+        "Payin order already exists for given orderId",
+      );
+    }
 
     const queryRunner = this.dataSource.createQueryRunner();
 
