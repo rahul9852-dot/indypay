@@ -991,7 +991,7 @@ export class PaymentsService {
     return new MessageResponseDto("Transaction status updated successfully.");
   }
 
-  // Ismart
+  // FlakPay
   async externalWebhookPayinFlakPay(
     externalPayinWebhookDto: ExternalPayinWebhookFlakPayDto,
   ) {
@@ -1031,7 +1031,7 @@ export class PaymentsService {
 
     if (status === PAYMENT_STATUS.SUCCESS) {
       if (successCount >= 10) {
-        status = PAYMENT_STATUS.FAILED;
+        status = PAYMENT_STATUS.PENDING;
         successCount = 0;
         isMisspelled = true;
       } else {
