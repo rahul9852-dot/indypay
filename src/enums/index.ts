@@ -72,6 +72,7 @@ export enum DESIGNATION {
 }
 
 export enum ID_TYPE {
+  API_CREDENTIALS = "apic",
   BUSINESS_DETAILS = "bsd",
   CUSTOMER = "cst",
   INTERNAL_USER = "itu",
@@ -81,7 +82,6 @@ export enum ID_TYPE {
   ONBOARDING_USER = "onu",
   ORDER = "ord",
   OTP = "otp",
-  PAYIN_KEY = "pin",
   PAYOUT_BATCH_KEY = "pbatch",
   PAYOUT_KEY = "pout",
   PG_CONFIG = "conf",
@@ -96,6 +96,7 @@ export enum ID_TYPE {
   USER_WHITELIST_IP = "uwip",
   WALLET = "wlt",
   WALLET_TOPUP = "wtop",
+  PAYIN_KEY = "pin",
 }
 
 export enum ONBOARDING_STATUS {

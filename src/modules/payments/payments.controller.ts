@@ -41,7 +41,6 @@ import { WebhookGuard } from "@/guard/webhook.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { PayoutService } from "@/modules/payout/payout.service";
-import { DisabledEndpoint } from "@/decorators/disabled-endpoint.decorator";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -79,8 +78,6 @@ export class PaymentsController {
     return this.paymentsService.checkPayInStatusTransaction(payinStatusDto);
   }
 
-  // IMP: This endpoint is disabled
-  @DisabledEndpoint()
   @Public()
   @ApiOperation({ summary: "Create pay-out transaction", deprecated: true })
   @UseGuards(ApiKeyGuard)
@@ -92,8 +89,6 @@ export class PaymentsController {
     return this.paymentsService.createPayoutFlakPay(createPayoutDto, user);
   }
 
-  // IMP: This endpoint is disabled
-  @DisabledEndpoint()
   @ApiOperation({
     summary: "Create pay-out transaction for dashboard",
     deprecated: true,
@@ -109,8 +104,6 @@ export class PaymentsController {
     );
   }
 
-  // IMP: This endpoint is disabled
-  @DisabledEndpoint()
   @Public()
   @ApiOperation({
     summary: "Check status of pay-out transaction",

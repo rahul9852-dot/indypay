@@ -12,6 +12,7 @@ import { UserBankDetailsEntity } from "@/entities/user-bank-details.entity";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { UserAddressEntity } from "@/entities/user-address.entity";
 import { SNSService } from "@/modules/aws/sns.service";
+import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { SNSService } from "@/modules/aws/sns.service";
       UserBankDetailsEntity,
       UserWhitelistIpsEntity,
       UserAddressEntity,
+      ApiCredentialsEntity,
     ]),
     AuthModule,
   ],

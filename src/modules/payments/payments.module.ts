@@ -23,6 +23,7 @@ import { WalletEntity } from "@/entities/wallet.entity";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { SNSService } from "@/modules/aws/sns.service";
 import { PayoutService } from "@/modules/payout/payout.service";
+import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { PayoutService } from "@/modules/payout/payout.service";
       UserAddressEntity,
       WalletEntity,
       SettlementsEntity,
+      ApiCredentialsEntity,
     ]),
     BullModule.registerQueue({
       name: "payouts",

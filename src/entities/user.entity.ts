@@ -25,6 +25,7 @@ import { SettlementsEntity } from "./settlements.entity";
 import { WalletEntity } from "./wallet.entity";
 import { WalletTopupEntity } from "./wallet-topup.entity";
 import { CustomerEntity } from "./invoice-customer.entity";
+import { ApiCredentialsEntity } from "./api-credentials.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import {
   ONBOARDING_STATUS,
@@ -153,6 +154,12 @@ export class UsersEntity {
     cascade: true,
   })
   wallet: WalletEntity;
+
+  @JoinColumn()
+  @OneToOne(() => ApiCredentialsEntity, ({ user }) => user, {
+    cascade: true,
+  })
+  apiCredentials: ApiCredentialsEntity;
 
   @JoinColumn()
   @OneToOne(() => UserAddressEntity, ({ user }) => user, { cascade: true })

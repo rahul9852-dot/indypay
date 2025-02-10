@@ -36,6 +36,7 @@ import {
   WhitelistIpsResponseDto,
 } from "./dto/whitelist-ips.dto";
 import { UserListQuery, UserListResponseDto } from "./dto/user-list.dto";
+import { AddCredentialForFlakPayDto } from "./dto/add-credentials.dto";
 import { AddAddressAdminDto, AddAddressDto } from "./dto/add-address.dto";
 import { User } from "@/decorators/user.decorator";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
@@ -60,6 +61,28 @@ import { ChangeAccountStatusGuard } from "@/guard/change-account-status.guard";
 })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @ApiOperation({
+    summary: "Add Credential For FlakPay",
+  })
+  @Post("credentials/flakpay")
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN)
+  async addCredentialForFlakPay(
+    @Body() addCredentialForFlakPayDto: AddCredentialForFlakPayDto,
+  ) {
+    return this.usersService.addCredentialForFlakPay(
+      addCredentialForFlakPayDto,
+    );
+  }
+
+  @ApiOperation({
+    summary: "Get Credential For FalkPay",
+  })
+  @Get("credentials/flakpay/:userId")
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN)
+  async getCredentialForFalkPay(@Param("userId") userId: string) {
+    return this.usersService.getCredentialForFalkPay(userId);
+  }
 
   @ApiOperation({
     summary: "Add Address - Admin & OPS",

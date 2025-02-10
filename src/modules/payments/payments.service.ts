@@ -77,6 +77,8 @@ import {
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
 } from "@/utils/pg-config.utils";
+import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
+import { decryptData } from "@/utils/encode-decode.utils";
 
 const { beBaseUrl, externalPaymentConfig } = appConfig();
 
@@ -95,6 +97,8 @@ export class PaymentsService {
     private readonly walletRepository: Repository<WalletEntity>,
     @InjectRepository(SettlementsEntity)
     private readonly settlementRepository: Repository<SettlementsEntity>,
+    @InjectRepository(ApiCredentialsEntity)
+    private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
     @InjectQueue("payouts") private payoutQueue: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
@@ -342,15 +346,44 @@ export class PaymentsService {
     }
   }
 
+  private async getFlakPayCredentials(userId: string) {
+    const credentials = await this.apiCredentialsRepository.findOne({
+      where: { user: { id: userId } },
+      relations: { user: true },
+    });
+
+    if (!credentials) {
+      throw new BadRequestException("Credentials not found");
+    }
+
+    const decryptedCredentials = await decryptData(credentials.credentials);
+    const { clientId, clientSecret } = JSON.parse(decryptedCredentials);
+
+    if (
+      !clientId ||
+      !clientSecret ||
+      typeof clientId !== "string" ||
+      typeof clientSecret !== "string"
+    ) {
+      throw new BadRequestException("Invalid credentials");
+    }
+
+    return { clientId, clientSecret };
+  }
+
   async createTransactionPayinFlakPay(
     createPayinTransactionDto: CreatePayinTransactionFlaPayDto,
     user: UsersEntity,
   ) {
+    const { clientId, clientSecret } = await this.getFlakPayCredentials(
+      user.id,
+    );
+
     const axiosServiceFlakPay = new AxiosService(
       FALKPAY.BASE_URL,
       getFlakPayPgConfig({
-        clientId: externalPaymentConfig.flakPay.clientId,
-        clientSecret: externalPaymentConfig.flakPay.clientSecret,
+        clientId,
+        clientSecret,
       }),
     );
 
@@ -765,6 +798,7 @@ export class PaymentsService {
   async checkPayOutStatusTransactionFlakPay({ orderId }: PayoutStatusDto) {
     const payoutOrder = await this.payOutOrdersRepository.findOne({
       where: { orderId },
+      relations: { user: true },
     });
 
     if (!payoutOrder) {
@@ -782,12 +816,15 @@ export class PaymentsService {
     }
 
     // call api
+    const { clientId, clientSecret } = await this.getFlakPayCredentials(
+      payoutOrder.user.id,
+    );
 
     const axiosServiceFlakPay = new AxiosService(
       FALKPAY.BASE_URL,
       getFlakPayPgConfig({
-        clientId: externalPaymentConfig.flakPay.clientId,
-        clientSecret: externalPaymentConfig.flakPay.clientSecret,
+        clientId,
+        clientSecret,
       }),
     );
 

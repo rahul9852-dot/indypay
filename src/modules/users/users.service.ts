@@ -23,6 +23,7 @@ import { ChangeRoleDto } from "./dto/change-role.dto";
 import { AddAddressDto } from "./dto/add-address.dto";
 import { DeleteWhitelistIpsDto } from "./dto/whitelist-ips.dto";
 import { UserListQuery } from "./dto/user-list.dto";
+import { AddCredentialForFlakPayDto } from "./dto/add-credentials.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { IAccessTokenPayload } from "@/interface/common.interface";
@@ -46,6 +47,7 @@ import { getPagination } from "@/utils/pagination.utils";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { UserAddressEntity } from "@/entities/user-address.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
+import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 
 @Injectable()
 export class UsersService {
@@ -60,12 +62,82 @@ export class UsersService {
     private readonly userWhitelistIpsRepository: Repository<UserWhitelistIpsEntity>,
     @InjectRepository(UserAddressEntity)
     private readonly addressEntity: Repository<UserAddressEntity>,
+    @InjectRepository(ApiCredentialsEntity)
+    private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
 
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
   ) {}
+
+  async getCredentialForFalkPay(userId: string) {
+    const apiCredentials = await this.apiCredentialsRepository.findOne({
+      where: {
+        user: {
+          id: userId,
+        },
+      },
+      relations: {
+        user: true,
+      },
+    });
+
+    if (!apiCredentials) {
+      throw new NotFoundException(
+        new MessageResponseDto("Credential not found"),
+      );
+    }
+
+    const decryptedCredentials = JSON.parse(
+      await decryptData(apiCredentials.credentials),
+    );
+
+    return {
+      id: apiCredentials.id,
+      fullName: apiCredentials.user.fullName,
+      email: apiCredentials.user.email,
+      credentials: decryptedCredentials,
+    };
+  }
+
+  async addCredentialForFlakPay({
+    userId,
+    credentials,
+  }: AddCredentialForFlakPayDto) {
+    const user = await this.usersRepository.findOne({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const existingCredential = await this.apiCredentialsRepository.findOne({
+      where: {
+        user: {
+          id: userId,
+        },
+      },
+      relations: {
+        user: true,
+      },
+    });
+
+    const encryptedCredentials = await encryptData(JSON.stringify(credentials));
+
+    await this.apiCredentialsRepository.save(
+      this.apiCredentialsRepository.create({
+        ...(existingCredential && { id: existingCredential?.id }),
+        credentials: encryptedCredentials,
+        user,
+      }),
+    );
+
+    return new MessageResponseDto("Credential added successfully");
+  }
 
   async changeOnboardingStatus({
     userId,

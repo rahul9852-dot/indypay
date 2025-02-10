@@ -11,6 +11,7 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { EmailService } from "@/shared/services/email.service";
 import { InvoiceService } from "@/shared/services/invoice.service";
 import { UserAddressEntity } from "@/entities/user-address.entity";
+import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UserAddressEntity } from "@/entities/user-address.entity";
       WalletEntity,
       PayInOrdersEntity,
       UserAddressEntity,
+      ApiCredentialsEntity,
     ]),
   ],
   providers: [SettlementsService, BanksService, EmailService, InvoiceService],

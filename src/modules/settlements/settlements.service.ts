@@ -54,6 +54,8 @@ import {
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
 } from "@/utils/pg-config.utils";
+import { decryptData } from "@/utils/encode-decode.utils";
+import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 
 const { externalPaymentConfig } = appConfig();
 @Injectable()
@@ -71,6 +73,8 @@ export class SettlementsService {
     private readonly payinRepository: Repository<PayInOrdersEntity>,
     @InjectRepository(UserAddressEntity)
     private readonly addressRepository: Repository<UserAddressEntity>,
+    @InjectRepository(ApiCredentialsEntity)
+    private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
 
     private readonly bankService: BanksService,
     private readonly dataSource: DataSource,
@@ -1104,6 +1108,31 @@ export class SettlementsService {
   //   }
   // }
 
+  private async getFlakPayCredentials(userId: string) {
+    const credentials = await this.apiCredentialsRepository.findOne({
+      where: { user: { id: userId } },
+      relations: { user: true },
+    });
+
+    if (!credentials) {
+      throw new BadRequestException("Credentials not found");
+    }
+
+    const decryptedCredentials = await decryptData(credentials.credentials);
+    const { clientId, clientSecret } = JSON.parse(decryptedCredentials);
+
+    if (
+      !clientId ||
+      !clientSecret ||
+      typeof clientId !== "string" ||
+      typeof clientSecret !== "string"
+    ) {
+      throw new BadRequestException("Invalid credentials");
+    }
+
+    return { clientId, clientSecret };
+  }
+
   async initiateSettlementFalkPay(
     {
       amount,
@@ -1125,11 +1154,15 @@ export class SettlementsService {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
 
+    const { clientId, clientSecret } = await this.getFlakPayCredentials(
+      user.id,
+    );
+
     const axiosServiceFlakPay = new AxiosService(
       FALKPAY.BASE_URL,
       getFlakPayPgConfig({
-        clientId: externalPaymentConfig.flakPay.clientId,
-        clientSecret: externalPaymentConfig.flakPay.clientSecret,
+        clientId,
+        clientSecret,
       }),
     );
 

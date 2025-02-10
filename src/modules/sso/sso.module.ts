@@ -15,6 +15,7 @@ import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
 import { AuthOtpEntity } from "@/entities/otp.entity";
 import { SNSService } from "@/modules/aws/sns.service";
 import { WalletEntity } from "@/entities/wallet.entity";
+import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { WalletEntity } from "@/entities/wallet.entity";
       UserAddressEntity,
       AuthOtpEntity,
       WalletEntity,
+      ApiCredentialsEntity,
     ]),
   ],
   providers: [
