@@ -70,7 +70,7 @@ export class AuthController {
 
   @Public()
   @ApiOperation({
-    summary: "Step 2: Verify contact",
+    summary: "Register merchant - Step 2: Verify contact",
   })
   @Post("register-contact")
   @HttpCode(200)
@@ -83,7 +83,7 @@ export class AuthController {
   }
 
   @ApiOperation({
-    summary: "Register",
+    summary: "Merchant Register by Admin",
   })
   @UseGuards(AuthGuard)
   @IgnoreKyc()
@@ -98,7 +98,7 @@ export class AuthController {
   @Public()
   @UseGuards(VerifyMobileGuard)
   @ApiOperation({
-    summary: "Forgot Password",
+    summary: "Forgot Password - Inside Dashboard",
   })
   @Post("forgot-password")
   async forgotPassword(
@@ -110,7 +110,7 @@ export class AuthController {
 
   @Public()
   @ApiOperation({
-    summary: "Send OTP forgot password mobile",
+    summary: "Forgot password - Step 1: Send OTP",
   })
   @HttpCode(200)
   @ApiOkResponse({ type: SendOtpResDto })
@@ -120,6 +120,22 @@ export class AuthController {
     @Res() res: Response,
   ) {
     return this.authService.sendForgotPasswordOtp(sendOtpDto, res);
+  }
+
+  @Public()
+  @IgnoreMobileVerification()
+  @UseGuards(VerifyMobileGuard)
+  @ApiOperation({
+    summary: "Forgot password - Step 2: Verify OTP",
+  })
+  @HttpCode(200)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("verify-forgot-password-otp")
+  async verifyForgotPasswordOtp(
+    @Body() verifyOtpDto: VerifyOtpDto,
+    @Res() res: Response,
+  ) {
+    return this.authService.verifyForgotPasswordOtp(verifyOtpDto, res);
   }
 
   @ApiOperation({
@@ -136,57 +152,6 @@ export class AuthController {
     return this.authService.logout(req, res, id);
   }
 
-  @Public()
-  @ApiOperation({
-    summary: "Send OTP mobile",
-  })
-  @HttpCode(200)
-  @ApiOkResponse({ type: SendOtpResDto })
-  @Post("send-otp")
-  async sendOtp(@Body() sendOtpDto: SendOtpDto, @Res() res: Response) {
-    return this.authService.sendOtp(sendOtpDto, res);
-  }
-
-  // @Public()
-  // @ApiOperation({
-  //   summary: "Resend OTP mobile",
-  // })
-  // @HttpCode(200)
-  // @ApiOkResponse({ type: SendOtpResDto })
-  // @Post("resend-otp")
-  // async resendOtp(@Body() reSendOtpDto: ReSendOtpDto, @Res() res: Response) {
-  //   return this.authService.resendOtp(reSendOtpDto, res);
-  // }
-
-  @Public()
-  @IgnoreMobileVerification()
-  @UseGuards(VerifyMobileGuard)
-  @ApiOperation({
-    summary: "Verify OTP mobile",
-  })
-  @HttpCode(200)
-  @ApiOkResponse({ type: MessageResponseDto })
-  @Post("verify-otp")
-  async verifyForgotPasswordOtp(
-    @Body() verifyOtpDto: VerifyOtpDto,
-    @Res() res: Response,
-  ) {
-    return this.authService.verifyForgotPasswordOtp(verifyOtpDto, res);
-  }
-
-  @Public()
-  @ApiOperation({
-    summary: "Step 2: Verify OTP for mobile and email",
-  })
-  // @Post("verify-contact-otp")
-  // @HttpCode(200)
-  // @ApiOkResponse({ type: MessageResponseDto })
-  // async verifyContactOtp(
-  //   @Body() verifyOtpContactDto: VerifyOtpContactDto,
-  //   @Res() res: Response,
-  // ) {
-  //   return this.authService.verifyContactOtp(verifyOtpContactDto, res);
-  // }
   @Public()
   @UseGuards(RefreshGuard)
   @ApiOperation({
