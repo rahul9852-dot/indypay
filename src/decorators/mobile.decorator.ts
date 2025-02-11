@@ -13,7 +13,7 @@ export const Mobile = createParamDecorator(
   (_: unknown, ctx: ExecutionContext): IVerifyMobilePayload => {
     const request = ctx.switchToHttp().getRequest();
 
-    return request[MOBILE_INFO_KEY];
+    return request[MOBILE_INFO_KEY].mobile;
   },
 );
 

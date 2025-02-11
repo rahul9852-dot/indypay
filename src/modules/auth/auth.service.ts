@@ -5,6 +5,7 @@ import {
   ConflictException,
   Injectable,
   Inject,
+  NotFoundException,
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
@@ -15,6 +16,7 @@ import { RegisterUserDto } from "./dto/register-user.dto";
 import { LoginUserDto } from "./dto/login-user.dto";
 import { VerifyContactDto } from "./dto/verify-contact.dto";
 import { SendSignupOtpDto } from "./dto/send-signup-otp.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { SNSService } from "@/modules/aws/sns.service";
 import { UsersEntity } from "@/entities/user.entity";
 import { BcryptService } from "@/shared/bcrypt/bcrypt.service";
@@ -26,7 +28,7 @@ import {
   mobileVerifyCookieOptions,
   refreshCookieOptions,
 } from "@/utils/cookies.utils";
-import { COOKIE_KEYS } from "@/enums";
+import { ACCOUNT_STATUS, COOKIE_KEYS } from "@/enums";
 import {
   IAccessTokenPayload,
   IRefreshTokenPayload,
@@ -247,8 +249,89 @@ export class AuthService {
     return new MessageResponseDto("User registered successfully");
   }
 
-  forgotPassword() {
-    return;
+  async forgotPassword(mobile: string, forgotPasswordDto: ForgotPasswordDto) {
+    if (forgotPasswordDto.password !== forgotPasswordDto.confirmPassword) {
+      throw new BadRequestException(
+        new MessageResponseDto("Passwords do not match"),
+      );
+    }
+
+    const existingUser = await this.usersRepository.findOne({
+      where: {
+        mobile,
+        accountStatus: ACCOUNT_STATUS.ACTIVE,
+      },
+      select: {
+        password: true,
+      },
+    });
+
+    if (!existingUser) {
+      throw new NotFoundException(
+        new MessageResponseDto(
+          "User not found or deactivated. Please contact support",
+        ),
+      );
+    }
+
+    const hashedPassword = await this.bcryptService.hash(
+      forgotPasswordDto.password,
+    );
+
+    const updatedUser = this.usersRepository.create({
+      password: hashedPassword,
+    });
+
+    await this.usersRepository.update({ mobile }, updatedUser);
+
+    return new MessageResponseDto("Password changed successfully");
+  }
+
+  async sendForgotPasswordOtp({ mobile }: SendOtpDto, res: Response) {
+    const user = await this.usersRepository.findOne({
+      where: {
+        mobile,
+      },
+    });
+
+    if (!user) {
+      throw new ConflictException(
+        new MessageResponseDto("User doesn't exists"),
+      );
+    }
+
+    const otpKey = REDIS_KEYS.FORGET_PASSWORD_KEY(mobile);
+
+    const mobileOtp = generateOtp();
+
+    const formattedPhone = mobile.startsWith("+") ? mobile : `+91${mobile}`;
+
+    const smsSent = await this.snsService.sendSMS(
+      formattedPhone,
+      `Your PayBolt OTP to reset your password is: ${mobileOtp}`,
+    );
+
+    if (!smsSent) {
+      throw new BadRequestException(
+        new MessageResponseDto("Failed to send mobile OTP"),
+      );
+    }
+
+    const payload: IVerifyMobilePayload = { mobile, isVerified: false };
+    const token = this.generateAccessToken(payload, { expiresIn: "15m" });
+
+    await this.cacheManager.set(
+      otpKey,
+      { mobileOtp, mobile, createdAt: Date.now() },
+      1000 * 60 * 15,
+    );
+
+    return res
+      .cookie(COOKIE_KEYS.MOBILE_INFO_KEY, token, mobileVerifyCookieOptions)
+      .json({
+        mobile,
+        ...(!isProduction && { otp: mobileOtp }),
+      });
   }
 
   async logout(req: Request, res: Response, userId: string) {
@@ -366,36 +449,33 @@ export class AuthService {
       });
   }
 
-  async verifyOtp({ mobile, otp }: VerifyOtpDto, res: Response) {
-    const authOtp = await this.authOtpRepository.findOne({
-      where: {
-        mobile,
-        code: otp,
-      },
-    });
+  async verifyForgotPasswordOtp({ mobile, otp }: VerifyOtpDto, res: Response) {
+    const otpKey = REDIS_KEYS.FORGET_PASSWORD_KEY(mobile);
 
-    if (!authOtp) {
+    const storedData = await this.cacheManager.get<{
+      mobileOtp: string;
+      mobile: string;
+      createdAt: number;
+    }>(otpKey);
+
+    if (!storedData) {
       throw new BadRequestException(
-        new MessageResponseDto("Invalid or expired OTP"),
+        new MessageResponseDto("OTPs have expired. Please request new OTPs"),
       );
     }
 
-    if (authOtp.expiredAt < new Date()) {
-      throw new BadRequestException(
-        new MessageResponseDto("Invalid or expired OTP"),
-      );
+    if (storedData.mobileOtp !== otp) {
+      throw new BadRequestException(new MessageResponseDto("Invalid OTP"));
     }
 
-    await this.authOtpRepository.delete(authOtp.id);
+    await this.cacheManager.del(otpKey);
 
     const payload: IVerifyMobilePayload = {
-      mobile,
+      mobile: storedData.mobile,
       isVerified: true,
     };
 
-    const token = this.generateAccessToken(payload, {
-      expiresIn: "15m",
-    });
+    const token = this.generateAccessToken(payload);
 
     return res
       .cookie(COOKIE_KEYS.MOBILE_INFO_KEY, token, mobileVerifyCookieOptions)

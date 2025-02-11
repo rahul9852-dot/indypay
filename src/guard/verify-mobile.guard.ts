@@ -35,7 +35,6 @@ export class VerifyMobileGuard implements CanActivate {
     );
     const request = context.switchToHttp().getRequest<Request>();
     const verifyToken = this.extractTokenFromCookie(request);
-
     if (!verifyToken) {
       throw new UnauthorizedException();
     }
@@ -50,8 +49,9 @@ export class VerifyMobileGuard implements CanActivate {
         throw new ForbiddenException("Mobile number is not verified");
       }
 
-      if (request.body?.mobile !== payload.mobile)
-        throw new UnprocessableEntityException("Mobile number does not match");
+      request[MOBILE_INFO_KEY] = payload;
+      // if (request.body?.mobile !== payload.mobile)
+      //   throw new UnprocessableEntityException("Mobile number does not match");
     } catch (err: any) {
       if (
         err instanceof UnprocessableEntityException ||

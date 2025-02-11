@@ -20,12 +20,13 @@ import { RegisterUserDto } from "./dto/register-user.dto";
 import { VerifyContactDto } from "./dto/verify-contact.dto";
 import { LoginUserDto } from "./dto/login-user.dto";
 import { SendSignupOtpDto } from "./dto/send-signup-otp.dto";
-
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { Public } from "@/decorators/public.decorator";
 import { VerifyMobileGuard } from "@/guard/verify-mobile.guard";
 import { IgnoreMobileVerification } from "@/decorators/mobile.decorator";
 import { RefreshGuard } from "@/guard/refesh.guard";
 import { User } from "@/decorators/user.decorator";
+import { Mobile } from "@/decorators/mobile.decorator";
 import { IRefreshTokenPayload } from "@/interface/common.interface";
 import { MessageResponseDto } from "@/dtos/common.dto";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -94,14 +95,32 @@ export class AuthController {
     return this.authService.registerByAdmin(registerUserDto);
   }
 
-  // @Public()
-  // @ApiOperation({
-  //   summary: "Forgot Password",
-  // })
-  // @Post("forgot-password")
-  // async forgotPassword() {
-  //   return this.authService.forgotPassword();
-  // }
+  @Public()
+  @UseGuards(VerifyMobileGuard)
+  @ApiOperation({
+    summary: "Forgot Password",
+  })
+  @Post("forgot-password")
+  async forgotPassword(
+    @Mobile() mobile: string,
+    @Body() forgotPasswordDto: ForgotPasswordDto,
+  ) {
+    return this.authService.forgotPassword(mobile, forgotPasswordDto);
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: "Send OTP forgot password mobile",
+  })
+  @HttpCode(200)
+  @ApiOkResponse({ type: SendOtpResDto })
+  @Post("send-forgot-password-otp")
+  async sendForgotPasswordOtp(
+    @Body() sendOtpDto: SendOtpDto,
+    @Res() res: Response,
+  ) {
+    return this.authService.sendForgotPasswordOtp(sendOtpDto, res);
+  }
 
   @ApiOperation({
     summary: "Logout",
@@ -148,8 +167,11 @@ export class AuthController {
   @HttpCode(200)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("verify-otp")
-  async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto, @Res() res: Response) {
-    return this.authService.verifyOtp(verifyOtpDto, res);
+  async verifyForgotPasswordOtp(
+    @Body() verifyOtpDto: VerifyOtpDto,
+    @Res() res: Response,
+  ) {
+    return this.authService.verifyForgotPasswordOtp(verifyOtpDto, res);
   }
 
   @Public()

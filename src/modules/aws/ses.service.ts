@@ -39,8 +39,15 @@ export class SESService {
       data: Buffer;
       contentType: string;
     },
+    isProduction = false,
   ): Promise<{ success: boolean; message: string }> {
     try {
+      if (!isProduction) {
+        return {
+          success: true,
+          message: "Email sent successfully",
+        };
+      }
       if (attachment) {
         // Use SendRawEmailCommand for emails with attachments
         const boundary = "boundary_" + Math.random().toString(36).substring(2);

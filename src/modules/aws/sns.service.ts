@@ -24,7 +24,14 @@ export class SNSService {
   async sendSMS(
     phoneNumber: string,
     message: string,
+    isProduction = false,
   ): Promise<{ success: boolean; message: string }> {
+    if (!isProduction) {
+      return {
+        success: true,
+        message: "SMS sent successfully",
+      };
+    }
     try {
       const formattedNumber = phoneNumber.startsWith("+")
         ? phoneNumber
