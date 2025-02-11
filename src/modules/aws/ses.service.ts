@@ -12,6 +12,7 @@ import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 const {
   aws: { accessKeyId, secretAccessKey, region },
   emailConfig: { from },
+  isProduction,
 } = appConfig();
 
 @Injectable()
@@ -39,7 +40,6 @@ export class SESService {
       data: Buffer;
       contentType: string;
     },
-    isProduction = false,
   ): Promise<{ success: boolean; message: string }> {
     try {
       if (!isProduction) {

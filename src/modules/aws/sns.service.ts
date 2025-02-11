@@ -5,6 +5,7 @@ import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 const {
   aws: { accessKeyId, secretAccessKey, region },
+  isProduction,
 } = appConfig();
 @Injectable()
 export class SNSService {
@@ -24,7 +25,6 @@ export class SNSService {
   async sendSMS(
     phoneNumber: string,
     message: string,
-    isProduction = false,
   ): Promise<{ success: boolean; message: string }> {
     if (!isProduction) {
       return {
