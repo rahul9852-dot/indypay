@@ -16,11 +16,7 @@ import {
 } from "typeorm";
 import { InitiateSettlementAdminDto } from "./dto/initate-settlement-admin.dto";
 import { GetSettlementListDto } from "./dto/get-settlement-list.dto";
-import {
-  MessageResponseDto,
-  PaginationWithDateDto,
-  PaginationWithoutSortAndOrderDto,
-} from "@/dtos/common.dto";
+import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
@@ -1325,13 +1321,16 @@ export class SettlementsService {
     limit = 10,
     page = 1,
     search = "",
-  }: PaginationWithoutSortAndOrderDto) {
+    startDate = todayStartDate(),
+    endDate = todayEndDate(),
+  }: PaginationWithDateDto) {
     const [settlements, totalItems] = await this.usersRepository.findAndCount({
       where: {
         role: USERS_ROLE.MERCHANT,
         ...(search && {
           fullName: ILike(`%${search}%`),
         }),
+        createdAt: Between(new Date(startDate), new Date(endDate)),
       },
       relations: {
         wallet: true,
