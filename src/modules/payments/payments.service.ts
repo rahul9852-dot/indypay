@@ -43,6 +43,7 @@ import { TransactionsEntity } from "@/entities/transaction.entity";
 import {
   MessageResponseDto,
   PaginationWithDateAndStatusDto,
+  PaginationWithDateDto,
 } from "@/dtos/common.dto";
 import {
   PAYMENT_STATUS,
@@ -79,6 +80,7 @@ import {
 } from "@/utils/pg-config.utils";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { decryptData } from "@/utils/encode-decode.utils";
+import { todayEndDate } from "@/utils/date.utils";
 
 const { beBaseUrl, externalPaymentConfig } = appConfig();
 
@@ -351,7 +353,6 @@ export class PaymentsService {
       where: { user: { id: userId } },
       relations: { user: true },
     });
-
     if (!credentials) {
       throw new BadRequestException("Credentials not found");
     }
@@ -1759,6 +1760,84 @@ export class PaymentsService {
     };
   }
 
+  async getMisspelledPayinTransactions({
+    page = 1,
+    limit = 10,
+    sort = "id",
+    order = "DESC",
+    startDate = todayEndDate(),
+    endDate = todayEndDate(),
+  }: PaginationWithDateDto) {
+    try {
+      const whereQuery: FindOptionsWhere<PayInOrdersEntity> = {
+        status: PAYMENT_STATUS.PENDING,
+        isMisspelled: true,
+      };
+
+      if (startDate && endDate) {
+        whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
+      } else if (startDate) {
+        whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
+      } else if (endDate) {
+        whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+      }
+
+      const [transactions, totalItems] =
+        await this.payInOrdersRepository.findAndCount({
+          where: whereQuery,
+          relations: {
+            user: true,
+          },
+          select: {
+            id: true,
+            orderId: true,
+            amount: true,
+            status: true,
+            txnRefId: true,
+            createdAt: true,
+            updatedAt: true,
+            isMisspelled: true,
+            user: {
+              id: true,
+              fullName: true,
+              email: true,
+              mobile: true,
+            },
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+          order: { [sort]: order },
+        });
+
+      const pagination = getPagination({
+        totalItems,
+        page,
+        limit,
+      });
+
+      this.logger.info(
+        `PAYIN - getMisspelledPayinTransactions - Found ${totalItems} misspelled transactions`,
+      );
+
+      return {
+        data: transactions.map((transaction) => ({
+          ...transaction,
+          amount: +transaction.amount, // Convert to number
+        })),
+        pagination,
+        stats: {
+          totalAmount: transactions.reduce((sum, tx) => +sum + +tx.amount, 0),
+          totalCount: totalItems,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `PAYIN - getMisspelledPayinTransactions - Error: ${LoggerPlaceHolder.Json}`,
+        error,
+      );
+      throw new BadRequestException(error.message);
+    }
+  }
   // check payment status
   // async checkPaymentStatus(orderId: string, req: Request) {
   //   const token = req.cookies[COOKIE_KEYS.PAYMENT_LINK_TOKEN];

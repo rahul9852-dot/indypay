@@ -41,6 +41,7 @@ import { WebhookGuard } from "@/guard/webhook.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { PayoutService } from "@/modules/payout/payout.service";
+import { PaginationWithDateDto } from "@/dtos/common.dto";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -155,6 +156,13 @@ export class PaymentsController {
     @Query() paginationDto: PaginationWithDateAndStatusDto,
   ) {
     return this.paymentsService.getTransactionsDetails(user, paginationDto);
+  }
+
+  @ApiOperation({ summary: "Get misspelled transactions" })
+  @Get("misspelled-transactions")
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  async getMisspelledTransactions(@Query() query: PaginationWithDateDto) {
+    return this.paymentsService.getMisspelledPayinTransactions(query);
   }
 
   // this api is used to redirect user to payment link UI
