@@ -80,7 +80,6 @@ import {
 } from "@/utils/pg-config.utils";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { decryptData } from "@/utils/encode-decode.utils";
-import { todayEndDate } from "@/utils/date.utils";
 
 const { beBaseUrl, externalPaymentConfig } = appConfig();
 
@@ -1765,14 +1764,12 @@ export class PaymentsService {
     limit = 10,
     sort = "id",
     order = "DESC",
-    startDate = todayEndDate(),
-    endDate = todayEndDate(),
+    search = "",
+    startDate,
+    endDate,
   }: PaginationWithDateDto) {
     try {
-      const whereQuery: FindOptionsWhere<PayInOrdersEntity> = {
-        status: PAYMENT_STATUS.PENDING,
-        isMisspelled: true,
-      };
+      const whereQuery: FindOptionsWhere<PayInOrdersEntity> = {};
 
       if (startDate && endDate) {
         whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
@@ -1782,9 +1779,22 @@ export class PaymentsService {
         whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
       }
 
+      const query = [
+        { ...whereQuery, isMisspelled: true },
+        {
+          isMisspelled: true,
+        },
+      ];
+      if (search) {
+        query.push({
+          orderId: ILike(`%${search}%`),
+          isMisspelled: true,
+        });
+      }
+
       const [transactions, totalItems] =
         await this.payInOrdersRepository.findAndCount({
-          where: whereQuery,
+          where: query,
           relations: {
             user: true,
           },
