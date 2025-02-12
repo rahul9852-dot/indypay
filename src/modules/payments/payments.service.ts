@@ -1794,32 +1794,40 @@ export class PaymentsService {
         });
       }
 
-      const [transactions, totalItems] =
-        await this.payInOrdersRepository.findAndCount({
-          where: query,
-          relations: {
-            user: true,
-          },
-          select: {
+      const totalAmountPromise = await this.payInOrdersRepository
+        .createQueryBuilder()
+        .select("SUM(amount)", "total")
+        .where(query)
+        .getRawOne();
+
+      const txnPromise = this.payInOrdersRepository.findAndCount({
+        where: query,
+        relations: {
+          user: true,
+        },
+        select: {
+          id: true,
+          orderId: true,
+          amount: true,
+          status: true,
+          txnRefId: true,
+          createdAt: true,
+          updatedAt: true,
+          isMisspelled: true,
+          user: {
             id: true,
-            orderId: true,
-            amount: true,
-            status: true,
-            txnRefId: true,
-            createdAt: true,
-            updatedAt: true,
-            isMisspelled: true,
-            user: {
-              id: true,
-              fullName: true,
-              email: true,
-              mobile: true,
-            },
+            fullName: true,
+            email: true,
+            mobile: true,
           },
-          skip: (page - 1) * limit,
-          take: limit,
-          order: { [sort]: order },
-        });
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        order: { [sort]: order },
+      });
+
+      const [[transactions, totalItems], { total: totalAmount }] =
+        await Promise.all([txnPromise, totalAmountPromise]);
 
       const pagination = getPagination({
         totalItems,
@@ -1838,8 +1846,12 @@ export class PaymentsService {
         })),
         pagination,
         stats: {
-          totalAmount: transactions.reduce((sum, tx) => +sum + +tx.amount, 0),
+          totalAmount: +totalAmount,
           totalCount: totalItems,
+          paginatedAmount: transactions.reduce(
+            (sum, tx) => +sum + +tx.amount,
+            0,
+          ),
         },
       };
     } catch (error) {

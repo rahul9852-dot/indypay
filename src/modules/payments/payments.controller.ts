@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
+  ApiExcludeEndpoint,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -158,7 +159,7 @@ export class PaymentsController {
     return this.paymentsService.getTransactionsDetails(user, paginationDto);
   }
 
-  @ApiOperation({ summary: "Get misspelled transactions" })
+  @ApiExcludeEndpoint()
   @Get("misspelled-transactions")
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   async getMisspelledTransactions(@Query() query: PaginationWithDateDto) {
