@@ -1001,7 +1001,7 @@ export class PaymentsService {
       transactionRefId: txnRefId,
     } = externalPayinWebhookDto;
 
-    const status = convertExternalPaymentStatusToInternal(status_code);
+    let status = convertExternalPaymentStatusToInternal(status_code);
 
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: {
@@ -1029,10 +1029,9 @@ export class PaymentsService {
 
     let isMisspelled = false;
 
-    let updatedStatus = status;
     if (status === PAYMENT_STATUS.SUCCESS) {
       if (successCount >= 50) {
-        updatedStatus = PAYMENT_STATUS.PENDING;
+        status = PAYMENT_STATUS.PENDING;
         successCount = 0;
         isMisspelled = true;
       } else {
@@ -1050,7 +1049,7 @@ export class PaymentsService {
 
     const payinOrderRaw = this.payInOrdersRepository.create({
       id: payinOrder.id,
-      status: updatedStatus,
+      status,
       txnRefId,
       isMisspelled,
       ...(status === PAYMENT_STATUS.SUCCESS && {
