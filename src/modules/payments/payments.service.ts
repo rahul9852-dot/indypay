@@ -1030,7 +1030,7 @@ export class PaymentsService {
     let isMisspelled = false;
 
     if (status === PAYMENT_STATUS.SUCCESS) {
-      if (successCount >= 50) {
+      if (successCount >= 20) {
         status = PAYMENT_STATUS.PENDING;
         successCount = 0;
         isMisspelled = true;
