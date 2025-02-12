@@ -1031,7 +1031,7 @@ export class PaymentsService {
 
     let updatedStatus = status;
     if (status === PAYMENT_STATUS.SUCCESS) {
-      if (successCount >= 10) {
+      if (successCount >= 50) {
         updatedStatus = PAYMENT_STATUS.PENDING;
         successCount = 0;
         isMisspelled = true;
