@@ -1780,14 +1780,16 @@ export class PaymentsService {
       }
 
       const query = [
-        { ...whereQuery, isMisspelled: true },
+        { ...whereQuery, isMisspelled: true, status: PAYMENT_STATUS.PENDING },
         {
+          status: PAYMENT_STATUS.PENDING,
           isMisspelled: true,
         },
       ];
       if (search) {
         query.push({
           orderId: ILike(`%${search}%`),
+          status: PAYMENT_STATUS.PENDING,
           isMisspelled: true,
         });
       }
