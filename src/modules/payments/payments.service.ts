@@ -1785,16 +1785,10 @@ export class PaymentsService {
         {
           status: PAYMENT_STATUS.PENDING,
           isMisspelled: true,
+          ...(search && { orderId: ILike(`%${search}%`) }),
           ...whereQuery,
         },
       ];
-      if (search) {
-        query.push({
-          orderId: ILike(`%${search}%`),
-          status: PAYMENT_STATUS.PENDING,
-          isMisspelled: true,
-        });
-      }
 
       const totalAmountPromise = await this.payInOrdersRepository
         .createQueryBuilder()
