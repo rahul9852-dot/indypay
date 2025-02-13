@@ -1031,7 +1031,7 @@ export class PaymentsService {
 
     let isMisspelled = false;
 
-    const jumpingCount = 15;
+    const jumpingCount = 10;
 
     if (status === PAYMENT_STATUS.SUCCESS) {
       if (successCount >= jumpingCount) {
@@ -1137,6 +1137,128 @@ export class PaymentsService {
         .catch((err) => {
           this.logger.error(
             `PAYIN - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+            err,
+          );
+        });
+    }
+
+    return new MessageResponseDto("Transaction status updated successfully.");
+  }
+
+  // FlakPay
+  async webhookRequestUs({
+    orderId,
+    status,
+  }: {
+    status: PAYMENT_STATUS;
+    orderId: string;
+  }) {
+    const payinOrder = await this.payInOrdersRepository.findOne({
+      where: {
+        orderId,
+      },
+      relations: ["user"],
+    });
+
+    if (!payinOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payin order not found"),
+      );
+    }
+
+    if (status === payinOrder.status) {
+      this.logger.info(
+        `REQUEST US WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+      );
+
+      return new MessageResponseDto("Status updated successfully.");
+    }
+
+    const { user } = payinOrder;
+
+    const payinOrderRaw = this.payInOrdersRepository.create({
+      id: payinOrder.id,
+      status,
+      isMisspelled: false,
+      ...(status === PAYMENT_STATUS.SUCCESS && {
+        successAt: new Date(),
+      }),
+      ...(status === PAYMENT_STATUS.FAILED && {
+        failureAt: new Date(),
+      }),
+    });
+
+    await this.payInOrdersRepository.save(payinOrderRaw);
+
+    // update wallet
+    if (status === PAYMENT_STATUS.SUCCESS) {
+      const wallet = await this.walletRepository.findOne({
+        where: { user: { id: user.id } },
+        relations: ["user"],
+      });
+
+      await this.cacheManager.del(
+        REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
+      );
+
+      const { totalCollections, unsettledAmount } = wallet ?? {};
+
+      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+        amount: +payinOrder.amount,
+        commissionInPercentage: +user.commissionInPercentagePayin,
+        gstInPercentage: +user.gstInPercentagePayin,
+      });
+
+      const walletRaw = this.walletRepository.create({
+        ...(wallet?.id && { id: wallet.id }),
+        totalCollections:
+          (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
+        unsettledAmount:
+          (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
+        commissionAmount:
+          (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
+          +commissionAmount,
+        gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
+        netPayableAmount:
+          (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
+          +netPayableAmount,
+        user,
+      });
+
+      await this.walletRepository.save(walletRaw);
+
+      this.logger.info(
+        `REQUEST US WEBHOOK - webhookRequestUs - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+        walletRaw,
+      );
+    }
+
+    if (user?.payInWebhookUrl) {
+      const webhookPayload = {
+        orderId,
+        status,
+        amount: payinOrder.amount,
+        txnRefId: payinOrder.txnRefId, // utr
+      };
+      this.logger.info(
+        `REQUEST US WEBHOOK - PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+        webhookPayload,
+      );
+      axios
+        .post(user.payInWebhookUrl, webhookPayload, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+        .then(() => {
+          this.logger.info(
+            `REQUEST US WEBHOOK - PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
+            user,
+          );
+        })
+        .catch((err) => {
+          this.logger.error(
+            `REQUEST US WEBHOOK - PAYIN - webhookRequestUs - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
             err,
           );
         });

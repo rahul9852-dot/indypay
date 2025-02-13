@@ -43,6 +43,7 @@ import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { PayoutService } from "@/modules/payout/payout.service";
 import { PaginationWithDateDto } from "@/dtos/common.dto";
+import { PAYMENT_STATUS } from "@/enums/payment.enum";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -157,6 +158,18 @@ export class PaymentsController {
     @Query() paginationDto: PaginationWithDateAndStatusDto,
   ) {
     return this.paymentsService.getTransactionsDetails(user, paginationDto);
+  }
+
+  @ApiExcludeEndpoint()
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Post("update-status")
+  async updateMisspelledTransactions(
+    @Body() { orderId, status }: { orderId: string; status: PAYMENT_STATUS },
+  ) {
+    return this.paymentsService.webhookRequestUs({
+      orderId,
+      status,
+    });
   }
 
   @ApiExcludeEndpoint()
