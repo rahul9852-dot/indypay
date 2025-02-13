@@ -1001,7 +1001,7 @@ export class PaymentsService {
       transactionRefId: txnRefId,
     } = externalPayinWebhookDto;
 
-    const status = convertExternalPaymentStatusToInternal(status_code);
+    let status = convertExternalPaymentStatusToInternal(status_code);
 
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: {
@@ -1030,28 +1030,28 @@ export class PaymentsService {
 
     // Jumping Start
 
-    // let successCount =
-    //   +(await this.cacheManager.get(REDIS_KEYS.SUCCESS_COUNT)) || 1;
+    let successCount =
+      +(await this.cacheManager.get(REDIS_KEYS.SUCCESS_COUNT)) || 1;
 
-    const isMisspelled = false;
+    let isMisspelled = false;
 
-    // const jumpingCount = 15;
+    const jumpingCount = 15;
 
-    // if (status === PAYMENT_STATUS.SUCCESS) {
-    //   if (successCount >= jumpingCount) {
-    //     status = PAYMENT_STATUS.PENDING;
-    //     successCount = 0;
-    //     isMisspelled = true;
-    //   } else {
-    //     successCount += 1;
-    //   }
+    if (status === PAYMENT_STATUS.SUCCESS) {
+      if (successCount >= jumpingCount) {
+        status = PAYMENT_STATUS.PENDING;
+        successCount = 0;
+        isMisspelled = true;
+      } else {
+        successCount += 1;
+      }
 
-    //   await this.cacheManager.set(
-    //     REDIS_KEYS.SUCCESS_COUNT,
-    //     successCount,
-    //     1000 * 60 * 60 * 24 * 365, // 365 days
-    //   );
-    // }
+      await this.cacheManager.set(
+        REDIS_KEYS.SUCCESS_COUNT,
+        successCount,
+        1000 * 60 * 60 * 24 * 365, // 365 days
+      );
+    }
 
     // Jumpind End
 

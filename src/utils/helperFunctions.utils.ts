@@ -46,7 +46,7 @@ export const convertExternalPaymentStatusToInternal = (status: string) => {
     case "TAMPERED":
       return PAYMENT_STATUS.TAMPERED;
     default:
-      return PAYMENT_STATUS.TEST;
+      return PAYMENT_STATUS.PENDING;
   }
 };
 
