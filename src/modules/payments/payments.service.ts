@@ -1024,10 +1024,6 @@ export class PaymentsService {
       return new MessageResponseDto("Status updated successfully.");
     }
 
-    if (payinOrder.isMisspelled) {
-      return new MessageResponseDto("Status updated successfully.");
-    }
-
     // Jumping Start
 
     let successCount =
