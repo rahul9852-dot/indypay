@@ -1780,10 +1780,10 @@ export class PaymentsService {
       }
 
       const query = [
-        { ...whereQuery, isMisspelled: true, status: PAYMENT_STATUS.PENDING },
         {
           status: PAYMENT_STATUS.PENDING,
           isMisspelled: true,
+          ...whereQuery,
         },
       ];
       if (search) {
