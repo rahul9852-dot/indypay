@@ -1001,7 +1001,7 @@ export class PaymentsService {
       transactionRefId: txnRefId,
     } = externalPayinWebhookDto;
 
-    let status = convertExternalPaymentStatusToInternal(status_code);
+    const status = convertExternalPaymentStatusToInternal(status_code);
 
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: {
@@ -1024,28 +1024,32 @@ export class PaymentsService {
       return new MessageResponseDto("Status updated successfully.");
     }
 
-    let successCount =
-      +(await this.cacheManager.get(REDIS_KEYS.SUCCESS_COUNT)) || 1;
+    // Jumping Start
 
-    let isMisspelled = false;
+    // let successCount =
+    //   +(await this.cacheManager.get(REDIS_KEYS.SUCCESS_COUNT)) || 1;
 
-    const jumpingCount = 15;
+    const isMisspelled = false;
 
-    if (status === PAYMENT_STATUS.SUCCESS) {
-      if (successCount >= jumpingCount) {
-        status = PAYMENT_STATUS.PENDING;
-        successCount = 0;
-        isMisspelled = true;
-      } else {
-        successCount += 1;
-      }
+    // const jumpingCount = 15;
 
-      await this.cacheManager.set(
-        REDIS_KEYS.SUCCESS_COUNT,
-        successCount,
-        1000 * 60 * 60 * 24 * 365, // 365 days
-      );
-    }
+    // if (status === PAYMENT_STATUS.SUCCESS) {
+    //   if (successCount >= jumpingCount) {
+    //     status = PAYMENT_STATUS.PENDING;
+    //     successCount = 0;
+    //     isMisspelled = true;
+    //   } else {
+    //     successCount += 1;
+    //   }
+
+    //   await this.cacheManager.set(
+    //     REDIS_KEYS.SUCCESS_COUNT,
+    //     successCount,
+    //     1000 * 60 * 60 * 24 * 365, // 365 days
+    //   );
+    // }
+
+    // Jumpind End
 
     const { user } = payinOrder;
 
