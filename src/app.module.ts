@@ -13,6 +13,7 @@ import { PayoutModule } from "./modules/payout/payout.module";
 import { InvoiceModule } from "./modules/invoices/invoice.module";
 import { WalletsModule } from "./modules/wallets/wallets.module";
 import { CustomerModule } from "./modules/customers/customer.module";
+import { ReportsModule } from "./modules/reports/reports.module";
 import { appConfig } from "@/config/app.config";
 import { dbConfig } from "@/config/db.config";
 import { AuthModule } from "@/modules/auth/auth.module";
@@ -54,6 +55,7 @@ import { DisabledEndpointInterceptor } from "@/interceptors/disabled-endpoint.in
     InvoiceModule,
     WalletsModule,
     CustomerModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [
