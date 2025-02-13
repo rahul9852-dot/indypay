@@ -1029,7 +1029,7 @@ export class PaymentsService {
 
     let isMisspelled = false;
 
-    const jumpingCount = 20;
+    const jumpingCount = 15;
 
     if (status === PAYMENT_STATUS.SUCCESS) {
       if (successCount >= jumpingCount) {
