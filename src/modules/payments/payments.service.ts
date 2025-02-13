@@ -1029,8 +1029,10 @@ export class PaymentsService {
 
     let isMisspelled = false;
 
+    const jumpingCount = 10;
+
     if (status === PAYMENT_STATUS.SUCCESS) {
-      if (successCount >= 20) {
+      if (successCount >= jumpingCount) {
         status = PAYMENT_STATUS.PENDING;
         successCount = 0;
         isMisspelled = true;
