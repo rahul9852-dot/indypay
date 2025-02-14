@@ -764,6 +764,11 @@ export class PaymentsService {
           }),
         );
 
+        this.logger.info(
+          `PAYOUT - createTransaction - Created payout order successfully: ${payoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
+          payoutOrder,
+        );
+
         await this.transactionsRepository.save(
           this.transactionsRepository.create({
             user,
@@ -1285,7 +1290,7 @@ export class PaymentsService {
       status_code.toUpperCase(),
     );
 
-    this.logger.info(`WEBHOOK: decrypted data: ${LoggerPlaceHolder.Json}`, {
+    this.logger.info(`WEBHOOK: data: ${LoggerPlaceHolder.Json}`, {
       STATUS: status_code,
       PAYOUT_REF: order_id,
       TXN_ID: transaction_id,

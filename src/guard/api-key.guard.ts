@@ -16,7 +16,7 @@ import { REQUEST_USER_KEY } from "@/constants/auth.constant";
 import { ACCOUNT_STATUS } from "@/enums";
 import { ERROR_MESSAGES } from "@/constants/messages.constant";
 import { decryptData } from "@/utils/encode-decode.utils";
-import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+import { CustomLogger } from "@/logger";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 
@@ -94,10 +94,10 @@ export class ApiKeyGuard implements CanActivate {
         where: { user: { id: userId } },
       });
 
-      this.logger.info(
-        `user whitelist ips: ${LoggerPlaceHolder.Json}`,
-        userWhitelistIps.map((ip) => ip.ipAddress),
-      );
+      // this.logger.info(
+      //   `user whitelist ips: ${LoggerPlaceHolder.Json}`,
+      //   userWhitelistIps.map((ip) => ip.ipAddress),
+      // );
 
       const isIpWhitelisted = userWhitelistIps.some(
         (whitelistIp) => whitelistIp.ipAddress === requestIp,
