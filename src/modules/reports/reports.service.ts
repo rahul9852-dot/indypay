@@ -31,7 +31,7 @@ export class ReportsService {
     res: Response;
   }): Promise<void> {
     const filename =
-      `payin_orders_${userId}_${status}_${formatDateTime(new Date())}.xlsx`.replaceAll(
+      `payin_orders_${userId}_${status}_${formatDateTime(new Date(startDate))}-${formatDateTime(new Date(endDate))}.xlsx`.replaceAll(
         " ",
         "_",
       );

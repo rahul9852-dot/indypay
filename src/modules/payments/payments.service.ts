@@ -1031,7 +1031,7 @@ export class PaymentsService {
 
     let isMisspelled = false;
 
-    const jumpingCount = 10;
+    const jumpingCount = 20;
 
     if (status === PAYMENT_STATUS.SUCCESS) {
       if (successCount >= jumpingCount) {
