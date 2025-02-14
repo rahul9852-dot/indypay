@@ -1,4 +1,8 @@
-import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiResponseProperty,
+} from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
   IsArray,
@@ -128,6 +132,12 @@ export class SinglePayoutDto {
   @IsString()
   @IsNotEmpty()
   remarks: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  @IsNotEmpty()
+  payoutId?: string;
 
   @ApiProperty({ enum: PAYOUT_PAYMENT_MODE })
   @IsEnum(PAYOUT_PAYMENT_MODE)

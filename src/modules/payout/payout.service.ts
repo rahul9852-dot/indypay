@@ -1,5 +1,6 @@
 import {
   Between,
+  Brackets,
   FindOptionsWhere,
   ILike,
   LessThanOrEqual,
@@ -65,8 +66,13 @@ export class PayoutService {
   }: PaginationWithoutSortAndOrderDto) {
     const query = this.userRepository
       .createQueryBuilder("user")
-      .where("user.fullName ILIKE :search", { search: `%${search}%` })
-      .orWhere("user.email ILIKE :search", { search: `%${search}%` })
+      .where(
+        new Brackets((qb) => {
+          qb.where("user.fullName ILIKE :search", {
+            search: `%${search}%`,
+          }).orWhere("user.email ILIKE :search", { search: `%${search}%` });
+        }),
+      )
       .andWhere("user.role = :role", { role: USERS_ROLE.MERCHANT })
       .andWhere("user.onboardingStatus = :onboardingStatus", {
         onboardingStatus: ONBOARDING_STATUS.KYC_VERIFIED,
@@ -401,6 +407,7 @@ export class PayoutService {
         orderId: payoutOrder.orderId,
         status: payoutOrder.status,
         transferId: payoutOrder.transferId,
+        payoutId: payoutOrder.payoutId,
       };
     }
 

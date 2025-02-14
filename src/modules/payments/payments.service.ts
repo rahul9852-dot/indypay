@@ -611,6 +611,12 @@ export class PaymentsService {
         batchId,
         payoutOrders: payoutOrders.map((payout) => ({
           orderId: payout.orderId,
+          payoutId: payout.payoutId,
+          amount: payout.amount,
+          status: payout.status,
+          accountNumber: payout.bankAccountNumber,
+          bankName: payout.bankName,
+          ifscCode: payout.bankIfsc,
         })),
         summary: {
           total: payoutDataArr.length,
@@ -781,6 +787,7 @@ export class PaymentsService {
           bankName: payment.bankName,
           remarks: payment.remarks,
           purpose: payment.purpose,
+          payoutId: payment.payoutId,
         });
 
         const savedPayoutOrder = await queryRunner.manager.save(payoutOrder);
@@ -1490,13 +1497,14 @@ export class PaymentsService {
       }
 
       // send webhook
-      if (payOutOrder.user.payOutWebhookUrl) {
+      if (payOutOrder.user?.payOutWebhookUrl) {
         axios
           .post(payOutOrder.user.payOutWebhookUrl, {
             orderId: order_id,
             status,
             amount,
             txnRefId: transaction_id,
+            payoutId: payOutOrder.payoutId,
           })
           .then(() => {
             this.logger.info(

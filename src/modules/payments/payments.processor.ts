@@ -153,16 +153,16 @@ export class PayoutProcessor {
               throw new Error(response.message || "Payout failed");
             }
 
-            await this.payOutOrdersRepository.update(
-              { id: order.id },
-              {
+            const payOutOrder = await this.payOutOrdersRepository.save(
+              this.payOutOrdersRepository.create({
+                id: order.id,
                 transferId: response.data.transferId,
                 ...(status === PAYMENT_STATUS.SUCCESS && {
                   status,
                   successAt: new Date(),
                 }),
                 ...(![PAYMENT_STATUS.SUCCESS].includes(status) && { status }),
-              },
+              }),
             );
 
             this.usersService
@@ -173,7 +173,8 @@ export class PayoutProcessor {
                     orderId: order.orderId,
                     status,
                     amount: order.amount,
-                    txnRefId: order.transferId,
+                    txnRefId: payOutOrder.transferId,
+                    payoutId: payOutOrder.payoutId,
                   };
                   axios
                     .post(user.payOutWebhookUrl, payload)

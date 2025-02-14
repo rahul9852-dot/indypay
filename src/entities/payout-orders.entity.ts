@@ -61,6 +61,10 @@ export class PayOutOrdersEntity {
   @Column({ nullable: true, default: "DEFAULT" })
   remarks: string;
 
+  @Index()
+  @Column({ nullable: true, unique: true })
+  payoutId: string;
+
   @Column({ type: "numeric", precision: 10, scale: 2 })
   commissionInPercentage: number;
 

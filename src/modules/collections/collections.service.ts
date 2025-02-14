@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
   Between,
+  Brackets,
   FindOptionsWhere,
   ILike,
   LessThanOrEqual,
@@ -35,8 +36,13 @@ export class CollectionsService {
   }: PaginationWithoutSortAndOrderDto) {
     const query = this.userRepository
       .createQueryBuilder("user")
-      .where("user.fullName ILIKE :search", { search: `%${search}%` })
-      .orWhere("user.email ILIKE :search", { search: `%${search}%` })
+      .where(
+        new Brackets((qb) => {
+          qb.where("user.fullName ILIKE :search", {
+            search: `%${search}%`,
+          }).orWhere("user.email ILIKE :search", { search: `%${search}%` });
+        }),
+      )
       .andWhere("user.role = :role", { role: USERS_ROLE.MERCHANT })
       .andWhere("user.onboardingStatus = :onboardingStatus", {
         onboardingStatus: ONBOARDING_STATUS.KYC_VERIFIED,
