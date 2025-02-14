@@ -434,13 +434,36 @@ export class PayoutService {
       flakPayResponse.data.status.toUpperCase(),
     );
 
-    await this.payoutRepository.save(
+    const savedPayout = await this.payoutRepository.save(
       this.payoutRepository.create({
         ...payoutOrder,
         status,
         transferId: flakPayResponse.data.transferId,
       }),
     );
+
+    if (user?.payOutWebhookUrl) {
+      const payload = {
+        orderId: savedPayout.orderId,
+        status,
+        amount: +savedPayout.amount,
+        txnRefId: savedPayout.transferId,
+      };
+      axios
+        .post(user.payOutWebhookUrl, payload)
+        .then(() => {
+          this.logger.info(
+            `Payout webhook sent successfully: ${savedPayout.orderId} : ${LoggerPlaceHolder.Json}`,
+            payload,
+          );
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Payout webhook failed for order: ${savedPayout.orderId} : ${LoggerPlaceHolder.Json}`,
+            error,
+          );
+        });
+    }
 
     return {
       orderId: payoutOrder.orderId,
