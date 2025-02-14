@@ -113,9 +113,13 @@ export class PaymentsController {
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)
   @Post("payout/status")
-  async checkStatusTransactionPayout(@Body() payoutStatusDto: PayoutStatusDto) {
+  async checkStatusTransactionPayout(
+    @Body() payoutStatusDto: PayoutStatusDto,
+    @User() user: UsersEntity,
+  ) {
     return this.payoutService.checkPayOutStatusTransactionFlakPay(
       payoutStatusDto,
+      user,
     );
   }
 

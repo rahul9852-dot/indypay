@@ -40,6 +40,8 @@ import {
 import { PayoutStatusDto } from "@/modules/payments/dto/create-payout-payment.dto";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
+import { decryptData } from "@/utils/encode-decode.utils";
 
 const { externalPaymentConfig } = appConfig();
 
@@ -51,6 +53,8 @@ export class PayoutService {
     private readonly payoutRepository: Repository<PayOutOrdersEntity>,
     @InjectRepository(UsersEntity)
     private readonly userRepository: Repository<UsersEntity>,
+    @InjectRepository(ApiCredentialsEntity)
+    private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
   ) {}
 
   async getAllPayoutsGroupedByUser({
@@ -374,7 +378,10 @@ export class PayoutService {
     return payout;
   }
 
-  async checkPayOutStatusTransactionFlakPay({ orderId }: PayoutStatusDto) {
+  async checkPayOutStatusTransactionFlakPay(
+    { orderId }: PayoutStatusDto,
+    user: UsersEntity,
+  ) {
     const payoutOrder = await this.payoutRepository.findOne({
       where: { orderId },
     });
@@ -395,11 +402,15 @@ export class PayoutService {
 
     // call api
 
+    const { clientId, clientSecret } = await this.getFlakPayCredentials(
+      user.id,
+    );
+
     const axiosServiceFlakPay = new AxiosService(
       FALKPAY.BASE_URL,
       getFlakPayPgConfig({
-        clientId: externalPaymentConfig.flakPay.clientId,
-        clientSecret: externalPaymentConfig.flakPay.clientSecret,
+        clientId,
+        clientSecret,
       }),
     );
 
@@ -536,5 +547,30 @@ export class PayoutService {
       status,
       transferId: ismartPayResponse.transaction_id,
     };
+  }
+
+  private async getFlakPayCredentials(userId: string) {
+    const credentials = await this.apiCredentialsRepository.findOne({
+      where: { user: { id: userId } },
+      relations: { user: true },
+    });
+
+    if (!credentials) {
+      throw new BadRequestException("Credentials not found");
+    }
+
+    const decryptedCredentials = await decryptData(credentials.credentials);
+    const { clientId, clientSecret } = JSON.parse(decryptedCredentials);
+
+    if (
+      !clientId ||
+      !clientSecret ||
+      typeof clientId !== "string" ||
+      typeof clientSecret !== "string"
+    ) {
+      throw new BadRequestException("Invalid credentials");
+    }
+
+    return { clientId, clientSecret };
   }
 }
