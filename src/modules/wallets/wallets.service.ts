@@ -11,7 +11,7 @@ import { WalletTopupEntity } from "@/entities/wallet-topup.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
 import { SettlementsEntity } from "@/entities/settlements.entity";
-import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 
 @Injectable()
 export class WalletsService {
@@ -26,14 +26,57 @@ export class WalletsService {
     private readonly usersRepository: Repository<UsersEntity>,
   ) {}
 
+  async getWalletList({
+    limit = 10,
+    page = 1,
+    sort = "id",
+    order = "DESC",
+  }: PaginationDto) {
+    const [wallets, totalItems] = await this.usersRepository.findAndCount({
+      where: {
+        role: USERS_ROLE.MERCHANT,
+        accountStatus: ACCOUNT_STATUS.ACTIVE,
+        onboardingStatus: ONBOARDING_STATUS.KYC_VERIFIED,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        mobile: true,
+        wallet: {
+          id: true,
+        },
+      },
+      relations: {
+        wallet: true,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      order: {
+        [sort]: order,
+      },
+    });
+
+    const pagination = getPagination({
+      totalItems,
+      page,
+      limit,
+    });
+
+    return {
+      data: wallets,
+      pagination,
+    };
+  }
+
   async getWallet(userId: string) {
     return this.walletRepository.findOne({
       where: { user: { id: userId } },
       select: {
         id: true,
-        settledAmount: true,
-        netPayableAmount: true,
+        totalTopUp: true,
         availablePayoutBalance: true,
+        totalPayout: true,
         user: {
           id: true,
           fullName: true,
@@ -48,6 +91,149 @@ export class WalletsService {
     });
   }
 
+  async getWalletListByUserId(
+    userId: string,
+    {
+      limit = 10,
+      page = 1,
+      sort = "id",
+      order = "DESC",
+      search = "",
+    }: PaginationDto,
+  ) {
+    const walletQueryBuilder = this.walletRepository
+      .createQueryBuilder("wallet")
+      .leftJoin("wallet.user", "user")
+      .where("user.id = :userId", { userId })
+      .select([
+        "wallet.totalTopUp",
+        "wallet.availablePayoutBalance",
+        "wallet.totalPayout",
+      ]);
+
+    const wallet = await walletQueryBuilder.getOne();
+
+    if (!wallet) {
+      throw new NotFoundException(new MessageResponseDto("Wallet not found"));
+    }
+
+    const topupQueryBuilder = this.walletTopupRepository
+      .createQueryBuilder("topup")
+      .leftJoinAndSelect("topup.user", "user")
+      .leftJoinAndSelect("topup.topupBy", "topupBy")
+      .where("user.id = :userId", { userId });
+
+    if (search) {
+      topupQueryBuilder.andWhere("user.fullName ILIKE :search", {
+        search: `%${search}%`,
+      });
+    }
+
+    const [transactions, totalItems] = await topupQueryBuilder
+      .select([
+        "topup.id",
+        "topup.amount",
+        "topup.createdAt",
+        "user.id",
+        "user.fullName",
+        "user.email",
+        "user.mobile",
+        "topupBy.id",
+        "topupBy.fullName",
+      ])
+      .orderBy(`topup.${sort}`, order as "ASC" | "DESC")
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    const pagination = getPagination({
+      totalItems,
+      page,
+      limit,
+    });
+
+    return {
+      data: transactions,
+      pagination,
+      stats: {
+        totalTopup: wallet.totalTopUp || 0,
+        availablePayout: wallet.availablePayoutBalance || 0,
+        totalPayout: wallet.totalPayout || 0,
+      },
+    };
+  }
+
+  async getWalletListByMerchant(
+    {
+      page = 1,
+      limit = 10,
+      sort = "id",
+      order = "DESC",
+      search = "",
+    }: PaginationDto,
+    merchantId: string,
+  ) {
+    const walletQueryBuilder = this.walletRepository
+      .createQueryBuilder("wallet")
+      .leftJoin("wallet.user", "user")
+      .where("user.id = :merchantId", { merchantId })
+      .select([
+        "wallet.totalTopUp",
+        "wallet.availablePayoutBalance",
+        "wallet.totalPayout",
+      ]);
+
+    const wallet = await walletQueryBuilder.getOne();
+
+    if (!wallet) {
+      throw new NotFoundException(new MessageResponseDto("Wallet not found"));
+    }
+
+    const topupQueryBuilder = this.walletTopupRepository
+      .createQueryBuilder("topup")
+      .leftJoinAndSelect("topup.user", "user")
+      .leftJoinAndSelect("topup.topupBy", "topupBy")
+      .where("user.id = :merchantId", { merchantId });
+
+    if (search) {
+      topupQueryBuilder.andWhere("user.fullName ILIKE :search", {
+        search: `%${search}%`,
+      });
+    }
+
+    const [transactions, totalItems] = await topupQueryBuilder
+      .select([
+        "topup.id",
+        "topup.amount",
+        "topup.createdAt",
+        "user.id",
+        "user.fullName",
+        "user.email",
+        "user.mobile",
+        "topupBy.id",
+        "topupBy.fullName",
+      ])
+      .orderBy(`topup.${sort}`, order as "ASC" | "DESC")
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    const pagination = getPagination({
+      totalItems,
+      page,
+      limit,
+    });
+
+    return {
+      data: transactions,
+      pagination,
+      stats: {
+        totalTopup: wallet.totalTopUp || 0,
+        availablePayout: wallet.availablePayoutBalance || 0,
+        totalPayout: wallet.totalPayout || 0,
+      },
+    };
+  }
   async getTopupTransactionsAdmin({
     limit = 10,
     page = 1,
@@ -194,23 +380,23 @@ export class WalletsService {
 
     await this.walletTopupRepository.save(topUp);
 
-    const settlement = this.settlementsRepository.create({
-      amount: +amount,
-      user: merchantUser,
-      status: PAYMENT_STATUS.SUCCESS,
-      successAt: new Date(),
-      settledBy: adminUser,
-      remarks: "Wallet topup",
-    });
+    // const settlement = this.settlementsRepository.create({
+    //   amount: +amount,
+    //   user: merchantUser,
+    //   status: PAYMENT_STATUS.SUCCESS,
+    //   successAt: new Date(),
+    //   settledBy: adminUser,
+    //   remarks: "Wallet topup",
+    // });
 
-    await this.settlementsRepository.save(settlement);
+    // await this.settlementsRepository.save(settlement);
 
     // update wallet balance
     const savedWallet = await this.walletRepository.save(
       this.walletRepository.create({
         id: wallet.id,
         user: wallet.user,
-        settledAmount: +wallet.settledAmount + amount,
+        totalTopUp: +wallet.totalTopUp + amount,
         netPayableAmount: +wallet.netPayableAmount - amount,
         availablePayoutBalance: +wallet.availablePayoutBalance + amount,
       }),

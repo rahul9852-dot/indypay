@@ -12,3 +12,25 @@ export class WalletTopUpDto {
   @IsNotEmpty()
   userId: string;
 }
+
+export class WalletListDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  walletId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  mobile: string;
+}

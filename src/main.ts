@@ -8,7 +8,7 @@ import * as path from "path";
 import { AppModule } from "./app.module";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
-import { appConfig } from "@//config/app.config";
+import { appConfig } from "@/config/app.config";
 import { loadSwaggerConfigs } from "@/config/swagger.config";
 import { helmetConfigs } from "@/config/helmet.config";
 import { HttpExceptionsFilter } from "@/filters/http-exceptions.filter";
@@ -33,7 +33,7 @@ async function bootstrap() {
   // Enable cors
   app.enableCors({
     origin: allowedOrigins,
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",
       "Authorization",
@@ -42,12 +42,11 @@ async function bootstrap() {
       "Origin",
       "Content-Length",
       "Content-Disposition",
-      "Access-Control-Allow-Origin",
-      "Access-Control-Allow-Headers",
-      "Access-Control-Allow-Methods",
     ],
+    exposedHeaders: ["Set-Cookie"],
     credentials: true,
   });
+
   // Add security headers
   app.use(helmet(helmetConfigs));
 

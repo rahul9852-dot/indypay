@@ -1455,6 +1455,7 @@ export class PaymentsService {
             id: wallet.id,
             availablePayoutBalance: +wallet.availablePayoutBalance + amount, // 600
             totalPayout: +wallet.totalPayout - +actualAmount, // 500
+            totalTopUp: +wallet.totalTopUp + amount,
             payoutServiceCharge: +wallet.payoutServiceCharge + serviceCharge, // 100
           }),
         );

@@ -86,6 +86,14 @@ export class WalletEntity {
     scale: 2,
     default: 0,
   })
+  totalTopUp: number;
+
+  @Column({
+    type: "numeric",
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
   payoutServiceCharge: number;
 
   // Relations

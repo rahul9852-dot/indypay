@@ -82,7 +82,7 @@ export class PaymentsController {
   }
 
   @Public()
-  @ApiOperation({ summary: "Create pay-out transaction", deprecated: true })
+  @ApiOperation({ summary: "Create pay-out transaction" })
   @UseGuards(ApiKeyGuard)
   @Post("payout/create")
   async createPayout(
@@ -94,7 +94,6 @@ export class PaymentsController {
 
   @ApiOperation({
     summary: "Create pay-out transaction for dashboard",
-    deprecated: true,
   })
   @Post("payout/dashboard")
   async createPayoutDashboardIsmart(
@@ -110,7 +109,6 @@ export class PaymentsController {
   @Public()
   @ApiOperation({
     summary: "Check status of pay-out transaction",
-    deprecated: true,
   })
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)

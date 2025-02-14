@@ -5,11 +5,9 @@ const { isProduction, isStaging, allowCookiesDomain } = appConfig();
 
 export const cookieOptions: CookieOptions = {
   httpOnly: true, // accessible only by web server
-  ...((isProduction || isStaging) && {
-    secure: true, // only send cookie over https
-    domain: allowCookiesDomain || ".paybolt.money",
-    sameSite: "none",
-  }),
+  secure: false, // allow non-https in development
+  sameSite: "lax",
+  domain: allowCookiesDomain,
 };
 
 export const accessCookieOptions: CookieOptions = {

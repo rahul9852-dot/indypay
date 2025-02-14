@@ -1,4 +1,4 @@
-import { ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { WalletsService } from "./wallets.service";
 import { WalletTopUpDto } from "./dto/wallet.dto";
@@ -18,16 +18,47 @@ export class WalletsController {
   constructor(private readonly walletsService: WalletsService) {}
 
   @Get()
+  @ApiOperation({ summary: "Get Wallet" })
   getWallet(@User() user: UsersEntity) {
     return this.walletsService.getWallet(user.id);
   }
 
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Get Wallet Txn - Admin" })
+  @Get("/admin/wallet-list")
+  getWalletList(@Query() paginationDto: PaginationDto) {
+    return this.walletsService.getWalletList(paginationDto);
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Get Wallet Txn of a user - Admin" })
+  @Get("/admin/wallet-list/:userId")
+  getWalletListByUserId(
+    @Param("userId") userId: string,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    return this.walletsService.getWalletListByUserId(userId, paginationDto);
+  }
+
+  @Role(USERS_ROLE.MERCHANT)
+  @ApiOperation({ summary: "Get Wallet Txn - Merchant" })
+  @Get("/merchant/wallet-list")
+  getWalletListByMerchant(
+    @User() user: UsersEntity,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    return this.walletsService.getWalletListByMerchant(paginationDto, user.id);
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Get Wallet of a user - Admin" })
   @Get("/admin/:userId")
   async getWalletAdmin(@Param("userId") userId: string) {
     return this.walletsService.getWallet(userId);
   }
 
   @Get("transactions")
+  @ApiOperation({ summary: "Get Wallet Txn" })
   getTransactions(
     @User() user: UsersEntity,
     @Query() paginationDto: PaginationDto,
@@ -40,6 +71,7 @@ export class WalletsController {
   }
 
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Top Up Wallet - Admin" })
   @Post("top-up")
   topUpWallet(
     @User() user: UsersEntity,
