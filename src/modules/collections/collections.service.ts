@@ -17,6 +17,7 @@ import {
 import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
+import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 
 @Injectable()
 export class CollectionsService {
@@ -36,6 +37,10 @@ export class CollectionsService {
       .createQueryBuilder("user")
       .where("user.fullName ILIKE :search", { search: `%${search}%` })
       .orWhere("user.email ILIKE :search", { search: `%${search}%` })
+      .andWhere("user.role = :role", { role: USERS_ROLE.MERCHANT })
+      .andWhere("user.onboardingStatus = :onboardingStatus", {
+        onboardingStatus: ONBOARDING_STATUS.KYC_VERIFIED,
+      })
       .leftJoin("user.payInOrders", "payin")
       .select([
         "user.id",

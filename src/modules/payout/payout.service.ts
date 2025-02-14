@@ -25,7 +25,7 @@ import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { UsersEntity } from "@/entities/user.entity";
-import { USERS_ROLE } from "@/enums";
+import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
 import {
   getFlakPayPgConfig,
@@ -67,6 +67,10 @@ export class PayoutService {
       .createQueryBuilder("user")
       .where("user.fullName ILIKE :search", { search: `%${search}%` })
       .orWhere("user.email ILIKE :search", { search: `%${search}%` })
+      .andWhere("user.role = :role", { role: USERS_ROLE.MERCHANT })
+      .andWhere("user.onboardingStatus = :onboardingStatus", {
+        onboardingStatus: ONBOARDING_STATUS.KYC_VERIFIED,
+      })
       .leftJoin("user.payOutOrders", "payout")
       .select([
         "user.id",

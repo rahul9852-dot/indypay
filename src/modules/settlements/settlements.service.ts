@@ -26,7 +26,7 @@ import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
 import { BanksService } from "@/modules/banks/banks.service";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
-import { USERS_ROLE } from "@/enums";
+import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 import { getPagination } from "@/utils/pagination.utils";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
@@ -1321,16 +1321,15 @@ export class SettlementsService {
     limit = 10,
     page = 1,
     search = "",
-    startDate = todayStartDate(),
-    endDate = todayEndDate(),
   }: PaginationWithDateDto) {
     const [settlements, totalItems] = await this.usersRepository.findAndCount({
       where: {
         role: USERS_ROLE.MERCHANT,
+        onboardingStatus: ONBOARDING_STATUS.KYC_VERIFIED,
+        accountStatus: ACCOUNT_STATUS.ACTIVE,
         ...(search && {
           fullName: ILike(`%${search}%`),
         }),
-        createdAt: Between(new Date(startDate), new Date(endDate)),
       },
       relations: {
         wallet: true,
