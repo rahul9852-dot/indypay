@@ -1,6 +1,7 @@
 import { Process, Processor } from "@nestjs/bull";
 import { BadRequestException } from "@nestjs/common";
 import { Job } from "bull";
+import axios from "axios";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
@@ -14,6 +15,7 @@ import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { decryptData } from "@/utils/encode-decode.utils";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
+import { UsersService } from "@/modules/users/users.service";
 
 @Processor("payouts")
 export class PayoutProcessor {
@@ -25,6 +27,7 @@ export class PayoutProcessor {
     private readonly walletRepository: Repository<WalletEntity>,
     @InjectRepository(ApiCredentialsEntity)
     private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
+    private readonly usersService: UsersService,
   ) {}
 
   private async getFlakPayCredentials(userId: string) {
@@ -162,13 +165,46 @@ export class PayoutProcessor {
               },
             );
 
+            this.usersService
+              .findOne(userId)
+              .then((user) => {
+                if (user?.payOutWebhookUrl) {
+                  const payload = {
+                    orderId: order.orderId,
+                    status,
+                    amount: order.amount,
+                    txnRefId: order.transferId,
+                  };
+                  axios
+                    .post(user.payOutWebhookUrl, payload)
+                    .then(() => {
+                      this.logger.info(
+                        `Payout webhook sent successfully: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+                        payload,
+                      );
+                    })
+                    .catch((error) => {
+                      this.logger.error(
+                        `Payout webhook failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+                        error,
+                      );
+                    });
+                }
+              })
+              .catch((error) => {
+                this.logger.error(
+                  `User not found for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+                  error,
+                );
+              });
+
             this.logger.info(
               `Payout processed successfully: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
               response.data,
             );
           } catch (error) {
             this.logger.error(
-              `Payout failed for order: ${order.orderId}`,
+              `Payout failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
               error,
             );
 
