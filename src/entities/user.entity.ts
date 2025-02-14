@@ -69,6 +69,9 @@ export class UsersEntity {
   @Column({ enum: ONBOARDING_STATUS, default: ONBOARDING_STATUS.SIGN_UP })
   onboardingStatus: number;
 
+  @Column({ default: false })
+  isPayoutDisabledFromDashboard: boolean;
+
   @Column({ nullable: true, length: 255 })
   image?: string;
 

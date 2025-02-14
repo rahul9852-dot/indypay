@@ -7,6 +7,7 @@ import {
   UseGuards,
   Get,
   Query,
+  BadRequestException,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -100,6 +101,10 @@ export class PaymentsController {
     @Body() createPayoutIsmartDto: CreatePayoutDto,
     @User() user: UsersEntity,
   ) {
+    if (user.isPayoutDisabledFromDashboard) {
+      throw new BadRequestException("Payout is disabled from dashboard");
+    }
+
     return this.paymentsService.createPayoutFlakPay(
       createPayoutIsmartDto,
       user,
@@ -121,6 +126,17 @@ export class PaymentsController {
       payoutStatusDto,
       user,
     );
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: "Payout Wallet of Merchant",
+  })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("payout/wallet")
+  async checkPayOutWallet(@User() user: UsersEntity) {
+    return this.paymentsService.checkPayOutWalletFlakPay(user);
   }
 
   @Public()

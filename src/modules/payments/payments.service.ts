@@ -106,6 +106,27 @@ export class PaymentsService {
     private readonly dataSource: DataSource,
   ) {}
 
+  async checkPayOutWalletFlakPay(user: UsersEntity) {
+    const wallet = await this.walletRepository.findOne({
+      where: { user: { id: user.id } },
+      select: {
+        id: true,
+        availablePayoutBalance: true,
+        totalPayout: true,
+        totalTopUp: true,
+        user: {
+          id: true,
+          fullName: true,
+        },
+      },
+      relations: {
+        user: true,
+      },
+    });
+
+    return wallet;
+  }
+
   async createTransactionPayinIsmart(
     createPayinTransactionDto: CreatePayinTransactionIsmartDto,
     user: UsersEntity,
