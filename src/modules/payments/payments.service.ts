@@ -743,49 +743,43 @@ export class PaymentsService {
           gstInPercentage: user.gstInPercentagePayout,
         });
 
-        const payoutOrder = await queryRunner.manager.save(
-          this.payOutOrdersRepository.create({
-            amount: +payment.amount,
-            transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
-            orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
-            batchId,
-            user,
-            commissionAmount: +commissions.commissionAmount,
-            commissionInPercentage: +user.commissionInPercentagePayout,
-            gstAmount: +commissions.gstAmount,
-            gstInPercentage: +user.gstInPercentagePayout,
-            netPayableAmount: +commissions.netPayableAmount,
-            name: payment.beneficiaryName,
-            bankAccountNumber: payment.accountNumber,
-            bankIfsc: payment.ifscCode,
-            bankName: payment.bankName,
-            remarks: payment.remarks,
-            purpose: payment.purpose,
-          }),
-        );
+        const payoutOrder = this.payOutOrdersRepository.create({
+          amount: +payment.amount,
+          transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
+          orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
+          batchId,
+          user,
+          commissionAmount: +commissions.commissionAmount,
+          commissionInPercentage: +user.commissionInPercentagePayout,
+          gstAmount: +commissions.gstAmount,
+          gstInPercentage: +user.gstInPercentagePayout,
+          netPayableAmount: +commissions.netPayableAmount,
+          name: payment.beneficiaryName,
+          bankAccountNumber: payment.accountNumber,
+          bankIfsc: payment.ifscCode,
+          bankName: payment.bankName,
+          remarks: payment.remarks,
+          purpose: payment.purpose,
+        });
+
+        const savedPayoutOrder = await queryRunner.manager.save(payoutOrder);
 
         this.logger.info(
-          `PAYOUT - createTransaction - Created payout order successfully: ${payoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
-          payoutOrder,
+          `PAYOUT - createTransaction - Created payout order successfully: ${savedPayoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
+          savedPayoutOrder,
         );
 
-        await this.transactionsRepository.save(
-          this.transactionsRepository.create({
-            user,
-            payOutOrder: payoutOrder,
-            transactionType: PAYMENT_TYPE.PAYOUT,
-          }),
-        );
+        // 3. create transaction
+        const transaction = this.transactionsRepository.create({
+          user,
+          payOutOrder: savedPayoutOrder,
+          transactionType: PAYMENT_TYPE.PAYIN,
+        });
 
-        await queryRunner.manager.save(
-          this.transactionsRepository.create({
-            user,
-            payOutOrder: payoutOrder,
-            transactionType: PAYMENT_TYPE.PAYOUT,
-          }),
-        );
+        // 4. save transaction
+        await queryRunner.manager.save(transaction);
 
-        return payoutOrder;
+        return savedPayoutOrder;
       }),
     );
   }

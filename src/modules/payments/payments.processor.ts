@@ -8,7 +8,7 @@ import { FALKPAY } from "@/constants/external-api.constant";
 import { getFlakPayPgConfig } from "@/utils/pg-config.utils";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { IExternalPayoutResponseFlakPay } from "@/interface/external-api.interface";
-import { CustomLogger } from "@/logger";
+import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { WalletEntity } from "@/entities/wallet.entity";
@@ -162,7 +162,10 @@ export class PayoutProcessor {
               },
             );
 
-            this.logger.info(`Payout processed successfully: ${order.orderId}`);
+            this.logger.info(
+              `Payout processed successfully: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+              response.data,
+            );
           } catch (error) {
             this.logger.error(
               `Payout failed for order: ${order.orderId}`,
