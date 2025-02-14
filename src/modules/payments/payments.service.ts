@@ -764,6 +764,14 @@ export class PaymentsService {
           }),
         );
 
+        await this.transactionsRepository.save(
+          this.transactionsRepository.create({
+            user,
+            payOutOrder: payoutOrder,
+            transactionType: PAYMENT_TYPE.PAYOUT,
+          }),
+        );
+
         await queryRunner.manager.save(
           this.transactionsRepository.create({
             user,
