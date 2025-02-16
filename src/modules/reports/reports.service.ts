@@ -19,7 +19,7 @@ export class ReportsService {
 
   async generateXLSX({
     userId,
-    status = PAYMENT_STATUS.SUCCESS,
+    status,
     startDate = todayStartDate(),
     endDate = todayEndDate(),
     res,
@@ -30,18 +30,35 @@ export class ReportsService {
     endDate?: Date | string;
     res: Response;
   }): Promise<void> {
-    const filename =
-      `payin_orders_${userId}_${status}_${formatDateTime(new Date(startDate))}-${formatDateTime(new Date(endDate))}.xlsx`.replaceAll(
-        " ",
-        "_",
-      );
+    const normalizedStartDate = new Date(startDate);
+    const normalizedEndDate = new Date(endDate);
 
-    // Create a new workbook and worksheet
+    if (
+      isNaN(normalizedStartDate.getTime()) ||
+      isNaN(normalizedEndDate.getTime())
+    ) {
+      throw new Error("Invalid date format provided");
+    }
+
+    if (normalizedStartDate > normalizedEndDate) {
+      throw new Error("Start date must be before or equal to end date");
+    }
+    const filename =
+      `payin_orders_${userId}${status ? "_" + status : ""}_${formatDateTime(normalizedStartDate)}-${formatDateTime(normalizedEndDate)}.xlsx`
+        .replaceAll(" ", "_")
+        .replaceAll(/[<>:"/\\|?*]/g, "-");
+
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("PayIn Orders");
 
-    // Define the header row
-    worksheet.addRow(["ID", "Order ID", "Amount", "Status", "Created At"]);
+    worksheet.addRow([
+      "ID",
+      "Order ID",
+      "Amount",
+      "UTR",
+      "Status",
+      "Created At",
+    ]);
 
     let skip = 0;
     let hasMore = true;
@@ -54,6 +71,7 @@ export class ReportsService {
         startDate,
         endDate,
       );
+
       hasMore = batch.length === this.batchSize;
       skip += batch.length;
 
@@ -63,6 +81,7 @@ export class ReportsService {
             order.id,
             order.orderId,
             order.amount,
+            // order.utr,
             order.status,
             order.createdAt,
           ]);
@@ -89,16 +108,38 @@ export class ReportsService {
     startDate: Date | string,
     endDate: Date | string,
   ): Promise<PayInOrdersEntity[]> {
-    return this.payInOrdersRepository.find({
-      where: {
+    try {
+      const whereClause: any = {
         user: { id: userId },
-        status,
         createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-      skip,
-      take: this.batchSize,
-      order: { createdAt: "DESC" },
-      select: ["id", "orderId", "amount", "status", "createdAt"],
-    });
+      };
+      if (status) {
+        whereClause.status = status;
+      }
+
+      const query = {
+        where: whereClause,
+        relations: ["user"],
+        skip,
+        take: this.batchSize,
+        order: { createdAt: "DESC" as const },
+        select: {
+          id: true,
+          orderId: true,
+          amount: true,
+          utr: true,
+          status: true,
+          createdAt: true,
+          user: {
+            id: true,
+          },
+        },
+      };
+      const result = await this.payInOrdersRepository.find(query);
+
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to fetch payin orders: ${error.message}`);
+    }
   }
 }

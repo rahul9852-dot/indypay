@@ -62,7 +62,10 @@ import {
 } from "@/utils/helperFunctions.utils";
 import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
-import { getCommissions } from "@/utils/commissions.utils";
+import {
+  calculateOriginalAmountFromNetPayable,
+  getCommissions,
+} from "@/utils/commissions.utils";
 import {
   IExternalPayinPaymentRequestFlakPay,
   IExternalPayinPaymentRequestIsmart,
@@ -580,11 +583,7 @@ export class PaymentsService {
       }, 0);
 
       // Check and update wallet balance
-      const walletAfterDeduction = await this.validateAndUpdateWallet(
-        queryRunner,
-        user,
-        totalAmount,
-      );
+      await this.validateAndUpdateWallet(queryRunner, user, totalAmount);
 
       // Create batch job identifier
       const batchId = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
@@ -730,17 +729,9 @@ export class PaymentsService {
       );
     }
 
-    const { totalServiceChange } = getCommissions({
-      amount: totalAmount,
-      commissionInPercentage: user.commissionInPercentagePayout,
-      gstInPercentage: user.gstInPercentagePayout,
-    });
-
-    const grossTotalAmount = totalAmount + totalServiceChange;
-
-    if (grossTotalAmount > +userWallet.availablePayoutBalance) {
+    if (totalAmount > +userWallet.availablePayoutBalance) {
       throw new BadRequestException(
-        `Insufficient balance. Gross Total Amount: ${grossTotalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
+        `Insufficient balance. Gross Total Amount: ${totalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
       );
     }
 
@@ -748,10 +739,8 @@ export class PaymentsService {
       this.walletRepository.create({
         id: userWallet.id,
         availablePayoutBalance:
-          +userWallet.availablePayoutBalance - grossTotalAmount,
+          +userWallet.availablePayoutBalance - totalAmount,
         totalPayout: +userWallet.totalPayout + totalAmount,
-        payoutServiceCharge:
-          +userWallet.payoutServiceCharge + totalServiceChange,
       }),
     );
   }
@@ -960,9 +949,7 @@ export class PaymentsService {
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const { totalCollections, unsettledAmount } = wallet ?? {};
-
-      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+      const { totalServiceChange } = getCommissions({
         amount: +payinOrder.amount,
         commissionInPercentage: +user.commissionInPercentagePayin,
         gstInPercentage: +user.gstInPercentagePayin,
@@ -971,16 +958,16 @@ export class PaymentsService {
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
         totalCollections:
-          (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
-        unsettledAmount:
-          (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
-        commissionAmount:
-          (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
-          +commissionAmount,
-        gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
-        netPayableAmount:
-          (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
-          +netPayableAmount,
+          (wallet.totalCollections ? +wallet.totalCollections : 0) +
+          +payinOrder.amount,
+        serviceCharge:
+          (wallet.serviceCharge ? +wallet.serviceCharge : 0) +
+          totalServiceChange,
+        collectionAfterDeduction:
+          (wallet.collectionAfterDeduction
+            ? +wallet.collectionAfterDeduction
+            : 0) +
+          (+payinOrder.amount - totalServiceChange),
         user,
       });
 
@@ -1034,6 +1021,7 @@ export class PaymentsService {
       orderId,
       status: status_code,
       transactionRefId: txnRefId,
+      utr,
     } = externalPayinWebhookDto;
 
     let status = convertExternalPaymentStatusToInternal(status_code);
@@ -1066,7 +1054,7 @@ export class PaymentsService {
 
     let isMisspelled = false;
 
-    const jumpingCount = 20;
+    const jumpingCount = 50;
 
     if (status === PAYMENT_STATUS.SUCCESS) {
       if (successCount >= jumpingCount) {
@@ -1092,6 +1080,7 @@ export class PaymentsService {
       id: payinOrder.id,
       status,
       txnRefId,
+      utr,
       isMisspelled,
       ...(status === PAYMENT_STATUS.SUCCESS && {
         successAt: new Date(),
@@ -1114,9 +1103,7 @@ export class PaymentsService {
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const { totalCollections, unsettledAmount } = wallet ?? {};
-
-      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+      const { totalServiceChange } = getCommissions({
         amount: +payinOrder.amount,
         commissionInPercentage: +user.commissionInPercentagePayin,
         gstInPercentage: +user.gstInPercentagePayin,
@@ -1125,16 +1112,16 @@ export class PaymentsService {
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
         totalCollections:
-          (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
-        unsettledAmount:
-          (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
-        commissionAmount:
-          (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
-          +commissionAmount,
-        gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
-        netPayableAmount:
-          (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
-          +netPayableAmount,
+          (wallet.totalCollections ? +wallet.totalCollections : 0) +
+          +payinOrder.amount,
+        serviceCharge:
+          (wallet.serviceCharge ? +wallet.serviceCharge : 0) +
+          totalServiceChange,
+        collectionAfterDeduction:
+          (wallet.collectionAfterDeduction
+            ? +wallet.collectionAfterDeduction
+            : 0) +
+          (+payinOrder.amount - totalServiceChange),
         user,
       });
 
@@ -1151,7 +1138,8 @@ export class PaymentsService {
         orderId,
         status,
         amount: payinOrder.amount,
-        txnRefId: payinOrder.txnRefId, // utr
+        txnRefId: payinOrder.txnRefId,
+        utr,
       };
       this.logger.info(
         `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
@@ -1236,9 +1224,7 @@ export class PaymentsService {
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const { totalCollections, unsettledAmount } = wallet ?? {};
-
-      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+      const { totalServiceChange } = getCommissions({
         amount: +payinOrder.amount,
         commissionInPercentage: +user.commissionInPercentagePayin,
         gstInPercentage: +user.gstInPercentagePayin,
@@ -1247,16 +1233,16 @@ export class PaymentsService {
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
         totalCollections:
-          (totalCollections ? +totalCollections : 0) + +payinOrder.amount,
-        unsettledAmount:
-          (unsettledAmount ? +unsettledAmount : 0) + +payinOrder.amount,
-        commissionAmount:
-          (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
-          +commissionAmount,
-        gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
-        netPayableAmount:
-          (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
-          +netPayableAmount,
+          (wallet.totalCollections ? +wallet.totalCollections : 0) +
+          +payinOrder.amount,
+        serviceCharge:
+          (wallet.serviceCharge ? +wallet.serviceCharge : 0) +
+          totalServiceChange,
+        collectionAfterDeduction:
+          (wallet.collectionAfterDeduction
+            ? +wallet.collectionAfterDeduction
+            : 0) +
+          (+payinOrder.amount - totalServiceChange),
         user,
       });
 
@@ -1307,6 +1293,7 @@ export class PaymentsService {
     orderId: order_id,
     transferId: transaction_id,
     amount,
+    utr,
   }: ExternalPayOutWebhookFlakPayDto) {
     const status = convertExternalPaymentStatusToInternal(
       status_code.toUpperCase(),
@@ -1317,6 +1304,7 @@ export class PaymentsService {
       PAYOUT_REF: order_id,
       TXN_ID: transaction_id,
       AMOUNT: amount,
+      utr,
     });
 
     const [idPrefix] = order_id.split("_");
@@ -1355,6 +1343,7 @@ export class PaymentsService {
           status,
           successAt: new Date(),
           transferId: transaction_id,
+          utr,
         });
 
         await this.settlementRepository.save(settlementRaw);
@@ -1366,6 +1355,7 @@ export class PaymentsService {
           status,
           failureAt: new Date(),
           transferId: transaction_id,
+          utr,
         });
 
         await this.settlementRepository.save(settlementRaw);
@@ -1386,27 +1376,24 @@ export class PaymentsService {
         const { commissionInPercentagePayin, gstInPercentagePayin } =
           wallet.user;
 
-        const { totalCollections, unsettledAmount } = wallet ?? {};
+        const { totalServiceChange } = getCommissions({
+          amount: +amount,
+          commissionInPercentage: +commissionInPercentagePayin,
+          gstInPercentage: +gstInPercentagePayin,
+        });
 
-        const { commissionAmount, gstAmount, netPayableAmount } =
-          getCommissions({
-            amount: +amount,
-            commissionInPercentage: +commissionInPercentagePayin,
-            gstInPercentage: +gstInPercentagePayin,
-          });
+        const originalAmount = calculateOriginalAmountFromNetPayable({
+          netPayableAmount: +amount,
+          commissionInPercentage: +wallet.user.commissionInPercentagePayout,
+          gstInPercentage: +wallet.user.gstInPercentagePayout,
+        });
 
         const walletRaw = this.walletRepository.create({
           ...(wallet?.id && { id: wallet.id }),
-          totalCollections:
-            (totalCollections ? +totalCollections : 0) + +amount,
-          unsettledAmount: (unsettledAmount ? +unsettledAmount : 0) + +amount,
-          commissionAmount:
-            (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
-            +commissionAmount,
-          gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
-          netPayableAmount:
-            (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
-            +netPayableAmount,
+          id: wallet.id,
+          totalCollections: +wallet.totalCollections + originalAmount,
+          collectionAfterDeduction: +wallet.collectionAfterDeduction + +amount,
+          serviceCharge: +wallet.serviceCharge + totalServiceChange,
           user: wallet.user,
         });
 
@@ -1444,6 +1431,7 @@ export class PaymentsService {
           status,
           successAt: new Date(),
           transferId: transaction_id,
+          utr,
         });
 
         await this.payOutOrdersRepository.save(payOutOrderRaw);
@@ -1455,6 +1443,7 @@ export class PaymentsService {
           status,
           failureAt: new Date(),
           transferId: transaction_id,
+          utr,
         });
 
         await this.payOutOrdersRepository.save(payOutOrderRaw);
@@ -1470,28 +1459,25 @@ export class PaymentsService {
           },
         });
 
-        const commissionRate = +wallet.user.commissionInPercentagePayout / 100;
-        const gstRate =
-          (commissionRate * +wallet.user.gstInPercentagePayout) / 100;
+        const deductedAmount = calculateOriginalAmountFromNetPayable({
+          netPayableAmount: +amount,
+          commissionInPercentage: +wallet.user.commissionInPercentagePayout,
+          gstInPercentage: +wallet.user.gstInPercentagePayout,
+        });
 
-        const totalDeductionRate = commissionRate + gstRate;
+        const { totalServiceChange } = getCommissions({
+          amount: deductedAmount,
+          commissionInPercentage: +wallet.user.commissionInPercentagePayout,
+          gstInPercentage: +wallet.user.gstInPercentagePayout,
+        });
 
-        if (totalDeductionRate >= 1) {
-          throw new BadRequestException(
-            "Invalid rates: Total deduction cannot be equal or greater than 1.",
-          );
-        }
-        const actualAmount = +amount / (1 + totalDeductionRate / 100);
-        const serviceCharge = +amount - actualAmount;
-
-        // update wallet
         await this.walletRepository.save(
           this.walletRepository.create({
             id: wallet.id,
-            availablePayoutBalance: +wallet.availablePayoutBalance + amount, // 600
-            totalPayout: +wallet.totalPayout - +actualAmount, // 500
-            totalTopUp: +wallet.totalTopUp + amount,
-            payoutServiceCharge: +wallet.payoutServiceCharge + serviceCharge, // 100
+            availablePayoutBalance: +wallet.availablePayoutBalance + +amount,
+            totalPayout: +wallet.totalPayout - +amount,
+            payoutServiceCharge:
+              +wallet.payoutServiceCharge - totalServiceChange,
           }),
         );
       }
@@ -1505,6 +1491,7 @@ export class PaymentsService {
             amount,
             txnRefId: transaction_id,
             payoutId: payOutOrder.payoutId,
+            utr,
           })
           .then(() => {
             this.logger.info(
@@ -1602,30 +1589,26 @@ export class PaymentsService {
         const { commissionInPercentagePayin, gstInPercentagePayin } =
           wallet.user;
 
-        const { totalCollections, unsettledAmount } = wallet ?? {};
+        const { totalServiceChange } = getCommissions({
+          amount: +amount,
+          commissionInPercentage: +commissionInPercentagePayin,
+          gstInPercentage: +gstInPercentagePayin,
+        });
 
-        const { commissionAmount, gstAmount, netPayableAmount } =
-          getCommissions({
-            amount: +amount,
-            commissionInPercentage: +commissionInPercentagePayin,
-            gstInPercentage: +gstInPercentagePayin,
-          });
+        const originalAmount = calculateOriginalAmountFromNetPayable({
+          netPayableAmount: +amount,
+          commissionInPercentage: +wallet.user.commissionInPercentagePayout,
+          gstInPercentage: +wallet.user.gstInPercentagePayout,
+        });
 
         const walletRaw = this.walletRepository.create({
           ...(wallet?.id && { id: wallet.id }),
-          totalCollections:
-            (totalCollections ? +totalCollections : 0) + +amount,
-          unsettledAmount: (unsettledAmount ? +unsettledAmount : 0) + +amount,
-          commissionAmount:
-            (wallet.commissionAmount ? +wallet.commissionAmount : 0) +
-            +commissionAmount,
-          gstAmount: (wallet.gstAmount ? +wallet.gstAmount : 0) + +gstAmount,
-          netPayableAmount:
-            (wallet.netPayableAmount ? +wallet.netPayableAmount : 0) +
-            +netPayableAmount,
+          id: wallet.id,
+          totalCollections: +wallet.totalCollections + originalAmount,
+          collectionAfterDeduction: +wallet.collectionAfterDeduction + +amount,
+          serviceCharge: +wallet.serviceCharge + totalServiceChange,
           user: wallet.user,
         });
-
         await this.walletRepository.save(walletRaw);
       }
 

@@ -8,7 +8,7 @@ import {
   IsPositive,
   IsString,
 } from "class-validator";
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 class DataDto {
   @ApiProperty()
@@ -154,6 +154,11 @@ export class ExternalPayinWebhookFlakPayDto {
   @IsString()
   @IsNotEmpty()
   orderId: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  utr?: string;
 }
 
 export class ExternalPayinWebhookPayNProDto {

@@ -37,6 +37,9 @@ export class SettlementsEntity {
   @Column({ nullable: true })
   remarks: string;
 
+  @Column({ nullable: true })
+  utr: string;
+
   // Relations
   @ManyToOne(() => UsersEntity, ({ settlements }) => settlements, {
     onDelete: "CASCADE",

@@ -12,6 +12,10 @@ import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
+import {
+  calculateOriginalAmountFromNetPayable,
+  getCommissions,
+} from "@/utils/commissions.utils";
 
 @Injectable()
 export class WalletsService {
@@ -76,6 +80,7 @@ export class WalletsService {
         id: true,
         totalTopUp: true,
         availablePayoutBalance: true,
+        payoutServiceCharge: true,
         totalPayout: true,
         user: {
           id: true,
@@ -361,9 +366,11 @@ export class WalletsService {
       throw new NotFoundException(new MessageResponseDto("Wallet not found"));
     }
 
-    if (+wallet.netPayableAmount < amount) {
+    if (+wallet.collectionAfterDeduction < amount) {
       throw new BadRequestException(
-        new MessageResponseDto("Insufficient wallet balance"),
+        new MessageResponseDto(
+          `Insufficient collection balance: ${wallet.collectionAfterDeduction}`,
+        ),
       );
     }
 
@@ -391,14 +398,33 @@ export class WalletsService {
 
     // await this.settlementsRepository.save(settlement);
 
+    const { totalServiceChange } = getCommissions({
+      amount,
+      commissionInPercentage: merchantUser.commissionInPercentagePayout,
+      gstInPercentage: merchantUser.gstInPercentagePayout,
+    });
+
+    const collectionAmountBeforeDeduction =
+      calculateOriginalAmountFromNetPayable({
+        netPayableAmount: amount,
+        commissionInPercentage: merchantUser.commissionInPercentagePayin,
+        gstInPercentage: merchantUser.gstInPercentagePayin,
+      });
     // update wallet balance
     const savedWallet = await this.walletRepository.save(
       this.walletRepository.create({
         id: wallet.id,
         user: wallet.user,
+        totalCollections:
+          +wallet.totalCollections - collectionAmountBeforeDeduction,
+        serviceCharge:
+          +wallet.serviceCharge - (collectionAmountBeforeDeduction - amount),
+        collectionAfterDeduction: +wallet.collectionAfterDeduction - amount,
+
         totalTopUp: +wallet.totalTopUp + amount,
-        netPayableAmount: +wallet.netPayableAmount - amount,
-        availablePayoutBalance: +wallet.availablePayoutBalance + amount,
+        availablePayoutBalance:
+          +wallet.availablePayoutBalance + (amount - totalServiceChange),
+        payoutServiceCharge: +wallet.payoutServiceCharge + totalServiceChange,
       }),
     );
 

@@ -129,8 +129,9 @@ export class SettlementsService {
     return {
       todayTotalCollections: +collections.totalCollections,
       todayTotalSettlements: +settlements.totalSettlements,
-      todayTotalUnSettled:
+      todayTotalUnSettled: Math.abs(
         +collections.totalCollections - +settlements.totalSettlements,
+      ),
     };
   }
 
@@ -361,6 +362,7 @@ export class SettlementsService {
           status: true,
           transferId: true,
           transferMode: true,
+          utr: true,
           remarks: true,
           createdAt: true,
           settledBy: {
@@ -433,6 +435,7 @@ export class SettlementsService {
           status: true,
           transferId: true,
           transferMode: true,
+          utr: true,
           remarks: true,
           createdAt: true,
           settledBy: {
@@ -803,9 +806,11 @@ export class SettlementsService {
         );
       }
 
-      if (+wallet.netPayableAmount < +amount) {
+      if (+wallet.collectionAfterDeduction < +amount) {
         throw new BadRequestException(
-          new MessageResponseDto("Amount is greater than unsettled amount"),
+          new MessageResponseDto(
+            `Amount is greater than unsettled amount: ${wallet.collectionAfterDeduction}`,
+          ),
         );
       }
       const originalAmount = calculateOriginalAmountFromNetPayable({
@@ -814,20 +819,17 @@ export class SettlementsService {
         gstInPercentage: +wallet.user.gstInPercentagePayin,
       });
 
-      const commission = getCommissions({
-        amount: originalAmount,
+      const { totalServiceChange } = getCommissions({
+        amount: +originalAmount,
         commissionInPercentage: +wallet.user.commissionInPercentagePayin,
         gstInPercentage: +wallet.user.gstInPercentagePayin,
       });
 
       const newWallet = this.walletRepository.create({
         id: wallet.id,
-        settledAmount: +wallet.settledAmount + +originalAmount,
-        unsettledAmount: +wallet.unsettledAmount - +originalAmount,
-        netPayableAmount: +wallet.netPayableAmount - +amount,
-        commissionAmount:
-          +wallet.commissionAmount - +commission.commissionAmount,
-        gstAmount: +wallet.gstAmount - +commission.gstAmount,
+        totalCollections: +wallet.totalCollections - originalAmount,
+        collectionAfterDeduction: +wallet.collectionAfterDeduction - +amount,
+        serviceCharge: +wallet.serviceCharge - totalServiceChange,
       });
 
       await queryRunner.manager.save(newWallet);
@@ -1150,9 +1152,7 @@ export class SettlementsService {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
 
-    const { clientId, clientSecret } = await this.getFlakPayCredentials(
-      user.id,
-    );
+    const { clientId, clientSecret } = externalPaymentConfig.flakPay;
 
     const axiosServiceFlakPay = new AxiosService(
       FALKPAY.BASE_URL,
@@ -1199,9 +1199,11 @@ export class SettlementsService {
         );
       }
 
-      if (+wallet.netPayableAmount < +amount) {
+      if (+wallet.collectionAfterDeduction < +amount) {
         throw new BadRequestException(
-          new MessageResponseDto("Amount is greater than unsettled amount"),
+          new MessageResponseDto(
+            `Amount is greater than unsettled amount: ${wallet.collectionAfterDeduction}`,
+          ),
         );
       }
       const originalAmount = calculateOriginalAmountFromNetPayable({
@@ -1210,20 +1212,17 @@ export class SettlementsService {
         gstInPercentage: +wallet.user.gstInPercentagePayin,
       });
 
-      const commission = getCommissions({
-        amount: originalAmount,
+      const { totalServiceChange } = getCommissions({
+        amount: +originalAmount,
         commissionInPercentage: +wallet.user.commissionInPercentagePayin,
         gstInPercentage: +wallet.user.gstInPercentagePayin,
       });
 
       const newWallet = this.walletRepository.create({
         id: wallet.id,
-        settledAmount: +wallet.settledAmount + +originalAmount,
-        unsettledAmount: +wallet.unsettledAmount - +originalAmount,
-        netPayableAmount: +wallet.netPayableAmount - +amount,
-        commissionAmount:
-          +wallet.commissionAmount - +commission.commissionAmount,
-        gstAmount: +wallet.gstAmount - +commission.gstAmount,
+        totalCollections: +wallet.totalCollections - originalAmount,
+        collectionAfterDeduction: +wallet.collectionAfterDeduction - +amount,
+        serviceCharge: +wallet.serviceCharge - totalServiceChange,
       });
 
       await queryRunner.manager.save(newWallet);
@@ -1291,6 +1290,19 @@ export class SettlementsService {
         },
       );
 
+      if (status === PAYMENT_STATUS.FAILED) {
+        // update wallet
+        await this.walletRepository.save(
+          this.walletRepository.create({
+            id: wallet.id,
+            totalCollections: +wallet.totalCollections + originalAmount,
+            collectionAfterDeduction:
+              +wallet.collectionAfterDeduction + +amount,
+            serviceCharge: +wallet.serviceCharge + totalServiceChange,
+          }),
+        );
+      }
+
       await queryRunner.commitTransaction();
 
       await this.sendSettlementInvoice(savedSettlement.id, "Initiated");
@@ -1350,10 +1362,9 @@ export class SettlementsService {
         return {
           id: settlement.id,
           name: settlement.fullName,
-          unsettledAmount: +settlement.wallet.unsettledAmount,
-          netUnsettledPayableAmount: +settlement.wallet.netPayableAmount,
-          gstAmount: +settlement.wallet.gstAmount,
-          commissionAmount: +settlement.wallet.commissionAmount,
+          totalCollections: +settlement.wallet.totalCollections,
+          serviceChange: +settlement.wallet.serviceCharge,
+          collectionAfterDeduction: +settlement.wallet.collectionAfterDeduction,
         };
       });
 
@@ -1387,10 +1398,9 @@ export class SettlementsService {
     return {
       id: settlement.id,
       name: settlement.fullName,
-      unsettledAmount: +settlement.wallet.unsettledAmount,
-      netUnsettledPayableAmount: +settlement.wallet.netPayableAmount,
-      gstAmount: +settlement.wallet.gstAmount,
-      commissionAmount: +settlement.wallet.commissionAmount,
+      totalCollections: +settlement.wallet.totalCollections,
+      serviceChange: +settlement.wallet.serviceCharge,
+      collectionAfterDeduction: +settlement.wallet.collectionAfterDeduction,
     };
   }
 

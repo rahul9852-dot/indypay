@@ -279,7 +279,8 @@ export class PayoutService {
         status: true,
         transferId: true,
         orderId: true,
-        netPayableAmount: true,
+        payoutId: true,
+        utr: true,
         batchId: true,
         createdAt: true,
         user: {

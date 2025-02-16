@@ -52,6 +52,9 @@ export class PayInOrdersEntity {
   @Column({ nullable: true })
   paymentLink: string;
 
+  @Column({ nullable: true })
+  utr: string;
+
   @Column({ default: false })
   isMisspelled: boolean;
 

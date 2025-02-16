@@ -44,6 +44,9 @@ export class PayOutOrdersEntity {
   transferId: string;
 
   @Column({ nullable: true })
+  utr: string;
+
+  @Column({ nullable: true })
   name: string;
 
   @Column({ nullable: true })

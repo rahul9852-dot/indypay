@@ -2,10 +2,11 @@ import {
   IsBoolean,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsPositive,
   IsString,
 } from "class-validator";
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class ExternalPayoutWebhookIsmartDto {
   @ApiProperty()
@@ -134,4 +135,9 @@ export class ExternalPayOutWebhookFlakPayDto {
   @IsNumber()
   @IsPositive()
   amount: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  utr?: string;
 }

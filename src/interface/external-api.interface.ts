@@ -251,6 +251,7 @@ export interface IExternalPayoutResponseFlakPay {
   data: {
     status: string;
     transferId: string;
+    utr: string;
   };
 }
 

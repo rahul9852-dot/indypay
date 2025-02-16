@@ -9,16 +9,30 @@ import {
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 
 export class GeneratePayinReportDto {
+  @ApiProperty({
+    description: "User ID for filtering reports",
+    required: false,
+  })
   @IsString()
   @IsNotEmpty()
   @IsOptional()
   userId?: string;
 
+  @ApiProperty({
+    description: "Start date for filtering reports (ISO format)",
+    required: false,
+    example: "2025-02-16T00:00:00.000Z",
+  })
   @IsDateString()
   @IsNotEmpty()
   @IsOptional()
   startDate?: string;
 
+  @ApiProperty({
+    description: "End date for filtering reports (ISO format)",
+    required: false,
+    example: "2025-02-16T23:59:59.999Z",
+  })
   @IsDateString()
   @IsNotEmpty()
   @IsOptional()
@@ -26,13 +40,11 @@ export class GeneratePayinReportDto {
 
   @IsEnum(PAYMENT_STATUS)
   @ApiProperty({
-    enum: [
-      PAYMENT_STATUS.SUCCESS,
-      PAYMENT_STATUS.PENDING,
-      PAYMENT_STATUS.FAILED,
-    ],
+    enum: PAYMENT_STATUS,
+    description:
+      "Filter by payment status. If not provided, will return all statuses",
+    required: false,
   })
-  @IsNotEmpty()
   @IsOptional()
   status?: PAYMENT_STATUS;
 }

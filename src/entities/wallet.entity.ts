@@ -22,7 +22,7 @@ export class WalletEntity {
     scale: 2,
     default: 0,
   })
-  totalCollections: number; // Total amount collected
+  totalCollections: number; // Total amount collected +500; +200; +1000 ==> 1700; -1200
 
   @Column({
     type: "numeric",
@@ -30,7 +30,7 @@ export class WalletEntity {
     scale: 2,
     default: 0,
   })
-  settledAmount: number; // Total amount settled
+  serviceCharge: number; // Service charge applied on collection +100; +50; +150 ==> 300
 
   @Column({
     type: "numeric",
@@ -38,7 +38,7 @@ export class WalletEntity {
     scale: 2,
     default: 0,
   })
-  unsettledAmount: number; // Total amount unsettled
+  collectionAfterDeduction: number; // Collection after deduction +400; +150; +850 ==> 1400; -1000 ==> 400;
 
   @Column({
     type: "numeric",
@@ -46,7 +46,7 @@ export class WalletEntity {
     scale: 2,
     default: 0,
   })
-  commissionAmount: number;
+  availablePayoutBalance: number; // Available balance for payout // +95 ==> 95; -90 ==> 5; -5 ==> 0; +190 ==> 190
 
   @Column({
     type: "numeric",
@@ -54,7 +54,8 @@ export class WalletEntity {
     scale: 2,
     default: 0,
   })
-  gstAmount: number;
+  totalPayout: number; // Total amount paid out +90; +5; ==> 95
+  // (totalTopUp - payoutServiceCharge) == (totalPayout + availablePayoutBalance)
 
   @Column({
     type: "numeric",
@@ -62,7 +63,7 @@ export class WalletEntity {
     scale: 2,
     default: 0,
   })
-  netPayableAmount: number;
+  totalTopUp: number; // Total top-up amount +100 ==> 100; +200 ==> 300;
 
   @Column({
     type: "numeric",
@@ -70,31 +71,7 @@ export class WalletEntity {
     scale: 2,
     default: 0,
   })
-  availablePayoutBalance: number;
-
-  @Column({
-    type: "numeric",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  totalPayout: number;
-
-  @Column({
-    type: "numeric",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  totalTopUp: number;
-
-  @Column({
-    type: "numeric",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  payoutServiceCharge: number;
+  payoutServiceCharge: number; // Service charge for payout 5; 10; ==> 15
 
   // Relations
   @OneToOne(() => UsersEntity, ({ wallet }) => wallet, {
