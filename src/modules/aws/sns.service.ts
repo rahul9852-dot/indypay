@@ -35,7 +35,7 @@ export class SNSService {
     try {
       const formattedNumber = phoneNumber.startsWith("+")
         ? phoneNumber
-        : `+${phoneNumber}`;
+        : `+91${phoneNumber}`;
       this.logger.info(
         `Preparing to send SMS to ${formattedNumber} with config: ${LoggerPlaceHolder.Json}`,
         { region, messageLength: message.length },
