@@ -49,8 +49,6 @@ export class ChannelPartnersService {
     private readonly settlementsRepository: Repository<SettlementsEntity>,
   ) {}
 
-  async getStats(cpId: string) {}
-
   async getAllMerchants(
     {
       limit = 10,

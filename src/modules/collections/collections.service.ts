@@ -18,7 +18,7 @@ import {
 import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
-import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
+import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 
 @Injectable()
 export class CollectionsService {
@@ -47,7 +47,19 @@ export class CollectionsService {
       .andWhere("user.onboardingStatus = :onboardingStatus", {
         onboardingStatus: ONBOARDING_STATUS.KYC_VERIFIED,
       })
-      .leftJoin("user.payInOrders", "payin")
+      .andWhere("user.accountStatus NOT IN (:...statuses)", {
+        statuses: [
+          ACCOUNT_STATUS.INTERNAL_USER,
+          ACCOUNT_STATUS.TEST_DELETED,
+          ACCOUNT_STATUS.DELETED,
+        ],
+      })
+      .leftJoin(
+        "user.payInOrders",
+        "payin",
+        // Add the date condition in the join itself
+        "payin.createdAt >= :today AND payin.createdAt < :tomorrow",
+      )
       .select([
         "user.id",
 
@@ -87,7 +99,9 @@ export class CollectionsService {
       .addSelect("user.email", "email")
       .setParameter("successStatus", PAYMENT_STATUS.SUCCESS)
       .setParameter("failedStatus", PAYMENT_STATUS.FAILED)
-      .setParameter("pendingStatus", PAYMENT_STATUS.PENDING);
+      .setParameter("pendingStatus", PAYMENT_STATUS.PENDING)
+      .setParameter("today", new Date(todayStartDate()))
+      .setParameter("tomorrow", new Date(todayEndDate()));
 
     const { raw: data } = await query
       .skip((page - 1) * limit)
@@ -169,6 +183,7 @@ export class CollectionsService {
           status: true,
           createdAt: true,
           txnRefId: true,
+          utr: true,
           orderId: true,
           netPayableAmount: true,
           settlementStatus: true,
@@ -235,6 +250,7 @@ export class CollectionsService {
         createdAt: true,
         txnRefId: true,
         orderId: true,
+        utr: true,
         netPayableAmount: true,
         settlementStatus: true,
         user: {
@@ -244,6 +260,22 @@ export class CollectionsService {
           mobile: true,
           accountStatus: true,
         },
+      },
+    });
+  }
+
+  async getCollectionsByOrderIdAdmin(orderId: string) {
+    return this.payInOrdersRepository.findOne({
+      where: { orderId },
+      select: {
+        id: true,
+        amount: true,
+        status: true,
+        txnRefId: true,
+        orderId: true,
+        utr: true,
+        isMisspelled: true,
+        createdAt: true,
       },
     });
   }
@@ -300,6 +332,7 @@ export class CollectionsService {
           status: true,
           createdAt: true,
           txnRefId: true,
+          utr: true,
           orderId: true,
           netPayableAmount: true,
           settlementStatus: true,
@@ -330,6 +363,7 @@ export class CollectionsService {
         status: true,
         createdAt: true,
         txnRefId: true,
+        utr: true,
         orderId: true,
         netPayableAmount: true,
         settlementStatus: true,

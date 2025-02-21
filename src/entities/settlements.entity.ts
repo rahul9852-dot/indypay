@@ -3,6 +3,8 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
+  JoinColumn,
   ManyToOne,
   PrimaryColumn,
   UpdateDateColumn,
@@ -14,20 +16,23 @@ import { ID_TYPE } from "@/enums";
 import { PAYMENT_STATUS, PAYOUT_PAYMENT_MODE } from "@/enums/payment.enum";
 
 @Entity("settlements")
+@Index(["userId", "createdAt"])
 export class SettlementsEntity {
   @PrimaryColumn()
   id: string;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 10,
     scale: 2,
   })
   amount: number;
 
+  @Index()
   @Column({ enum: PAYOUT_PAYMENT_MODE, default: PAYOUT_PAYMENT_MODE.IMPS })
   transferMode: string;
 
+  @Index()
   @Column({ enum: PAYMENT_STATUS, default: PAYMENT_STATUS.PENDING })
   status: string;
 
@@ -40,19 +45,31 @@ export class SettlementsEntity {
   @Column({ nullable: true })
   utr: string;
 
-  // Relations
+  @Index()
+  @Column()
+  userId: string;
+
   @ManyToOne(() => UsersEntity, ({ settlements }) => settlements, {
     onDelete: "CASCADE",
   })
+  @JoinColumn({ name: "userId" })
   user: UsersEntity;
+
+  @Column({ nullable: true })
+  bankDetailsId: string;
 
   @ManyToOne(() => UserBankDetailsEntity, ({ settlements }) => settlements, {
     onDelete: "CASCADE",
     nullable: true,
   })
+  @JoinColumn({ name: "bankDetailsId" })
   bankDetails: UserBankDetailsEntity;
 
+  @Column({ nullable: true })
+  settledById: string;
+
   @ManyToOne(() => UsersEntity, { nullable: true })
+  @JoinColumn({ name: "settledById" })
   settledBy: UsersEntity;
 
   @Column({ nullable: true, type: "timestamptz" })
@@ -61,6 +78,7 @@ export class SettlementsEntity {
   @Column({ nullable: true, type: "timestamptz" })
   failureAt: Date;
 
+  @Index()
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 

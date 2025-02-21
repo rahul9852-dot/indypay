@@ -4,6 +4,7 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
   ManyToOne,
   OneToOne,
   PrimaryColumn,
@@ -16,12 +17,13 @@ import { ID_TYPE } from "@/enums";
 import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
 
 @Entity("payin_orders")
+@Index(["userId", "createdAt"])
 export class PayInOrdersEntity {
   @PrimaryColumn()
   id: string;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 10,
     scale: 2,
   })
@@ -40,6 +42,7 @@ export class PayInOrdersEntity {
   @Column()
   mobile: string;
 
+  @Index()
   @Column({ enum: PAYMENT_STATUS, default: PAYMENT_STATUS.PENDING })
   status: string;
 
@@ -58,28 +61,32 @@ export class PayInOrdersEntity {
   @Column({ default: false })
   isMisspelled: boolean;
 
-  @Column({ type: "numeric", precision: 10, scale: 2, default: 4.5 })
+  @Column({ type: "decimal", precision: 10, scale: 2, default: 4.5 })
   commissionInPercentage: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   commissionAmount: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 2, default: 18 })
+  @Column({ type: "decimal", precision: 10, scale: 2, default: 18 })
   gstInPercentage: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   gstAmount: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   netPayableAmount: number;
 
   @Column({ enum: SETTLEMENT_STATUS, default: SETTLEMENT_STATUS.NOT_INITIATED })
   settlementStatus: string;
 
-  // Relations
+  @Index()
+  @Column()
+  userId: string;
+
   @ManyToOne(() => UsersEntity, ({ payInOrders }) => payInOrders, {
     onDelete: "CASCADE",
   })
+  @JoinColumn({ name: "userId" })
   user: UsersEntity;
 
   @OneToOne(() => TransactionsEntity, ({ payInOrder }) => payInOrder, {
@@ -93,6 +100,7 @@ export class PayInOrdersEntity {
   @Column({ nullable: true, type: "timestamptz" })
   failureAt: Date;
 
+  @Index()
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 

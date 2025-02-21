@@ -14,6 +14,7 @@ import { AuthOtpEntity } from "@/entities/otp.entity";
 import { SNSService } from "@/modules/aws/sns.service";
 import { appConfig } from "@/config/app.config";
 import { WalletEntity } from "@/entities/wallet.entity";
+import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 
 const {
   redisConfig: { redisHostUrl, redisPort },
@@ -21,7 +22,12 @@ const {
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UsersEntity, AuthOtpEntity, WalletEntity]),
+    TypeOrmModule.forFeature([
+      UsersEntity,
+      AuthOtpEntity,
+      WalletEntity,
+      UserLoginIpsEntity,
+    ]),
     JwtModule.register({
       signOptions: { expiresIn: "1h" },
     }),

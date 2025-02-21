@@ -1,5 +1,6 @@
 import {
   ApiCreatedResponse,
+  ApiExcludeEndpoint,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -29,6 +30,7 @@ import {
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { ChangeStatusDto } from "./dto/change-status.dto";
 import { ChangeRoleDto } from "./dto/change-role.dto";
+import { UpdateCountDto } from "./dto/count.dto";
 import {
   AddWhitelistIpsDto,
   AddWhitelistIpsMerchantDto,
@@ -61,6 +63,15 @@ import { ChangeAccountStatusGuard } from "@/guard/change-account-status.guard";
 })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get("user-ip/:userId")
+  @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN)
+  async getUserIp(
+    @Param("userId") userId: string,
+    @Query() query: PaginationDto,
+  ) {
+    return this.usersService.getUserIps(userId, query);
+  }
 
   @ApiOperation({
     summary: "Add Credential For FlakPay",
@@ -342,6 +353,15 @@ export class UsersController {
     return this.usersService.getAllApiKeysMerchant(user.id);
   }
 
+  @Get("/api-key/:userId")
+  @ApiOperation({
+    summary: "Get api key",
+  })
+  @Role(USERS_ROLE.OWNER)
+  async getAllApiKeysAdmin(@Param("userId") userId: string) {
+    return this.usersService.getAllApiKeysMerchant(userId);
+  }
+
   @ApiOperation({ summary: "Add whitelist ip - Admin only" })
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @IgnoreKyc()
@@ -468,25 +488,37 @@ export class UsersController {
     return this.usersService.getUserById(userId);
   }
 
-  @ApiOperation({ summary: "Reset password - Admin Only" })
+  @ApiExcludeEndpoint()
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @IgnoreKyc()
-  @ApiOkResponse({
-    type: MessageResponseDto,
-  })
   @Post("reset-password-admin")
   async resetPasswordAdmin(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.usersService.resetPassword(resetPasswordDto);
   }
 
-  @ApiOperation({ summary: "Reset cache - Admin Only" })
+  @ApiExcludeEndpoint()
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @IgnoreKyc()
-  @ApiOkResponse({
-    type: MessageResponseDto,
-  })
   @Get("reset-cache-admin")
   async resetCacheAdmin() {
     return this.usersService.resetCache();
+  }
+
+  @ApiExcludeEndpoint()
+  @Role(USERS_ROLE.OWNER)
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @Patch("count")
+  async updateCount(@Body() updateCountDto: UpdateCountDto) {
+    return this.usersService.updateCount(updateCountDto);
+  }
+
+  @ApiExcludeEndpoint()
+  @Role(USERS_ROLE.OWNER)
+  @IgnoreKyc()
+  @IgnoreBusinessDetails()
+  @Get("count/:userId")
+  async getCount(@Param("userId") userId: string) {
+    return this.usersService.getCount(userId);
   }
 }

@@ -26,7 +26,7 @@ import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { UsersEntity } from "@/entities/user.entity";
-import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
+import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
 import {
   getFlakPayPgConfig,
@@ -38,7 +38,10 @@ import {
   IExternalPayoutStatusResponseFlakPay,
   IExternalPayoutStatusResponseIsmart,
 } from "@/interface/external-api.interface";
-import { PayoutStatusDto } from "@/modules/payments/dto/create-payout-payment.dto";
+import {
+  PayoutStatusDto,
+  PayoutStatusMerchantDto,
+} from "@/modules/payments/dto/create-payout-payment.dto";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
@@ -76,6 +79,13 @@ export class PayoutService {
       .andWhere("user.role = :role", { role: USERS_ROLE.MERCHANT })
       .andWhere("user.onboardingStatus = :onboardingStatus", {
         onboardingStatus: ONBOARDING_STATUS.KYC_VERIFIED,
+      })
+      .andWhere("user.accountStatus NOT IN (:...statuses)", {
+        statuses: [
+          ACCOUNT_STATUS.INTERNAL_USER,
+          ACCOUNT_STATUS.TEST_DELETED,
+          ACCOUNT_STATUS.DELETED,
+        ],
       })
       .leftJoin("user.payOutOrders", "payout")
       .select([
@@ -268,7 +278,7 @@ export class PayoutService {
       });
     }
 
-    const [collections, totalItems] = await this.payoutRepository.findAndCount({
+    const [payouts, totalItems] = await this.payoutRepository.findAndCount({
       where: query,
       relations: {
         user: true,
@@ -280,12 +290,15 @@ export class PayoutService {
         transferId: true,
         orderId: true,
         payoutId: true,
+        transferMode: true,
         utr: true,
         batchId: true,
         createdAt: true,
         user: {
           id: true,
           fullName: true,
+          commissionInPercentagePayout: true,
+          gstInPercentagePayout: true,
         },
       },
       skip: (page - 1) * limit,
@@ -301,7 +314,7 @@ export class PayoutService {
 
     if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
       return {
-        data: collections,
+        data: payouts,
         pagination,
       };
     } else {
@@ -312,7 +325,7 @@ export class PayoutService {
         });
 
       return {
-        data: collections,
+        data: payouts,
         pagination,
         stats: {
           totalPayouts: +todayPayouts,
@@ -389,7 +402,149 @@ export class PayoutService {
     return payout;
   }
 
+  async getPayoutByOrderId(orderId: string) {
+    const payout = await this.payoutRepository.findOne({
+      where: { orderId },
+      relations: {
+        user: true,
+      },
+      select: {
+        id: true,
+        orderId: true,
+        amount: true,
+        status: true,
+        transferId: true,
+        transferMode: true,
+        batchId: true,
+        bankName: true,
+        bankAccountNumber: true,
+        bankIfsc: true,
+        successAt: true,
+        createdAt: true,
+        name: true,
+        payoutId: true,
+        purpose: true,
+        remarks: true,
+        utr: true,
+        user: {
+          id: true,
+          fullName: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+    });
+
+    if (!payout) {
+      throw new NotFoundException(new MessageResponseDto("Payout not found"));
+    }
+
+    return payout;
+  }
+
   async checkPayOutStatusTransactionFlakPay(
+    { payoutId }: PayoutStatusMerchantDto,
+    user: UsersEntity,
+  ) {
+    const payoutOrder = await this.payoutRepository.findOne({
+      where: { payoutId },
+    });
+
+    if (!payoutOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payout order not found"),
+      );
+    }
+
+    if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
+      return {
+        orderId: payoutOrder.orderId,
+        status: payoutOrder.status,
+        transferId: payoutOrder.transferId,
+        payoutId: payoutOrder.payoutId,
+        utr: payoutOrder.utr,
+      };
+    }
+
+    // call api
+
+    const { clientId, clientSecret } = await this.getFlakPayCredentials(
+      user.id,
+    );
+
+    const axiosServiceFlakPay = new AxiosService(
+      FALKPAY.BASE_URL,
+      getFlakPayPgConfig({
+        clientId,
+        clientSecret,
+      }),
+    );
+
+    const flakPayResponse =
+      await axiosServiceFlakPay.postRequest<IExternalPayoutStatusResponseFlakPay>(
+        FALKPAY.PAYOUT.STATUS_CHECK,
+        {
+          orderId: payoutOrder.orderId,
+        },
+      );
+
+    if (flakPayResponse.statusCode !== HttpStatus.OK) {
+      throw new BadRequestException(
+        new MessageResponseDto(flakPayResponse.message),
+      );
+    }
+
+    // update payout order
+
+    const status = convertExternalPaymentStatusToInternal(
+      flakPayResponse.data.status.toUpperCase(),
+    );
+
+    const savedPayout = await this.payoutRepository.save(
+      this.payoutRepository.create({
+        ...payoutOrder,
+        status,
+        transferId: flakPayResponse.data.transferId,
+      }),
+    );
+
+    if (user?.payOutWebhookUrl) {
+      const payload = {
+        orderId: savedPayout.orderId,
+        status,
+        amount: +savedPayout.amount,
+        txnRefId: savedPayout.transferId,
+        utr: savedPayout.utr,
+      };
+      this.logger.info(
+        `Payout webhook for ${savedPayout.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
+      axios
+        .post(user.payOutWebhookUrl, payload)
+        .then((res) => {
+          this.logger.info(
+            `Payout webhook sent successfully: ${savedPayout.orderId} : ${LoggerPlaceHolder.Json}`,
+            res,
+          );
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Payout webhook failed for order: ${savedPayout.orderId} : ${LoggerPlaceHolder.Json}`,
+            error,
+          );
+        });
+    }
+
+    return {
+      orderId: payoutOrder.orderId,
+      status,
+      transferId: flakPayResponse.data.transferId,
+    };
+  }
+
+  async checkPayOutStatusDashboardFlakPay(
     { orderId }: PayoutStatusDto,
     user: UsersEntity,
   ) {
@@ -461,12 +616,15 @@ export class PayoutService {
         amount: +savedPayout.amount,
         txnRefId: savedPayout.transferId,
       };
+      this.logger.info(
+        `Payout webhook for ${savedPayout.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
       axios
         .post(user.payOutWebhookUrl, payload)
-        .then(() => {
+        .then(({ data }) => {
           this.logger.info(
-            `Payout webhook sent successfully: ${savedPayout.orderId} : ${LoggerPlaceHolder.Json}`,
-            payload,
+            `Payout webhook sent successfully: ${savedPayout.orderId} RES : ${JSON.stringify(data)}`,
           );
         })
         .catch((error) => {

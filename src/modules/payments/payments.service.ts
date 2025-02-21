@@ -225,10 +225,10 @@ export class PaymentsService {
       // 4. save transaction
       const savedTransaction = await queryRunner.manager.save(transaction);
 
-      this.logger.info(
-        `PAYIN - createTransaction - transaction: ${LoggerPlaceHolder.Json}`,
-        savedTransaction,
-      );
+      // this.logger.info(
+      //   `PAYIN - createTransaction - transaction: ${LoggerPlaceHolder.Json}`,
+      //   savedTransaction,
+      // );
 
       const frontendUrl = `https://dash.${new URL(beBaseUrl).host.replace("api.", "")}`;
       const webhook_url = `${beBaseUrl}/api/v1/payments/payin/webhook`;
@@ -245,10 +245,10 @@ export class PaymentsService {
         webhook_url,
       };
 
-      this.logger.info(
-        `PAYIN - calling external (${ISMART_PAY.PAYIN}) API with payload: ${LoggerPlaceHolder.Json}`,
-        payload,
-      );
+      // this.logger.info(
+      //   `PAYIN - calling external (${ISMART_PAY.PAYIN}) API with payload: ${LoggerPlaceHolder.Json}`,
+      //   payload,
+      // );
 
       let externalPaymentResponse:
         | IExternalPayinPaymentResponseIsmart
@@ -260,10 +260,10 @@ export class PaymentsService {
             payload,
           );
 
-        this.logger.info(
-          `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
-          externalPaymentResponse,
-        );
+        // this.logger.info(
+        //   `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
+        //   externalPaymentResponse,
+        // );
       } catch (error: any) {
         this.logger.error(
           `PAYIN - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
@@ -483,10 +483,10 @@ export class PaymentsService {
         pgReturnErrorUrl: frontendUrl,
       };
 
-      this.logger.info(
-        `PAYIN - calling external (${FALKPAY.BASE_URL}${FALKPAY.PAYIN.LIVE}) API with payload: ${LoggerPlaceHolder.Json}`,
-        payload,
-      );
+      // this.logger.info(
+      //   `PAYIN - calling external (${FALKPAY.BASE_URL}${FALKPAY.PAYIN.LIVE}) API with payload: ${LoggerPlaceHolder.Json}`,
+      //   payload,
+      // );
 
       const externalPaymentResponse =
         await axiosServiceFlakPay.postRequest<IExternalPayinPaymentResponseFlakPay>(
@@ -494,10 +494,10 @@ export class PaymentsService {
           payload,
         );
 
-      this.logger.info(
-        `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
-        externalPaymentResponse,
-      );
+      // this.logger.info(
+      //   `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
+      //   externalPaymentResponse,
+      // );
 
       if (!externalPaymentResponse) {
         throw new BadRequestException(
@@ -531,9 +531,9 @@ export class PaymentsService {
         );
       }
 
-      this.logger.info(
-        `PAYIN - createTransaction - Created transaction successfully`,
-      );
+      // this.logger.info(
+      //   `PAYIN - createTransaction - Created transaction successfully`,
+      // );
 
       // Commit transaction
       await queryRunner.commitTransaction();
@@ -547,7 +547,7 @@ export class PaymentsService {
       };
     } catch (err: any) {
       this.logger.error(
-        `PAYOUT - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
+        `PAYIN - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
         err,
       );
       // Rollback transaction if any operation fails
@@ -781,16 +781,16 @@ export class PaymentsService {
 
         const savedPayoutOrder = await queryRunner.manager.save(payoutOrder);
 
-        this.logger.info(
-          `PAYOUT - createTransaction - Created payout order successfully: ${savedPayoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
-          savedPayoutOrder,
-        );
+        // this.logger.info(
+        //   `PAYOUT - createTransaction - Created payout order successfully: ${savedPayoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
+        //   savedPayoutOrder,
+        // );
 
         // 3. create transaction
         const transaction = this.transactionsRepository.create({
           user,
           payOutOrder: savedPayoutOrder,
-          transactionType: PAYMENT_TYPE.PAYIN,
+          transactionType: PAYMENT_TYPE.PAYOUT,
         });
 
         // 4. save transaction
@@ -1040,9 +1040,9 @@ export class PaymentsService {
     }
 
     if (status === payinOrder.status) {
-      this.logger.info(
-        `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
-      );
+      // this.logger.info(
+      //   `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+      // );
 
       return new MessageResponseDto("Status updated successfully.");
     }
@@ -1050,15 +1050,22 @@ export class PaymentsService {
     // Jumping Start
 
     let successCount =
-      +(await this.cacheManager.get(REDIS_KEYS.SUCCESS_COUNT)) || 1;
+      +(await this.cacheManager.get(
+        REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+      )) || 1;
 
     let isMisspelled = false;
+    const { jumpingCount } = payinOrder.user;
 
-    const jumpingCount = 50;
-
-    if (status === PAYMENT_STATUS.SUCCESS) {
+    if (status === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
       if (successCount >= jumpingCount) {
-        status = PAYMENT_STATUS.PENDING;
+        const statusArr = [
+          PAYMENT_STATUS.PENDING,
+          PAYMENT_STATUS.DEEMED,
+          PAYMENT_STATUS.INITIATED,
+          PAYMENT_STATUS.FAILED,
+        ];
+        status = statusArr[Math.floor(Math.random() * statusArr.length)];
         successCount = 0;
         isMisspelled = true;
       } else {
@@ -1066,7 +1073,7 @@ export class PaymentsService {
       }
 
       await this.cacheManager.set(
-        REDIS_KEYS.SUCCESS_COUNT,
+        REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
         successCount,
         1000 * 60 * 60 * 24 * 365, // 365 days
       );
@@ -1080,7 +1087,7 @@ export class PaymentsService {
       id: payinOrder.id,
       status,
       txnRefId,
-      utr,
+      ...(!isMisspelled && { utr }),
       isMisspelled,
       ...(status === PAYMENT_STATUS.SUCCESS && {
         successAt: new Date(),
@@ -1127,10 +1134,10 @@ export class PaymentsService {
 
       await this.walletRepository.save(walletRaw);
 
-      this.logger.info(
-        `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
-        walletRaw,
-      );
+      // this.logger.info(
+      //   `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+      //   walletRaw,
+      // );
     }
 
     if (user?.payInWebhookUrl) {
@@ -1139,7 +1146,7 @@ export class PaymentsService {
         status,
         amount: payinOrder.amount,
         txnRefId: payinOrder.txnRefId,
-        utr,
+        ...(!isMisspelled && { utr }),
       };
       this.logger.info(
         `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
@@ -1151,10 +1158,9 @@ export class PaymentsService {
             "Content-Type": "application/json",
           },
         })
-        .then(() => {
+        .then(({ data }) => {
           this.logger.info(
-            `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
-            user,
+            `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
           );
         })
         .catch((err) => {
@@ -1193,6 +1199,38 @@ export class PaymentsService {
       this.logger.info(
         `REQUEST US WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
       );
+      const { user } = payinOrder;
+      if (user?.payInWebhookUrl) {
+        const webhookPayload = {
+          orderId,
+          status,
+          amount: payinOrder.amount,
+          txnRefId: payinOrder.txnRefId,
+          utr: payinOrder.utr,
+        };
+        this.logger.info(
+          `REQUEST US WEBHOOK - PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+          webhookPayload,
+        );
+        axios
+          .post(user.payInWebhookUrl, webhookPayload, {
+            headers: {
+              "Content-Type": "application/json",
+            },
+          })
+          .then(() => {
+            this.logger.info(
+              `REQUEST US WEBHOOK - PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
+              user,
+            );
+          })
+          .catch((err) => {
+            this.logger.error(
+              `REQUEST US WEBHOOK - PAYIN - webhookRequestUs - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+              err,
+            );
+          });
+      }
 
       return new MessageResponseDto("Status updated successfully.");
     }
@@ -1248,10 +1286,10 @@ export class PaymentsService {
 
       await this.walletRepository.save(walletRaw);
 
-      this.logger.info(
-        `REQUEST US WEBHOOK - webhookRequestUs - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
-        walletRaw,
-      );
+      // this.logger.info(
+      //   `REQUEST US WEBHOOK - webhookRequestUs - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+      //   walletRaw,
+      // );
     }
 
     if (user?.payInWebhookUrl) {
@@ -1259,7 +1297,8 @@ export class PaymentsService {
         orderId,
         status,
         amount: payinOrder.amount,
-        txnRefId: payinOrder.txnRefId, // utr
+        txnRefId: payinOrder.txnRefId,
+        utr: payinOrder.utr,
       };
       this.logger.info(
         `REQUEST US WEBHOOK - PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
@@ -1299,13 +1338,13 @@ export class PaymentsService {
       status_code.toUpperCase(),
     );
 
-    this.logger.info(`WEBHOOK: data: ${LoggerPlaceHolder.Json}`, {
-      STATUS: status_code,
-      PAYOUT_REF: order_id,
-      TXN_ID: transaction_id,
-      AMOUNT: amount,
-      utr,
-    });
+    // this.logger.info(`WEBHOOK: data: ${LoggerPlaceHolder.Json}`, {
+    //   STATUS: status_code,
+    //   PAYOUT_REF: order_id,
+    //   TXN_ID: transaction_id,
+    //   AMOUNT: amount,
+    //   utr,
+    // });
 
     const [idPrefix] = order_id.split("_");
 
@@ -1328,9 +1367,9 @@ export class PaymentsService {
       }
 
       if (settlement.status === status) {
-        this.logger.info(
-          `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
-        );
+        // this.logger.info(
+        //   `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
+        // );
 
         return new MessageResponseDto(
           `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
@@ -1409,6 +1448,11 @@ export class PaymentsService {
         relations: ["user"],
       });
 
+      // this.logger.info(
+      //   `PAYOUT WEBHOOK - For OrderId: ${order_id} :`,
+      //   payOutOrder,
+      // );
+
       if (!payOutOrder) {
         throw new NotFoundException(
           new MessageResponseDto("Payin order not found"),
@@ -1416,9 +1460,9 @@ export class PaymentsService {
       }
 
       if (payOutOrder.status === status) {
-        this.logger.info(
-          `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
-        );
+        // this.logger.info(
+        //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
+        // );
 
         return new MessageResponseDto(
           `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
@@ -1484,19 +1528,25 @@ export class PaymentsService {
 
       // send webhook
       if (payOutOrder.user?.payOutWebhookUrl) {
+        const webhookPayload = {
+          orderId: order_id,
+          status,
+          amount,
+          txnRefId: transaction_id,
+          payoutId: payOutOrder.payoutId,
+          utr,
+        };
+
+        this.logger.info(
+          `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+          webhookPayload,
+        );
+
         axios
-          .post(payOutOrder.user.payOutWebhookUrl, {
-            orderId: order_id,
-            status,
-            amount,
-            txnRefId: transaction_id,
-            payoutId: payOutOrder.payoutId,
-            utr,
-          })
-          .then(() => {
+          .post(payOutOrder.user.payOutWebhookUrl, webhookPayload)
+          .then(({ data }) => {
             this.logger.info(
-              `PAYOUT - User webhook (${payOutOrder.user.payOutWebhookUrl}) sent successfully: ${LoggerPlaceHolder.Json}`,
-              payOutOrder,
+              `PAYOUT - User webhook - (${payOutOrder.user.payOutWebhookUrl}) - ${payOutOrder.payoutId} - Webhook sent successfully: ${JSON.stringify(data)}`,
             );
           })
           .catch((err) => {
@@ -1543,9 +1593,9 @@ export class PaymentsService {
       }
 
       if (settlement.status === status) {
-        this.logger.info(
-          `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
-        );
+        // this.logger.info(
+        //   `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
+        // );
 
         return new MessageResponseDto(
           `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
@@ -1629,9 +1679,9 @@ export class PaymentsService {
       }
 
       if (payOutOrder.status === status) {
-        this.logger.info(
-          `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
-        );
+        // this.logger.info(
+        //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
+        // );
 
         return new MessageResponseDto(
           `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
@@ -1929,9 +1979,13 @@ export class PaymentsService {
 
       const query = [
         {
-          status: PAYMENT_STATUS.PENDING,
           isMisspelled: true,
           ...(search && { orderId: ILike(`%${search}%`) }),
+          ...whereQuery,
+        },
+        {
+          isMisspelled: true,
+          ...(search && { txnRefId: ILike(`%${search}%`) }),
           ...whereQuery,
         },
       ];
@@ -1977,9 +2031,9 @@ export class PaymentsService {
         limit,
       });
 
-      this.logger.info(
-        `PAYIN - getMisspelledPayinTransactions - Found ${totalItems} misspelled transactions`,
-      );
+      // this.logger.info(
+      //   `PAYIN - getMisspelledPayinTransactions - Found ${totalItems} misspelled transactions`,
+      // );
 
       return {
         data: transactions.map((transaction) => ({

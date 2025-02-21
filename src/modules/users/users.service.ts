@@ -23,6 +23,7 @@ import { ChangeRoleDto } from "./dto/change-role.dto";
 import { AddAddressDto } from "./dto/add-address.dto";
 import { DeleteWhitelistIpsDto } from "./dto/whitelist-ips.dto";
 import { UserListQuery } from "./dto/user-list.dto";
+import { UpdateCountDto } from "./dto/count.dto";
 import { AddCredentialForFlakPayDto } from "./dto/add-credentials.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
@@ -48,6 +49,7 @@ import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { UserAddressEntity } from "@/entities/user-address.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
+import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 
 @Injectable()
 export class UsersService {
@@ -64,12 +66,39 @@ export class UsersService {
     private readonly addressEntity: Repository<UserAddressEntity>,
     @InjectRepository(ApiCredentialsEntity)
     private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
+    @InjectRepository(UserLoginIpsEntity)
+    private readonly userLoginIpsRepository: Repository<UserLoginIpsEntity>,
 
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
   ) {}
+
+  async getUserIps(
+    userId: string,
+    { page = 1, limit = 10, search = "" }: PaginationDto,
+  ) {
+    return this.userLoginIpsRepository.find({
+      where: {
+        userId,
+        ipAddress: ILike(`%${search}%`),
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      order: {
+        createdAt: "DESC",
+      },
+      select: {
+        ipAddress: true,
+        createdAt: true,
+        isApproved: true,
+        user: {
+          fullName: true,
+        },
+      },
+    });
+  }
 
   async getCredentialForFalkPay(userId: string) {
     const apiCredentials = await this.apiCredentialsRepository.findOne({
@@ -348,7 +377,7 @@ export class UsersService {
       userApiKey.user.id === user.id
     ) {
       {
-        await this.userApiKeysRepository.delete(userApiKey.id);
+        await this.userApiKeysRepository.remove(userApiKey);
       }
     } else {
       throw new ForbiddenException(new MessageResponseDto("Forbidden"));
@@ -380,6 +409,12 @@ export class UsersService {
     const existingUserApiKey = await this.userApiKeysRepository.findOne({
       where: { user: { id: user.id } },
     });
+
+    if (existingUserApiKey) {
+      await this.cacheManager.del(
+        REDIS_KEYS.API_KEY(existingUserApiKey.clientId),
+      );
+    }
 
     const clientId = getUlidId("key");
     const clientSecret = getUlidId("sc");
@@ -778,10 +813,20 @@ export class UsersService {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
 
-    await this.userWhitelistIpsRepository.delete({
-      user: { id: user.id },
-      ipAddress,
+    const ipWhitelist = await this.userWhitelistIpsRepository.findOne({
+      where: {
+        ipAddress,
+        user: { id: user.id },
+      },
     });
+
+    if (!ipWhitelist) {
+      throw new NotFoundException(
+        new MessageResponseDto("IP address not found"),
+      );
+    }
+
+    await this.userWhitelistIpsRepository.remove(ipWhitelist);
 
     return new MessageResponseDto("IP address deleted successfully");
   }
@@ -978,5 +1023,40 @@ export class UsersService {
         bankDetails: true,
       },
     });
+  }
+
+  async updateCount(updateCountDto: UpdateCountDto) {
+    const { userId, count } = updateCountDto;
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    await this.usersRepository.save(
+      this.usersRepository.create({
+        id: userId,
+        jumpingCount: count,
+      }),
+    );
+
+    return new MessageResponseDto("Count updated successfully");
+  }
+
+  async getCount(userId: string) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    return {
+      id: userId,
+      count: user.jumpingCount,
+    };
   }
 }

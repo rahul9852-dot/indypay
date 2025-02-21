@@ -38,6 +38,7 @@ export enum ACCOUNT_STATUS {
   BLOCKED = 4,
   DELETED = 5,
   TEST_DELETED = 6,
+  INTERNAL_USER = 7,
 }
 
 export enum BUSINESS_ENTITY_TYPE {
@@ -93,6 +94,7 @@ export enum ID_TYPE {
   USER_API_KEY = "apik",
   USER_BANK_DETAILS_KEY = "ubank",
   USER_KYC = "ukyc",
+  USER_LOGIN_IP = "ip",
   USER_MULTI_FACTOR_AUTH = "umfa",
   USER_WHITELIST_IP = "uwip",
   WALLET = "wlt",

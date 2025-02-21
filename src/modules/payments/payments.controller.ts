@@ -25,7 +25,7 @@ import {
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
   CreatePayoutDto,
-  PayoutStatusDto,
+  PayoutStatusMerchantDto,
 } from "./dto/create-payout-payment.dto";
 import { ExternalPayinWebhookFlakPayDto } from "./dto/external-webhook-payin.dto";
 import { ExternalPayOutWebhookFlakPayDto } from "./dto/external-webhook-payout.dto";
@@ -119,11 +119,11 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @Post("payout/status")
   async checkStatusTransactionPayout(
-    @Body() payoutStatusDto: PayoutStatusDto,
+    @Body() payoutStatusMerchantDto: PayoutStatusMerchantDto,
     @User() user: UsersEntity,
   ) {
     return this.payoutService.checkPayOutStatusTransactionFlakPay(
-      payoutStatusDto,
+      payoutStatusMerchantDto,
       user,
     );
   }

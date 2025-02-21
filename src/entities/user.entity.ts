@@ -34,6 +34,7 @@ import {
   ID_TYPE,
 } from "@/enums";
 import { InvoiceEntity } from "@/entities/invoice.entity";
+import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 
 @Entity("users")
 export class UsersEntity {
@@ -82,7 +83,7 @@ export class UsersEntity {
   payOutWebhookUrl?: string;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 10,
     scale: 2,
     default: 4.5,
@@ -90,7 +91,7 @@ export class UsersEntity {
   commissionInPercentagePayin?: number;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 10,
     scale: 2,
     default: 1.5,
@@ -98,15 +99,18 @@ export class UsersEntity {
   commissionInPercentagePayout?: number;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 10,
     scale: 2,
     default: 18,
   })
   gstInPercentagePayin?: number;
 
+  @Column({ default: 0 })
+  jumpingCount?: number;
+
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 10,
     scale: 2,
     default: 18,
@@ -120,6 +124,12 @@ export class UsersEntity {
 
   @Column({ nullable: true })
   channelPartnerId: string;
+
+  @Column({ nullable: true, length: 45 })
+  lastLoginIp: string;
+
+  @Column({ type: "boolean", default: false })
+  twoFactorEnabled: boolean;
 
   @OneToMany(() => PayInOrdersEntity, ({ user }) => user, { cascade: true })
   payInOrders: PayInOrdersEntity[];
@@ -139,6 +149,11 @@ export class UsersEntity {
     cascade: true,
   })
   whitelistIps: UserWhitelistIpsEntity[];
+
+  @OneToMany(() => UserLoginIpsEntity, ({ user }) => user, {
+    cascade: true,
+  })
+  loginIps: UserLoginIpsEntity[];
 
   @JoinColumn()
   @OneToOne(() => UserBusinessDetailsEntity, ({ user }) => user, {
@@ -188,6 +203,9 @@ export class UsersEntity {
     cascade: true,
   })
   customers: CustomerEntity[];
+
+  @Column({ type: "timestamptz", nullable: true })
+  lastLoginAt: Date;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;

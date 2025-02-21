@@ -1,13 +1,14 @@
 import { CookieOptions } from "express";
 import { appConfig } from "@/config/app.config";
 
-const { isProduction, isStaging, allowCookiesDomain } = appConfig();
+const { isProduction, allowCookiesDomain } = appConfig();
 
 export const cookieOptions: CookieOptions = {
-  httpOnly: true, // accessible only by web server
-  secure: false, // allow non-https in development
-  sameSite: "lax",
-  domain: allowCookiesDomain,
+  httpOnly: isProduction, // accessible only by web server
+  secure: isProduction, // true in production, false in development
+  sameSite: "lax", // stricter in production
+  domain: allowCookiesDomain || undefined, // let browser set domain in development
+  path: "/",
 };
 
 export const accessCookieOptions: CookieOptions = {

@@ -91,6 +91,8 @@ export class PayoutProcessor {
     //   }),
     // );
 
+    const user = await this.usersService.findOne(userId);
+
     // Process in smaller batches
     for (let i = 0; i < payoutOrders.length; i += BATCH_SIZE) {
       const batch = payoutOrders.slice(i, i + BATCH_SIZE);
@@ -98,6 +100,11 @@ export class PayoutProcessor {
       await Promise.all(
         batch.map(async (order) => {
           try {
+            // this.logger.info(
+            //   `Processing payout order: ${order.orderId} ORDER: ${LoggerPlaceHolder.Json}`,
+            //   order,
+            // );
+
             await new Promise((resolve) =>
               setTimeout(resolve, DELAY_BETWEEN_REQUESTS),
             );
@@ -142,10 +149,10 @@ export class PayoutProcessor {
             //     payloadIsmart,
             //   );
 
-            this.logger.info(
-              `Payout processed for order: ${order.orderId}`,
-              response,
-            );
+            // this.logger.info(
+            //   `Payout processed for order: ${order.orderId}`,
+            //   response,
+            // );
 
             if (!response.status) {
               throw new Error(response.message);
@@ -155,7 +162,7 @@ export class PayoutProcessor {
               response.data.status.toUpperCase(),
             );
 
-            const payOutOrder = await this.payOutOrdersRepository.save(
+            await this.payOutOrdersRepository.save(
               this.payOutOrdersRepository.create({
                 id: order.id,
                 transferId: response.data.transferId,
@@ -163,101 +170,104 @@ export class PayoutProcessor {
                   status,
                   successAt: new Date(),
                 }),
-                ...(![PAYMENT_STATUS.SUCCESS].includes(status) && { status }),
+                ...(status === PAYMENT_STATUS.FAILED && {
+                  status,
+                  failureAt: new Date(),
+                }),
+                ...(![PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.FAILED].includes(
+                  status,
+                ) && { status }),
+
                 utr: response.data.utr,
               }),
             );
 
             if (status === PAYMENT_STATUS.FAILED) {
-              this.usersService
-                .findOne(userId)
-                .then((user) => {
-                  if (user?.payOutWebhookUrl) {
-                    const payload = {
-                      orderId: order.orderId,
-                      status,
-                      amount: order.amount,
-                      txnRefId: payOutOrder.transferId,
-                      payoutId: payOutOrder.payoutId,
-                      utr: payOutOrder.utr,
-                    };
-                    axios
-                      .post(user.payOutWebhookUrl, payload)
-                      .then(() => {
-                        this.logger.info(
-                          `Payout webhook sent successfully: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-                          payload,
-                        );
-                      })
-                      .catch((error) => {
-                        this.logger.error(
-                          `Payout webhook failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-                          error,
-                        );
-                      });
-                  }
-                })
-                .catch((error) => {
-                  this.logger.error(
-                    `User not found for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-                    error,
-                  );
-                });
-
               throw new Error(response.message || "Payout failed");
             }
 
-            this.usersService
-              .findOne(userId)
-              .then((user) => {
-                if (user?.payOutWebhookUrl) {
-                  const payload = {
-                    orderId: order.orderId,
-                    status,
-                    amount: order.amount,
-                    txnRefId: payOutOrder.transferId,
-                    payoutId: payOutOrder.payoutId,
-                    utr: payOutOrder.utr,
-                  };
-                  axios
-                    .post(user.payOutWebhookUrl, payload)
-                    .then(() => {
-                      this.logger.info(
-                        `Payout webhook sent successfully: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-                        payload,
-                      );
-                    })
-                    .catch((error) => {
-                      this.logger.error(
-                        `Payout webhook failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-                        error,
-                      );
-                    });
-                }
-              })
-              .catch((error) => {
-                this.logger.error(
-                  `User not found for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-                  error,
-                );
+            if (user?.payOutWebhookUrl) {
+              const payOutOrder = await this.payOutOrdersRepository.findOne({
+                where: { id: order.id },
               });
 
-            this.logger.info(
-              `Payout processed successfully: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-              response.data,
-            );
+              // this.logger.info(
+              //   `Payout webhook payOutOrder: ${LoggerPlaceHolder.Json}`,
+              //   payOutOrder,
+              // );
+              const payload = {
+                orderId: order.orderId,
+                status,
+                amount: order.amount,
+                txnRefId: payOutOrder.transferId,
+                payoutId: payOutOrder.payoutId,
+                utr: payOutOrder.utr,
+              };
+
+              this.logger.info(
+                `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+                payload,
+              );
+              axios
+                .post(user.payOutWebhookUrl, payload)
+                .then(({ data }) => {
+                  this.logger.info(
+                    `Payout webhook sent successfully - ${user.payOutWebhookUrl} - ${order.orderId} RES: ${JSON.stringify(data)}`,
+                  );
+                })
+                .catch((error) => {
+                  this.logger.error(
+                    `Payout webhook failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+                    error,
+                  );
+                });
+            }
+
+            // this.logger.info(
+            //   `Payout processed successfully: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+            //   response.data,
+            // );
           } catch (error) {
             this.logger.error(
               `Payout failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
               error,
             );
 
-            const { amount } = order;
+            const { amount, orderId, payoutId } = order;
 
-            this.logger.info(
-              `Payout failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-              order,
-            );
+            // this.logger.info(
+            //   `Payout failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+            //   order,
+            // );
+
+            if (user?.payOutWebhookUrl) {
+              const payload = {
+                orderId,
+                status: PAYMENT_STATUS.FAILED,
+                amount,
+                txnRefId: null,
+                payoutId,
+                utr: null,
+              };
+              // this.logger.error(
+              //   `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+              //   payload,
+              // );
+
+              axios
+                .post(user.payOutWebhookUrl, payload)
+                .then(({ data }) => {
+                  this.logger.info(
+                    `Payout webhook sent successfully - ${order.orderId} - ${user.payOutWebhookUrl} - RES: ${JSON.stringify(data)}`,
+                  );
+                })
+                .catch((error) => {
+                  this.logger.error(
+                    `Payout webhook failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+                    error,
+                  );
+                });
+            }
 
             // Update wallet
             const wallet = await this.walletRepository.findOne({

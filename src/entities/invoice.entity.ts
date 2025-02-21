@@ -18,14 +18,14 @@ export class InvoiceEntity {
   @PrimaryColumn()
   id: string;
 
-  @Column({ unique: true })
+  @Column()
   invoiceNumber: string;
 
   @Column()
   description: string;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 15,
     scale: 2,
     default: 0,

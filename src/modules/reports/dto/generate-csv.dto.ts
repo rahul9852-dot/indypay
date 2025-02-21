@@ -1,45 +1,41 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsDateString,
   IsEnum,
-  IsNotEmpty,
+  IsInt,
   IsOptional,
   IsString,
+  Min,
 } from "class-validator";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 
-export class GeneratePayinReportDto {
-  @ApiProperty({
+export class GenerateReportDto {
+  @ApiPropertyOptional({
     description: "User ID for filtering reports",
-    required: false,
   })
   @IsString()
-  @IsNotEmpty()
   @IsOptional()
   userId?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: "Start date for filtering reports (ISO format)",
-    required: false,
     example: "2025-02-16T00:00:00.000Z",
   })
   @IsDateString()
-  @IsNotEmpty()
   @IsOptional()
   startDate?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: "End date for filtering reports (ISO format)",
     required: false,
     example: "2025-02-16T23:59:59.999Z",
   })
   @IsDateString()
-  @IsNotEmpty()
   @IsOptional()
   endDate?: string;
 
   @IsEnum(PAYMENT_STATUS)
-  @ApiProperty({
+  @ApiPropertyOptional({
     enum: PAYMENT_STATUS,
     description:
       "Filter by payment status. If not provided, will return all statuses",
@@ -47,4 +43,16 @@ export class GeneratePayinReportDto {
   })
   @IsOptional()
   status?: PAYMENT_STATUS;
+
+  @ApiPropertyOptional()
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  from?: number;
+
+  @ApiPropertyOptional()
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  count?: number;
 }

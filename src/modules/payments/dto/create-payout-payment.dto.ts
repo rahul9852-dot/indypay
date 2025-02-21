@@ -84,6 +84,13 @@ export class PayoutStatusDto {
   orderId: string;
 }
 
+export class PayoutStatusMerchantDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  payoutId: string;
+}
+
 export class CreatePayoutPaymentResponseDto {
   @ApiResponseProperty({
     enum: PAYMENT_STATUS,

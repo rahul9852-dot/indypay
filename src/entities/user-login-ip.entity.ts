@@ -10,41 +10,33 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 import { UsersEntity } from "./user.entity";
-import { ID_TYPE } from "@/enums";
 import { getUlidId } from "@/utils/helperFunctions.utils";
+import { ID_TYPE } from "@/enums";
 
-@Entity("wallet-topup")
+@Entity("user_login_ips")
 @Index(["userId", "createdAt"])
-export class WalletTopupEntity {
+export class UserLoginIpsEntity {
   @PrimaryColumn()
   id: string;
 
-  @Column({
-    type: "decimal",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  amount: number;
+  @Index()
+  @Column()
+  ipAddress: string;
+
+  @Column({ default: false })
+  isApproved: boolean;
 
   @Index()
   @Column()
   userId: string;
 
-  @ManyToOne(() => UsersEntity, ({ walletTopup }) => walletTopup, {
+  // Relations
+  @ManyToOne(() => UsersEntity, ({ loginIps }) => loginIps, {
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "userId" })
   user: UsersEntity;
 
-  @Column({ nullable: true })
-  topupById: string;
-
-  @ManyToOne(() => UsersEntity, { nullable: true })
-  @JoinColumn({ name: "topupById" })
-  topupBy: UsersEntity;
-
-  @Index()
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
@@ -53,6 +45,6 @@ export class WalletTopupEntity {
 
   @BeforeInsert()
   beforeInsertHook() {
-    this.id = getUlidId(ID_TYPE.WALLET_TOPUP);
+    this.id = getUlidId(ID_TYPE.USER_WHITELIST_IP);
   }
 }

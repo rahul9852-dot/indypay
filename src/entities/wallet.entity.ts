@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
@@ -17,63 +18,62 @@ export class WalletEntity {
   id: string;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 15,
     scale: 2,
     default: 0,
   })
-  totalCollections: number; // Total amount collected +500; +200; +1000 ==> 1700; -1200
+  totalCollections: number;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 15,
     scale: 2,
     default: 0,
   })
-  serviceCharge: number; // Service charge applied on collection +100; +50; +150 ==> 300
+  serviceCharge: number;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 15,
     scale: 2,
     default: 0,
   })
-  collectionAfterDeduction: number; // Collection after deduction +400; +150; +850 ==> 1400; -1000 ==> 400;
+  collectionAfterDeduction: number;
+
+  @Index()
+  @Column({
+    type: "decimal",
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  availablePayoutBalance: number;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 15,
     scale: 2,
     default: 0,
   })
-  availablePayoutBalance: number; // Available balance for payout // +95 ==> 95; -90 ==> 5; -5 ==> 0; +190 ==> 190
+  totalPayout: number;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 15,
     scale: 2,
     default: 0,
   })
-  totalPayout: number; // Total amount paid out +90; +5; ==> 95
-  // (totalTopUp - payoutServiceCharge) == (totalPayout + availablePayoutBalance)
+  totalTopUp: number;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 15,
     scale: 2,
     default: 0,
   })
-  totalTopUp: number; // Total top-up amount +100 ==> 100; +200 ==> 300;
+  payoutServiceCharge: number;
 
-  @Column({
-    type: "numeric",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  payoutServiceCharge: number; // Service charge for payout 5; 10; ==> 15
-
-  // Relations
   @OneToOne(() => UsersEntity, ({ wallet }) => wallet, {
     onDelete: "CASCADE",
   })

@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToOne,
@@ -17,29 +18,41 @@ import { ID_TYPE } from "@/enums";
 import { PAYMENT_TYPE } from "@/enums/payment.enum";
 
 @Entity("transactions")
+@Index(["userId", "createdAt"])
 export class TransactionsEntity {
   @PrimaryColumn()
   id: string;
 
+  @Index()
   @Column({ enum: PAYMENT_TYPE })
   transactionType: string;
 
-  // Relations
-  @JoinColumn()
+  @Column({ nullable: true })
+  payInOrderId: string;
+
+  @JoinColumn({ name: "payInOrderId" })
   @OneToOne(() => PayInOrdersEntity, ({ transaction }) => transaction, {
     onDelete: "CASCADE",
   })
   payInOrder: PayInOrdersEntity;
 
-  @JoinColumn()
+  @Column({ nullable: true })
+  payOutOrderId: string;
+
+  @JoinColumn({ name: "payOutOrderId" })
   @OneToOne(() => PayOutOrdersEntity, ({ transaction }) => transaction, {
     onDelete: "CASCADE",
   })
   payOutOrder: PayOutOrdersEntity;
 
+  @Index()
+  @Column()
+  userId: string;
+
   @ManyToOne(() => UsersEntity, ({ transactions }) => transactions, {
     onDelete: "CASCADE",
   })
+  @JoinColumn({ name: "userId" })
   user: UsersEntity;
 
   @Column({ nullable: true, type: "timestamptz" })
@@ -48,6 +61,7 @@ export class TransactionsEntity {
   @Column({ nullable: true, type: "timestamptz" })
   successAt: Date;
 
+  @Index()
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 

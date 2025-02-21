@@ -6,14 +6,14 @@ import {
 } from "@nestjs/common";
 import { Request } from "express";
 import { appConfig } from "@/config/app.config";
-import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+// import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 const {
   externalPaymentConfig: { flakPay, ismart, paynpro },
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
-  logger = new CustomLogger(WebhookGuard.name);
+  // logger = new CustomLogger(WebhookGuard.name);
   constructor() {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -21,10 +21,10 @@ export class WebhookGuard implements CanActivate {
 
     const requestIp = this.parseIp(request);
 
-    this.logger.info(`WEBHOOK REQUEST : ${LoggerPlaceHolder.Json}`, {
-      requestIp,
-      requestBody: request.body,
-    });
+    // this.logger.info(`WEBHOOK REQUEST : ${LoggerPlaceHolder.Json}`, {
+    //   requestIp,
+    //   requestBody: request.body,
+    // });
 
     const webhookIps = [
       ...flakPay.webhookIps,

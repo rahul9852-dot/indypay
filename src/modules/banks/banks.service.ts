@@ -50,9 +50,7 @@ export class BanksService {
       throw new NotFoundException(new MessageResponseDto("Bank not found"));
     }
 
-    await this.bankRepository.delete({
-      id: bankId,
-    });
+    await this.bankRepository.remove(bank);
 
     return new MessageResponseDto("Bank deleted successfully");
   }

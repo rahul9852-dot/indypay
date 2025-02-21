@@ -51,6 +51,18 @@ import {
 import { ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 import { SESService } from "@/modules/aws/ses.service";
 import { WalletEntity } from "@/entities/wallet.entity";
+import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
+import { getCurrentUserIp } from "@/utils/request.utils";
+import { CustomLogger } from "@/logger";
+
+interface ICachedUserData {
+  id: string;
+  mobile: string;
+  role: USERS_ROLE;
+  email: string;
+  onboardingStatus: ONBOARDING_STATUS;
+  twoFactorEnabled: boolean;
+}
 
 const {
   jwtConfig: {
@@ -58,18 +70,21 @@ const {
     accessTokenSecret,
     refreshTokenExpiresIn,
     refreshTokenSecret,
+    twoFactorSecret,
   },
   isProduction,
 } = appConfig();
 
-interface StoredOtps {
-  mobileOtp: string;
-  emailOtp: string;
+interface IVerifyTokenPayload {
+  id: string;
+  role: USERS_ROLE;
   email: string;
+  pending2FA: boolean;
 }
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new CustomLogger(AuthService.name);
   constructor(
     @InjectRepository(UsersEntity)
     private readonly usersRepository: Repository<UsersEntity>,
@@ -77,6 +92,8 @@ export class AuthService {
     private readonly authOtpRepository: Repository<AuthOtpEntity>,
     @InjectRepository(WalletEntity)
     private readonly walletRepository: Repository<WalletEntity>,
+    @InjectRepository(UserLoginIpsEntity)
+    private readonly userLoginIpsRepository: Repository<UserLoginIpsEntity>,
 
     private readonly bcryptService: BcryptService,
     private readonly jwtService: JwtService,
@@ -85,7 +102,36 @@ export class AuthService {
     private readonly sesService: SESService,
   ) {}
 
-  async login(loginUserDto: LoginUserDto, res: Response) {
+  async generate2FAToken(user: UsersEntity): Promise<string> {
+    const token = generateOtp(6);
+    const redisKey = REDIS_KEYS.TWO_FACTOR_TOKEN(user.id);
+
+    // console.log('==========================================');
+    // console.log('Generating 2FA Token');
+    // console.log('Token:', token);
+    // console.log('User ID:', user.id);
+    // console.log('Redis Key:', redisKey);
+    // console.log('==========================================');
+
+    // Store token in Redis
+    // Store with TTL of 5 minutes (300 seconds)
+    await this.cacheManager.set(
+      redisKey,
+      token,
+      300, // 5 minutes
+    );
+
+    // Verify storage
+    const storedToken = await this.cacheManager.get<string>(redisKey);
+    // console.log('Token Storage Verification:');
+    // console.log('Stored Token:', storedToken);
+    // console.log('Storage Successful:', token === storedToken);
+    // console.log('==========================================');
+
+    return token;
+  }
+
+  async login(loginUserDto: LoginUserDto, req: Request, res: Response) {
     const isLocked = await this.cacheManager.get<number>(
       generateLockAccountKey(loginUserDto.mobile),
     );
@@ -101,7 +147,15 @@ export class AuthService {
       where: {
         mobile: loginUserDto.mobile,
       },
-      select: ["password", "id", "mobile", "onboardingStatus", "role", "email"],
+      select: {
+        id: true,
+        mobile: true,
+        password: true,
+        onboardingStatus: true,
+        role: true,
+        email: true,
+        twoFactorEnabled: true,
+      },
     });
 
     if (!user) {
@@ -126,6 +180,105 @@ export class AuthService {
 
     await this.cacheManager.del(generateAttemptsKey(loginUserDto.mobile));
 
+    const currentIp = getCurrentUserIp(req);
+
+    // Save login IP
+
+    const isExistingIp = await this.userLoginIpsRepository.findOne({
+      where: {
+        userId: user.id,
+        ipAddress: currentIp,
+      },
+    });
+
+    if (!isExistingIp) {
+      // Save new IP
+      // FIXME: will send email for approval
+      await this.userLoginIpsRepository.save(
+        this.userLoginIpsRepository.create({
+          ipAddress: currentIp,
+          isApproved: true, // will change later
+          userId: user.id,
+        }),
+      );
+    }
+
+    // If 2FA is enabled, send OTP and return early with VERIFY_TOKEN
+    if (user.twoFactorEnabled) {
+      const twoFactorToken = await this.generate2FAToken(user);
+
+      // Send OTP via SMS
+      const otpSent = await this.snsService.sendSMS(
+        user.mobile,
+        `Your two-factor authentication code is: ${twoFactorToken}`,
+      );
+      if (!otpSent) {
+        throw new BadRequestException(
+          new MessageResponseDto("Failed to send SMS"),
+        );
+      }
+
+      try {
+        const userData: ICachedUserData = {
+          id: user.id,
+          mobile: user.mobile,
+          role: user.role,
+          email: user.email,
+          onboardingStatus: user.onboardingStatus,
+          twoFactorEnabled: user.twoFactorEnabled,
+        };
+
+        await Promise.all([
+          // Store 2FA token
+          this.cacheManager.set(
+            REDIS_KEYS.TWO_FACTOR_TOKEN(user.id),
+            twoFactorToken,
+          ),
+          // Store pending flag
+          this.cacheManager.set(REDIS_KEYS.TWO_FACTOR_PENDING(user.id), true),
+          // Store user data
+          this.cacheManager.set(REDIS_KEYS.USER_KEY(user.id), userData),
+        ]);
+
+        // Generate a verification token with user data
+        const tokenPayload: IVerifyTokenPayload = {
+          id: user.id,
+          role: user.role,
+          email: user.email,
+          pending2FA: true,
+        };
+
+        const verifyToken = this.jwtService.sign(tokenPayload, {
+          expiresIn: "5m",
+          secret: twoFactorSecret,
+        });
+
+        res.cookie(COOKIE_KEYS.VERIFY_TOKEN, verifyToken, {
+          ...cookieOptions,
+          maxAge: 300000, // 5 minutes
+        });
+
+        return res.json({
+          message:
+            "Please enter the verification code sent to your mobile number",
+          ...(!isProduction && { code: twoFactorToken }),
+        });
+      } catch (error) {
+        // console.error('Failed to setup 2FA session:', error);
+        throw new BadRequestException(
+          new MessageResponseDto("Failed to setup 2FA verification"),
+        );
+      }
+    }
+
+    // Update last login info
+    if (!user.twoFactorEnabled) {
+      await this.usersRepository.update(user.id, {
+        lastLoginAt: new Date(),
+        lastLoginIp: currentIp,
+      });
+    }
+
     const payload: IAccessTokenPayload = {
       id: user.id,
       mobile: user.mobile,
@@ -133,13 +286,174 @@ export class AuthService {
       role: user.role,
       email: user.email,
     };
+
     const accessToken = this.generateAccessToken(payload);
     const refreshToken = this.generateRefreshToken(payload);
 
-    return res
-      .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
-      .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
-      .json(new MessageResponseDto("User logged in successfully"));
+    // Set cookies
+    try {
+      res.cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions);
+      res.cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions);
+    } catch (error) {
+      throw error;
+    }
+    res.cookie(COOKIE_KEYS.VERIFY_TOKEN, "", {
+      ...mobileVerifyCookieOptions,
+      maxAge: 0,
+    });
+
+    // Return the tokens and message
+    const response = {
+      message: "Login successful",
+    };
+
+    return response;
+  }
+
+  async verify2FA(token: string, req: Request, res: Response) {
+    try {
+      const verifyToken = req.cookies?.[COOKIE_KEYS.VERIFY_TOKEN];
+      if (!verifyToken) {
+        throw new BadRequestException("Verification session expired");
+      }
+
+      // 2. Decode and validate JWT token
+      let decodedToken: IVerifyTokenPayload;
+      try {
+        decodedToken = this.jwtService.verify(verifyToken, {
+          secret: twoFactorSecret, // Using the same secret we used to sign
+        }) as IVerifyTokenPayload;
+      } catch (error) {
+        this.logger.error("Failed to verify token");
+        throw new BadRequestException("Invalid or expired verification token");
+      }
+
+      if (
+        !decodedToken?.id ||
+        !decodedToken?.role ||
+        !decodedToken?.pending2FA
+      ) {
+        throw new BadRequestException("Invalid verification token structure");
+      }
+
+      // 3. Get and verify stored OTP first
+      const userId = decodedToken.id;
+
+      // Check all Redis keys
+      // let it be for debugging puropse.
+      const [storedToken] = await Promise.all([
+        this.cacheManager.get<string>(REDIS_KEYS.TWO_FACTOR_TOKEN(userId)),
+        this.cacheManager.get<boolean>(REDIS_KEYS.TWO_FACTOR_PENDING(userId)),
+        this.cacheManager.get(REDIS_KEYS.USER_KEY(userId)),
+      ]);
+
+      // console.log('Redis State:');
+      // console.log('2FA Token Key:', REDIS_KEYS.TWO_FACTOR_TOKEN(userId));
+      // console.log('2FA Pending Key:', REDIS_KEYS.TWO_FACTOR_PENDING(userId));
+      // console.log('User Data Key:', REDIS_KEYS.USER_KEY(userId));
+      // console.log('Stored Token:', storedToken);
+      // console.log('Is Pending:', isPending);
+      // console.log('Has User Data:', !!userData);
+      // console.log('Provided Token:', token);
+      // console.log('Tokens Match:', token === storedToken);
+
+      if (!storedToken) {
+        throw new BadRequestException("Verification code expired");
+      }
+
+      if (token !== storedToken) {
+        throw new BadRequestException("Invalid verification code");
+      }
+
+      const user = await this.usersRepository.findOne({
+        where: { id: decodedToken.id },
+        select: {
+          id: true,
+          mobile: true,
+          onboardingStatus: true,
+          role: true,
+          email: true,
+          twoFactorEnabled: true,
+        },
+      });
+
+      // this.logger.log("User found in database");
+
+      if (!user) {
+        throw new BadRequestException("User not found");
+      }
+
+      if (user.role !== decodedToken.role) {
+        throw new BadRequestException("Role mismatch");
+      }
+
+      // 5. Clean up 2FA session
+      await Promise.all([
+        this.cacheManager.del(REDIS_KEYS.TWO_FACTOR_TOKEN(decodedToken.id)),
+        this.cacheManager.del(REDIS_KEYS.TWO_FACTOR_PENDING(decodedToken.id)),
+        this.cacheManager.del(REDIS_KEYS.USER_KEY(decodedToken.id)),
+      ]);
+
+      // get current user request IP
+
+      const currentIp = getCurrentUserIp(req);
+
+      const isExistingIp = await this.userLoginIpsRepository.findOne({
+        where: {
+          userId: user.id,
+          ipAddress: currentIp,
+        },
+      });
+
+      if (!isExistingIp) {
+        // FIXME: LOGIN from new IP :: SEND EMAIL TO APPROVE
+        await this.userLoginIpsRepository.save(
+          this.userLoginIpsRepository.create({
+            userId: user.id,
+            ipAddress: currentIp,
+            isApproved: true, // Change it Later after Approvement
+          }),
+        );
+      }
+
+      // 6. Update last login info
+      await this.usersRepository.update(user.id, {
+        lastLoginAt: new Date(),
+        lastLoginIp: currentIp,
+      });
+
+      // 7. Generate tokens and set cookies
+      const payload: IAccessTokenPayload = {
+        id: user.id,
+        mobile: user.mobile,
+        onboardingStatus: user.onboardingStatus,
+        role: user.role,
+        email: user.email,
+      };
+
+      const accessToken = this.generateAccessToken(payload);
+      const refreshToken = this.generateRefreshToken(payload);
+
+      // 8. Set cookies and clear verify token
+      res.cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions);
+      res.cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions);
+      res.cookie(COOKIE_KEYS.VERIFY_TOKEN, "", {
+        ...mobileVerifyCookieOptions,
+        maxAge: 0,
+      });
+
+      // this.logger.info("2FA verification completed successfully");
+
+      // 10. Return success response with tokens
+      return {
+        message: "Login successful",
+        // accessToken,
+        // refreshToken,
+      };
+    } catch (error) {
+      this.logger.error(`2FA verification failed: ${error.message}`);
+      throw error;
+    }
   }
 
   async register(registerUserDto: RegisterUserDto, res: Response) {
@@ -310,7 +624,6 @@ export class AuthService {
       formattedPhone,
       `Your PayBolt OTP to reset your password is: ${mobileOtp}`,
     );
-
     if (!smsSent) {
       throw new BadRequestException(
         new MessageResponseDto("Failed to send mobile OTP"),
@@ -482,6 +795,402 @@ export class AuthService {
       .json(new MessageResponseDto("OTP verified successfully"));
   }
 
+  async enable2FA(userId: string) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const updateResult = await this.usersRepository.update(userId, {
+      twoFactorEnabled: true,
+    });
+
+    if (updateResult.affected === 0) {
+      throw new BadRequestException(
+        new MessageResponseDto("Failed to update 2FA status"),
+      );
+    }
+    // Clear user cache
+    await this.cacheManager.del(REDIS_KEYS.USER_KEY(userId));
+
+    return new MessageResponseDto(
+      `Two-factor authentication has been enabled successfully`,
+    );
+  }
+
+  async update2FAStatusAdmin(userId: string, isEnabled: boolean) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(new MessageResponseDto("User not found"));
+    }
+
+    const updateResult = await this.usersRepository.update(userId, {
+      twoFactorEnabled: isEnabled,
+    });
+
+    if (updateResult.affected === 0) {
+      throw new BadRequestException(
+        new MessageResponseDto("Failed to update 2FA status"),
+      );
+    }
+    // Clear user cache
+    await this.cacheManager.del(REDIS_KEYS.USER_KEY(userId));
+
+    return new MessageResponseDto(
+      `Two-factor authentication has been ${isEnabled ? "enabled" : "disabled"} successfully`,
+    );
+  }
+
+  // private validateUserData(user: any): boolean {
+  //   if (!user) return false;
+
+  //   const requiredFields = ['id', 'mobile', 'onboardingStatus', 'role', 'email'];
+
+  //   return requiredFields.every(field => {
+  //     const hasField = field in user && user[field] !== null && user[field] !== undefined;
+  //     if (!hasField) {
+  //       // console.log(`Missing or invalid field: ${field}`);
+  //     }
+
+  //     return hasField;
+  //   });
+  // }
+
+  // async verify2FA(token: string, req: Request, res: Response) {
+  //   let decodedUserId: string;
+  //   let user: any;
+
+  //   console.log('Starting 2FA verification process');
+  //   console.log('Input token:', token);
+  //   console.log('Request cookies:', req.cookies);
+
+  //   try {
+  //     // Step 1: Get and verify token from cookie
+  //     console.log('Step 1: Verifying cookie token');
+  //     const verifyToken = req.cookies[COOKIE_KEYS.VERIFY_TOKEN];
+  //     console.log('Verification token from cookie:', verifyToken);
+
+  //     if (!verifyToken) {
+  //       console.log('No verification token found in cookies');
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('Invalid verification session. Please login again.'),
+  //       );
+  //     }
+  //     // console.log('Verification token found in cookies')
+
+  //     // Step 2: Decode and validate the token
+  //     this.logger.debug('Step 2: Decoding JWT token');
+  //     let decoded: IVerifyTokenPayload;
+  //     try {
+  //       decoded = this.jwtService.verify(verifyToken, { secret: accessTokenSecret }) as IVerifyTokenPayload;
+  //       this.logger.debug('Decoded token:', decoded);
+
+  //       if (!decoded || typeof decoded !== 'object') {
+  //         this.logger.error('Invalid token format:', decoded);
+  //         throw new BadRequestException(
+  //           new MessageResponseDto('Invalid verification token format'),
+  //         );
+  //       }
+
+  //       // Validate token has required fields
+  //       if (!decoded.id || !decoded.role) {
+  //         this.logger.error('Missing required fields in token:', decoded);
+  //         throw new BadRequestException(
+  //           new MessageResponseDto('Invalid token data'),
+  //         );
+  //       }
+
+  //       this.logger.debug('Token successfully decoded and validated with fields:', {
+  //         id: decoded.id,
+  //         role: decoded.role,
+  //         pending2FA: decoded.pending2FA
+  //       });
+  //     } catch (error) {
+  //       this.logger.error('Token verification failed:', error);
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('Invalid or expired verification token'),
+  //       );
+  //     }
+
+  //     const typedDecoded = decoded as { id: string; pending2FA: boolean };
+  //     if (!typedDecoded.pending2FA) {
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('Invalid verification token - 2FA not pending'),
+  //       );
+  //     }
+
+  //     decodedUserId = typedDecoded.id;
+  //     if (!decodedUserId) {
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('Invalid user ID in verification token'),
+  //       );
+  //     }
+
+  //     // Step 3: Verify the 2FA token
+  //     this.logger.debug('Step 3: Verifying 2FA token');
+  //     this.logger.debug('Checking Redis for user:', { userId: decodedUserId });
+
+  //     const [storedToken, isPending] = await Promise.all([
+  //       this.cacheManager.get<string>(REDIS_KEYS.TWO_FACTOR_TOKEN(decodedUserId)),
+  //       this.cacheManager.get<boolean>(REDIS_KEYS.TWO_FACTOR_PENDING(decodedUserId))
+  //     ]);
+
+  //     this.logger.debug('2FA verification:', {
+  //       providedToken: token,
+  //       storedToken,
+  //       isPending,
+  //       match: token === storedToken
+  //     });
+
+  //     if (!storedToken || !isPending) {
+  //       this.logger.error('Invalid 2FA session:', { hasStoredToken: !!storedToken, isPending });
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('Invalid or expired 2FA session'),
+  //       );
+  //     }
+
+  //     // Get stored user data from Redis
+  //     const storedUserData = await this.cacheManager.get<ICachedUserData>(REDIS_KEYS.USER_KEY(decodedUserId));
+  //     this.logger.debug('Retrieved stored user data:', storedUserData);
+
+  //     if (!storedUserData || !storedUserData.role) {
+  //       this.logger.error('Missing user data in Redis:', {
+  //         hasData: !!storedUserData,
+  //         hasRole: storedUserData?.role
+  //       });
+  //     }
+
+  //     this.logger.debug('2FA session validated successfully');
+
+  //     console.log('Comparing tokens:', {
+  //       provided: String(token),
+  //       stored: String(storedToken)
+  //     });
+
+  //     if (String(token) !== String(storedToken)) {
+  //       console.log('Token mismatch');
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('Invalid 2FA code'),
+  //       );
+  //     }
+
+  //     console.log('2FA token verified successfully');
+
+  //     // Step 4: Get user data with all required fields
+  //     this.logger.debug('Step 4: Fetching user data');
+  //     this.logger.debug('Checking Redis for cached user data:', { userId: decodedUserId });
+
+  //     // Validate decoded token has role
+  //     if (!decoded.role) {
+  //       this.logger.error('Role missing in verification token:', decoded);
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('Invalid token: missing role'),
+  //       );
+  //     }
+
+  //     this.logger.debug('Token decoded data:', {
+  //       id: decoded.id,
+  //       role: decoded.role,
+  //       hasRole: 'role' in decoded
+  //     });
+
+  //     try {
+  //       // First try to get user from Redis
+  //       const cachedUser = await this.cacheManager.get<ICachedUserData>(REDIS_KEYS.USER_KEY(decodedUserId));
+  //       console.log('Cached user data found:', !!cachedUser);
+
+  //       if (cachedUser && this.validateUserData(cachedUser)) {
+  //         console.log('Using valid cached user data');
+  //         user = cachedUser;
+  //       } else {
+  //         this.logger.debug('No valid cached data, fetching fresh user data from database');
+  //         user = await this.usersRepository.findOne({
+  //           where: { id: decodedUserId },
+  //           select: {
+  //             id: true,
+  //             mobile: true,
+  //             onboardingStatus: true,
+  //             role: true,
+  //             email: true,
+  //             twoFactorEnabled: true,
+  //             firstName: true,
+  //             lastName: true
+  //           }
+  //         });
+
+  //         this.logger.debug('Retrieved user from database:', {
+  //           id: user?.id,
+  //           role: user?.role,
+  //           email: user?.email
+  //         });
+  //         this.logger.debug('Database user data:', { id: user?.id, role: user?.role });
+
+  //         if (!user) {
+  //           console.log('No user found with ID:', decodedUserId);
+  //           throw new BadRequestException(
+  //             new MessageResponseDto('User not found'),
+  //           );
+  //         }
+
+  //         if (!this.validateUserData(user)) {
+  //           console.error('Invalid user data from database:', {
+  //             id: user.id,
+  //             hasRole: 'role' in user,
+  //             role: user.role
+  //           });
+  //           throw new BadRequestException(
+  //             new MessageResponseDto('Invalid user data'),
+  //           );
+  //         }
+
+  //         // Cache the valid user data
+  //         await this.cacheManager.set(REDIS_KEYS.USER_KEY(decodedUserId), user, 300); // 5 minutes TTL
+
+  //       }
+
+  //       console.log('User data validated successfully:', {
+  //         id: user.id,
+  //         role: user.role,
+  //         hasRole: 'role' in user
+  //       });
+  //     } catch (error) {
+  //       console.error('Error fetching/validating user data:', error);
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('Error retrieving user data'),
+  //       );
+  //     }
+
+  //     // Log user data for debugging
+  //     this.logger.debug('Retrieved user data:', {
+  //       id: user.id,
+  //       role: user.role,
+  //       email: user.email,
+  //       mobile: user.mobile,
+  //       onboardingStatus: user.onboardingStatus,
+  //       firstName: user.firstName,
+  //       lastName: user.lastName
+  //     });
+
+  //     // Verify all required fields are present
+  //     const requiredFields = ['id', 'mobile', 'onboardingStatus', 'role', 'email'];
+  //     for (const field of requiredFields) {
+  //       if (user[field] === undefined || user[field] === null) {
+  //         console.error(`Missing required field: ${field}`, {
+  //           user,
+  //           availableFields: Object.keys(user)
+  //         });
+  //         throw new BadRequestException(
+  //           new MessageResponseDto(`Missing required user data: ${field}`)
+  //         );
+  //       }
+  //     }
+
+  //     // Step 5: Clean up 2FA session
+  //     console.log('Step 5: Cleaning up 2FA session');
+  //     try {
+  //       await Promise.all([
+  //         this.cacheManager.del(REDIS_KEYS.TWO_FACTOR_TOKEN(decodedUserId)),
+  //         this.cacheManager.del(REDIS_KEYS.TWO_FACTOR_PENDING(decodedUserId))
+  //       ]);
+  //       console.log('2FA session cleanup completed');
+  //     } catch (error) {
+  //       console.error('Error cleaning up 2FA session:', error);
+  //     }
+
+  //     // Step 6: Update last login info
+  //     console.log('Step 6: Updating last login info');
+  //     try {
+  //       await this.usersRepository.update(user.id, {
+  //         lastLoginAt: new Date(),
+  //         lastLoginIp: req.ip
+  //       });
+  //       console.log('Last login info updated successfully');
+  //     } catch (error) {
+  //       console.error('Error updating last login info:', error);
+  //     }
+
+  //     // Step 7: Generate tokens and set cookies
+  //     this.logger.debug('Step 7: Generating tokens and setting cookies');
+
+  //     // Validate role consistency
+  //     if (!user.role) {
+  //       this.logger.error('Role missing in user data before token generation');
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('User role is missing')
+  //       );
+  //     }
+
+  //     if (user.role !== decoded.role) {
+  //       this.logger.error('Role mismatch between token and user:', {
+  //         tokenRole: decoded.role,
+  //         userRole: user.role
+  //       });
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('Invalid user role')
+  //       );
+  //     }
+
+  //     this.logger.debug('User data for token generation:', {
+  //       id: user.id,
+  //       role: user.role,
+  //       hasRole: 'role' in user
+  //     });
+
+  //     // Validate role before token generation
+  //     if (!user.role) {
+  //       this.logger.error('User role is missing before token generation');
+  //       throw new BadRequestException(
+  //         new MessageResponseDto('User role is missing'),
+  //       );
+  //     }
+  //     this.logger.debug('User role validated:', user.role);
+
+  //     console.log('Preparing token payload');
+  //     const payload: IAccessTokenPayload = {
+  //       id: user.id,
+  //       mobile: user.mobile,
+  //       onboardingStatus: user.onboardingStatus,
+  //       role: user.role,
+  //       email: user.email,
+  //     };
+  //     console.log('Token payload prepared:', { ...payload, email: '***' });
+
+  //     console.log('Generating tokens');
+  //     const accessToken = this.generateAccessToken(payload);
+  //     const refreshToken = this.generateRefreshToken(payload);
+  //     console.log('Tokens generated successfully');
+
+  //     console.log('Setting cookies');
+  //     res.clearCookie(COOKIE_KEYS.VERIFY_TOKEN);
+  //     res.cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions);
+  //     res.cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions);
+  //     console.log('Cookies set successfully');
+
+  //     console.log('2FA verification completed successfully');
+
+  //     return {
+  //       accessToken,
+  //       refreshToken,
+  //       message: 'Login successful'
+  //     };
+
+  //   } catch (error) {
+  //     console.error('2FA verification error:', error);
+  //     if (error instanceof BadRequestException) {
+  //       throw error;
+  //     }
+  //     throw new BadRequestException(
+  //       new MessageResponseDto('Error during 2FA verification'),
+  //     );
+  //   }
+  // }
+
   async refreshToken(user: IRefreshTokenPayload, req: Request, res: Response) {
     const { email, id, mobile, onboardingStatus, role } = user;
     const userRaw = await this.usersRepository.findOne({
@@ -589,7 +1298,11 @@ export class AuthService {
     };
   }
 
-  async verifyContact(verifyContactDto: VerifyContactDto, res: Response) {
+  async verifyContact(
+    verifyContactDto: VerifyContactDto,
+    req: Request,
+    res: Response,
+  ) {
     const {
       firstName,
       lastName,
@@ -672,6 +1385,12 @@ export class AuthService {
 
       // Clear OTPs from Redis after successful verification
       await this.cacheManager.del(otpKey);
+
+      // Update last login info
+      await this.usersRepository.update(user.id, {
+        lastLoginAt: new Date(),
+        lastLoginIp: req.ip,
+      });
 
       const payload: IAccessTokenPayload = {
         id: user.id,

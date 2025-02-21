@@ -27,6 +27,7 @@ export const appConfig = registerAs("appConfig", () => ({
     accessTokenExpiresIn: getOsEnv("JWT_ACCESS_TOKEN_EXPIRES_IN"),
     refreshTokenExpiresIn: getOsEnv("JWT_REFRESH_TOKEN_EXPIRES_IN"),
     paymentLinkSecret: getOsEnv("JWT_PAYMENT_LINK_SECRET"),
+    twoFactorSecret: getOsEnv("JWT_TWO_FACTOR_SECRET"),
   },
   // oauthGoogle: {
   //   clientId: getOsEnv("OAUTH_GOOGLE_CLIENT_ID"),

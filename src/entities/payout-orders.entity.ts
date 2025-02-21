@@ -4,6 +4,7 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
   ManyToOne,
   OneToOne,
   PrimaryColumn,
@@ -16,12 +17,13 @@ import { ID_TYPE } from "@/enums";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 
 @Entity("payout_orders")
+@Index(["userId", "createdAt"])
 export class PayOutOrdersEntity {
   @PrimaryColumn()
   id: string;
 
   @Column({
-    type: "numeric",
+    type: "decimal",
     precision: 10,
     scale: 2,
   })
@@ -37,6 +39,7 @@ export class PayOutOrdersEntity {
   @Column()
   transferMode: string;
 
+  @Index()
   @Column({ enum: PAYMENT_STATUS, default: PAYMENT_STATUS.PENDING })
   status: string;
 
@@ -68,25 +71,29 @@ export class PayOutOrdersEntity {
   @Column({ nullable: true, unique: true })
   payoutId: string;
 
-  @Column({ type: "numeric", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   commissionInPercentage: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   commissionAmount: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   gstInPercentage: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   gstAmount: number;
 
-  @Column({ type: "numeric", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   netPayableAmount: number;
 
-  // Relations
+  @Index()
+  @Column()
+  userId: string;
+
   @ManyToOne(() => UsersEntity, ({ payOutOrders }) => payOutOrders, {
     onDelete: "CASCADE",
   })
+  @JoinColumn({ name: "userId" })
   user: UsersEntity;
 
   @OneToOne(() => TransactionsEntity, ({ payOutOrder }) => payOutOrder, {
@@ -100,6 +107,7 @@ export class PayOutOrdersEntity {
   @Column({ nullable: true, type: "timestamptz" })
   failureAt: Date;
 
+  @Index()
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 

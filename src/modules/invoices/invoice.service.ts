@@ -504,7 +504,7 @@ export class InvoiceCustomerService {
       throw new ForbiddenException("Only Admin or Owner can delete invoices");
     }
 
-    await this.invoiceRepo.delete(invoiceId);
+    await this.invoiceRepo.remove(invoice);
 
     return new MessageResponseDto("Invoice deleted successfully");
   }

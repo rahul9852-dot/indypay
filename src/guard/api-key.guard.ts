@@ -36,8 +36,6 @@ export class ApiKeyGuard implements CanActivate {
 
     const requestIp = this.parseIp(request);
 
-    this.logger.info(`api key request ip: ${requestIp}`);
-
     const [type, cred] = request.headers?.authorization?.split(" ") || [];
     if (type !== "Basic" || !cred) {
       throw new UnauthorizedException();
@@ -87,6 +85,9 @@ export class ApiKeyGuard implements CanActivate {
         //   );
         // }
       }
+      this.logger.info(
+        `API KEY Request IP: ${requestIp} - ${apiKeyEntity.user.fullName} - [${request.method}] - ${request.url}}`,
+      );
 
       const userId = apiKeyEntity.user.id;
 
@@ -104,7 +105,7 @@ export class ApiKeyGuard implements CanActivate {
       );
 
       if (!isIpWhitelisted) {
-        throw new ForbiddenException(`Invalid IP address || ${requestIp}`);
+        throw new ForbiddenException(`Invalid IP address`);
       }
 
       const decryptedClientSecret = await decryptData(

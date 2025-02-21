@@ -24,6 +24,13 @@ module.exports = {
       min_uptime: "60s",
       max_restarts: 10,
       restart_delay: 4000,
+
+      // Log rotation settings
+      merge_logs: true,
+      log_file: "./logs/combined.log",
+      log_rotate_interval: "0 0 * * 0", // Run at midnight every Sunday (cron format)
+      log_max_size: "50M", // Size threshold for rotation
+      log_retain_count: 1, // Only keep 1 rotated log file (effectively deleting logs older than 1 week)
     },
   ],
 };

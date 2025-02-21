@@ -13,6 +13,7 @@ import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { UserAddressEntity } from "@/entities/user-address.entity";
 import { SNSService } from "@/modules/aws/sns.service";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
+import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
       UserWhitelistIpsEntity,
       UserAddressEntity,
       ApiCredentialsEntity,
+      UserLoginIpsEntity,
     ]),
     AuthModule,
   ],

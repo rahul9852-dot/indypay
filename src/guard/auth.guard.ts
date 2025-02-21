@@ -81,7 +81,8 @@ export class AuthGuard implements CanActivate {
       if (
         !(
           user.accountStatus === ACCOUNT_STATUS.ACTIVE ||
-          user.accountStatus === ACCOUNT_STATUS.INACTIVE
+          user.accountStatus === ACCOUNT_STATUS.INACTIVE ||
+          user.accountStatus === ACCOUNT_STATUS.INTERNAL_USER
         )
       ) {
         throw new ForbiddenException(

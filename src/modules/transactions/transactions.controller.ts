@@ -93,7 +93,7 @@ export class TransactionsController {
   @ApiOperation({
     summary: "Get stats of all merchants - Admin Only",
   })
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER, USERS_ROLE.OPS)
   @Get("stats/admin")
   @IgnoreBusinessDetails()
   @IgnoreKyc()

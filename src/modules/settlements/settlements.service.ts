@@ -52,6 +52,7 @@ import {
 } from "@/utils/pg-config.utils";
 import { decryptData } from "@/utils/encode-decode.utils";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
+import { WalletTopupEntity } from "@/entities/wallet-topup.entity";
 
 const { externalPaymentConfig } = appConfig();
 @Injectable()
@@ -71,6 +72,8 @@ export class SettlementsService {
     private readonly addressRepository: Repository<UserAddressEntity>,
     @InjectRepository(ApiCredentialsEntity)
     private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
+    @InjectRepository(WalletTopupEntity)
+    private readonly walletTopupRepository: Repository<WalletTopupEntity>,
 
     private readonly bankService: BanksService,
     private readonly dataSource: DataSource,
@@ -80,9 +83,9 @@ export class SettlementsService {
 
   async createWalletForMerchants() {
     const merchants = await this.usersRepository.find({
-      where: {
-        role: USERS_ROLE.MERCHANT,
-      },
+      // where: {
+      //   role: USERS_ROLE.MERCHANT,
+      // },
       relations: {
         wallet: true,
       },
@@ -126,12 +129,19 @@ export class SettlementsService {
       })
       .getRawOne();
 
+    const totalTopUp = await this.walletTopupRepository.sum("amount", {
+      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+    });
+
+    const grossTotalSettlement = +settlements.totalSettlements + totalTopUp;
+
     return {
       todayTotalCollections: +collections.totalCollections,
-      todayTotalSettlements: +settlements.totalSettlements,
-      todayTotalUnSettled: Math.abs(
-        +collections.totalCollections - +settlements.totalSettlements,
-      ),
+      todayTotalSettlements: grossTotalSettlement,
+      todayTotalUnSettled:
+        +collections.totalCollections - grossTotalSettlement < 0
+          ? 0
+          : +collections.totalCollections - grossTotalSettlement,
     };
   }
 
@@ -1199,10 +1209,10 @@ export class SettlementsService {
         );
       }
 
-      if (+wallet.collectionAfterDeduction < +amount) {
+      if (+wallet.totalCollections < +amount) {
         throw new BadRequestException(
           new MessageResponseDto(
-            `Amount is greater than unsettled amount: ${wallet.collectionAfterDeduction}`,
+            `Amount is greater than Total Collections amount: ${wallet.totalCollections}`,
           ),
         );
       }
@@ -1287,6 +1297,7 @@ export class SettlementsService {
         {
           transferId: externalPayoutResponse.data.transferId,
           status,
+          utr: externalPayoutResponse.data.utr,
         },
       );
 
@@ -1305,15 +1316,16 @@ export class SettlementsService {
 
       await queryRunner.commitTransaction();
 
-      await this.sendSettlementInvoice(savedSettlement.id, "Initiated");
+      // await this.sendSettlementInvoice(savedSettlement.id, "Initiated");
       if (status === PAYMENT_STATUS.SUCCESS) {
-        await this.sendSettlementInvoice(savedSettlement.id, "Completed");
+        // await this.sendSettlementInvoice(savedSettlement.id, "Completed");
       }
 
       return {
         orderId: savedSettlement.id,
         amount: savedSettlement.amount,
         transferId: externalPayoutResponse.data.transferId,
+        utr: externalPayoutResponse.data.utr,
         status,
       };
     } catch (err) {
@@ -1363,8 +1375,8 @@ export class SettlementsService {
           id: settlement.id,
           name: settlement.fullName,
           totalCollections: +settlement.wallet.totalCollections,
-          serviceChange: +settlement.wallet.serviceCharge,
-          collectionAfterDeduction: +settlement.wallet.collectionAfterDeduction,
+          // serviceChange: +settlement.wallet.serviceCharge,
+          // collectionAfterDeduction: +settlement.wallet.collectionAfterDeduction,
         };
       });
 

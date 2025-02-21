@@ -51,7 +51,14 @@ export class PayoutController {
     @Body() body: PayoutStatusDto,
     @User() user: UsersEntity,
   ) {
-    return this.payoutService.checkPayOutStatusTransactionFlakPay(body, user);
+    return this.payoutService.checkPayOutStatusDashboardFlakPay(body, user);
+  }
+
+  @ApiOperation({ summary: "Get By OrderId" })
+  @Get("/order/:orderId")
+  @Role(USERS_ROLE.OWNER)
+  async getPayoutByOrderId(@Param("orderId") orderId: string) {
+    return this.payoutService.getPayoutByOrderId(orderId);
   }
 
   @ApiOperation({ summary: "Get payout by id" })

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   HttpCode,
+  Patch,
   Post,
   Req,
   Res,
@@ -11,15 +12,18 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiResponse,
   ApiTags,
 } from "@nestjs/swagger";
 import { Request, Response } from "express";
 import { SendOtpDto, SendOtpResDto, VerifyOtpDto } from "./dto/send-otp.dto";
+import { Verify2FADto } from "./dto/verify-2fa.dto";
 import { AuthService } from "./auth.service";
 import { RegisterUserDto } from "./dto/register-user.dto";
 import { VerifyContactDto } from "./dto/verify-contact.dto";
 import { LoginUserDto } from "./dto/login-user.dto";
 import { SendSignupOtpDto } from "./dto/send-signup-otp.dto";
+import { Update2FAStatusDto } from "./dto/toggle-two-fa";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { Public } from "@/decorators/public.decorator";
 import { VerifyMobileGuard } from "@/guard/verify-mobile.guard";
@@ -27,7 +31,6 @@ import { IgnoreMobileVerification } from "@/decorators/mobile.decorator";
 import { RefreshGuard } from "@/guard/refesh.guard";
 import { User } from "@/decorators/user.decorator";
 import { Mobile } from "@/decorators/mobile.decorator";
-import { IRefreshTokenPayload } from "@/interface/common.interface";
 import { MessageResponseDto } from "@/dtos/common.dto";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
@@ -45,6 +48,73 @@ import { UsersEntity } from "@/entities/user.entity";
 })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+  // private readonly logger = new CustomLogger(AuthController.name);
+
+  @Post("2fa")
+  @ApiOperation({
+    summary: "Enable two-factor authentication status",
+    description:
+      "For regular users, this will toggle their own 2FA status. For admins, a userId must be provided to toggle another user's 2FA status.",
+  })
+  @ApiOkResponse({
+    type: MessageResponseDto,
+    description: "Returns success message indicating the new 2FA status",
+  })
+  async enable2FA(@User() user: UsersEntity) {
+    return this.authService.enable2FA(user.id);
+  }
+
+  @Patch("2fa/admin")
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({
+    summary: "Update two-factor authentication status",
+  })
+  async update2FAAdmin(@Body() body: Update2FAStatusDto) {
+    return this.authService.update2FAStatusAdmin(body.userId, body.isEnabled);
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: "Verify 2FA code and complete login",
+    description:
+      "After receiving the 2FA code via SMS, use this endpoint to verify the code and complete the login process.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Login successful",
+    type: MessageResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: "Invalid verification code or session expired",
+  })
+  @Post("verify-2fa")
+  @HttpCode(200)
+  async verify2FA(
+    @Body() verifyDto: Verify2FADto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.authService.verify2FA(
+        verifyDto.token,
+        req,
+        res,
+      );
+
+      return res.status(200).json({
+        ...result,
+        message: "Login successful",
+      });
+    } catch (error) {
+      if (!res.headersSent) {
+        return res.status(400).json({
+          message: error.message || "Verification failed",
+          error: "Bad Request",
+        });
+      }
+    }
+  }
 
   @Public()
   @ApiOperation({
@@ -53,8 +123,20 @@ export class AuthController {
   @Post("login")
   @HttpCode(200)
   @ApiOkResponse({ type: MessageResponseDto })
-  async login(@Body() loginUserDto: LoginUserDto, @Res() res: Response) {
-    return this.authService.login(loginUserDto, res);
+  async login(
+    @Body() loginUserDto: LoginUserDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.authService.login(loginUserDto, req, res);
+
+      return res.status(200).json(result);
+    } catch (error) {
+      if (!res.headersSent) {
+        throw error;
+      }
+    }
   }
 
   @Public()
@@ -77,9 +159,10 @@ export class AuthController {
   @ApiOkResponse({ type: MessageResponseDto })
   async onboarding(
     @Body() verifyContactDto: VerifyContactDto,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
-    return this.authService.verifyContact(verifyContactDto, res);
+    return this.authService.verifyContact(verifyContactDto, req, res);
   }
 
   @ApiOperation({
@@ -163,7 +246,7 @@ export class AuthController {
   async refreshToken(
     @Req() req: Request,
     @Res() res: Response,
-    @User() user: IRefreshTokenPayload,
+    @User() user: UsersEntity,
   ) {
     return this.authService.refreshToken(user, req, res);
   }

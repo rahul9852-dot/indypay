@@ -1,4 +1,4 @@
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiExcludeEndpoint, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Controller, Get, Param, Query } from "@nestjs/common";
 import { CollectionsService } from "./collections.service";
 import { User } from "@/decorators/user.decorator";
@@ -15,7 +15,7 @@ import {
 export class CollectionsController {
   constructor(private readonly collectionsService: CollectionsService) {}
 
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER, USERS_ROLE.OPS)
   @ApiOperation({ summary: "Get all collections grouped by user - Admin" })
   @Get("admin")
   getAllCollectionsGroupByUserAdmin(
@@ -26,7 +26,7 @@ export class CollectionsController {
     );
   }
 
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER, USERS_ROLE.OPS)
   @ApiOperation({ summary: "Get collection by payin Id - Admin" })
   @Get("admin/payin/:payinId")
   getCollectionsByPayinIdAdmin(@Param("payinId") payinId: string) {
@@ -34,6 +34,13 @@ export class CollectionsController {
   }
 
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiExcludeEndpoint()
+  @Get("admin/payin-order/:orderId")
+  getCollectionsByOrderIdAdmin(@Param("orderId") orderId: string) {
+    return this.collectionsService.getCollectionsByOrderIdAdmin(orderId);
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER, USERS_ROLE.OPS)
   @ApiOperation({ summary: "Get all collections by user Id - Admin" })
   @Get("admin/:userId")
   getAllCollectionsByUserIdAdmin(

@@ -366,10 +366,10 @@ export class WalletsService {
       throw new NotFoundException(new MessageResponseDto("Wallet not found"));
     }
 
-    if (+wallet.collectionAfterDeduction < amount) {
+    if (+wallet.totalCollections < amount) {
       throw new BadRequestException(
         new MessageResponseDto(
-          `Insufficient collection balance: ${wallet.collectionAfterDeduction}`,
+          `Insufficient Total Collections balance: ${wallet.totalCollections}`,
         ),
       );
     }
