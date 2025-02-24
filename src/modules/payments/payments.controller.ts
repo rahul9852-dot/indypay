@@ -78,8 +78,14 @@ export class PaymentsController {
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)
   @Post("payin/status")
-  async checkStatusTransactionPayin(@Body() payinStatusDto: PayinStatusDto) {
-    return this.paymentsService.checkPayInStatusTransaction(payinStatusDto);
+  async checkStatusTransactionPayin(
+    @Body() payinStatusDto: PayinStatusDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.checkPayInStatusTransaction(
+      payinStatusDto,
+      user,
+    );
   }
 
   @Public()
