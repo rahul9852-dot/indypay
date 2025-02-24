@@ -812,10 +812,50 @@ export class PaymentsService {
       );
     }
 
+    if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
+      return {
+        orderId: payinOrder.orderId,
+        status: payinOrder.status,
+        txnRefId: payinOrder.txnRefId,
+      };
+    }
+
+    const { clientId, clientSecret } = await this.getFlakPayCredentials(
+      payinOrder.user.id,
+    );
+
+    const axiosServiceFlakPay = new AxiosService(
+      FALKPAY.BASE_URL,
+      getFlakPayPgConfig({
+        clientId,
+        clientSecret,
+      }),
+    );
+
+    const flakPayResponse =
+      await axiosServiceFlakPay.postRequest<IExternalPayoutStatusResponseFlakPay>(
+        FALKPAY.PAYOUT.STATUS_CHECK,
+        {
+          orderId,
+        },
+      );
+
+    const status = convertExternalPaymentStatusToInternal(
+      flakPayResponse.data.status.toUpperCase(),
+    );
+
+    await this.payInOrdersRepository.save(
+      this.payInOrdersRepository.create({
+        ...payinOrder,
+        status,
+        txnRefId: flakPayResponse.data.transferId,
+      }),
+    );
+
     return {
       orderId: payinOrder.orderId,
-      status: payinOrder.status,
-      txnRefId: payinOrder.txnRefId,
+      status,
+      txnRefId: flakPayResponse.data.transferId,
     };
   }
 
