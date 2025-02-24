@@ -856,7 +856,6 @@ export class PaymentsService {
       `FLAKPAY PAYIN API RESPONSE -:`,
       JSON.stringify(flakPayResponse.data),
     );
-
     const payInOrder = await this.payInOrdersRepository.save(
       this.payInOrdersRepository.create({
         ...payinOrder,
@@ -864,7 +863,7 @@ export class PaymentsService {
         txnRefId: flakPayResponse.data.transferId,
       }),
     );
-    if (user?.payOutWebhookUrl) {
+    if (user?.payInWebhookUrl) {
       const payload = {
         orderId: payInOrder.orderId,
         status,
@@ -877,7 +876,7 @@ export class PaymentsService {
         payload,
       );
       axios
-        .post(user.payOutWebhookUrl, payload)
+        .post(user.payInWebhookUrl, payload)
         .then((res) => {
           this.logger.info(
             `Payout webhook sent successfully: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
