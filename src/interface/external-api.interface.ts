@@ -270,3 +270,19 @@ export interface IExternalPayoutStatusResponseFlakPay {
     transferId: string;
   };
 }
+
+export interface IExternalPayinStatusRequestFlakPay {
+  orderId: string;
+}
+
+export interface IExternalPayinStatusResponseFlakPay {
+  timestamp: string;
+  statusCode: number;
+  status: string;
+  message: string;
+  success: boolean;
+  data: {
+    status: string;
+    transferId: string;
+  };
+}

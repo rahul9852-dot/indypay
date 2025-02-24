@@ -71,6 +71,7 @@ import {
   IExternalPayinPaymentRequestIsmart,
   IExternalPayinPaymentResponseFlakPay,
   IExternalPayinPaymentResponseIsmart,
+  IExternalPayinStatusResponseFlakPay,
   IExternalPayoutStatusResponseFlakPay,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
@@ -833,8 +834,8 @@ export class PaymentsService {
     );
 
     const flakPayResponse =
-      await axiosServiceFlakPay.postRequest<IExternalPayoutStatusResponseFlakPay>(
-        FALKPAY.PAYOUT.STATUS_CHECK,
+      await axiosServiceFlakPay.postRequest<IExternalPayinStatusResponseFlakPay>(
+        FALKPAY.PAYIN.STATUS_CHECK,
         {
           orderId,
         },
