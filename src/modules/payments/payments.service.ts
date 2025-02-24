@@ -833,6 +833,10 @@ export class PaymentsService {
       }),
     );
 
+    this.logger.info(`Calling FLAKPAY PAYIN STATUS API - orderId: ${orderId}`, {
+      orderId,
+    });
+
     const flakPayResponse =
       await axiosServiceFlakPay.postRequest<IExternalPayinStatusResponseFlakPay>(
         FALKPAY.PAYIN.STATUS_CHECK,
@@ -843,6 +847,11 @@ export class PaymentsService {
 
     const status = convertExternalPaymentStatusToInternal(
       flakPayResponse.data.status.toUpperCase(),
+    );
+
+    this.logger.info(
+      `FLAKPAY PAYIN API RESPONSE -:`,
+      JSON.stringify(flakPayResponse.data),
     );
 
     await this.payInOrdersRepository.save(
