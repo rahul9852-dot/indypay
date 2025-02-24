@@ -802,7 +802,10 @@ export class PaymentsService {
     );
   }
 
-  async checkPayInStatusTransaction({ orderId }: PayinStatusDto) {
+  async checkPayInStatusTransaction(
+    { orderId }: PayinStatusDto,
+    user: UsersEntity,
+  ) {
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: { orderId },
     });
@@ -822,7 +825,7 @@ export class PaymentsService {
     }
 
     const { clientId, clientSecret } = await this.getFlakPayCredentials(
-      payinOrder.user.id,
+      user.id,
     );
 
     const axiosServiceFlakPay = new AxiosService(
@@ -849,18 +852,44 @@ export class PaymentsService {
       flakPayResponse.data.status.toUpperCase(),
     );
 
-    // this.logger.info(
-    //   `FLAKPAY PAYIN API RESPONSE -:`,
-    //   JSON.stringify(flakPayResponse.data),
-    // );
-
-    await this.payInOrdersRepository.save(
+    this.logger.info(
+      `FLAKPAY PAYIN API RESPONSE -:`,
+      JSON.stringify(flakPayResponse.data),
+    );
+    const payInOrder = await this.payInOrdersRepository.save(
       this.payInOrdersRepository.create({
         ...payinOrder,
         status,
         txnRefId: flakPayResponse.data.transferId,
       }),
     );
+    if (user?.payInWebhookUrl) {
+      const payload = {
+        orderId: payInOrder.orderId,
+        status,
+        amount: +payInOrder.amount,
+        txnRefId: payInOrder.txnRefId,
+        utr: payInOrder.utr,
+      };
+      this.logger.info(
+        `Payout webhook for ${payInOrder.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
+      axios
+        .post(user.payInWebhookUrl, payload)
+        .then((res) => {
+          this.logger.info(
+            `Payout webhook sent successfully: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+            res,
+          );
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Payout webhook failed for order: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+            error,
+          );
+        });
+    }
 
     return {
       orderId: payinOrder.orderId,
@@ -872,7 +901,6 @@ export class PaymentsService {
   async checkPayOutStatusTransactionFlakPay({ orderId }: PayoutStatusDto) {
     const payoutOrder = await this.payOutOrdersRepository.findOne({
       where: { orderId },
-      relations: { user: true },
     });
 
     if (!payoutOrder) {
