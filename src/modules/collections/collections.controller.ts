@@ -5,10 +5,7 @@ import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
-import {
-  PaginationWithDateDto,
-  PaginationWithoutSortAndOrderDto,
-} from "@/dtos/common.dto";
+import { PaginationWithDateDto } from "@/dtos/common.dto";
 
 @ApiTags("Collections")
 @Controller("collections")
@@ -19,7 +16,7 @@ export class CollectionsController {
   @ApiOperation({ summary: "Get all collections grouped by user - Admin" })
   @Get("admin")
   getAllCollectionsGroupByUserAdmin(
-    @Query() paginationDto: PaginationWithoutSortAndOrderDto,
+    @Query() paginationDto: PaginationWithDateDto,
   ) {
     return this.collectionsService.getAllCollectionsGroupByUserAdmin(
       paginationDto,

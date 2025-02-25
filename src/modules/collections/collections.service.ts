@@ -11,10 +11,7 @@ import {
 } from "typeorm";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { UsersEntity } from "@/entities/user.entity";
-import {
-  PaginationWithDateDto,
-  PaginationWithoutSortAndOrderDto,
-} from "@/dtos/common.dto";
+import { PaginationWithDateDto } from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
@@ -33,7 +30,9 @@ export class CollectionsService {
     limit = 10,
     page = 1,
     search = "",
-  }: PaginationWithoutSortAndOrderDto) {
+    startDate = todayStartDate(),
+    endDate = todayEndDate(),
+  }: PaginationWithDateDto) {
     const query = this.userRepository
       .createQueryBuilder("user")
       .where(
@@ -100,8 +99,8 @@ export class CollectionsService {
       .setParameter("successStatus", PAYMENT_STATUS.SUCCESS)
       .setParameter("failedStatus", PAYMENT_STATUS.FAILED)
       .setParameter("pendingStatus", PAYMENT_STATUS.PENDING)
-      .setParameter("today", new Date(todayStartDate()))
-      .setParameter("tomorrow", new Date(todayEndDate()));
+      .setParameter("today", new Date(startDate))
+      .setParameter("tomorrow", new Date(endDate));
 
     const { raw: data } = await query
       .skip((page - 1) * limit)
