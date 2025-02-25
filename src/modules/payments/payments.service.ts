@@ -1256,9 +1256,11 @@ export class PaymentsService {
   async webhookRequestUs({
     orderId,
     status,
+    utr,
   }: {
     status: PAYMENT_STATUS;
     orderId: string;
+    utr?: string;
   }) {
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: {
@@ -1284,7 +1286,7 @@ export class PaymentsService {
           status,
           amount: payinOrder.amount,
           txnRefId: payinOrder.txnRefId,
-          utr: payinOrder.utr,
+          utr: utr ? utr : payinOrder.utr,
         };
         this.logger.info(
           `REQUEST US WEBHOOK - PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
@@ -1318,6 +1320,7 @@ export class PaymentsService {
     const payinOrderRaw = this.payInOrdersRepository.create({
       id: payinOrder.id,
       status,
+      ...(utr && { utr }),
       isMisspelled: false,
       ...(status === PAYMENT_STATUS.SUCCESS && {
         successAt: new Date(),
@@ -1376,7 +1379,7 @@ export class PaymentsService {
         status,
         amount: payinOrder.amount,
         txnRefId: payinOrder.txnRefId,
-        utr: payinOrder.utr,
+        utr: utr ? utr : payinOrder.utr,
       };
       this.logger.info(
         `REQUEST US WEBHOOK - PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,

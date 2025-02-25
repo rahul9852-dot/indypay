@@ -188,11 +188,21 @@ export class PaymentsController {
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @Post("update-status")
   async updateMisspelledTransactions(
-    @Body() { orderId, status }: { orderId: string; status: PAYMENT_STATUS },
+    @Body()
+    {
+      orderId,
+      status,
+      utr,
+    }: {
+      orderId: string;
+      status: PAYMENT_STATUS;
+      utr?: string;
+    },
   ) {
     return this.paymentsService.webhookRequestUs({
       orderId,
       status,
+      utr,
     });
   }
 
