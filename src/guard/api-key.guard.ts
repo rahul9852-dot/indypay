@@ -19,6 +19,7 @@ import { decryptData } from "@/utils/encode-decode.utils";
 import { CustomLogger } from "@/logger";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
+import { getCurrentUserIp } from "@/utils/request.utils";
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -34,7 +35,7 @@ export class ApiKeyGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
-    const requestIp = this.parseIp(request);
+    const requestIp = getCurrentUserIp(request);
 
     const [type, cred] = request.headers?.authorization?.split(" ") || [];
     if (type !== "Basic" || !cred) {
@@ -122,20 +123,5 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     return true;
-  }
-
-  private parseIp(req: Request) {
-    const xForwardedFor = req.headers["x-forwarded-for"];
-    if (
-      xForwardedFor &&
-      Array.isArray(xForwardedFor) &&
-      xForwardedFor.length > 0
-    ) {
-      return xForwardedFor[0];
-    } else if (xForwardedFor && typeof xForwardedFor === "string") {
-      return xForwardedFor;
-    }
-
-    return req.socket?.remoteAddress || req.ip;
   }
 }

@@ -9,6 +9,9 @@ export const getCurrentUserIp = (req: Request) => {
   ) {
     return xForwardedFor[0];
   }
+  if (xForwardedFor && typeof xForwardedFor === "string") {
+    return xForwardedFor;
+  }
 
   return req.socket?.remoteAddress || req.ip;
 };
