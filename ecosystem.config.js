@@ -30,7 +30,7 @@ module.exports = {
       log_file: "./logs/combined.log",
       log_rotate_interval: "0 0 * * 0", // Run at midnight every Sunday (cron format)
       log_max_size: "50M", // Size threshold for rotation
-      log_retain_count: 1, // Only keep 1 rotated log file (effectively deleting logs older than 1 week)
+      log_retain_count: 5, // Only keep 5 rotated log file (effectively deleting logs older than 5 week)
     },
   ],
 };
