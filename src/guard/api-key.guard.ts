@@ -16,7 +16,7 @@ import { REQUEST_USER_KEY } from "@/constants/auth.constant";
 import { ACCOUNT_STATUS } from "@/enums";
 import { ERROR_MESSAGES } from "@/constants/messages.constant";
 import { decryptData } from "@/utils/encode-decode.utils";
-import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+import { CustomLogger } from "@/logger";
 import { UserWhitelistIpsEntity } from "@/entities/user-whitelist-ip.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import { getCurrentUserIp } from "@/utils/request.utils";
@@ -93,12 +93,6 @@ export class ApiKeyGuard implements CanActivate {
       this.logger.info(
         `API KEY Request IP: ${requestIp} - ${apiKeyEntity.user.fullName} - [${request.method}] - ${request.url}}`,
       );
-
-      request.method === "POST" &&
-        this.logger.info(
-          `API KEY Request Body: ${LoggerPlaceHolder.Json}`,
-          request.body,
-        );
 
       const userId = apiKeyEntity.user.id;
 
