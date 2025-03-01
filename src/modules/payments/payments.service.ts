@@ -1132,7 +1132,10 @@ export class PaymentsService {
       //   `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
       // );
 
-      return new MessageResponseDto("Status updated successfully.");
+      return {
+        message: "Status updated successfully.",
+        timestamp: new Date().toISOString(),
+      };
     }
 
     // Jumping Start
@@ -1259,7 +1262,10 @@ export class PaymentsService {
         });
     }
 
-    return new MessageResponseDto("Transaction status updated successfully.");
+    return {
+      message: "Transaction status updated successfully.",
+      timestamp: new Date().toISOString(),
+    };
   }
 
   // FlakPay
@@ -1322,7 +1328,10 @@ export class PaymentsService {
           });
       }
 
-      return new MessageResponseDto("Status updated successfully.");
+      return {
+        message: "Status updated successfully.",
+        timestamp: new Date().toISOString(),
+      };
     }
 
     const { user } = payinOrder;
@@ -1415,7 +1424,10 @@ export class PaymentsService {
         });
     }
 
-    return new MessageResponseDto("Transaction status updated successfully.");
+    return {
+      message: "Transaction status updated successfully.",
+      timestamp: new Date().toISOString(),
+    };
   }
 
   async externalWebhookPayoutFlaPay({
@@ -1462,9 +1474,10 @@ export class PaymentsService {
         //   `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
         // );
 
-        return new MessageResponseDto(
-          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
-        );
+        return {
+          message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+          timestamp: new Date().toISOString(),
+        };
       }
 
       if (status === PAYMENT_STATUS.SUCCESS) {
@@ -1530,7 +1543,10 @@ export class PaymentsService {
         await this.walletRepository.save(walletRaw);
       }
 
-      return new MessageResponseDto("Transaction status updated successfully.");
+      return {
+        message: "Transaction status updated successfully.",
+        timestamp: new Date().toISOString(),
+      };
     } else {
       const payOutOrder = await this.payOutOrdersRepository.findOne({
         where: {
@@ -1554,10 +1570,10 @@ export class PaymentsService {
         // this.logger.info(
         //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
         // );
-
-        return new MessageResponseDto(
-          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
-        );
+        return {
+          message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+          timestamp: new Date().toISOString(),
+        };
       }
 
       if (status === PAYMENT_STATUS.SUCCESS) {
@@ -1648,7 +1664,10 @@ export class PaymentsService {
           });
       }
 
-      return new MessageResponseDto("Payout status updated successfully.");
+      return {
+        message: "Payout status updated successfully.",
+        timestamp: new Date().toISOString(),
+      };
     }
   }
 
