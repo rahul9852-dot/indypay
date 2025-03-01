@@ -539,6 +539,11 @@ export class PaymentsService {
       // Commit transaction
       await queryRunner.commitTransaction();
 
+      this.logger.info(
+        `PAYIN CREATED: ${LoggerPlaceHolder.Json}`,
+        createPayinTransactionDto,
+      );
+
       return {
         orderId: externalPaymentResponse?.data?.orderId,
         ...(externalPaymentResponse?.data?.paymentUrl && {
@@ -605,6 +610,11 @@ export class PaymentsService {
       });
 
       await queryRunner.commitTransaction();
+
+      this.logger.info(
+        `PAYOUT CREATED: ${LoggerPlaceHolder.Json}`,
+        createPayoutDto,
+      );
 
       return {
         message: "Payout process initiated",
