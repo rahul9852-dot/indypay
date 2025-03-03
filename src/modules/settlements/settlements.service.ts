@@ -129,9 +129,15 @@ export class SettlementsService {
       })
       .getRawOne();
 
-    const totalTopUp = await this.walletTopupRepository.sum("topUpAmount", {
-      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
-    });
+    const totalTopUp = await this.walletTopupRepository.sum(
+      "collectionAmount",
+      {
+        createdAt: Between(
+          new Date(todayStartDate()),
+          new Date(todayEndDate()),
+        ),
+      },
+    );
 
     const grossTotalSettlement = +settlements.totalSettlements + +totalTopUp;
 
