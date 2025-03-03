@@ -4,6 +4,7 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
   OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
@@ -25,23 +26,7 @@ export class WalletEntity {
   })
   totalCollections: number;
 
-  @Column({
-    type: "decimal",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  serviceCharge: number;
-
-  @Column({
-    type: "decimal",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  collectionAfterDeduction: number;
-
-  @Index()
+  // PAYOUT
   @Column({
     type: "decimal",
     precision: 15,
@@ -50,33 +35,15 @@ export class WalletEntity {
   })
   availablePayoutBalance: number;
 
-  @Column({
-    type: "decimal",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  totalPayout: number;
+  @Index()
+  @Column()
+  userId: string;
 
-  @Column({
-    type: "decimal",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  totalTopUp: number;
-
-  @Column({
-    type: "decimal",
-    precision: 15,
-    scale: 2,
-    default: 0,
-  })
-  payoutServiceCharge: number;
-
+  // Relations
   @OneToOne(() => UsersEntity, ({ wallet }) => wallet, {
     onDelete: "CASCADE",
   })
+  @JoinColumn({ name: "userId" })
   user: UsersEntity;
 
   @CreateDateColumn({ type: "timestamptz" })

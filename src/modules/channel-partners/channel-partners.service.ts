@@ -318,7 +318,7 @@ export class ChannelPartnersService {
       ]),
       // Settlement Stats
       Promise.all([
-        this.settlementsRepository.sum("amount", {
+        this.settlementsRepository.sum("amountAfterDeduction", {
           user: { channelPartnerId: cpId },
           createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
@@ -328,7 +328,7 @@ export class ChannelPartnersService {
             createdAt: Between(new Date(startDate), new Date(endDate)),
           },
         }),
-        this.settlementsRepository.sum("amount", {
+        this.settlementsRepository.sum("amountAfterDeduction", {
           status: PAYMENT_STATUS.SUCCESS,
           user: { channelPartnerId: cpId },
           createdAt: Between(new Date(startDate), new Date(endDate)),
@@ -340,7 +340,7 @@ export class ChannelPartnersService {
             createdAt: Between(new Date(startDate), new Date(endDate)),
           },
         }),
-        this.settlementsRepository.sum("amount", {
+        this.settlementsRepository.sum("amountAfterDeduction", {
           status: PAYMENT_STATUS.FAILED,
           user: { channelPartnerId: cpId },
           createdAt: Between(new Date(startDate), new Date(endDate)),
@@ -510,7 +510,7 @@ export class ChannelPartnersService {
         },
         select: {
           id: true,
-          amount: true,
+          amountAfterDeduction: true,
           status: true,
           transferId: true,
           transferMode: true,
@@ -582,7 +582,7 @@ export class ChannelPartnersService {
         },
         select: {
           id: true,
-          amount: true,
+          amountAfterDeduction: true,
           status: true,
           transferId: true,
           transferMode: true,
@@ -643,7 +643,7 @@ export class ChannelPartnersService {
       return {
         settlementId,
         status: settlement.status,
-        amount: settlement.amount,
+        amount: settlement.amountAfterDeduction,
       };
     }
 
@@ -683,7 +683,7 @@ export class ChannelPartnersService {
     return {
       settlementId,
       status,
-      amount: settlement.amount,
+      amount: settlement.amountAfterDeduction,
     };
   }
 }

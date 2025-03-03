@@ -26,20 +26,20 @@ import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
 import { BanksService } from "@/modules/banks/banks.service";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
-import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
+import {
+  ACCOUNT_STATUS,
+  ONBOARDING_STATUS,
+  SETTLEMENT_TYPE,
+  USERS_ROLE,
+} from "@/enums";
 import { getPagination } from "@/utils/pagination.utils";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
-import {
-  calculateOriginalAmountFromNetPayable,
-  getCommissions,
-} from "@/utils/commissions.utils";
+import { getCommissions } from "@/utils/commissions.utils";
 import {
   IExternalPayoutRequestFlakPay,
-  IExternalPayoutRequestIsmart,
   IExternalPayoutResponseFlakPay,
-  IExternalPayoutResponseIsmart,
   IExternalPayoutStatusResponseIsmart,
 } from "@/interface/external-api.interface";
 
@@ -121,7 +121,7 @@ export class SettlementsService {
       totalSettlements: number;
     } = await this.settlementsRepository
       .createQueryBuilder("settlement")
-      .select("SUM(settlement.amount)", "totalSettlements")
+      .select("SUM(settlement.collectionAmount)", "totalSettlements")
       .where("settlement.status = :status", { status: PAYMENT_STATUS.SUCCESS })
       .andWhere("settlement.createdAt BETWEEN :startDate AND :endDate", {
         startDate: todayStartDate(),
@@ -129,11 +129,11 @@ export class SettlementsService {
       })
       .getRawOne();
 
-    const totalTopUp = await this.walletTopupRepository.sum("amount", {
+    const totalTopUp = await this.walletTopupRepository.sum("topUpAmount", {
       createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
     });
 
-    const grossTotalSettlement = +settlements.totalSettlements + totalTopUp;
+    const grossTotalSettlement = +settlements.totalSettlements + +totalTopUp;
 
     return {
       todayTotalCollections: +collections.totalCollections,
@@ -251,7 +251,7 @@ export class SettlementsService {
     const totalSettlementGroupedByUser = settlementUserGroup.map((user) => {
       const settledAmount = user.settlements.reduce((acc, order) => {
         if (order.status === PAYMENT_STATUS.SUCCESS) {
-          acc += +order.amount;
+          acc += +order.amountAfterDeduction;
         }
 
         return acc;
@@ -368,7 +368,9 @@ export class SettlementsService {
         },
         select: {
           id: true,
-          amount: true,
+          collectionAmount: true,
+          serviceCharge: true,
+          amountAfterDeduction: true,
           status: true,
           transferId: true,
           transferMode: true,
@@ -441,7 +443,9 @@ export class SettlementsService {
         },
         select: {
           id: true,
-          amount: true,
+          collectionAmount: true,
+          serviceCharge: true,
+          amountAfterDeduction: true,
           status: true,
           transferId: true,
           transferMode: true,
@@ -693,7 +697,7 @@ export class SettlementsService {
       }
 
       const pdf = await this.invoiceService.generateInvoicePDF({
-        amount: settlement.amount,
+        amount: +settlement.amountAfterDeduction,
         transferMode: settlement.transferMode,
         userName: settlement.user.fullName,
         settledBy: settlement.settledBy.fullName,
@@ -736,7 +740,7 @@ export class SettlementsService {
       this.emailService.sendEmail(
         settlement.user.email,
         `Settlement ${status} - PayBolt`,
-        `Your settlement request for ₹${settlement.amount} has been ${status.toLowerCase()}.`,
+        `Your settlement request for ₹${settlement.amountAfterDeduction} has been ${status.toLowerCase()}.`,
         [
           {
             filename: `settlement-${status.toLowerCase()}-${settlement.id}.pdf`,
@@ -747,193 +751,6 @@ export class SettlementsService {
     } catch (error) {
       this.logger.error(`Failed to send settlement ${status} invoice`, error);
       // Don't throw error as this is a non-critical operation
-    }
-  }
-
-  async initiateSettlementIsmart(
-    {
-      amount,
-      bankId,
-      remarks,
-      userId,
-      transferMode,
-    }: InitiateSettlementAdminDto,
-    settledBy: UsersEntity,
-  ) {
-    const axiosServiceIsmart = new AxiosService(
-      ISMART_PAY.BASE_URL,
-      getIsmartPayPgConfig({
-        clientId: externalPaymentConfig.ismart.clientId,
-        clientSecret: externalPaymentConfig.ismart.clientSecret,
-      }),
-    );
-
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-      relations: {
-        address: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    if (!user.address) {
-      throw new NotFoundException(
-        new MessageResponseDto("User address not found"),
-      );
-    }
-
-    const banks = await this.bankService.getAllBanks(userId);
-
-    const targetBank = banks.find((bank) => bank.id === bankId);
-
-    if (!targetBank) {
-      throw new NotFoundException(new MessageResponseDto("Bank not found"));
-    }
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    try {
-      // Start transaction
-      await queryRunner.connect();
-      await queryRunner.startTransaction();
-
-      const wallet = await this.walletRepository.findOne({
-        where: {
-          user: {
-            id: userId,
-          },
-        },
-        relations: {
-          user: true,
-        },
-      });
-
-      if (!wallet) {
-        throw new NotFoundException(
-          new MessageResponseDto("User wallet not found"),
-        );
-      }
-
-      if (+wallet.collectionAfterDeduction < +amount) {
-        throw new BadRequestException(
-          new MessageResponseDto(
-            `Amount is greater than unsettled amount: ${wallet.collectionAfterDeduction}`,
-          ),
-        );
-      }
-      const originalAmount = calculateOriginalAmountFromNetPayable({
-        netPayableAmount: +amount,
-        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
-        gstInPercentage: +wallet.user.gstInPercentagePayin,
-      });
-
-      const { totalServiceChange } = getCommissions({
-        amount: +originalAmount,
-        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
-        gstInPercentage: +wallet.user.gstInPercentagePayin,
-      });
-
-      const newWallet = this.walletRepository.create({
-        id: wallet.id,
-        totalCollections: +wallet.totalCollections - originalAmount,
-        collectionAfterDeduction: +wallet.collectionAfterDeduction - +amount,
-        serviceCharge: +wallet.serviceCharge - totalServiceChange,
-      });
-
-      await queryRunner.manager.save(newWallet);
-
-      const settlement = this.settlementsRepository.create({
-        amount: +amount,
-        transferMode,
-        user,
-        settledBy,
-        remarks,
-        bankDetails: targetBank,
-      });
-
-      const savedSettlement = await queryRunner.manager.save(settlement);
-
-      this.logger.info(
-        `SETTLEMENT - initiateSettlements - Sending Settlements Amount: ${amount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
-        targetBank,
-      );
-
-      const payload: IExternalPayoutRequestIsmart = {
-        amount: +amount,
-        currency: "INR",
-        narration: remarks,
-        order_id: savedSettlement.id,
-        phone_number: targetBank.mobile,
-        purpose: "Settlement Fund",
-        payment_details: {
-          account_number: targetBank.accountNumber,
-          ifsc_code: targetBank.bankIFSC,
-          beneficiary_name: targetBank.name,
-          type: "NB",
-          mode: transferMode,
-        },
-      };
-
-      this.logger.info(
-        `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${ISMART_PAY.PAYOUT} with payload: ${LoggerPlaceHolder.Json}`,
-        payload,
-      );
-
-      const externalPayoutResponse =
-        await axiosServiceIsmart.postRequest<IExternalPayoutResponseIsmart>(
-          ISMART_PAY.PAYOUT,
-          payload,
-        );
-
-      this.logger.info(
-        `SETTLEMENT - initiateSettlements - External Payout Response: ${LoggerPlaceHolder.Json}`,
-        externalPayoutResponse,
-      );
-
-      if (!externalPayoutResponse.status) {
-        throw new BadRequestException(
-          externalPayoutResponse?.errors || "Something went wrong",
-        );
-      }
-
-      const status = convertExternalPaymentStatusToInternal(
-        externalPayoutResponse.status_code,
-      );
-
-      await queryRunner.manager.update(
-        SettlementsEntity,
-        { id: savedSettlement.id },
-        {
-          transferId: externalPayoutResponse.transaction_id,
-          status,
-        },
-      );
-
-      await queryRunner.commitTransaction();
-
-      await this.sendSettlementInvoice(savedSettlement.id, "Initiated");
-      if (status === PAYMENT_STATUS.SUCCESS) {
-        await this.sendSettlementInvoice(savedSettlement.id, "Completed");
-      }
-
-      return {
-        orderId: externalPayoutResponse.order_id,
-        amount: externalPayoutResponse.amount,
-        transferId: externalPayoutResponse.transaction_id,
-        status,
-      };
-    } catch (err) {
-      this.logger.error(
-        `SETTLEMENT - initiateSettlements - error: ${LoggerPlaceHolder.Json}`,
-        err,
-      );
-      await queryRunner.rollbackTransaction();
-
-      throw new BadRequestException(err.message);
-    } finally {
-      await queryRunner.release();
     }
   }
 
@@ -1143,7 +960,7 @@ export class SettlementsService {
 
   async initiateSettlementFalkPay(
     {
-      amount,
+      amount: collectionAmount,
       bankId,
       remarks,
       userId,
@@ -1209,36 +1026,35 @@ export class SettlementsService {
         );
       }
 
-      if (+wallet.totalCollections < +amount) {
+      if (+wallet.totalCollections < +collectionAmount) {
         throw new BadRequestException(
           new MessageResponseDto(
             `Amount is greater than Total Collections amount: ${wallet.totalCollections}`,
           ),
         );
       }
-      const originalAmount = calculateOriginalAmountFromNetPayable({
-        netPayableAmount: +amount,
-        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
-        gstInPercentage: +wallet.user.gstInPercentagePayin,
-      });
 
-      const { totalServiceChange } = getCommissions({
-        amount: +originalAmount,
-        commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+      const {
+        totalServiceChange,
+        netPayableAmount: collectionAfterPayinDeduction,
+      } = getCommissions({
+        amount: +collectionAmount,
+        commissionInPercentage: +wallet.user.commissionInPercentagePayin, // PAYIN Commission
         gstInPercentage: +wallet.user.gstInPercentagePayin,
       });
 
       const newWallet = this.walletRepository.create({
         id: wallet.id,
-        totalCollections: +wallet.totalCollections - originalAmount,
-        collectionAfterDeduction: +wallet.collectionAfterDeduction - +amount,
-        serviceCharge: +wallet.serviceCharge - totalServiceChange,
+        totalCollections: +wallet.totalCollections - +collectionAmount,
       });
 
       await queryRunner.manager.save(newWallet);
 
       const settlement = this.settlementsRepository.create({
-        amount: +amount,
+        collectionAmount: +collectionAmount,
+        serviceCharge: totalServiceChange,
+        amountAfterDeduction: collectionAfterPayinDeduction,
+        settlementType: SETTLEMENT_TYPE.MANUAL,
         transferMode,
         user,
         settledBy,
@@ -1249,12 +1065,12 @@ export class SettlementsService {
       const savedSettlement = await queryRunner.manager.save(settlement);
 
       this.logger.info(
-        `SETTLEMENT - initiateSettlements - Sending Settlements Amount: ${amount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
+        `SETTLEMENT - initiateSettlements - Sending Settlements Amount: ${collectionAfterPayinDeduction} for Collection Amount: ${collectionAmount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
         targetBank,
       );
 
       const payload: IExternalPayoutRequestFlakPay = {
-        amount: +(+amount).toFixed(2),
+        amount: +collectionAfterPayinDeduction.toFixed(2),
         orderId: savedSettlement.id,
         transferMode,
         beneDetails: {
@@ -1296,8 +1112,8 @@ export class SettlementsService {
         { id: savedSettlement.id },
         {
           transferId: externalPayoutResponse.data.transferId,
-          status,
           utr: externalPayoutResponse.data.utr,
+          status,
         },
       );
 
@@ -1306,10 +1122,7 @@ export class SettlementsService {
         await this.walletRepository.save(
           this.walletRepository.create({
             id: wallet.id,
-            totalCollections: +wallet.totalCollections + originalAmount,
-            collectionAfterDeduction:
-              +wallet.collectionAfterDeduction + +amount,
-            serviceCharge: +wallet.serviceCharge + totalServiceChange,
+            totalCollections: +wallet.totalCollections + +collectionAmount,
           }),
         );
       }
@@ -1323,7 +1136,9 @@ export class SettlementsService {
 
       return {
         orderId: savedSettlement.id,
-        amount: savedSettlement.amount,
+        collectionAmount: savedSettlement.collectionAmount,
+        serviceCharge: savedSettlement.serviceCharge,
+        amountAfterDeduction: savedSettlement.amountAfterDeduction,
         transferId: externalPayoutResponse.data.transferId,
         utr: externalPayoutResponse.data.utr,
         status,
@@ -1375,8 +1190,6 @@ export class SettlementsService {
           id: settlement.id,
           name: settlement.fullName,
           totalCollections: +settlement.wallet.totalCollections,
-          // serviceChange: +settlement.wallet.serviceCharge,
-          // collectionAfterDeduction: +settlement.wallet.collectionAfterDeduction,
         };
       });
 
@@ -1411,8 +1224,6 @@ export class SettlementsService {
       id: settlement.id,
       name: settlement.fullName,
       totalCollections: +settlement.wallet.totalCollections,
-      serviceChange: +settlement.wallet.serviceCharge,
-      collectionAfterDeduction: +settlement.wallet.collectionAfterDeduction,
     };
   }
 
@@ -1451,7 +1262,10 @@ export class SettlementsService {
       },
       select: {
         id: true,
-        amount: true,
+        collectionAmount: true,
+        serviceCharge: true,
+        amountAfterDeduction: true,
+        settlementType: true,
         status: true,
         transferId: true,
         transferMode: true,
@@ -1496,7 +1310,9 @@ export class SettlementsService {
       return {
         settlementId,
         status: settlement.status,
-        amount: settlement.amount,
+        collectionAmount: settlement.collectionAmount,
+        serviceCharge: settlement.serviceCharge,
+        amount: settlement.amountAfterDeduction,
       };
     }
 
@@ -1536,7 +1352,7 @@ export class SettlementsService {
     return {
       settlementId,
       status,
-      amount: settlement.amount,
+      amount: settlement.amountAfterDeduction,
     };
   }
   // async checkSettlementStatusPayNPro(settlementId: string) {

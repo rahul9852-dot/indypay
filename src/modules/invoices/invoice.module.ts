@@ -9,6 +9,8 @@ import { UserAddressEntity } from "@/entities/user-address.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { SESService } from "@/modules/aws/ses.service";
 import { InvoiceService } from "@/shared/services/invoice.service";
+import { ItemEntity } from "@/entities/item.entity";
+import { InvoiceItemEntity } from "@/entities/invoice-item.entity";
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { InvoiceService } from "@/shared/services/invoice.service";
       UsersEntity,
       CustomerEntity,
       UserAddressEntity,
+      ItemEntity,
+      InvoiceItemEntity,
     ]),
     CustomerModule,
   ],

@@ -1,4 +1,12 @@
-import { Controller, Post, Get, Body, Param, Query } from "@nestjs/common";
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
+  Delete,
+} from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { InvoiceCustomerService } from "./invoice.service";
 import { CreateInvoiceDto } from "./dto/create-invoice.dto";
@@ -6,7 +14,7 @@ import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
-import { PaginationWithDateDto } from "@/dtos/common.dto";
+import { PaginationInvoiceDto, PaginationWithDateDto } from "@/dtos/common.dto";
 
 @Controller("invoices")
 @ApiTags("Invoices")
@@ -34,12 +42,12 @@ export class InvoiceController {
   @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @Get()
   async getInvoicesOfMerchant(
-    @Query() paginationWithDateDto: PaginationWithDateDto,
+    @Query() paginationInvoiceDto: PaginationInvoiceDto,
     @User() user: UsersEntity,
   ) {
     return this.invoiceService.getInvoicesOfMerchant(
       user.id,
-      paginationWithDateDto,
+      paginationInvoiceDto,
     );
   }
 
@@ -74,5 +82,12 @@ export class InvoiceController {
       merchantId,
       paginationWithDateDto,
     );
+  }
+
+  @ApiOperation({ summary: "Delete invoice - Merchant" })
+  @Role(USERS_ROLE.MERCHANT)
+  @Delete(":invoiceId")
+  async deleteInvoice(@Param("invoiceId") invoiceId: string) {
+    return this.invoiceService.deleteInvoice(invoiceId);
   }
 }

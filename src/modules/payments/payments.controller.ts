@@ -26,6 +26,7 @@ import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
   CreatePayoutDto,
   PayoutStatusMerchantDto,
+  SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
 import { ExternalPayinWebhookFlakPayDto } from "./dto/external-webhook-payin.dto";
 import { ExternalPayOutWebhookFlakPayDto } from "./dto/external-webhook-payout.dto";
@@ -89,14 +90,28 @@ export class PaymentsController {
   }
 
   @Public()
-  @ApiOperation({ summary: "Create pay-out transaction" })
+  @ApiOperation({ summary: "Create pay-out transaction Bulk" })
   @UseGuards(ApiKeyGuard)
   @Post("payout/create")
-  async createPayout(
+  async createPayoutBulk(
     @Body() createPayoutDto: CreatePayoutDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createPayoutFlakPay(createPayoutDto, user);
+    return this.paymentsService.createPayoutFlakPayBulk(createPayoutDto, user);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Create pay-out transaction" })
+  @UseGuards(ApiKeyGuard)
+  @Post("payout/single-create")
+  async createPayout(
+    @Body() singlePayoutDto: SinglePayoutDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutFlakPaySingle(
+      singlePayoutDto,
+      user,
+    );
   }
 
   @ApiOperation({
@@ -104,17 +119,14 @@ export class PaymentsController {
   })
   @Post("payout/dashboard")
   async createPayoutDashboardIsmart(
-    @Body() createPayoutIsmartDto: CreatePayoutDto,
+    @Body() createPayoutDto: CreatePayoutDto,
     @User() user: UsersEntity,
   ) {
     if (user.isPayoutDisabledFromDashboard) {
       throw new BadRequestException("Payout is disabled from dashboard");
     }
 
-    return this.paymentsService.createPayoutFlakPay(
-      createPayoutIsmartDto,
-      user,
-    );
+    return this.paymentsService.createPayoutFlakPayBulk(createPayoutDto, user);
   }
 
   @Public()

@@ -87,3 +87,12 @@ export class DateDto {
   @IsOptional()
   endDate?: Date;
 }
+
+export class PaginationInvoiceDto extends PaginationWithDateDto {
+  @ApiPropertyOptional({
+    enum: ["success", "failed", "draft"],
+  })
+  @IsEnum(["success", "failed", "draft"])
+  @IsOptional()
+  status?: "success" | "failed" | "draft";
+}

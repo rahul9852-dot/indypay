@@ -54,6 +54,7 @@ import { WalletEntity } from "@/entities/wallet.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { getCurrentUserIp } from "@/utils/request.utils";
 import { CustomLogger } from "@/logger";
+import { ERROR_MESSAGES } from "@/constants/messages.constant";
 
 interface ICachedUserData {
   id: string;
@@ -155,6 +156,7 @@ export class AuthService {
         role: true,
         email: true,
         twoFactorEnabled: true,
+        accountStatus: true,
       },
     });
 
@@ -175,6 +177,18 @@ export class AuthService {
         new MessageResponseDto(
           `Incorrect mobile number or password. ${attemptsLeft} attempts left.`,
         ),
+      );
+    }
+
+    if (
+      ![
+        ACCOUNT_STATUS.ACTIVE,
+        ACCOUNT_STATUS.INACTIVE,
+        ACCOUNT_STATUS.INTERNAL_USER,
+      ].includes(user.accountStatus)
+    ) {
+      throw new BadRequestException(
+        ERROR_MESSAGES.accountStatusMsg(user.accountStatus),
       );
     }
 
@@ -554,11 +568,15 @@ export class AuthService {
 
     const savedUser = await this.usersRepository.save(user);
 
-    await this.walletRepository.save(
+    const wallet = await this.walletRepository.save(
       this.walletRepository.create({
         user: savedUser,
       }),
     );
+
+    savedUser.wallet = wallet;
+
+    await this.usersRepository.save(savedUser);
 
     return new MessageResponseDto("User registered successfully");
   }

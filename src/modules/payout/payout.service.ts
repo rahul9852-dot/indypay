@@ -97,23 +97,11 @@ export class PayoutService {
         'COALESCE(SUM(CASE WHEN payout.status = :failedStatus THEN payout.amount ELSE 0.00 END), 0) as "failedTotalAmount"',
         'COALESCE(SUM(CASE WHEN payout.status = :pendingStatus THEN payout.amount ELSE 0.00 END), 0) as "pendingTotalAmount"',
 
-        // Total commission amount
-        'COALESCE(SUM(payout.commissionAmount), 0) as "initiatedCommissionAmount"',
-        'COALESCE(SUM(CASE WHEN payout.status = :successStatus THEN payout.commissionAmount ELSE 0.00 END), 0) as "successCommissionAmount"',
-        'COALESCE(SUM(CASE WHEN payout.status = :failedStatus THEN payout.commissionAmount ELSE 0.00 END), 0) as "failedCommissionAmount"',
-        'COALESCE(SUM(CASE WHEN payout.status = :pendingStatus THEN payout.commissionAmount ELSE 0.00 END), 0) as "pendingCommissionAmount"',
-
-        // Total gst amount
-        'COALESCE(SUM(payout.gstAmount), 0) as "initiatedGstAmount"',
-        'COALESCE(SUM(CASE WHEN payout.status = :successStatus THEN payout.gstAmount ELSE 0.00 END), 0) as "successGstAmount"',
-        'COALESCE(SUM(CASE WHEN payout.status = :failedStatus THEN payout.gstAmount ELSE 0.00 END), 0) as "failedGstAmount"',
-        'COALESCE(SUM(CASE WHEN payout.status = :pendingStatus THEN payout.gstAmount ELSE 0.00 END), 0) as "pendingGstAmount"',
-
         // Total Net Payable amount
-        'COALESCE(SUM(payout.netPayableAmount), 0) as "initiatedNetPayableAmount"',
-        'COALESCE(SUM(CASE WHEN payout.status = :successStatus THEN payout.netPayableAmount ELSE 0.00 END), 0) as "successNetPayableAmount"',
-        'COALESCE(SUM(CASE WHEN payout.status = :failedStatus THEN payout.netPayableAmount ELSE 0.00 END), 0) as "failedNetPayableAmount"',
-        'COALESCE(SUM(CASE WHEN payout.status = :pendingStatus THEN payout.netPayableAmount ELSE 0.00 END), 0) as "pendingNetPayableAmount"',
+        'COALESCE(SUM(payout.amountBeforeDeduction), 0) as "initiatedNetPayableAmount"',
+        'COALESCE(SUM(CASE WHEN payout.status = :successStatus THEN payout.amountBeforeDeduction ELSE 0.00 END), 0) as "successNetPayableAmount"',
+        'COALESCE(SUM(CASE WHEN payout.status = :failedStatus THEN payout.amountBeforeDeduction ELSE 0.00 END), 0) as "failedNetPayableAmount"',
+        'COALESCE(SUM(CASE WHEN payout.status = :pendingStatus THEN payout.amountBeforeDeduction ELSE 0.00 END), 0) as "pendingNetPayableAmount"',
 
         // count: total initiated payout
         'COUNT(payout.id) as "initiatedTotalCount"',
@@ -286,6 +274,9 @@ export class PayoutService {
       select: {
         id: true,
         amount: true,
+        amountBeforeDeduction: true,
+        commissionInPercentage: true,
+        gstInPercentage: true,
         status: true,
         transferId: true,
         orderId: true,
@@ -297,8 +288,6 @@ export class PayoutService {
         user: {
           id: true,
           fullName: true,
-          commissionInPercentagePayout: true,
-          gstInPercentagePayout: true,
         },
       },
       skip: (page - 1) * limit,

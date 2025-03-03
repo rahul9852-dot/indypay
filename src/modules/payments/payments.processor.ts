@@ -13,10 +13,6 @@ import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { UsersService } from "@/modules/users/users.service";
-import {
-  calculateOriginalAmountFromNetPayable,
-  getCommissions,
-} from "@/utils/commissions.utils";
 import { appConfig } from "@/config/app.config";
 
 const {
@@ -69,7 +65,7 @@ export class PayoutProcessor {
       batchId: string;
     }>,
   ) {
-    const { payoutOrders, userId, batchId } = job.data;
+    const { payoutOrders, userId, batchId: _ } = job.data;
     const BATCH_SIZE = 10;
     const DELAY_BETWEEN_REQUESTS = 1000; // 1 second
 
@@ -269,6 +265,35 @@ export class PayoutProcessor {
                 });
             }
 
+            if (user?.payOutWebhookUrl) {
+              const payload = {
+                orderId,
+                status: PAYMENT_STATUS.FAILED,
+                amount,
+                txnRefId: null,
+                payoutId,
+                utr: null,
+              };
+              // this.logger.error(
+              //   `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+              //   payload,
+              // );
+
+              axios
+                .post(user.payOutWebhookUrl, payload)
+                .then(({ data }) => {
+                  this.logger.info(
+                    `Payout webhook sent successfully: ${order.orderId} RES: ${JSON.stringify(data)}`,
+                  );
+                })
+                .catch((error) => {
+                  this.logger.error(
+                    `Payout webhook failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+                    error,
+                  );
+                });
+            }
+
             // Update wallet
             const wallet = await this.walletRepository.findOne({
               where: { user: { id: userId } },
@@ -276,28 +301,11 @@ export class PayoutProcessor {
             });
 
             if (wallet) {
-              const deductedAmount = calculateOriginalAmountFromNetPayable({
-                netPayableAmount: +amount,
-                commissionInPercentage:
-                  +wallet.user.commissionInPercentagePayout,
-                gstInPercentage: +wallet.user.gstInPercentagePayout,
-              });
-
-              const { totalServiceChange } = getCommissions({
-                amount: deductedAmount,
-                commissionInPercentage:
-                  +wallet.user.commissionInPercentagePayout,
-                gstInPercentage: +wallet.user.gstInPercentagePayout,
-              });
-
               await this.walletRepository.save(
                 this.walletRepository.create({
                   id: wallet.id,
                   availablePayoutBalance:
                     +wallet.availablePayoutBalance + +amount,
-                  totalPayout: +wallet.totalPayout - +amount,
-                  payoutServiceCharge:
-                    +wallet.payoutServiceCharge - totalServiceChange,
                 }),
               );
             }

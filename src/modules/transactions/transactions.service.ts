@@ -58,9 +58,10 @@ export class TransactionsService {
       orderId: true,
       amount: true,
       status: true,
-      commissionAmount: true,
-      gstAmount: true,
-      netPayableAmount: true,
+      amountBeforeDeduction: true,
+      commissionInPercentage: true,
+      gstInPercentage: true,
+      payoutId: true,
       createdAt: true,
     },
   };
@@ -398,7 +399,7 @@ export class TransactionsService {
       ]),
       // Settlement Stats
       Promise.all([
-        this.settlementsRepository.sum("amount", {
+        this.settlementsRepository.sum("amountAfterDeduction", {
           createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
         this.settlementsRepository.count({
@@ -406,7 +407,7 @@ export class TransactionsService {
             createdAt: Between(new Date(startDate), new Date(endDate)),
           },
         }),
-        this.settlementsRepository.sum("amount", {
+        this.settlementsRepository.sum("amountAfterDeduction", {
           status: PAYMENT_STATUS.SUCCESS,
           createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
@@ -416,7 +417,7 @@ export class TransactionsService {
             createdAt: Between(new Date(startDate), new Date(endDate)),
           },
         }),
-        this.settlementsRepository.sum("amount", {
+        this.settlementsRepository.sum("amountAfterDeduction", {
           status: PAYMENT_STATUS.FAILED,
           createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
@@ -555,7 +556,7 @@ export class TransactionsService {
     });
 
     const initiatedSettlementAmount = await this.settlementsRepository.sum(
-      "amount",
+      "amountAfterDeduction",
       {
         user: { id: userId },
         createdAt: Between(new Date(startDate), new Date(endDate)),
@@ -570,7 +571,7 @@ export class TransactionsService {
     });
 
     const successSettlementAmount = await this.settlementsRepository.sum(
-      "amount",
+      "amountAfterDeduction",
       {
         user: { id: userId },
         status: PAYMENT_STATUS.SUCCESS,
@@ -587,7 +588,7 @@ export class TransactionsService {
     });
 
     const failedSettlementAmount = await this.settlementsRepository.sum(
-      "amount",
+      "amountAfterDeduction",
       {
         user: { id: userId },
         status: PAYMENT_STATUS.FAILED,

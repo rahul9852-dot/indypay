@@ -24,8 +24,45 @@ export class WalletTopupEntity {
     precision: 15,
     scale: 2,
     default: 0,
+    comment: "collection amount",
   })
-  amount: number;
+  collectionAmount: number; // collection amount
+
+  @Column({
+    type: "decimal",
+    precision: 15,
+    scale: 2,
+    default: 0,
+    comment: "payin charge",
+  })
+  payInCharge: number;
+
+  @Column({
+    type: "decimal",
+    precision: 15,
+    scale: 2,
+    default: 0,
+    comment: "amount after payin deduction",
+  })
+  amountAfterPayinDeduction: number; // amount after payin deduction
+
+  @Column({
+    type: "decimal",
+    precision: 15,
+    scale: 2,
+    default: 0,
+    comment: "payout charge",
+  })
+  payOutCharge: number;
+
+  @Column({
+    type: "decimal",
+    precision: 15,
+    scale: 2,
+    default: 0,
+    comment: "amount after charges (payin + payout) deduction",
+  })
+  topUpAmount: number; // amount after charges (payin + payout) deduction
 
   @Index()
   @Column()

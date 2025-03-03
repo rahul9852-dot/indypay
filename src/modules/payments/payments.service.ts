@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -71,6 +72,7 @@ import {
   IExternalPayinPaymentRequestIsmart,
   IExternalPayinPaymentResponseFlakPay,
   IExternalPayinPaymentResponseIsmart,
+  IExternalPayoutResponseFlakPay,
   IExternalPayinStatusResponseFlakPay,
   IExternalPayoutStatusResponseFlakPay,
 } from "@/interface/external-api.interface";
@@ -116,8 +118,6 @@ export class PaymentsService {
       select: {
         id: true,
         availablePayoutBalance: true,
-        totalPayout: true,
-        totalTopUp: true,
         user: {
           id: true,
           fullName: true,
@@ -565,7 +565,7 @@ export class PaymentsService {
     }
   }
 
-  async createPayoutFlakPay(
+  async createPayoutFlakPayBulk(
     createPayoutDto: CreatePayoutDto,
     user: UsersEntity,
   ) {
@@ -631,6 +631,203 @@ export class PaymentsService {
         summary: {
           total: payoutDataArr.length,
           status: "PROCESSING",
+        },
+      };
+    } catch (err) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Error initiating payouts`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createPayoutFlakPaySingle(
+    singlePayoutDto: SinglePayoutDto,
+    user: UsersEntity,
+  ) {
+    if (singlePayoutDto.payoutId) {
+      const payoutOrder = await this.payOutOrdersRepository.findOne({
+        where: { payoutId: singlePayoutDto.payoutId },
+      });
+
+      if (payoutOrder) {
+        throw new ConflictException("Payout order already exists");
+      }
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      // Check and update wallet balance
+      await this.validateAndUpdateWallet(
+        queryRunner,
+        user,
+        singlePayoutDto.amount,
+      );
+
+      const settlementAmount = calculateOriginalAmountFromNetPayable({
+        netPayableAmount: +singlePayoutDto.amount,
+        commissionInPercentage: +user.commissionInPercentagePayout,
+        gstInPercentage: +user.gstInPercentagePayout,
+      });
+
+      const payoutOrder = this.payOutOrdersRepository.create({
+        amount: +singlePayoutDto.amount,
+        amountBeforeDeduction: settlementAmount,
+        transferMode: singlePayoutDto.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
+        orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
+        user,
+        commissionInPercentage: +user.commissionInPercentagePayout,
+        gstInPercentage: +user.gstInPercentagePayout,
+        name: singlePayoutDto.beneficiaryName,
+        bankAccountNumber: singlePayoutDto.accountNumber,
+        bankIfsc: singlePayoutDto.ifscCode,
+        bankName: singlePayoutDto.bankName,
+        remarks: singlePayoutDto.remarks,
+        purpose: singlePayoutDto.purpose,
+        payoutId: singlePayoutDto.payoutId,
+      });
+
+      // this.logger.info(
+      //   `PAYOUT - createTransaction - Created payout order successfully: ${savedPayoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
+      //   savedPayoutOrder,
+      // );
+
+      // Call API
+
+      const { clientId, clientSecret } = externalPaymentConfig.flakPay;
+
+      const axiosServiceFlakPay = new AxiosService(
+        FALKPAY.BASE_URL,
+        getFlakPayPgConfig({
+          clientId,
+          clientSecret,
+        }),
+      );
+
+      const payloadFlakPay = {
+        amount: singlePayoutDto.amount,
+        orderId: payoutOrder.orderId,
+        transferMode: payoutOrder.transferMode,
+        beneDetails: {
+          beneBankName: payoutOrder.bankName,
+          beneAccountNo: payoutOrder.bankAccountNumber,
+          beneIfsc: payoutOrder.bankIfsc,
+          beneName: payoutOrder.name,
+        },
+      };
+
+      const response =
+        await axiosServiceFlakPay.postRequest<IExternalPayoutResponseFlakPay>(
+          FALKPAY.PAYOUT.LIVE,
+          payloadFlakPay,
+        );
+
+      // this.logger.info(
+      //   `Payout processed for order: ${order.orderId}`,
+      //   response,
+      // );
+
+      if (!response.status) {
+        throw new Error(response.message);
+      }
+
+      const status = convertExternalPaymentStatusToInternal(
+        response.data.status.toUpperCase(),
+      );
+
+      const savedPayoutOrder = await this.payOutOrdersRepository.save(
+        this.payOutOrdersRepository.create({
+          ...payoutOrder,
+          transferId: response.data.transferId,
+          ...(status === PAYMENT_STATUS.SUCCESS && {
+            status,
+            successAt: new Date(),
+          }),
+          ...(status === PAYMENT_STATUS.FAILED && {
+            status,
+            failureAt: new Date(),
+          }),
+          ...(![PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.FAILED].includes(
+            status,
+          ) && { status }),
+
+          utr: response.data.utr,
+        }),
+      );
+      // 3. create transaction
+      const transaction = this.transactionsRepository.create({
+        user,
+        payOutOrder: savedPayoutOrder,
+        transactionType: PAYMENT_TYPE.PAYOUT,
+      });
+
+      // 4. save transaction
+      await queryRunner.manager.save(transaction);
+
+      if (status === PAYMENT_STATUS.FAILED) {
+        throw new Error(response.message || "Payout failed");
+      }
+
+      if (user?.payOutWebhookUrl) {
+        const payOutOrder = await this.payOutOrdersRepository.findOne({
+          where: { id: savedPayoutOrder.id },
+        });
+
+        // this.logger.info(
+        //   `Payout webhook payOutOrder: ${LoggerPlaceHolder.Json}`,
+        //   payOutOrder,
+        // );
+        const payload = {
+          orderId: savedPayoutOrder.orderId,
+          status,
+          amount: savedPayoutOrder.amountBeforeDeduction,
+          txnRefId: response.data.transferId,
+          payoutId: savedPayoutOrder.payoutId,
+          utr: response.data.utr,
+        };
+
+        this.logger.info(
+          `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+          payload,
+        );
+        axios
+          .post(user.payOutWebhookUrl, payload)
+          .then(({ data }) => {
+            this.logger.info(
+              `Payout webhook sent successfully - ${user.payOutWebhookUrl} - ${savedPayoutOrder.orderId} RES: ${JSON.stringify(data)}`,
+            );
+          })
+          .catch((error) => {
+            this.logger.error(
+              `Payout webhook failed for order: ${savedPayoutOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+              error,
+            );
+          });
+      }
+
+      // this.logger.info(
+      //   `Payout processed successfully: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
+      //   response.data,
+      // );
+
+      await queryRunner.commitTransaction();
+
+      return {
+        message: "Payout process initiated",
+        payoutOrder: {
+          orderId: savedPayoutOrder.orderId,
+          payoutId: singlePayoutDto.payoutId,
+          amount: singlePayoutDto.amount,
+          status,
+          accountNumber: savedPayoutOrder.bankAccountNumber,
+          bankName: savedPayoutOrder.bankName,
+          ifscCode: savedPayoutOrder.bankIfsc,
         },
       };
     } catch (err) {
@@ -751,7 +948,6 @@ export class PaymentsService {
         id: userWallet.id,
         availablePayoutBalance:
           +userWallet.availablePayoutBalance - totalAmount,
-        totalPayout: +userWallet.totalPayout + totalAmount,
       }),
     );
   }
@@ -764,23 +960,21 @@ export class PaymentsService {
   ) {
     return Promise.all(
       payouts.map(async (payment) => {
-        const commissions = getCommissions({
-          amount: +payment.amount,
-          commissionInPercentage: user.commissionInPercentagePayout,
-          gstInPercentage: user.gstInPercentagePayout,
+        const settlementAmount = calculateOriginalAmountFromNetPayable({
+          netPayableAmount: +payment.amount,
+          commissionInPercentage: +user.commissionInPercentagePayout,
+          gstInPercentage: +user.gstInPercentagePayout,
         });
 
         const payoutOrder = this.payOutOrdersRepository.create({
           amount: +payment.amount,
+          amountBeforeDeduction: settlementAmount,
           transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
           orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
           batchId,
           user,
-          commissionAmount: +commissions.commissionAmount,
           commissionInPercentage: +user.commissionInPercentagePayout,
-          gstAmount: +commissions.gstAmount,
           gstInPercentage: +user.gstInPercentagePayout,
-          netPayableAmount: +commissions.netPayableAmount,
           name: payment.beneficiaryName,
           bankAccountNumber: payment.accountNumber,
           bankIfsc: payment.ifscCode,
@@ -1037,25 +1231,11 @@ export class PaymentsService {
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const { totalServiceChange } = getCommissions({
-        amount: +payinOrder.amount,
-        commissionInPercentage: +user.commissionInPercentagePayin,
-        gstInPercentage: +user.gstInPercentagePayin,
-      });
-
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
         totalCollections:
           (wallet.totalCollections ? +wallet.totalCollections : 0) +
           +payinOrder.amount,
-        serviceCharge:
-          (wallet.serviceCharge ? +wallet.serviceCharge : 0) +
-          totalServiceChange,
-        collectionAfterDeduction:
-          (wallet.collectionAfterDeduction
-            ? +wallet.collectionAfterDeduction
-            : 0) +
-          (+payinOrder.amount - totalServiceChange),
         user,
       });
 
@@ -1201,25 +1381,11 @@ export class PaymentsService {
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const { totalServiceChange } = getCommissions({
-        amount: +payinOrder.amount,
-        commissionInPercentage: +user.commissionInPercentagePayin,
-        gstInPercentage: +user.gstInPercentagePayin,
-      });
-
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
         totalCollections:
           (wallet.totalCollections ? +wallet.totalCollections : 0) +
           +payinOrder.amount,
-        serviceCharge:
-          (wallet.serviceCharge ? +wallet.serviceCharge : 0) +
-          totalServiceChange,
-        collectionAfterDeduction:
-          (wallet.collectionAfterDeduction
-            ? +wallet.collectionAfterDeduction
-            : 0) +
-          (+payinOrder.amount - totalServiceChange),
         user,
       });
 
@@ -1239,10 +1405,10 @@ export class PaymentsService {
         txnRefId: payinOrder.txnRefId,
         ...(!isMisspelled && { utr }),
       };
-      this.logger.info(
-        `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
-        webhookPayload,
-      );
+      // this.logger.info(
+      //   `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+      //   webhookPayload,
+      // );
       axios
         .post(user.payInWebhookUrl, webhookPayload, {
           headers: {
@@ -1362,25 +1528,12 @@ export class PaymentsService {
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const { totalServiceChange } = getCommissions({
-        amount: +payinOrder.amount,
-        commissionInPercentage: +user.commissionInPercentagePayin,
-        gstInPercentage: +user.gstInPercentagePayin,
-      });
-
       const walletRaw = this.walletRepository.create({
         ...(wallet?.id && { id: wallet.id }),
         totalCollections:
           (wallet.totalCollections ? +wallet.totalCollections : 0) +
           +payinOrder.amount,
-        serviceCharge:
-          (wallet.serviceCharge ? +wallet.serviceCharge : 0) +
-          totalServiceChange,
-        collectionAfterDeduction:
-          (wallet.collectionAfterDeduction
-            ? +wallet.collectionAfterDeduction
-            : 0) +
-          (+payinOrder.amount - totalServiceChange),
+
         user,
       });
 
@@ -1516,27 +1669,19 @@ export class PaymentsService {
           },
         });
 
-        const { commissionInPercentagePayin, gstInPercentagePayin } =
-          wallet.user;
-
-        const { totalServiceChange } = getCommissions({
-          amount: +amount,
-          commissionInPercentage: +commissionInPercentagePayin,
-          gstInPercentage: +gstInPercentagePayin,
-        });
-
-        const originalAmount = calculateOriginalAmountFromNetPayable({
+        const collectionAmount = calculateOriginalAmountFromNetPayable({
           netPayableAmount: +amount,
-          commissionInPercentage: +wallet.user.commissionInPercentagePayout,
-          gstInPercentage: +wallet.user.gstInPercentagePayout,
+          commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+          gstInPercentage: +wallet.user.gstInPercentagePayin,
         });
 
         const walletRaw = this.walletRepository.create({
           ...(wallet?.id && { id: wallet.id }),
           id: wallet.id,
-          totalCollections: +wallet.totalCollections + originalAmount,
-          collectionAfterDeduction: +wallet.collectionAfterDeduction + +amount,
-          serviceCharge: +wallet.serviceCharge + totalServiceChange,
+          totalCollections: +wallet.totalCollections - collectionAmount,
+          availablePayoutBalance:
+            +wallet.availablePayoutBalance + collectionAmount,
+
           user: wallet.user,
         });
 
@@ -1562,7 +1707,7 @@ export class PaymentsService {
 
       if (!payOutOrder) {
         throw new NotFoundException(
-          new MessageResponseDto("Payin order not found"),
+          new MessageResponseDto("Payout order not found"),
         );
       }
 
@@ -1610,25 +1755,10 @@ export class PaymentsService {
           },
         });
 
-        const deductedAmount = calculateOriginalAmountFromNetPayable({
-          netPayableAmount: +amount,
-          commissionInPercentage: +wallet.user.commissionInPercentagePayout,
-          gstInPercentage: +wallet.user.gstInPercentagePayout,
-        });
-
-        const { totalServiceChange } = getCommissions({
-          amount: deductedAmount,
-          commissionInPercentage: +wallet.user.commissionInPercentagePayout,
-          gstInPercentage: +wallet.user.gstInPercentagePayout,
-        });
-
         await this.walletRepository.save(
           this.walletRepository.create({
             id: wallet.id,
             availablePayoutBalance: +wallet.availablePayoutBalance + +amount,
-            totalPayout: +wallet.totalPayout - +amount,
-            payoutServiceCharge:
-              +wallet.payoutServiceCharge - totalServiceChange,
           }),
         );
       }
@@ -1749,12 +1879,6 @@ export class PaymentsService {
         const { commissionInPercentagePayin, gstInPercentagePayin } =
           wallet.user;
 
-        const { totalServiceChange } = getCommissions({
-          amount: +amount,
-          commissionInPercentage: +commissionInPercentagePayin,
-          gstInPercentage: +gstInPercentagePayin,
-        });
-
         const originalAmount = calculateOriginalAmountFromNetPayable({
           netPayableAmount: +amount,
           commissionInPercentage: +wallet.user.commissionInPercentagePayout,
@@ -1765,8 +1889,6 @@ export class PaymentsService {
           ...(wallet?.id && { id: wallet.id }),
           id: wallet.id,
           totalCollections: +wallet.totalCollections + originalAmount,
-          collectionAfterDeduction: +wallet.collectionAfterDeduction + +amount,
-          serviceCharge: +wallet.serviceCharge + totalServiceChange,
           user: wallet.user,
         });
         await this.walletRepository.save(walletRaw);
@@ -1841,16 +1963,12 @@ export class PaymentsService {
             "Invalid rates: Total deduction cannot be equal or greater than 1.",
           );
         }
-        const actualAmount = +amount / (1 + totalDeductionRate / 100);
-        const serviceCharge = +amount - actualAmount;
 
         // update wallet
         await this.walletRepository.save(
           this.walletRepository.create({
             id: wallet.id,
             availablePayoutBalance: +wallet.availablePayoutBalance + amount, // 600
-            totalPayout: +wallet.totalPayout - +actualAmount, // 500
-            payoutServiceCharge: +wallet.payoutServiceCharge + serviceCharge, // 100
           }),
         );
       }

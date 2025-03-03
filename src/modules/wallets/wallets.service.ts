@@ -4,18 +4,17 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { ILike, Repository } from "typeorm";
+import { Between, ILike, Repository } from "typeorm";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { WalletTopupEntity } from "@/entities/wallet-topup.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
-import { SettlementsEntity } from "@/entities/settlements.entity";
 import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
-import {
-  calculateOriginalAmountFromNetPayable,
-  getCommissions,
-} from "@/utils/commissions.utils";
+import { getCommissions } from "@/utils/commissions.utils";
+import { todayEndDate, todayStartDate } from "@/utils/date.utils";
+import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
+import { PAYMENT_STATUS } from "@/enums/payment.enum";
 
 @Injectable()
 export class WalletsService {
@@ -24,8 +23,8 @@ export class WalletsService {
     private readonly walletRepository: Repository<WalletEntity>,
     @InjectRepository(WalletTopupEntity)
     private readonly walletTopupRepository: Repository<WalletTopupEntity>,
-    @InjectRepository(SettlementsEntity)
-    private readonly settlementsRepository: Repository<SettlementsEntity>,
+    @InjectRepository(PayOutOrdersEntity)
+    private readonly payoutRepository: Repository<PayOutOrdersEntity>,
     @InjectRepository(UsersEntity)
     private readonly usersRepository: Repository<UsersEntity>,
   ) {}
@@ -78,10 +77,8 @@ export class WalletsService {
       where: { user: { id: userId } },
       select: {
         id: true,
-        totalTopUp: true,
+        totalCollections: true,
         availablePayoutBalance: true,
-        payoutServiceCharge: true,
-        totalPayout: true,
         user: {
           id: true,
           fullName: true,
@@ -111,9 +108,9 @@ export class WalletsService {
       .leftJoin("wallet.user", "user")
       .where("user.id = :userId", { userId })
       .select([
-        "wallet.totalTopUp",
         "wallet.availablePayoutBalance",
-        "wallet.totalPayout",
+        "wallet.totalCollections",
+        "wallet.availablePayoutBalance",
       ]);
 
     const wallet = await walletQueryBuilder.getOne();
@@ -134,22 +131,42 @@ export class WalletsService {
       });
     }
 
-    const [transactions, totalItems] = await topupQueryBuilder
-      .select([
-        "topup.id",
-        "topup.amount",
-        "topup.createdAt",
-        "user.id",
-        "user.fullName",
-        "user.email",
-        "user.mobile",
-        "topupBy.id",
-        "topupBy.fullName",
-      ])
-      .orderBy(`topup.${sort}`, order as "ASC" | "DESC")
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
+    const topupAmountPromise = this.walletTopupRepository.sum("topUpAmount", {
+      user: { id: userId },
+      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+    });
+
+    const totalPayoutPromise = this.payoutRepository.sum("amount", {
+      user: { id: userId },
+      status: PAYMENT_STATUS.SUCCESS,
+      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+    });
+
+    const [[transactions, totalItems], topupAmount, totalPayout] =
+      await Promise.all([
+        topupQueryBuilder
+          .select([
+            "topup.id",
+            "topup.collectionAmount",
+            "topup.payInCharge",
+            "topup.amountAfterPayinDeduction",
+            "topup.payOutCharge",
+            "topup.topUpAmount",
+            "topup.createdAt",
+            "user.id",
+            "user.fullName",
+            "user.email",
+            "user.mobile",
+            "topupBy.id",
+            "topupBy.fullName",
+          ])
+          .orderBy(`topup.${sort}`, order as "ASC" | "DESC")
+          .skip((page - 1) * limit)
+          .take(limit)
+          .getManyAndCount(),
+        topupAmountPromise,
+        totalPayoutPromise,
+      ]);
 
     const pagination = getPagination({
       totalItems,
@@ -161,9 +178,9 @@ export class WalletsService {
       data: transactions,
       pagination,
       stats: {
-        totalTopup: wallet.totalTopUp || 0,
-        availablePayout: wallet.availablePayoutBalance || 0,
-        totalPayout: wallet.totalPayout || 0,
+        totalTopup: topupAmount || 0,
+        availablePayoutBalance: wallet.availablePayoutBalance || 0,
+        totalPayout: totalPayout || 0,
       },
     };
   }
@@ -182,11 +199,7 @@ export class WalletsService {
       .createQueryBuilder("wallet")
       .leftJoin("wallet.user", "user")
       .where("user.id = :merchantId", { merchantId })
-      .select([
-        "wallet.totalTopUp",
-        "wallet.availablePayoutBalance",
-        "wallet.totalPayout",
-      ]);
+      .select(["wallet.totalCollections", "wallet.availablePayoutBalance"]);
 
     const wallet = await walletQueryBuilder.getOne();
 
@@ -206,22 +219,41 @@ export class WalletsService {
       });
     }
 
-    const [transactions, totalItems] = await topupQueryBuilder
-      .select([
-        "topup.id",
-        "topup.amount",
-        "topup.createdAt",
-        "user.id",
-        "user.fullName",
-        "user.email",
-        "user.mobile",
-        "topupBy.id",
-        "topupBy.fullName",
-      ])
-      .orderBy(`topup.${sort}`, order as "ASC" | "DESC")
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
+    const topupAmountPromise = this.walletTopupRepository.sum("topUpAmount", {
+      user: { id: merchantId },
+      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+    });
+
+    const totalPayoutPromise = this.payoutRepository.sum("amount", {
+      user: { id: merchantId },
+      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+    });
+
+    const [[transactions, totalItems], topupAmount, totalPayout] =
+      await Promise.all([
+        topupQueryBuilder
+          .select([
+            "topup.id",
+            "topup.collectionAmount",
+            "topup.payInCharge",
+            "topup.amountAfterPayinDeduction",
+            "topup.payOutCharge",
+            "topup.topUpAmount",
+            "topup.createdAt",
+            "user.id",
+            "user.fullName",
+            "user.email",
+            "user.mobile",
+            "topupBy.id",
+            "topupBy.fullName",
+          ])
+          .orderBy(`topup.${sort}`, order as "ASC" | "DESC")
+          .skip((page - 1) * limit)
+          .take(limit)
+          .getManyAndCount(),
+        topupAmountPromise,
+        totalPayoutPromise,
+      ]);
 
     const pagination = getPagination({
       totalItems,
@@ -233,9 +265,9 @@ export class WalletsService {
       data: transactions,
       pagination,
       stats: {
-        totalTopup: wallet.totalTopUp || 0,
-        availablePayout: wallet.availablePayoutBalance || 0,
-        totalPayout: wallet.totalPayout || 0,
+        totalTopup: topupAmount || 0,
+        availablePayoutBalance: wallet.availablePayoutBalance || 0,
+        totalPayout: totalPayout || 0,
       },
     };
   }
@@ -255,7 +287,11 @@ export class WalletsService {
         ],
         select: {
           id: true,
-          amount: true,
+          collectionAmount: true,
+          payInCharge: true,
+          amountAfterPayinDeduction: true,
+          payOutCharge: true,
+          topUpAmount: true,
           createdAt: true,
           user: {
             id: true,
@@ -314,7 +350,11 @@ export class WalletsService {
         ],
         select: {
           id: true,
-          amount: true,
+          collectionAmount: true,
+          payInCharge: true,
+          amountAfterPayinDeduction: true,
+          topUpAmount: true,
+          payOutCharge: true,
           createdAt: true,
           user: {
             id: true,
@@ -353,7 +393,7 @@ export class WalletsService {
   async topUpWallet(
     merchantUserId: string,
     adminUser: UsersEntity,
-    amount: number,
+    collectionAmount: number,
   ) {
     const wallet = await this.walletRepository.findOne({
       where: { user: { id: merchantUserId } },
@@ -366,7 +406,7 @@ export class WalletsService {
       throw new NotFoundException(new MessageResponseDto("Wallet not found"));
     }
 
-    if (+wallet.totalCollections < amount) {
+    if (+wallet.totalCollections < +collectionAmount) {
       throw new BadRequestException(
         new MessageResponseDto(
           `Insufficient Total Collections balance: ${wallet.totalCollections}`,
@@ -378,53 +418,45 @@ export class WalletsService {
       where: { id: merchantUserId },
     });
 
+    const {
+      netPayableAmount: collectionsAfterDeduction,
+      totalServiceChange: payinCharge,
+    } = getCommissions({
+      amount: collectionAmount,
+      commissionInPercentage: merchantUser.commissionInPercentagePayin,
+      gstInPercentage: merchantUser.gstInPercentagePayin,
+    });
+
+    const {
+      totalServiceChange: payoutCharge,
+      netPayableAmount: netPayableAmountPayout,
+    } = getCommissions({
+      amount: collectionsAfterDeduction,
+      commissionInPercentage: merchantUser.commissionInPercentagePayout,
+      gstInPercentage: merchantUser.gstInPercentagePayout,
+    });
+
     // record a topup transaction
     const topUp = this.walletTopupRepository.create({
       user: merchantUser,
-      amount,
+      collectionAmount,
+      payInCharge: payinCharge,
+      amountAfterPayinDeduction: collectionsAfterDeduction,
+      payOutCharge: payoutCharge,
+      topUpAmount: netPayableAmountPayout,
       topupBy: adminUser,
     });
 
     await this.walletTopupRepository.save(topUp);
 
-    // const settlement = this.settlementsRepository.create({
-    //   amount: +amount,
-    //   user: merchantUser,
-    //   status: PAYMENT_STATUS.SUCCESS,
-    //   successAt: new Date(),
-    //   settledBy: adminUser,
-    //   remarks: "Wallet topup",
-    // });
-
-    // await this.settlementsRepository.save(settlement);
-
-    const { totalServiceChange } = getCommissions({
-      amount,
-      commissionInPercentage: merchantUser.commissionInPercentagePayout,
-      gstInPercentage: merchantUser.gstInPercentagePayout,
-    });
-
-    const collectionAmountBeforeDeduction =
-      calculateOriginalAmountFromNetPayable({
-        netPayableAmount: amount,
-        commissionInPercentage: merchantUser.commissionInPercentagePayin,
-        gstInPercentage: merchantUser.gstInPercentagePayin,
-      });
     // update wallet balance
     const savedWallet = await this.walletRepository.save(
       this.walletRepository.create({
         id: wallet.id,
         user: wallet.user,
-        totalCollections:
-          +wallet.totalCollections - collectionAmountBeforeDeduction,
-        serviceCharge:
-          +wallet.serviceCharge - (collectionAmountBeforeDeduction - amount),
-        collectionAfterDeduction: +wallet.collectionAfterDeduction - amount,
-
-        totalTopUp: +wallet.totalTopUp + amount,
+        totalCollections: +wallet.totalCollections - collectionAmount,
         availablePayoutBalance:
-          +wallet.availablePayoutBalance + (amount - totalServiceChange),
-        payoutServiceCharge: +wallet.payoutServiceCharge + totalServiceChange,
+          +wallet.availablePayoutBalance + netPayableAmountPayout,
       }),
     );
 

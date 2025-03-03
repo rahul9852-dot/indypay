@@ -76,6 +76,7 @@ export class CustomerService {
         addressLine2: true,
         city: true,
         state: true,
+        pincode: true,
         country: true,
         gstin: true,
         createdAt: true,

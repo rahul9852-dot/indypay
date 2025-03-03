@@ -34,6 +34,7 @@ import {
   ID_TYPE,
 } from "@/enums";
 import { InvoiceEntity } from "@/entities/invoice.entity";
+import { ItemEntity } from "@/entities/item.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 
 @Entity("users")
@@ -202,6 +203,9 @@ export class UsersEntity {
   @OneToMany(() => CustomerEntity, ({ merchant }) => merchant, {
     cascade: true,
   })
+  @OneToMany(() => ItemEntity, (item) => item.merchant)
+  items: ItemEntity[];
+
   customers: CustomerEntity[];
 
   @Column({ type: "timestamptz", nullable: true })

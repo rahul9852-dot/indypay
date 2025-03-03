@@ -229,7 +229,12 @@ export class UsersController {
   })
   @Get("profile")
   async getUserProfile(@User() user: UsersEntity) {
-    return user;
+    if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) return user;
+    else {
+      const { jumpingCount: _, ...rest } = user;
+
+      return rest;
+    }
   }
 
   @ApiOperation({ summary: "Add business details" })

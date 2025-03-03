@@ -29,6 +29,14 @@ export class PayOutOrdersEntity {
   })
   amount: number;
 
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+  amountBeforeDeduction: number;
+
   @Index()
   @Column({ unique: true })
   orderId: string;
@@ -75,16 +83,7 @@ export class PayOutOrdersEntity {
   commissionInPercentage: number;
 
   @Column({ type: "decimal", precision: 10, scale: 2 })
-  commissionAmount: number;
-
-  @Column({ type: "decimal", precision: 10, scale: 2 })
   gstInPercentage: number;
-
-  @Column({ type: "decimal", precision: 10, scale: 2 })
-  gstAmount: number;
-
-  @Column({ type: "decimal", precision: 10, scale: 2 })
-  netPayableAmount: number;
 
   @Index()
   @Column()

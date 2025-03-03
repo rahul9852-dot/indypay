@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -18,11 +17,16 @@ import { CustomerService } from "@/modules/customers/customer.service";
 import { UsersEntity } from "@/entities/user.entity";
 import { INVOICE_STATUS, USERS_ROLE } from "@/enums";
 import { InvoiceEntity } from "@/entities/invoice.entity";
-import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
+import { MessageResponseDto, PaginationInvoiceDto } from "@/dtos/common.dto";
 import { SESService } from "@/modules/aws/ses.service";
 import { InvoiceService } from "@/shared/services/invoice.service";
-import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { getPagination } from "@/utils/pagination.utils";
+import { ItemEntity } from "@/entities/item.entity";
+import { InvoiceItemEntity } from "@/entities/invoice-item.entity";
+import {
+  getInvoiceStatusForQuery,
+  getInvoiceStatus,
+} from "@/utils/helperFunctions.utils";
 
 @Injectable()
 export class InvoiceCustomerService {
@@ -34,6 +38,10 @@ export class InvoiceCustomerService {
     private readonly customerService: CustomerService,
     private readonly sesService: SESService,
     private readonly invoiceService: InvoiceService,
+    @InjectRepository(ItemEntity)
+    private readonly itemRepo: Repository<ItemEntity>,
+    @InjectRepository(InvoiceItemEntity)
+    private readonly invoiceItemRepo: Repository<InvoiceItemEntity>,
   ) {}
 
   async saveToDraftInvoice(
@@ -51,6 +59,7 @@ export class InvoiceCustomerService {
       customerId,
       invoiceNumber,
       id,
+      items,
     } = createInvoiceDto;
 
     const customer = await this.customerService.findOne(customerId);
@@ -62,12 +71,35 @@ export class InvoiceCustomerService {
     const existingInvoice = await this.invoiceRepo.findOne({
       where: {
         invoiceNumber,
+        id,
       },
     });
 
-    if (existingInvoice) {
-      throw new BadRequestException("Invoice number already exists");
+    if (existingInvoice && existingInvoice.status === INVOICE_STATUS.SENT) {
+      throw new BadRequestException("Invoice already sent");
     }
+
+    const invoiceItems = items
+      ? await Promise.all(
+          items.map(async (singleItem) => {
+            const item = await this.itemRepo.findOne({
+              where: { id: singleItem.id },
+            });
+            if (!item) {
+              throw new NotFoundException(
+                `Item with ID ${singleItem.id} not found`,
+              );
+            }
+
+            const invoiceItem = this.invoiceItemRepo.create({
+              item: singleItem,
+              quantity: singleItem.quantity,
+            });
+
+            return invoiceItem;
+          }),
+        )
+      : undefined;
 
     const user = await this.userRepo.findOne({
       where: {
@@ -93,6 +125,7 @@ export class InvoiceCustomerService {
       customer,
       shippingAddress,
       user: merchant,
+      ...(items && items.length > 0 && { items: invoiceItems }),
     });
 
     await this.invoiceRepo.save(invoice);
@@ -109,6 +142,9 @@ export class InvoiceCustomerService {
       relations: {
         customer: true,
         user: true,
+        items: {
+          item: true,
+        },
       },
       select: {
         id: true,
@@ -118,6 +154,7 @@ export class InvoiceCustomerService {
         customerNotes: true,
         termsAndServices: true,
         shippingAddress: true,
+        billingAddress: true,
         status: true,
         issueDate: true,
         expiryDate: true,
@@ -130,6 +167,14 @@ export class InvoiceCustomerService {
         customer: {
           id: true,
           name: true,
+        },
+        items: {
+          id: true,
+          item: {
+            id: true,
+            price: true,
+          },
+          quantity: true,
         },
       },
     });
@@ -217,9 +262,10 @@ export class InvoiceCustomerService {
       search = "",
       sort = "id",
       order = "DESC",
-      startDate = todayStartDate(),
-      endDate = todayEndDate(),
-    }: PaginationWithDateDto,
+      startDate,
+      endDate,
+      status,
+    }: PaginationInvoiceDto,
   ) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
@@ -300,6 +346,8 @@ export class InvoiceCustomerService {
           customer: {
             id: true,
             name: true,
+            contactNumber: true,
+            email: true,
           },
         },
       });
@@ -324,7 +372,11 @@ export class InvoiceCustomerService {
         whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
       }
 
-      const query = [{ ...whereQuery, user: { id: user.id } }];
+      const query = [whereQuery];
+
+      const internalStatus = status
+        ? getInvoiceStatusForQuery(status)
+        : undefined;
 
       if (search) {
         query.push({
@@ -332,6 +384,7 @@ export class InvoiceCustomerService {
           user: {
             id: user.id,
           },
+          ...(internalStatus && { status: internalStatus }),
         });
         query.push({
           customer: {
@@ -340,8 +393,42 @@ export class InvoiceCustomerService {
           user: {
             id: user.id,
           },
+          ...(internalStatus && { status: internalStatus }),
+        });
+        query.push({
+          customer: {
+            contactNumber: ILike(`%${search}%`),
+          },
+          user: {
+            id: user.id,
+          },
+          ...(internalStatus && { status: internalStatus }),
+        });
+        query.push({
+          customer: {
+            email: ILike(`%${search}%`),
+          },
+          user: {
+            id: user.id,
+          },
+          ...(internalStatus && { status: internalStatus }),
+        });
+        query.push({
+          id: ILike(`%${search}%`),
+          user: {
+            id: user.id,
+          },
+          ...(internalStatus && { status: internalStatus }),
+        });
+      } else {
+        query.push({
+          user: {
+            id: user.id,
+          },
+          ...(internalStatus && { status: internalStatus }),
         });
       }
+
       const [invoices, totalItems] = await this.invoiceRepo.findAndCount({
         where: query,
         relations: {
@@ -368,6 +455,8 @@ export class InvoiceCustomerService {
           customer: {
             id: true,
             name: true,
+            contactNumber: true,
+            email: true,
           },
         },
         take: limit,
@@ -384,6 +473,34 @@ export class InvoiceCustomerService {
     }
   }
 
+  async checkInvoiceValidation(createInvoiceDto: CreateInvoiceDto) {
+    const { customerId, items, invoiceNumber } = createInvoiceDto;
+
+    if (!customerId) {
+      throw new BadRequestException("Customer is required");
+    }
+
+    const customer = await this.customerService.findOne(customerId);
+
+    if (!customer) {
+      throw new NotFoundException("Customer not found");
+    }
+
+    if (!invoiceNumber) {
+      throw new BadRequestException("Invoice number is required");
+    }
+
+    if (items.length === 0) {
+      throw new BadRequestException("Items cannot be empty");
+    }
+
+    if (items.some((item) => item.quantity <= 0)) {
+      throw new BadRequestException("Quantity must be greater than 0");
+    }
+
+    return true;
+  }
+
   async processInvoice(
     createInvoiceDto: CreateInvoiceDto,
     merchant: UsersEntity,
@@ -392,6 +509,12 @@ export class InvoiceCustomerService {
       createInvoiceDto,
       merchant,
     );
+
+    const isValid = await this.checkInvoiceValidation(createInvoiceDto);
+
+    if (!isValid) {
+      throw new BadRequestException("Invalid invoice");
+    }
 
     return this.finalizeAndSendInvoiceForMerchant(
       merchant,
@@ -404,6 +527,10 @@ export class InvoiceCustomerService {
       where: { id },
       relations: {
         customer: true,
+        user: true,
+        items: {
+          item: true,
+        },
       },
     });
 
@@ -418,9 +545,11 @@ export class InvoiceCustomerService {
     const invoicePdfBuffer =
       await this.invoiceService.generateInvoiceToCustomer({
         amount: invoice.totalAmount,
+        invoiceNumber: invoice.invoiceNumber,
         userName: user.fullName,
-        remarks: invoice.customerNotes,
-        status: invoice.status,
+        customerNotes: invoice.customerNotes,
+        termsAndServices: invoice.termsAndServices,
+        status: getInvoiceStatus(invoice.status),
         dateTime: invoice.issueDate,
         address: {
           billing: {
@@ -436,7 +565,9 @@ export class InvoiceCustomerService {
         customer: {
           name: invoice.customer.name,
           email: invoice.customer.email,
+          gstin: invoice.customer.gstin,
         },
+        items: invoice.items,
       });
 
     const invoiceSubject = `Your Invoice from ${user.fullName}`;
@@ -455,6 +586,11 @@ export class InvoiceCustomerService {
           </body>
         </html>
       `;
+
+    // return res
+    //   .setHeader("Content-Type", "application/pdf")
+    //   .setHeader("Content-Disposition", "attachment; filename=invoice.pdf")
+    //   .send(invoicePdfBuffer);
 
     const emailResult = await this.sesService.sendEmail(
       invoiceSubject,
@@ -494,17 +630,13 @@ export class InvoiceCustomerService {
     return new MessageResponseDto("Invoice sent successfully");
   }
 
-  async deleteInvoice(userRole: USERS_ROLE, invoiceId: string) {
+  async deleteInvoice(invoiceId: string) {
     const invoice = await this.invoiceRepo.findOne({
       where: { id: invoiceId },
     });
     if (!invoice) throw new NotFoundException("Invoice not found");
 
-    if (![USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(userRole)) {
-      throw new ForbiddenException("Only Admin or Owner can delete invoices");
-    }
-
-    await this.invoiceRepo.remove(invoice);
+    await this.invoiceRepo.delete(invoiceId);
 
     return new MessageResponseDto("Invoice deleted successfully");
   }

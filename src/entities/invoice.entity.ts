@@ -7,8 +7,10 @@ import {
   BeforeInsert,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from "typeorm";
 import { CustomerEntity } from "./invoice-customer.entity";
+import { InvoiceItemEntity } from "./invoice-item.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE, INVOICE_STATUS } from "@/enums";
@@ -21,7 +23,7 @@ export class InvoiceEntity {
   @Column()
   invoiceNumber: string;
 
-  @Column()
+  @Column({ nullable: true })
   description: string;
 
   @Column({
@@ -29,28 +31,29 @@ export class InvoiceEntity {
     precision: 15,
     scale: 2,
     default: 0,
+    nullable: true,
   })
   totalAmount: number;
 
   @Column({ nullable: true })
   customerNotes?: string;
 
-  @Column({ type: "text" })
+  @Column({ type: "text", nullable: true })
   termsAndServices: string;
 
-  @Column()
+  @Column({ nullable: true })
   shippingAddress: string;
 
-  @Column()
+  @Column({ nullable: true })
   billingAddress: string;
 
   @Column({ type: "enum", enum: INVOICE_STATUS, default: INVOICE_STATUS.DRAFT })
   status: INVOICE_STATUS;
 
-  @Column({ type: "timestamptz" })
+  @Column({ type: "timestamptz", nullable: true })
   issueDate: Date;
 
-  @Column({ type: "timestamptz" })
+  @Column({ type: "timestamptz", nullable: true })
   expiryDate: Date;
 
   @ManyToOne(() => UsersEntity, ({ invoices }) => invoices, {
@@ -64,6 +67,11 @@ export class InvoiceEntity {
   })
   @JoinColumn({ name: "customerId" })
   customer: CustomerEntity;
+
+  @OneToMany(() => InvoiceItemEntity, (invoiceItem) => invoiceItem.invoice, {
+    cascade: true,
+  })
+  items: InvoiceItemEntity[];
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;

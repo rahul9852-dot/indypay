@@ -1,12 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 import {
+  ArrayMinSize,
+  IsArray,
   IsDateString,
-  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsPositive,
   IsString,
+  MaxLength,
+  ValidateNested,
 } from "class-validator";
+import { ItemQuantityDto } from "@/modules/items/dto/item.quantity.dto";
 
 export class CreateInvoiceDto {
   @ApiPropertyOptional()
@@ -15,24 +20,25 @@ export class CreateInvoiceDto {
 
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  invoiceNumber: string;
+  @IsOptional()
+  @MaxLength(50, { message: "Invoice number cannot exceed 50 characters." })
+  invoiceNumber?: string;
 
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  customerId: string;
+  @IsOptional()
+  customerId?: string;
 
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  description: string;
+  @IsOptional()
+  description?: string;
 
   @ApiProperty()
   @IsNumber()
-  @IsPositive()
-  @IsNotEmpty()
-  totalAmount: number;
+  @IsPositive({ message: "Total amount must be a positive number." })
+  @IsOptional()
+  totalAmount?: number;
 
   @ApiPropertyOptional()
   @IsString()
@@ -41,8 +47,8 @@ export class CreateInvoiceDto {
 
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  termsAndServices: string;
+  @IsOptional()
+  termsAndServices?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -51,11 +57,22 @@ export class CreateInvoiceDto {
 
   @ApiProperty()
   @IsDateString()
-  @IsNotEmpty()
-  issueDate: Date;
+  @IsOptional()
+  issueDate?: Date;
 
   @ApiProperty()
   @IsDateString()
-  @IsNotEmpty()
-  expiryDate: Date;
+  @IsOptional()
+  expiryDate?: Date;
+
+  @ApiProperty({
+    type: [ItemQuantityDto],
+    description: "List of items and their quantities included in the invoice",
+  })
+  @IsArray()
+  @IsOptional()
+  @ArrayMinSize(1, { message: "At least one item must be selected." })
+  @ValidateNested({ each: true })
+  @Type(() => ItemQuantityDto)
+  items?: ItemQuantityDto[];
 }

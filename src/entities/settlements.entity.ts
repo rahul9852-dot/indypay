@@ -12,7 +12,7 @@ import {
 import { UsersEntity } from "./user.entity";
 import { UserBankDetailsEntity } from "./user-bank-details.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
-import { ID_TYPE } from "@/enums";
+import { ID_TYPE, SETTLEMENT_TYPE } from "@/enums";
 import { PAYMENT_STATUS, PAYOUT_PAYMENT_MODE } from "@/enums/payment.enum";
 
 @Entity("settlements")
@@ -25,8 +25,28 @@ export class SettlementsEntity {
     type: "decimal",
     precision: 10,
     scale: 2,
+    default: 0,
   })
-  amount: number;
+  collectionAmount: number;
+
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+  serviceCharge: number;
+
+  @Column({
+    type: "numeric",
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+  amountAfterDeduction: number;
+
+  @Column({ enum: SETTLEMENT_TYPE, default: SETTLEMENT_TYPE.MANUAL })
+  settlementType: string;
 
   @Index()
   @Column({ enum: PAYOUT_PAYMENT_MODE, default: PAYOUT_PAYMENT_MODE.IMPS })

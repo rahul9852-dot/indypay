@@ -4,7 +4,8 @@ import * as handlebars from "handlebars";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { CustomLogger } from "@/logger";
-import { INVOICE_STATUS } from "@/enums";
+import { InvoiceItemEntity } from "@/entities/invoice-item.entity";
+import { formatDateTime } from "@/utils/helperFunctions.utils";
 
 @Injectable()
 export class InvoiceService {
@@ -197,27 +198,220 @@ export class InvoiceService {
       <head>
         <title>Invoice for {{customer.name}}</title>
         <style>
-          /* Add styles for your PDF here */
-        </style>
+
+      body {
+        font-family: 'Montserrat', sans-serif;
+        color: #333;
+      }
+
+      .header {
+        padding-bottom: 20px;
+        border-bottom: 2px solid #ddd;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .header img {
+        max-width: 150px;
+        height: auto;
+        margin-bottom: 10px;
+      }
+
+      .invoice-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .invoice-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+        margin-top: 10px;
+      }
+
+      .invoice-address h2 {
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+        margin-top: 10px;
+      }
+
+      .invoice-address p {
+        font-size: 16px;
+        color: #555;
+        width: 30%;
+      }
+
+      .invoice-details {
+        margin-top: 20px;
+        font-size: 16px;
+        color: #555;
+      }
+      .invoice-details-row {
+        display: flex;
+        gap: 40px;
+        align-items: center;
+      }
+
+      .invoice-details p {
+        margin: 5px 0;
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      .table th {
+        background: #2a63c3;
+        color: #fff;
+        padding: 10px;
+        font-size: 14px;
+        text-align: left;
+      }
+
+      .table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+      }
+
+      .section-title {
+        font-size: 16px;
+        font-weight: bold;
+        margin-top: 20px;
+        color: #333;
+        padding-bottom: 5px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .service {
+        display: flex;
+        justify-content: space-between;
+        // gap: 10px;
+      }
+
+      .address {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #444;
+      }
+
+      .item {
+        font-size: 14px;
+        color: #444;
+      }
+
+      .footer {
+        margin-top: 30px;
+        text-align: center;
+        font-size: 14px;
+        color: #777;
+      }
+
+      .footer p {
+        margin: 5px 0;
+      }
+    </style>
       </head>
       <body>
-        <div style="text-align: center;">
-          <img src="data:image/png;base64,{{logo}}" alt="Logo" />
+    <div class="invoice-container">
+      <div class="header">
+        <img src="data:image/png;base64,{{logo}}" alt="Logo" />
+        <div class="invoice-title">INVOICE</div>
+      </div>
+
+      <div class="invoice-header">
+        <div class="invoice-header-left">
+          <p><strong>Invoice Number:</strong> {{invoiceNumber}}</p>
         </div>
-        <h1>Invoice</h1>
-        <p>Invoice Number: {{transferMode}}</p>
-        <p>Amount: ₹{{amount}}</p>
-        <p>Remarks: {{remarks}}</p>
-        <p>Status: {{status}}</p>
-        <p>Customer: {{customer.name}}</p>
-        <p>Date: {{dateTime}}</p>
-        <h2>Billing Address</h2>
-        <p>{{address.billing.name}}</p>
-        <p>{{address.billing.billingAddress}}</p>
-        <h2>Shipping Address</h2>
+        <div class="invoice-header-right">
+          <p><strong>Date:</strong> {{dateTime}}</p>
+        </div>
+      </div>
+
+      <div class="address">
+        <div class="section-title">Invoice To:</div>
         <p>{{address.shipping.name}}</p>
         <p>{{address.shipping.shippingAddress}}</p>
-      </body>
+      </div>
+
+      <div class="invoice-details">
+        <div class="invoice-details-row">
+          <div class="section-title">Status</div>
+          <p>{{status}}</p>
+        </div>
+
+        <div class="invoice-details-row">
+          <div class="section-title">GSTIN</div>
+          <p>{{customer.gstin}}</p>
+        </div>
+
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>SL.</th>
+            <th>Item Name</th>
+            <th>Price</th>
+            <th>Qty.</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each items}}
+          <tr>
+            <td class="item">{{add @index 1}}</td>
+            <td class="item">{{item.name}}</td>
+            <td class="item">{{item.price}}</td>
+            <td class="item">{{quantity}}</td>
+            <td class="item">{{formatNumber total}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
+            <td>₹{{amount}}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+
+      <div class="section-title">Billing Address</div>
+      <div class="address">
+        <p>{{address.billing.name}}</p>
+        <p>{{address.billing.billingAddress}}</p>
+      </div>
+
+      <div class="service">
+      <div class="service-left">
+        <div class="section-title">Customer Notes</div>
+        <div class="customer-notes">
+          <p>{{customerNotes}}</p>
+        </div>
+      </div>
+
+      <div class="service-right">
+        <div class="section-title">Terms and Conditions</div>
+        <div class="terms-and-conditions">
+          <p>{{termsAndServices}}</p>
+        </div>
+      </div>
+
+      </div>
+
+      <div class="footer">
+        <p>Thank you for your business!</p>
+        <p>If you have any questions, please contact us.</p>
+      </div>
+    </div>
+  </body>
     </html>
 `;
 
@@ -311,10 +505,12 @@ export class InvoiceService {
 
   async generateInvoiceToCustomer(data: {
     amount: number;
+    invoiceNumber: string;
     userName: string;
-    remarks: string;
-    status: INVOICE_STATUS;
+    status: string;
     dateTime: Date;
+    customerNotes: string;
+    termsAndServices: string;
     address: {
       billing: {
         name: string;
@@ -328,13 +524,15 @@ export class InvoiceService {
     customer: {
       name: string;
       email: string;
+      gstin: string;
     };
+    items: InvoiceItemEntity[];
   }): Promise<Buffer> {
     try {
       // Use process.cwd() to get the project root directory
       const logoPath = path.join(
         process.cwd(),
-        "src/assets/images/paybolt-icon.png",
+        "src/assets/images/color-full.png",
       );
 
       let logoBase64 = "";
@@ -345,10 +543,25 @@ export class InvoiceService {
         this.logger.warn("Could not load logo image, proceeding without it");
       }
 
+      const items = data.items.map((item) => {
+        const total = item.item.price * item.quantity;
+
+        return {
+          ...item,
+          total,
+        };
+      });
+
+      const modifiedData = {
+        ...data,
+        items,
+        dateTime: formatDateTime(data.dateTime),
+      };
+
       // Use a different template for the customer-specific invoice
       const template = handlebars.compile(this.customerInvoiceTemplate);
       const html = template({
-        ...data,
+        ...modifiedData,
         logo: logoBase64,
       });
 
@@ -386,3 +599,11 @@ export class InvoiceService {
     }
   }
 }
+
+handlebars.registerHelper("add", function (value1, value2) {
+  return value1 + value2;
+});
+
+handlebars.registerHelper("formatNumber", function (value) {
+  return value.toFixed(2);
+});

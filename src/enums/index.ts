@@ -78,6 +78,8 @@ export enum ID_TYPE {
   CUSTOMER = "cst",
   INTERNAL_USER = "itu",
   INVOICES = "inv",
+  INVOICE_ITEMS = "invitm",
+  ITEMS = "itm",
   MEDIA_KYC = "mda",
   MERCHANT_PAYOUT = "mpout",
   ONBOARDING_USER = "onu",
@@ -186,4 +188,9 @@ export enum INVOICE_STATUS {
   DRAFT = 1,
   SENT = 2,
   FAILED = 3,
+}
+
+export enum SETTLEMENT_TYPE {
+  AUTOMATIC = "AUTOMATIC",
+  MANUAL = "MANUAL",
 }

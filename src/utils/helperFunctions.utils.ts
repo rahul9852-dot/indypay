@@ -1,7 +1,7 @@
 import { ulid } from "ulid";
 import * as dayjs from "dayjs";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
-import { ONBOARDING_STATUS } from "@/enums";
+import { INVOICE_STATUS, ONBOARDING_STATUS } from "@/enums";
 import { appConfig } from "@/config/app.config";
 
 export const getUlidId = (prefix = "pb") => `${prefix}_${ulid()}`;
@@ -85,5 +85,31 @@ export const getOnboardingStatus = (status: ONBOARDING_STATUS) => {
       return "onHold";
     default:
       return "signUp";
+  }
+};
+
+export const getInvoiceStatus = (status: INVOICE_STATUS) => {
+  switch (status) {
+    case INVOICE_STATUS.DRAFT:
+      return "draft";
+    case INVOICE_STATUS.FAILED:
+      return "failed";
+    case INVOICE_STATUS.SENT:
+      return "sent";
+    default:
+      return "draft";
+  }
+};
+
+export const getInvoiceStatusForQuery = (status: string) => {
+  switch (status) {
+    case "draft":
+      return INVOICE_STATUS.DRAFT;
+    case "failed":
+      return INVOICE_STATUS.FAILED;
+    case "success":
+      return INVOICE_STATUS.SENT;
+    default:
+      return INVOICE_STATUS.DRAFT;
   }
 };

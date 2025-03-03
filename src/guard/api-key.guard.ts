@@ -37,6 +37,10 @@ export class ApiKeyGuard implements CanActivate {
 
     const requestIp = getCurrentUserIp(request);
 
+    // this.logger.info(
+    //   `api key request ip: ${requestIp} on [${request.method}] - ${request.url}}`,
+    // );
+
     const [type, cred] = request.headers?.authorization?.split(" ") || [];
     if (type !== "Basic" || !cred) {
       throw new UnauthorizedException();
