@@ -15,6 +15,7 @@ import { TransactionsEntity } from "./transaction.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
 import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
+import { PAYMENT_METHOD } from "@/enums/payment-method.enum";
 
 @Entity("payin_orders")
 @Index(["userId", "createdAt"])
@@ -48,6 +49,9 @@ export class PayInOrdersEntity {
 
   @Column({ nullable: true })
   txnRefId: string;
+
+  @Column({ enum: PAYMENT_METHOD, default: PAYMENT_METHOD.UPI })
+  paymentMethod: string;
 
   @Column({ nullable: true })
   intent: string;
