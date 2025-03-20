@@ -29,6 +29,7 @@ import { CollectionsModule } from "@/modules/collections/collections.module";
 import { BanksModule } from "@/modules/banks/banks.module";
 import { SsoModule } from "@/modules/sso/sso.module";
 import { ChannelPartnersModule } from "@/modules/channel-partners/channel-partners.module";
+import { AnalyticsModule } from "@/modules/analytics/analytics.module";
 import { DisabledEndpointInterceptor } from "@/interceptors/disabled-endpoint.interceptor";
 
 @Module({
@@ -58,6 +59,7 @@ import { DisabledEndpointInterceptor } from "@/interceptors/disabled-endpoint.in
     CustomerModule,
     ItemModule,
     ReportsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [
