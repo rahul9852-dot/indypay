@@ -23,7 +23,6 @@ export class AnalyticsService {
     dateRange: { startDate: Date; endDate: Date },
     userId?: string,
   ) {
-    // Build base query with index hints for performance
     const baseQuery = this.payInOrdersRepository
       .createQueryBuilder("payInOrder")
       .where("payInOrder.createdAt BETWEEN :startDate AND :endDate", dateRange);
@@ -32,7 +31,6 @@ export class AnalyticsService {
       baseQuery.andWhere("payInOrder.userId = :userId", { userId });
     }
 
-    // Get total initiated count and volume first
     const initiatedMetrics = await baseQuery
       .clone()
       .select([
@@ -41,7 +39,6 @@ export class AnalyticsService {
       ])
       .getRawOne();
 
-    // Get counts and volumes by status in a single query
     const statusMetrics = await baseQuery
       .select([
         "payInOrder.status",
@@ -49,10 +46,9 @@ export class AnalyticsService {
         "COALESCE(SUM(payInOrder.amount), 0) as volume",
       ])
       .groupBy("payInOrder.status")
-      .cache(true) // Enable query caching for 5 minutes
+      .cache(true)
       .getRawMany();
 
-    // Get UPI volume with proper filtering
     const upiMetrics = await baseQuery
       .clone()
       .select("COALESCE(SUM(payInOrder.amount), 0)", "volume")
@@ -64,7 +60,6 @@ export class AnalyticsService {
       })
       .getRawOne();
 
-    // Process metrics with proper type handling
     const metrics = statusMetrics.reduce((acc, curr) => {
       acc[curr.payInOrder_status.toLowerCase()] = {
         count: parseInt(curr.count) || 0,
@@ -122,10 +117,6 @@ export class AnalyticsService {
     userId: string | null,
     { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
   ) {
-    this.logger.log(
-      `Getting business trend for user ${userId} from ${startDate} to ${endDate}`,
-    );
-
     if (new Date(startDate) > new Date(endDate)) {
       throw new BadRequestException("Start date cannot be after end date");
     }
@@ -134,35 +125,16 @@ export class AnalyticsService {
       const startDateTime = new Date(startDate);
       const endDateTime = new Date(endDate);
 
-      this.logger.log(`Querying UPI transactions with params:
-        userId: ${userId}
-        startDate: ${startDateTime.toISOString()}
-        endDate: ${endDateTime.toISOString()}
-        paymentMethod: ${PAYMENT_METHOD.UPI}`);
-
-      // First, let's check if we have any data at all
       const queryBuilder =
         this.payInOrdersRepository.createQueryBuilder("payInOrder");
 
-      // Only add userId condition for merchant users
       if (userId) {
         queryBuilder.where("payInOrder.userId = :userId", { userId });
       }
 
-      const dataCheck = await queryBuilder
-        .select(["payInOrder.paymentMethod", "COUNT(*) as count"])
-        .groupBy("payInOrder.paymentMethod")
-        .getRawMany();
-
-      this.logger.log(
-        `Total records by payment method: ${JSON.stringify(dataCheck)}`,
-      );
-
-      // Get UPI transaction stats
       const upiQueryBuilder =
         this.payInOrdersRepository.createQueryBuilder("payInOrder");
 
-      // Only add userId condition for merchant users
       if (userId) {
         upiQueryBuilder.where("payInOrder.userId = :userId", { userId });
       }
@@ -183,60 +155,18 @@ export class AnalyticsService {
           `SUM(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.amount ELSE 0 END) as successAmount`,
           `SUM(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.amount ELSE 0 END) as failedAmount`,
           `SUM(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.PENDING}' THEN payInOrder.amount ELSE 0 END) as pendingAmount`,
-          // Today's stats
           `COUNT(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.id END) as todaySuccessCount`,
           `COUNT(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE AND payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.id END) as todayFailedCount`,
           `SUM(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.amount ELSE 0 END) as todayVolume`,
-          // Yesterday's stats
           `COUNT(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE - INTERVAL '1 day' AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.id END) as yesterdaySuccessCount`,
           `COUNT(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE - INTERVAL '1 day' AND payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.id END) as yesterdayFailedCount`,
           `SUM(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE - INTERVAL '1 day' AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.amount ELSE 0 END) as yesterdayVolume`,
-          // Last 7 days stats
           `COUNT(CASE WHEN payInOrder.createdAt >= CURRENT_DATE - INTERVAL '7 days' AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.id END) as last7DaysSuccessCount`,
           `COUNT(CASE WHEN payInOrder.createdAt >= CURRENT_DATE - INTERVAL '7 days' AND payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.id END) as last7DaysFailedCount`,
           `SUM(CASE WHEN payInOrder.createdAt >= CURRENT_DATE - INTERVAL '7 days' AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.amount ELSE 0 END) as last7DaysVolume`,
         ])
         .getRawOne();
 
-      this.logger.log(`Raw UPI stats: ${JSON.stringify(upiStats, null, 2)}`);
-
-      // Check if we have any data in the date range
-      const dateRangeCheck = await this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
-        .where("payInOrder.userId = :userId", { userId })
-        .andWhere("payInOrder.createdAt >= :startDate", {
-          startDate: startDateTime,
-        })
-        .andWhere("payInOrder.createdAt <= :endDate", { endDate: endDateTime })
-        .select(["COUNT(*) as count"])
-        .getRawOne();
-
-      this.logger.log(
-        `Total records in date range: ${dateRangeCheck?.count || 0}`,
-      );
-
-      // Check payment method values in database
-      const paymentMethodCheck = await this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
-        .select(["DISTINCT payInOrder.paymentMethod"])
-        .getRawMany();
-
-      this.logger.log(
-        `Available payment methods in DB: ${JSON.stringify(paymentMethodCheck)}`,
-      );
-
-      // Log the query parameters for debugging
-      const queryParams = {
-        userId,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        paymentMethod: PAYMENT_METHOD.UPI,
-      };
-      this.logger.log(
-        `Query parameters: ${JSON.stringify(queryParams, null, 2)}`,
-      );
-
-      // Calculate success rates
       const upiTotalCount = Number(upiStats.totalcount) || 0;
       const upiSuccessCount = Number(upiStats.successcount) || 0;
       const todayTotal =
@@ -249,7 +179,6 @@ export class AnalyticsService {
         (Number(upiStats.last7dayssuccesscount) || 0) +
         (Number(upiStats.last7daysfailedcount) || 0);
 
-      // Convert string values to numbers
       const upiTrendStats = {
         method: PAYMENT_METHOD.UPI,
         totalcount: Number(upiStats.totalcount) || 0,
@@ -286,19 +215,10 @@ export class AnalyticsService {
             : 0,
       };
 
-      this.logger.log(`Calculated success rates: 
-      Overall: ${upiTrendStats.successRate}%
-      Today: ${upiTrendStats.todaySuccessRate}%
-      Yesterday: ${upiTrendStats.yesterdaySuccessRate}%
-      Last 7 days: ${upiTrendStats.last7DaysSuccessRate}%`);
-
       const paymentMethodStats = [upiTrendStats];
-
-      // Get overall transaction stats with pending status
       const overallQueryBuilder =
         this.payInOrdersRepository.createQueryBuilder("payInOrder");
 
-      // Only add userId condition for merchant users
       if (userId) {
         overallQueryBuilder.where("payInOrder.userId = :userId", { userId });
       }
@@ -320,7 +240,6 @@ export class AnalyticsService {
         ])
         .getRawOne();
 
-      // Calculate overall success and conversion rates with proper number conversion
       const overallTotalCount = Number(overallStats.totalcount) || 0;
       const overallSuccessCount = Number(overallStats.successcount) || 0;
       const overallFailedCount = Number(overallStats.failedcount) || 0;
@@ -345,11 +264,9 @@ export class AnalyticsService {
             : 0,
       };
 
-      // Calculate hourly transaction volume for the last 24 hours
       const hourlyQueryBuilder =
         this.payInOrdersRepository.createQueryBuilder("payInOrder");
 
-      // Only add userId condition for merchant users
       if (userId) {
         hourlyQueryBuilder.where("payInOrder.userId = :userId", { userId });
       }
@@ -371,12 +288,6 @@ export class AnalyticsService {
         .orderBy("hour", "ASC")
         .getRawMany();
 
-      // Log the raw stats for debugging
-      this.logger.log(
-        `Payment method stats: ${JSON.stringify(paymentMethodStats)}`,
-      );
-
-      // Calculate totals with proper type conversion
       const totalSuccessfulTransactions =
         Number(overallStats.successcount) || 0;
       const totalTransactions = Number(overallStats.totalcount) || 0;
@@ -385,12 +296,6 @@ export class AnalyticsService {
           ? (totalSuccessfulTransactions / totalTransactions) * 100
           : 0;
 
-      this.logger.log(`Calculated totals: 
-      Total transactions: ${totalTransactions}
-      Successful transactions: ${totalSuccessfulTransactions}
-      Success rate: ${successRate}%`);
-
-      // Sort payment methods by success rate for accurate best/worst performer
       const sortedStats = [...paymentMethodStats].sort(
         (a, b) => (b.successRate || 0) - (a.successRate || 0),
       );
@@ -404,11 +309,6 @@ export class AnalyticsService {
         successRate: 0,
       };
 
-      this.logger
-        .log(`Best performer: ${bestPerformer.method} (${bestPerformer.successRate}%)
-      Worst performer: ${worstPerformer.method} (${worstPerformer.successRate}%)`);
-
-      // Log final calculated values
       const response = {
         summary: {
           successfulTransactionsRate: Number(successRate) || 0,
@@ -440,8 +340,6 @@ export class AnalyticsService {
         ],
       };
 
-      this.logger.log(`Final response: ${JSON.stringify(response, null, 2)}`);
-
       return response;
     } catch (error) {
       this.logger.error(`Error in getBusinessTrend: ${error.message}`);
@@ -459,7 +357,6 @@ export class AnalyticsService {
     }
 
     const payInStats = await Promise.all([
-      // PayIn Stats - Total Amount
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .select("SUM(payInOrder.amount)", "total")
@@ -468,7 +365,7 @@ export class AnalyticsService {
           endDate: new Date(endDate),
         })
         .getRawOne(),
-      // PayIn Stats - Total Count
+
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where("payInOrder.createdAt BETWEEN :startDate AND :endDate", {
@@ -476,7 +373,7 @@ export class AnalyticsService {
           endDate: new Date(endDate),
         })
         .getCount(),
-      // Success Amount
+
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .select("SUM(payInOrder.amount)", "total")
@@ -489,7 +386,7 @@ export class AnalyticsService {
           },
         )
         .getRawOne(),
-      // Success Count
+
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where(
@@ -501,7 +398,7 @@ export class AnalyticsService {
           },
         )
         .getCount(),
-      // Failed Amount
+
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .select("SUM(payInOrder.amount)", "total")
@@ -514,7 +411,7 @@ export class AnalyticsService {
           },
         )
         .getRawOne(),
-      // Failed Count
+
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where(
@@ -527,9 +424,6 @@ export class AnalyticsService {
         )
         .getCount(),
     ]);
-
-    this.logger.log("PayIn stats:", payInStats);
-
     const [
       initiatedPayinAmountRaw,
       initiatedPayinCount,
@@ -539,21 +433,10 @@ export class AnalyticsService {
       failedPayinCount,
     ] = payInStats;
 
-    // Extract amounts from raw results
     const initiatedPayinAmount = initiatedPayinAmountRaw?.total || 0;
     const successPayinAmount = successPayinAmountRaw?.total || 0;
     const failedPayinAmount = failedPayinAmountRaw?.total || 0;
 
-    this.logger.log("Parsed PayIn stats:", {
-      initiatedPayinAmount,
-      initiatedPayinCount,
-      successPayinAmount,
-      successPayinCount,
-      failedPayinAmount,
-      failedPayinCount,
-    });
-
-    // Avoid division by zero
     const totalCount = initiatedPayinCount || 1;
 
     const numberOfOrdersCreated = initiatedPayinCount;
@@ -567,6 +450,8 @@ export class AnalyticsService {
         numberOfOrdersAttempted,
         numberOfOrdersPaid,
         ordersConversionRate,
+        successPayinAmount,
+        failedPayinAmount,
       },
     };
   }
@@ -580,7 +465,6 @@ export class AnalyticsService {
     }
 
     const payInStats = await Promise.all([
-      // PayIn Stats - Total Amount
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .select("SUM(payInOrder.amount)", "total")
@@ -590,7 +474,6 @@ export class AnalyticsService {
           endDate: new Date(endDate),
         })
         .getRawOne(),
-      // PayIn Stats - Total Count
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where("payInOrder.user.id = :userId", { userId })
@@ -599,7 +482,6 @@ export class AnalyticsService {
           endDate: new Date(endDate),
         })
         .getCount(),
-      // Success Amount
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .select("SUM(payInOrder.amount)", "total")
@@ -613,7 +495,6 @@ export class AnalyticsService {
           },
         )
         .getRawOne(),
-      // Success Count
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where("payInOrder.user.id = :userId", { userId })
@@ -626,7 +507,6 @@ export class AnalyticsService {
           },
         )
         .getCount(),
-      // Failed Amount
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where("payInOrder.user.id = :userId", { userId })
@@ -640,7 +520,6 @@ export class AnalyticsService {
           },
         )
         .getRawOne(),
-      // Failed Count
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where("payInOrder.user.id = :userId", { userId })
@@ -655,8 +534,6 @@ export class AnalyticsService {
         .getCount(),
     ]);
 
-    this.logger.log("PayIn stats:", payInStats);
-
     const [
       initiatedPayinAmountRaw,
       initiatedPayinCount,
@@ -666,21 +543,6 @@ export class AnalyticsService {
       failedPayinCount,
     ] = payInStats;
 
-    // Extract amounts from raw results
-    const initiatedPayinAmount = initiatedPayinAmountRaw?.total || 0;
-    const successPayinAmount = successPayinAmountRaw?.total || 0;
-    const failedPayinAmount = failedPayinAmountRaw?.total || 0;
-
-    this.logger.log("Parsed PayIn stats:", {
-      initiatedPayinAmount,
-      initiatedPayinCount,
-      successPayinAmount,
-      successPayinCount,
-      failedPayinAmount,
-      failedPayinCount,
-    });
-
-    // Avoid division by zero
     const totalCount = initiatedPayinCount || 1;
 
     const numberOfOrdersCreated = initiatedPayinCount;
@@ -704,7 +566,6 @@ export class AnalyticsService {
     userId: string,
     { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
   ) {
-    // Validate date range
     if (new Date(startDate) > new Date(endDate)) {
       throw new BadRequestException("Start date cannot be after end date");
     }
@@ -754,7 +615,6 @@ export class AnalyticsService {
     userId: string,
     { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
   ) {
-    // Validate date range
     if (new Date(startDate) > new Date(endDate)) {
       throw new BadRequestException("Start date cannot be after end date");
     }
@@ -785,13 +645,11 @@ export class AnalyticsService {
     startDate = todayStartDate(),
     endDate = todayEndDate(),
   }: DateDto) {
-    // Validate date range
     if (new Date(startDate) > new Date(endDate)) {
       throw new BadRequestException("Start date cannot be after end date");
     }
 
     const failedAnalytics = await Promise.all([
-      // Intitiated count
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where(
@@ -803,8 +661,6 @@ export class AnalyticsService {
           },
         )
         .getCount(),
-
-      // Failed Count
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where(
@@ -816,7 +672,6 @@ export class AnalyticsService {
           },
         )
         .getCount(),
-      // Failed Volume
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .select("SUM(payInOrder.amount)", "total")
@@ -848,13 +703,11 @@ export class AnalyticsService {
     userId: string,
     { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
   ) {
-    // Validate date range
     if (new Date(startDate) > new Date(endDate)) {
       throw new BadRequestException("Start date cannot be after end date");
     }
 
     const failedAnalytics = await Promise.all([
-      // initated count
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where("payInOrder.userId = :userId", { userId })
@@ -867,7 +720,6 @@ export class AnalyticsService {
           },
         )
         .getCount(),
-      // Failed Count
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .where("payInOrder.userId = :userId", { userId })
@@ -880,7 +732,6 @@ export class AnalyticsService {
           },
         )
         .getCount(),
-      // Failed Volume
       this.payInOrdersRepository
         .createQueryBuilder("payInOrder")
         .select("SUM(payInOrder.amount)", "total")
