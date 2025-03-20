@@ -20,6 +20,41 @@ import { UsersEntity } from "@/entities/user.entity";
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
+  @Get("/system/uptime")
+  @ApiOperation({ summary: "Get system uptime and performance metrics" })
+  @Role(USERS_ROLE.ADMIN)
+  @ApiResponse({
+    status: 200,
+    description: "Returns system uptime and performance metrics",
+    schema: {
+      type: "object",
+      properties: {
+        uptime: {
+          type: "object",
+          properties: {
+            days: { type: "number" },
+            hours: { type: "number" },
+            minutes: { type: "number" },
+            seconds: { type: "number" },
+            totalSeconds: { type: "number" },
+            startTime: { type: "string", format: "date-time" },
+          },
+        },
+        memory: {
+          type: "object",
+          properties: {
+            heapUsed: { type: "number" },
+            heapTotal: { type: "number" },
+            rss: { type: "number" },
+          },
+        },
+      },
+    },
+  })
+  getSystemUptime() {
+    return this.analyticsService.getSystemUptime();
+  }
+
   @Get("/merchant/business-trend")
   @ApiOperation({ summary: "Get merchant's business trend analytics" })
   @Role(USERS_ROLE.MERCHANT)
@@ -174,14 +209,14 @@ export class AnalyticsController {
     return this.analyticsService.getMerchantConversionRate(user.id, dateDto);
   }
 
-  @Get("/analytics/admin/failure")
+  @Get("/admin/failure")
   @ApiOperation({ summary: "Get failure analytics for admin" })
   @Role(USERS_ROLE.ADMIN)
   async getAdminFailureAnalytics(@Query() dateDto: DateDto) {
     return this.analyticsService.getAdminFailureAnalytics(dateDto);
   }
 
-  @Get("/analytics/merchant/failure")
+  @Get("/merchant/failure")
   @ApiOperation({ summary: "Get failure analytics for merchant" })
   @Role(USERS_ROLE.MERCHANT)
   async getMerchantFailureAnalytics(
