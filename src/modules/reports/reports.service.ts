@@ -2,12 +2,13 @@ import { Response } from "express";
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Between, FindManyOptions, Repository } from "typeorm";
-import * as ExcelJS from "exceljs"; // Import exceljs
+// Import exceljs
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { formatDateTime } from "@/utils/helperFunctions.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
+import { writeRecordsToWorkbookInChunksStreaming } from "@/utils/excel.utils";
 
 @Injectable()
 export class ReportsService {
@@ -26,15 +27,15 @@ export class ReportsService {
     startDate = todayStartDate().toISOString(),
     endDate = todayEndDate().toISOString(),
     from = 0,
-    count = 1000,
+    count,
     res,
   }: {
     userId: string;
     status?: PAYMENT_STATUS;
     startDate?: string;
     endDate?: string;
-    from?: number; // Skip records
-    count?: number; // How many records to take
+    from?: number;
+    count?: number;
     res: Response;
   }): Promise<void> {
     const normalizedStartDate = new Date(startDate);
@@ -51,74 +52,46 @@ export class ReportsService {
       throw new Error("Start date must be before or equal to end date");
     }
 
-    // Ensure valid range parameters
     const skip = Math.max(0, from);
-    const take = Math.min(count, 10000); // Set reasonable limit to prevent abuse
+    const take = Math.min(count, 10000);
 
     const filename =
       `payin_orders_${userId}${status ? "_" + status : ""}_${formatDateTime(normalizedStartDate)}-${formatDateTime(normalizedEndDate)}_records${skip}-${skip + take}.xlsx`
         .replaceAll(" ", "_")
         .replaceAll(/[<>:"/\\|?*]/g, "-");
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("PayIn Orders");
-
-    worksheet.addRow([
-      "ID",
-      "Order ID",
-      "Amount",
-      "UTR",
-      "Status",
-      "Created At",
-    ]);
-
-    // Get total count for context
-    const totalCount = await this.getPayinOrdersCount(
-      userId,
-      status,
-      normalizedStartDate,
-      normalizedEndDate,
-    );
-
-    // Add range info
-    worksheet.addRow([
-      `Records ${skip + 1} to ${Math.min(skip + take, totalCount)} of ${totalCount}`,
-    ]);
-    worksheet.addRow([]); // Empty row for separation
-
-    // Get records in specified range
-    const records = await this.getPayinOrdersBatch(
-      userId,
-      skip,
-      take,
-      status,
-      normalizedStartDate,
-      normalizedEndDate,
-    );
-
-    if (records.length > 0) {
-      records.forEach((order) => {
-        worksheet.addRow([
-          order.id,
-          order.orderId,
-          order.amount,
-          order.utr,
-          order.status,
-          formatDateTime(order.createdAt),
-        ]);
-      });
-    }
-
-    // Set response headers for Excel download
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    // Write Excel to buffer and send it in response
-    const buffer = await workbook.xlsx.writeBuffer();
-    res.end(Buffer.from(buffer));
+    await writeRecordsToWorkbookInChunksStreaming<PayInOrdersEntity>({
+      res,
+      sheetName: "PayIn Orders",
+      header: ["ID", "Order ID", "Amount", "UTR", "Status", "Created At"],
+      rowMapper: (order) => [
+        order.id,
+        order.orderId,
+        order.amount,
+        order.utr,
+        order.status,
+        formatDateTime(order.createdAt),
+      ],
+      batchFetch: (offset, limit) =>
+        this.getPayinOrdersBatch(
+          userId,
+          offset,
+          limit,
+          status,
+          normalizedStartDate,
+          normalizedEndDate,
+        ),
+      from: skip,
+      count: take,
+    });
+
+    res.end();
   }
 
   private async getPayinOrdersBatch(
@@ -192,15 +165,15 @@ export class ReportsService {
     startDate = todayStartDate().toISOString(),
     endDate = todayEndDate().toISOString(),
     from = 0,
-    count = 1000,
+    count,
     res,
   }: {
     userId: string;
     status?: PAYMENT_STATUS;
     startDate?: string;
     endDate?: string;
-    from?: number; // Skip records
-    count?: number; // How many records to take
+    from?: number;
+    count?: number;
     res: Response;
   }): Promise<void> {
     const normalizedStartDate = new Date(startDate);
@@ -219,74 +192,54 @@ export class ReportsService {
 
     // Ensure valid range parameters
     const skip = Math.max(0, from);
-    const take = Math.min(count, 10000); // Set reasonable limit to prevent abuse
+    const take = Math.min(count, 10000);
 
     const filename =
       `payout_orders_${userId}${status ? "_" + status : ""}_${formatDateTime(normalizedStartDate)}-${formatDateTime(normalizedEndDate)}_records${skip}-${skip + take}.xlsx`
         .replaceAll(" ", "_")
         .replaceAll(/[<>:"/\\|?*]/g, "-");
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("PayOut Orders");
-
-    worksheet.addRow([
-      "ID",
-      "Order ID",
-      "Payout ID",
-      "Amount",
-      "UTR",
-      "Status",
-      "Created At",
-    ]);
-
-    // Get total count for context
-    const totalCount = await this.getPayoutOrdersCount(
-      userId,
-      status,
-      normalizedStartDate,
-      normalizedEndDate,
-    );
-
-    // Add range info
-    worksheet.addRow([
-      `Records ${skip + 1} to ${Math.min(skip + take, totalCount)} of ${totalCount}`,
-    ]);
-    worksheet.addRow([]); // Empty row for separation
-
-    // Get records in specified range
-    const records = await this.getPayoutOrdersBatch(
-      userId,
-      skip,
-      take,
-      status,
-      normalizedStartDate,
-      normalizedEndDate,
-    );
-
-    if (records.length > 0) {
-      records.forEach((order) => {
-        worksheet.addRow([
-          order.id,
-          order.orderId,
-          order.payoutId,
-          order.amount,
-          order.utr,
-          order.status,
-          formatDateTime(order.createdAt),
-        ]);
-      });
-    }
-
-    // Set response headers for Excel download
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    // Write Excel to buffer and send it in response
-    const buffer = await workbook.xlsx.writeBuffer();
-    res.end(Buffer.from(buffer));
+    await writeRecordsToWorkbookInChunksStreaming<PayOutOrdersEntity>({
+      res,
+      sheetName: "Payout Orders",
+      header: [
+        "ID",
+        "Order ID",
+        "Payout ID",
+        "Amount",
+        "UTR",
+        "Status",
+        "Created At",
+      ],
+      rowMapper: (order) => [
+        order.id,
+        order.orderId,
+        order.payoutId,
+        order.amount,
+        order.utr,
+        order.status,
+        formatDateTime(order.createdAt),
+      ],
+      batchFetch: (offset, limit) =>
+        this.getPayoutOrdersBatch(
+          userId,
+          offset,
+          limit,
+          status,
+          normalizedStartDate,
+          normalizedEndDate,
+        ),
+      from: skip,
+      count: take,
+    });
+
+    res.end();
   }
 
   private async getPayoutOrdersBatch(
