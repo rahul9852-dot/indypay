@@ -5,7 +5,10 @@ import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
-import { PaginationWithDateDto } from "@/dtos/common.dto";
+import {
+  PaginationWithDateDto,
+  PaginationWithDateAndStatusDto,
+} from "@/dtos/common.dto";
 
 @ApiTags("Collections")
 @Controller("collections")
@@ -42,7 +45,7 @@ export class CollectionsController {
   @Get("admin/:userId")
   getAllCollectionsByUserIdAdmin(
     @Param("userId") userId: string,
-    @Query() paginationDto: PaginationWithDateDto,
+    @Query() paginationDto: PaginationWithDateAndStatusDto,
   ) {
     return this.collectionsService.getAllCollectionsByUserIdAdmin(
       userId,
