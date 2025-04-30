@@ -4,6 +4,7 @@ import { PayoutService } from "./payout.service";
 import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 import {
+  PaginationWithDateAndStatusDto,
   PaginationWithDateDto,
   PaginationWithoutSortAndOrderDto,
 } from "@/dtos/common.dto";
@@ -30,7 +31,7 @@ export class PayoutController {
   @Get("/admin/:userId")
   async getAllPayoutsByUserId(
     @Param("userId") userId: string,
-    @Query() query: PaginationWithDateDto,
+    @Query() query: PaginationWithDateAndStatusDto,
   ) {
     return this.payoutService.getAllPayoutsMerchant(query, userId);
   }

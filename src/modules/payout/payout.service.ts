@@ -19,6 +19,7 @@ import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import {
   DateDto,
   MessageResponseDto,
+  PaginationWithDateAndStatusDto,
   PaginationWithDateDto,
   PaginationWithoutSortAndOrderDto,
 } from "@/dtos/common.dto";
@@ -214,18 +215,23 @@ export class PayoutService {
   async getAllPayoutsMerchant(
     {
       page = 1,
-      limit = 10,
+      limit = 50,
       sort = "id",
       order = "DESC",
       search = "",
       startDate = todayStartDate(),
       endDate = todayEndDate(),
-    }: PaginationWithDateDto,
+      status,
+    }: PaginationWithDateAndStatusDto,
     userId: string,
   ) {
     const whereQuery:
       | FindOptionsWhere<PayOutOrdersEntity>
       | FindOptionsWhere<PayOutOrdersEntity>[] = {};
+
+    const internalStatus = status
+      ? convertExternalPaymentStatusToInternal(status.toUpperCase())
+      : undefined;
 
     // Date Filter
     if (startDate && endDate) {
@@ -234,6 +240,11 @@ export class PayoutService {
       whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
     } else if (endDate) {
       whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+    }
+
+    whereQuery.user = { id: userId };
+    if (internalStatus) {
+      whereQuery.status = internalStatus;
     }
 
     const user = await this.userRepository.findOne({
@@ -246,24 +257,15 @@ export class PayoutService {
 
     if (search) {
       query.push({
+        ...whereQuery,
         orderId: ILike(`%${search}%`),
-        user: {
-          id: userId,
-        },
       });
-      query.push({
-        transferId: ILike(`%${search}%`),
-        user: {
-          id: userId,
-        },
-      });
-    } else {
       query.push({
         ...whereQuery,
-        user: {
-          id: userId,
-        },
+        txnRefId: ILike(`%${search}%`),
       });
+    } else {
+      query.push(whereQuery);
     }
 
     const [payouts, totalItems] = await this.payoutRepository.findAndCount({

@@ -140,12 +140,10 @@ export class CollectionsService {
   ) {
     const whereQuery: FindOptionsWhere<PayInOrdersEntity> = {};
 
-    // Convert status to internal format if provided
     const internalStatus = status
       ? convertExternalPaymentStatusToInternal(status.toUpperCase())
       : undefined;
 
-    // Date Filter
     if (startDate && endDate) {
       whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
     } else if (startDate) {
