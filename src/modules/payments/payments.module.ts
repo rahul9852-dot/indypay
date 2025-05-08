@@ -2,6 +2,7 @@ import { JwtService } from "@nestjs/jwt";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
+import { CacheModule } from "@nestjs/cache-manager";
 
 import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
@@ -25,6 +26,7 @@ import { SNSService } from "@/modules/aws/sns.service";
 import { PayoutService } from "@/modules/payout/payout.service";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
+import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth.module";
 
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
     BullModule.registerQueue({
       name: "payouts",
     }),
+    CacheModule.register(),
+    ThirdPartyAuthModule,
   ],
   providers: [
     PaymentsService,
@@ -59,5 +63,6 @@ import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
     PayoutService,
   ],
   controllers: [PaymentsController],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}

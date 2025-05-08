@@ -25,11 +25,11 @@ import {
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
   CreatePayoutDto,
-  PayoutStatusMerchantDto,
+  PayoutStatusDto,
   SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
 import { ExternalPayinWebhookFlakPayDto } from "./dto/external-webhook-payin.dto";
-import { ExternalPayOutWebhookFlakPayDto } from "./dto/external-webhook-payout.dto";
+import { ExternalEritechWebhookDto } from "./dto/external-webhook-payout.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -108,7 +108,7 @@ export class PaymentsController {
     @Body() singlePayoutDto: SinglePayoutDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createPayoutFlakPaySingle(
+    return this.paymentsService.createPayoutEritechSingle(
       singlePayoutDto,
       user,
     );
@@ -137,11 +137,11 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @Post("payout/status")
   async checkStatusTransactionPayout(
-    @Body() payoutStatusMerchantDto: PayoutStatusMerchantDto,
+    @Body() payoutStatusDto: PayoutStatusDto,
     @User() user: UsersEntity,
   ) {
-    return this.payoutService.checkPayOutStatusTransactionFlakPay(
-      payoutStatusMerchantDto,
+    return this.payoutService.checkPayOutStatusTransactionEritech(
+      payoutStatusDto,
       user,
     );
   }
@@ -171,6 +171,19 @@ export class PaymentsController {
     );
   }
 
+  // @Public()
+  // @ApiOperation({ summary: "External webhook for pay-out" })
+  // @UseGuards(WebhookGuard)
+  // @HttpCode(HttpStatus.OK)
+  // @ApiOkResponse({ type: MessageResponseDto })
+  // @Post("payout/webhook")
+  // async externalWebhookPayout(
+  //   @Body() externalWebhookPayout: ExternalPayOutWebhookFlakPayDto,
+  // ) {
+  //   return this.paymentsService.externalWebhookPayoutFlaPay(
+  //     externalWebhookPayout,
+  //   );
+  // }
   @Public()
   @ApiOperation({ summary: "External webhook for pay-out" })
   @UseGuards(WebhookGuard)
@@ -178,9 +191,9 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payout/webhook")
   async externalWebhookPayout(
-    @Body() externalWebhookPayout: ExternalPayOutWebhookFlakPayDto,
+    @Body() externalWebhookPayout: ExternalEritechWebhookDto,
   ) {
-    return this.paymentsService.externalWebhookPayoutFlaPay(
+    return this.paymentsService.externalWebhookPayoutEritech(
       externalWebhookPayout,
     );
   }

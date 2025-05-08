@@ -33,8 +33,10 @@ import {
   SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
 import {
+  ExternalEritechWebhookDto,
   ExternalPayOutWebhookFlakPayDto,
   ExternalPayoutWebhookIsmartDto,
+  PayoutWebhookResponseDto,
 } from "./dto/external-webhook-payout.dto";
 import {
   ExternalPayinWebhookFlakPayDto,
@@ -61,7 +63,11 @@ import {
   convertExternalPaymentStatusToInternal,
   getUlidId,
 } from "@/utils/helperFunctions.utils";
-import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
+import {
+  ERTITECH,
+  FALKPAY,
+  ISMART_PAY,
+} from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
 import {
   calculateOriginalAmountFromNetPayable,
@@ -75,17 +81,23 @@ import {
   IExternalPayoutResponseFlakPay,
   IExternalPayinStatusResponseFlakPay,
   IExternalPayoutStatusResponseFlakPay,
+  IExternalPayoutRequestEritechEncrypt,
+  IExternalEritecPayoutFundResponse,
+  IExternalEritecPayoutFundResponseDecrypted,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
 import { ID_TYPE, USERS_ROLE } from "@/enums";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import {
+  getEritechPgConfig,
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
 } from "@/utils/pg-config.utils";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { decryptData } from "@/utils/encode-decode.utils";
+import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
+import { mapToFilteredDto } from "@/utils/interface-mapping.utils";
 
 const { beBaseUrl, externalPaymentConfig } = appConfig();
 
@@ -110,6 +122,7 @@ export class PaymentsService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
     private readonly dataSource: DataSource,
+    private readonly thirdPartyAuthService: ThirdPartyAuthService,
   ) {}
 
   async checkPayOutWalletFlakPay(user: UsersEntity) {
@@ -645,6 +658,48 @@ export class PaymentsService {
     }
   }
 
+  async getEncryptedPayload(payload: any, token: string) {
+    const axiosErtech = new AxiosService(
+      ERTITECH.BASE_URL,
+      getEritechPgConfig({
+        token,
+      }),
+    );
+
+    const encryptedErtechPayload =
+      await axiosErtech.postRequest<IExternalPayoutRequestEritechEncrypt>(
+        ERTITECH.PAYOUT.ENCRYPT,
+        {
+          data: payload,
+          key: externalPaymentConfig.ertech.encryptionKey,
+        },
+      );
+
+    return encryptedErtechPayload;
+  }
+  async getDecryptedPayload(
+    payload: any,
+    token: string,
+  ): Promise<IExternalEritecPayoutFundResponseDecrypted> {
+    const axiosErtech = new AxiosService(
+      ERTITECH.BASE_URL,
+      getEritechPgConfig({
+        token,
+      }),
+    );
+
+    const decryptedErtechPayload =
+      await axiosErtech.postRequest<IExternalEritecPayoutFundResponseDecrypted>(
+        ERTITECH.PAYOUT.DECRYPT,
+        {
+          data: payload,
+          key: externalPaymentConfig.ertech.encryptionKey,
+        },
+      );
+
+    return decryptedErtechPayload;
+  }
+
   async createPayoutFlakPaySingle(
     singlePayoutDto: SinglePayoutDto,
     user: UsersEntity,
@@ -815,6 +870,212 @@ export class PaymentsService {
       //   `Payout processed successfully: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
       //   response.data,
       // );
+
+      await queryRunner.commitTransaction();
+
+      return {
+        message: "Payout process initiated",
+        payoutOrder: {
+          orderId: savedPayoutOrder.orderId,
+          payoutId: singlePayoutDto.payoutId,
+          amount: singlePayoutDto.amount,
+          status,
+          accountNumber: savedPayoutOrder.bankAccountNumber,
+          bankName: savedPayoutOrder.bankName,
+          ifscCode: savedPayoutOrder.bankIfsc,
+        },
+      };
+    } catch (err) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Error initiating payouts`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  // Eritech single fund transfer payout
+  async createPayoutEritechSingle(
+    singlePayoutDto: SinglePayoutDto,
+    user: UsersEntity,
+  ) {
+    if (singlePayoutDto.payoutId) {
+      const payoutOrder = await this.payOutOrdersRepository.findOne({
+        where: { payoutId: singlePayoutDto.payoutId },
+      });
+
+      if (payoutOrder) {
+        throw new ConflictException("Payout order already exists");
+      }
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+      // Check and update wallet balance
+      await this.validateAndUpdateWallet(
+        queryRunner,
+        user,
+        singlePayoutDto.amount,
+      );
+      const settlementAmount = calculateOriginalAmountFromNetPayable({
+        netPayableAmount: +singlePayoutDto.amount,
+        commissionInPercentage: +user.commissionInPercentagePayout,
+        gstInPercentage: +user.gstInPercentagePayout,
+      });
+
+      const payoutOrder = this.payOutOrdersRepository.create({
+        amount: +singlePayoutDto.amount,
+        amountBeforeDeduction: settlementAmount,
+        transferMode: singlePayoutDto.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
+        orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
+        user,
+        commissionInPercentage: +user.commissionInPercentagePayout,
+        gstInPercentage: +user.gstInPercentagePayout,
+        name: singlePayoutDto.beneficiaryName,
+        bankAccountNumber: singlePayoutDto.accountNumber,
+        bankIfsc: singlePayoutDto.ifscCode,
+        bankName: singlePayoutDto.bankName,
+        remarks: singlePayoutDto.remarks,
+        purpose: singlePayoutDto.purpose,
+        payoutId: singlePayoutDto.payoutId,
+      });
+
+      // this.logger.info(
+      //   `PAYOUT - createTransaction - Created payout order successfully: ${savedPayoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
+      //   savedPayoutOrder,
+      // );
+
+      // Call API
+
+      // Get authentication token from ThirdPartyAuthService
+      const token = await this.thirdPartyAuthService.getEritechToken();
+
+      const axiosErtech = new AxiosService(
+        ERTITECH.BASE_URL,
+        getEritechPgConfig({
+          token,
+        }),
+      );
+
+      const eriTechPayload = {
+        paymentDetails: {
+          txnPaymode: payoutOrder.transferMode,
+          txnAmount: payoutOrder.amount,
+          beneIfscCode: payoutOrder.bankIfsc,
+          beneAccNum: payoutOrder.bankAccountNumber,
+          beneName: payoutOrder.name,
+          custUniqRef: payoutOrder.orderId,
+          beneMobileNo: "9123189231",
+        },
+      };
+
+      const getEncryptedPayload = await this.getEncryptedPayload(
+        eriTechPayload,
+        token,
+      );
+
+      const responseEritech =
+        await axiosErtech.postRequest<IExternalEritecPayoutFundResponse>(
+          ERTITECH.PAYOUT.FUND,
+          getEncryptedPayload,
+        );
+
+      const eriTechDecryptedResponse = await this.getDecryptedPayload(
+        responseEritech.data.encryptedResponseData,
+        token,
+      );
+
+      if (!responseEritech.success) {
+        throw new Error(responseEritech.errors);
+      }
+      this.logger.info(
+        `Payout processed for order: ${payoutOrder.orderId}`,
+        responseEritech.message,
+      );
+
+      const status = convertExternalPaymentStatusToInternal(
+        eriTechDecryptedResponse.txn_status.transactionStatus.toUpperCase(),
+      );
+
+      const savedPayoutOrder = await this.payOutOrdersRepository.save(
+        this.payOutOrdersRepository.create({
+          ...payoutOrder,
+          transferId: eriTechDecryptedResponse.custUniqRef,
+          ...(status === PAYMENT_STATUS.SUCCESS && {
+            status,
+            successAt: new Date(),
+          }),
+          ...(status === PAYMENT_STATUS.FAILED && {
+            status,
+            failureAt: new Date(),
+          }),
+          ...(![PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.FAILED].includes(
+            status,
+          ) && { status }),
+
+          utr: eriTechDecryptedResponse.crn,
+        }),
+      );
+      // 3. create transaction
+      const transaction = this.transactionsRepository.create({
+        user,
+        payOutOrder: savedPayoutOrder,
+        transactionType: PAYMENT_TYPE.PAYOUT,
+      });
+
+      // 4. save transaction
+      await queryRunner.manager.save(transaction);
+
+      if (status === PAYMENT_STATUS.FAILED) {
+        throw new Error(responseEritech.message || "Payout failed");
+      }
+
+      if (user?.payOutWebhookUrl) {
+        const payOutOrder = await this.payOutOrdersRepository.findOne({
+          where: { id: savedPayoutOrder.id },
+        });
+
+        this.logger.info(
+          `Payout webhook payOutOrder: ${LoggerPlaceHolder.Json}`,
+          payOutOrder,
+        );
+        const payload = {
+          orderId: savedPayoutOrder.orderId,
+          status,
+          amount: savedPayoutOrder.amountBeforeDeduction,
+          txnRefId: eriTechDecryptedResponse.custUniqRef,
+          payoutId: savedPayoutOrder.payoutId,
+          utr: eriTechDecryptedResponse.crn,
+        };
+
+        this.logger.info(
+          `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+          payload,
+        );
+        axios
+          .post(user.payOutWebhookUrl, payload)
+          .then(({ data }) => {
+            this.logger.info(
+              `Payout webhook sent successfully - ${user.payOutWebhookUrl} - ${savedPayoutOrder.orderId} RES: ${JSON.stringify(data)}`,
+            );
+          })
+          .catch((error) => {
+            this.logger.error(
+              `Payout webhook failed for order: ${savedPayoutOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+              error,
+            );
+          });
+      }
+
+      this.logger.info(
+        `Payout processed successfully: ${savedPayoutOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+        eriTechDecryptedResponse,
+      );
 
       await queryRunner.commitTransaction();
 
@@ -1102,6 +1363,7 @@ export class PaymentsService {
     };
   }
 
+  // flakpay status check
   async checkPayOutStatusTransactionFlakPay({ orderId }: PayoutStatusDto) {
     const payoutOrder = await this.payOutOrdersRepository.findOne({
       where: { orderId },
@@ -1770,6 +2032,230 @@ export class PaymentsService {
           status,
           amount,
           txnRefId: transaction_id,
+          payoutId: payOutOrder.payoutId,
+          utr,
+        };
+
+        this.logger.info(
+          `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+          webhookPayload,
+        );
+
+        axios
+          .post(payOutOrder.user.payOutWebhookUrl, webhookPayload)
+          .then(({ data }) => {
+            this.logger.info(
+              `PAYOUT - User webhook - (${payOutOrder.user.payOutWebhookUrl}) - ${payOutOrder.payoutId} - Webhook sent successfully: ${JSON.stringify(data)}`,
+            );
+          })
+          .catch((err) => {
+            this.logger.error(
+              `PAYOUT - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+              err,
+            );
+          });
+      }
+
+      return {
+        message: "Payout status updated successfully.",
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async externalWebhookPayoutEritech(
+    rawWebhookData: ExternalEritechWebhookDto,
+  ): Promise<PayoutWebhookResponseDto> {
+    const webhookData = mapToFilteredDto(rawWebhookData);
+
+    const {
+      status: status_code,
+      orderId: order_id,
+      transferId: custUniqRef,
+      amount,
+      utr,
+    } = webhookData;
+
+    const status = convertExternalPaymentStatusToInternal(
+      status_code.toUpperCase(),
+    );
+
+    // this.logger.info(`WEBHOOK: data: ${LoggerPlaceHolder.Json}`, {
+    //   STATUS: status_code,
+    //   PAYOUT_REF: order_id,
+    //   TXN_ID: transaction_id,
+    //   AMOUNT: amount,
+    //   utr,
+    // });
+
+    const [idPrefix] = order_id.split("_");
+
+    const isSettlement = idPrefix === ID_TYPE.SETTLEMENT_PAYOUT;
+
+    if (isSettlement) {
+      const settlement = await this.settlementRepository.findOne({
+        where: {
+          id: order_id,
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (!settlement) {
+        throw new BadRequestException(
+          new MessageResponseDto("No Settlement Found"),
+        );
+      }
+
+      if (settlement.status === status) {
+        // this.logger.info(
+        //   `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
+        // );
+
+        return {
+          message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      if (status === PAYMENT_STATUS.SUCCESS) {
+        const settlementRaw = this.settlementRepository.create({
+          id: order_id,
+          status,
+          successAt: new Date(),
+          transferId: custUniqRef,
+          utr,
+        });
+
+        await this.settlementRepository.save(settlementRaw);
+      }
+
+      if (status === PAYMENT_STATUS.FAILED) {
+        const settlementRaw = this.settlementRepository.create({
+          id: order_id,
+          status,
+          failureAt: new Date(),
+          transferId: custUniqRef,
+          utr,
+        });
+
+        await this.settlementRepository.save(settlementRaw);
+
+        const userId = settlement.user.id;
+
+        const wallet = await this.walletRepository.findOne({
+          where: {
+            user: {
+              id: userId,
+            },
+          },
+          relations: {
+            user: true,
+          },
+        });
+
+        const collectionAmount = calculateOriginalAmountFromNetPayable({
+          netPayableAmount: +amount,
+          commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+          gstInPercentage: +wallet.user.gstInPercentagePayin,
+        });
+
+        const walletRaw = this.walletRepository.create({
+          ...(wallet?.id && { id: wallet.id }),
+          id: wallet.id,
+          totalCollections: +wallet.totalCollections - collectionAmount,
+          availablePayoutBalance:
+            +wallet.availablePayoutBalance + collectionAmount,
+
+          user: wallet.user,
+        });
+
+        await this.walletRepository.save(walletRaw);
+      }
+
+      return {
+        message: "Transaction status updated successfully.",
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      const payOutOrder = await this.payOutOrdersRepository.findOne({
+        where: {
+          orderId: order_id,
+        },
+        relations: ["user"],
+      });
+
+      // this.logger.info(
+      //   `PAYOUT WEBHOOK - For OrderId: ${order_id} :`,
+      //   payOutOrder,
+      // );
+
+      if (!payOutOrder) {
+        throw new NotFoundException(
+          new MessageResponseDto("Payout order not found"),
+        );
+      }
+
+      if (payOutOrder.status === status) {
+        // this.logger.info(
+        //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
+        // );
+        return {
+          message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      if (status === PAYMENT_STATUS.SUCCESS) {
+        const payOutOrderRaw = this.payOutOrdersRepository.create({
+          id: payOutOrder.id,
+          status,
+          successAt: new Date(),
+          transferId: custUniqRef,
+          utr,
+        });
+
+        await this.payOutOrdersRepository.save(payOutOrderRaw);
+      }
+
+      if (status === PAYMENT_STATUS.FAILED) {
+        const payOutOrderRaw = this.payOutOrdersRepository.create({
+          id: payOutOrder.id,
+          status,
+          failureAt: new Date(),
+          transferId: custUniqRef,
+          utr,
+        });
+
+        await this.payOutOrdersRepository.save(payOutOrderRaw);
+
+        const wallet = await this.walletRepository.findOne({
+          where: {
+            user: {
+              id: payOutOrder.user.id,
+            },
+          },
+          relations: {
+            user: true,
+          },
+        });
+
+        await this.walletRepository.save(
+          this.walletRepository.create({
+            id: wallet.id,
+            availablePayoutBalance: +wallet.availablePayoutBalance + +amount,
+          }),
+        );
+      }
+
+      // send webhook
+      if (payOutOrder.user?.payOutWebhookUrl) {
+        const webhookPayload = {
+          orderId: order_id,
+          status,
+          amount,
+          txnRefId: custUniqRef,
           payoutId: payOutOrder.payoutId,
           utr,
         };
