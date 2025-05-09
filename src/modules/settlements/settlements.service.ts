@@ -495,6 +495,8 @@ export class SettlementsService {
         page,
       });
 
+      this.logger.info("settlements data", data);
+
       return {
         data,
         pagination,
