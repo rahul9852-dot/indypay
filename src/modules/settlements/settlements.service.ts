@@ -337,6 +337,7 @@ export class SettlementsService {
     }: PaginationWithDateDto,
     user: UsersEntity,
   ) {
+    this.logger.warn("Get settlements is hit");
     // Create base query with date filters
     const baseWhereQuery: FindOptionsWhere<SettlementsEntity> = {};
 
@@ -496,7 +497,6 @@ export class SettlementsService {
       });
 
       this.logger.info("settlements data", data);
-      this.logger.info("settlements pagination", pagination);
 
       return {
         data,
