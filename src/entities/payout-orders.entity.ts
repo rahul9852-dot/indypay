@@ -55,6 +55,9 @@ export class PayOutOrdersEntity {
   transferId: string;
 
   @Column({ nullable: true })
+  custUniqRef: string;
+
+  @Column({ nullable: true })
   utr: string;
 
   @Column({ nullable: true })

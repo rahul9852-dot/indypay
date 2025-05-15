@@ -43,7 +43,7 @@ export const FALKPAY = {
 };
 
 export const ERTITECH = {
-  BASE_URL: " https://api.ertipay.com/uat",
+  BASE_URL: " https://api.ertipay.com/payout",
   AUTH: "login",
   PAYOUT: {
     LIVE: "payout",
