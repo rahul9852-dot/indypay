@@ -1006,6 +1006,11 @@ export class PaymentsService {
           getEncryptedPayload,
         );
 
+      this.logger.info(
+        `Fund transfer Eritech Response: ${LoggerPlaceHolder.Json}`,
+        responseEritech,
+      );
+
       const eriTechDecryptedResponse = await this.getDecryptedPayload(
         responseEritech.data.encryptedResponseData,
         token,
