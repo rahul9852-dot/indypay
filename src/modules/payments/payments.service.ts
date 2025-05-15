@@ -912,6 +912,16 @@ export class PaymentsService {
       }
     }
 
+    if (singlePayoutDto.custUniqRef) {
+      const payoutOrder = await this.payOutOrdersRepository.findOne({
+        where: { custUniqRef: singlePayoutDto.custUniqRef },
+      });
+
+      if (payoutOrder) {
+        throw new ConflictException("Customer unique reference already exists");
+      }
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     try {
       await queryRunner.connect();
@@ -943,6 +953,7 @@ export class PaymentsService {
         remarks: singlePayoutDto.remarks,
         purpose: singlePayoutDto.purpose,
         payoutId: singlePayoutDto.payoutId,
+        custUniqRef: singlePayoutDto.custUniqRef,
       });
 
       this.logger.info(
@@ -969,15 +980,25 @@ export class PaymentsService {
           beneIfscCode: payoutOrder.bankIfsc,
           beneAccNum: payoutOrder.bankAccountNumber,
           beneName: payoutOrder.name,
-          custUniqRef: payoutOrder.orderId,
+          custUniqRef: singlePayoutDto.custUniqRef,
           beneMobileNo: singlePayoutDto.mobile,
         },
       };
+
+      // this.logger.info(
+      //   "eriTechPayload",
+      // this.logger.info(
+      //   "eriTechPayload",
+      //   `${LoggerPlaceHolder.Json}`,
+      //   eriTechPayload,
+      // );
 
       const getEncryptedPayload = await this.getEncryptedPayload(
         eriTechPayload,
         token,
       );
+
+      this.logger.info(`${LoggerPlaceHolder.Json}`, getEncryptedPayload);
 
       const responseEritech =
         await axiosErtech.postRequest<IExternalEritecPayoutFundResponse>(

@@ -113,6 +113,11 @@ export class SinglePayoutDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  custUniqRef: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
   purpose: string;
 
   @ApiProperty()
