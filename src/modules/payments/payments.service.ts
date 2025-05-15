@@ -945,10 +945,10 @@ export class PaymentsService {
         payoutId: singlePayoutDto.payoutId,
       });
 
-      // this.logger.info(
-      //   `PAYOUT - createTransaction - Created payout order successfully: ${savedPayoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
-      //   savedPayoutOrder,
-      // );
+      this.logger.info(
+        `PAYOUT - createTransaction - Created payout order successfully: ${payoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
+        payoutOrder,
+      );
 
       // Call API
 
@@ -988,6 +988,11 @@ export class PaymentsService {
       const eriTechDecryptedResponse = await this.getDecryptedPayload(
         responseEritech.data.encryptedResponseData,
         token,
+      );
+
+      this.logger.info(
+        `Ertitech Response: ${LoggerPlaceHolder.Json}`,
+        eriTechDecryptedResponse,
       );
 
       if (!responseEritech.success) {
