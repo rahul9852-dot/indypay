@@ -5,6 +5,7 @@ import { PayoutController } from "./payout.controller";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
+import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth.module";
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
       UsersEntity,
       ApiCredentialsEntity,
     ]),
+    ThirdPartyAuthModule,
   ],
   providers: [PayoutService],
   controllers: [PayoutController],

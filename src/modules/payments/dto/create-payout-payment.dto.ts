@@ -136,6 +136,11 @@ export class SinglePayoutDto {
   ifscCode: string;
 
   @ApiProperty()
+  @IsNumberString()
+  @IsNotEmpty()
+  mobile: string;
+
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   remarks: string;

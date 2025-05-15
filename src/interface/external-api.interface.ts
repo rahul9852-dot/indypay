@@ -286,3 +286,97 @@ export interface IExternalPayinStatusResponseFlakPay {
     transferId: string;
   };
 }
+
+export interface IExternalPayoutRequestEritech {
+  paymentDetails: {
+    txnPaymode: string;
+    txnAmount: string;
+    beneIfscCode: string;
+    beneAccNum: string;
+    beneName: string;
+    custUniqRef: string;
+    beneMobileNo: string;
+  };
+}
+
+export interface IExternalPayoutRequestEritechEncrypt {
+  data: string;
+  key: string;
+}
+export interface IExternalPayoutRequestEritechDecrypt {
+  data: string;
+  key: string;
+}
+
+export interface IExternalPayoutRequestEritechToken {
+  success: boolean;
+  data: {
+    user: string;
+    token: string;
+    creationDateTime: string;
+  };
+  message: string;
+  errors: string;
+  exception: string;
+}
+
+export interface IExternalEritecPayoutFundResponse {
+  success: true;
+  data: {
+    encryptedResponseData: string;
+    creationDateTime: string;
+  };
+  message: string;
+  errors: string;
+  exception: string;
+}
+
+export interface IExternalEritecPayoutFundResponseDecrypted {
+  orderId: string;
+  merchantId: string;
+  crn: string;
+  txn_status: { transactionStatus: string };
+  amount: string;
+  txnAmount: number;
+  totalCharge: number;
+  tax: string;
+  totalDeduction: string;
+  ip: string;
+  paymentType: string;
+  beneIfscCode: string;
+  beneAccNum: string;
+  beneName: string;
+  beneMobileNo: string;
+  custUniqRef: string;
+  batchNo: string;
+  mode: string;
+}
+
+export interface IExternalEritechStatusResponse {
+  success: boolean;
+  data: {
+    status: string;
+    response: {
+      merchantId: string;
+      totalCharge: number;
+      tax: number;
+      totalDeduction: number;
+      orderId: number;
+      txnAmount: number;
+      txn_status: {
+        statusDescription: string;
+        responseCode: string;
+        utrNo: string;
+        transactionStatus: string;
+      };
+      amount: number;
+      paymentType: string;
+      custUniqRef: string;
+      balance: number;
+    };
+  };
+  creationDateTime: string;
+  message: string;
+  errors: string;
+  exception: string;
+}

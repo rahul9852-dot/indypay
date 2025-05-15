@@ -179,6 +179,7 @@ export enum VERIFICATION_GATEWAY_EVENT {
 }
 
 export enum THIRDPARTY_PG {
+  ERTITECH = "ertitech",
   FLAK_PAY = "flakpay",
   ISMART_PAY = "ismartpay",
   PAYNPRO = "paynpro",

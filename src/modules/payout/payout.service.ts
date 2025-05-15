@@ -36,6 +36,7 @@ import {
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
 import {
+  IExternalEritechStatusResponse,
   IExternalPayoutStatusResponseFlakPay,
   IExternalPayoutStatusResponseIsmart,
 } from "@/interface/external-api.interface";
@@ -47,6 +48,9 @@ import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { decryptData } from "@/utils/encode-decode.utils";
+import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
+import { ERTITECH } from "@/constants/external-api.constant";
+import { getEritechPgConfig } from "@/utils/pg-config.utils";
 
 const { externalPaymentConfig } = appConfig();
 
@@ -60,6 +64,7 @@ export class PayoutService {
     private readonly userRepository: Repository<UsersEntity>,
     @InjectRepository(ApiCredentialsEntity)
     private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
+    private readonly thirdPartyAuthService: ThirdPartyAuthService,
   ) {}
 
   async getAllPayoutsGroupedByUser({
@@ -532,6 +537,101 @@ export class PayoutService {
       orderId: payoutOrder.orderId,
       status,
       transferId: flakPayResponse.data.transferId,
+    };
+  }
+  // Eritech
+  async checkPayOutStatusTransactionEritech(
+    { orderId }: PayoutStatusDto,
+    user: UsersEntity,
+  ) {
+    const payoutOrder = await this.payoutRepository.findOne({
+      where: { orderId },
+    });
+
+    if (!payoutOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payout order not found"),
+      );
+    }
+
+    if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
+      return {
+        orderId: payoutOrder.orderId,
+        status: payoutOrder.status,
+        transferId: payoutOrder.transferId,
+        payoutId: payoutOrder.payoutId,
+        utr: payoutOrder.utr,
+      };
+    }
+
+    // call api
+    const token = await this.thirdPartyAuthService.getEritechToken();
+    const axiosErtech = new AxiosService(
+      ERTITECH.BASE_URL,
+      getEritechPgConfig({
+        token,
+      }),
+    );
+
+    const ertechStatusResponse =
+      await axiosErtech.postRequest<IExternalEritechStatusResponse>(
+        ERTITECH.PAYOUT.STATUS_CHECK,
+        {
+          custUniqRef: payoutOrder.orderId,
+        },
+      );
+    if (!ertechStatusResponse.success) {
+      throw new BadRequestException(
+        new MessageResponseDto(ertechStatusResponse.message),
+      );
+    }
+
+    // update payout order
+
+    const status = convertExternalPaymentStatusToInternal(
+      ertechStatusResponse.data.response.txn_status.transactionStatus.toUpperCase(),
+    );
+
+    const savedPayout = await this.payoutRepository.save(
+      this.payoutRepository.create({
+        ...payoutOrder,
+        status,
+        transferId: ertechStatusResponse.data.response.txn_status.utrNo,
+      }),
+    );
+
+    if (user?.payOutWebhookUrl) {
+      const payload = {
+        orderId: savedPayout.orderId,
+        status,
+        amount: +savedPayout.amount,
+        txnRefId: savedPayout.transferId,
+        utr: savedPayout.utr,
+      };
+      this.logger.info(
+        `Payout webhook for ${savedPayout.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
+      axios
+        .post(user.payOutWebhookUrl, payload)
+        .then((res) => {
+          this.logger.info(
+            `Payout webhook sent successfully: ${savedPayout.orderId} : ${LoggerPlaceHolder.Json}`,
+            res,
+          );
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Payout webhook failed for order: ${savedPayout.orderId} : ${LoggerPlaceHolder.Json}`,
+            error,
+          );
+        });
+    }
+
+    return {
+      orderId: payoutOrder.orderId,
+      status,
+      transferId: ertechStatusResponse.data.response.txn_status.utrNo,
     };
   }
 
