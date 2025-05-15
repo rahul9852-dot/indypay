@@ -11,11 +11,15 @@ import {
 } from "typeorm";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { UsersEntity } from "@/entities/user.entity";
-import { PaginationWithDateDto } from "@/dtos/common.dto";
+import {
+  PaginationWithDateAndStatusDto,
+  PaginationWithDateDto,
+} from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
+import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 
 @Injectable()
 export class CollectionsService {
@@ -129,15 +133,17 @@ export class CollectionsService {
       sort = "id",
       order = "DESC",
       search = "",
+      status,
       startDate = todayStartDate(),
       endDate = todayEndDate(),
-    }: PaginationWithDateDto,
+    }: PaginationWithDateAndStatusDto,
   ) {
-    const whereQuery:
-      | FindOptionsWhere<PayInOrdersEntity>
-      | FindOptionsWhere<PayInOrdersEntity>[] = {};
+    const whereQuery: FindOptionsWhere<PayInOrdersEntity> = {};
 
-    // Date Filter
+    const internalStatus = status
+      ? convertExternalPaymentStatusToInternal(status.toUpperCase())
+      : undefined;
+
     if (startDate && endDate) {
       whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
     } else if (startDate) {
@@ -145,29 +151,24 @@ export class CollectionsService {
     } else if (endDate) {
       whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
     }
+    whereQuery.user = { id: userId };
+    if (internalStatus) {
+      whereQuery.status = internalStatus;
+    }
 
     const query = [];
 
     if (search) {
       query.push({
+        ...whereQuery,
         orderId: ILike(`%${search}%`),
-        user: {
-          id: userId,
-        },
       });
-      query.push({
-        txnRefId: ILike(`%${search}%`),
-        user: {
-          id: userId,
-        },
-      });
-    } else {
       query.push({
         ...whereQuery,
-        user: {
-          id: userId,
-        },
+        txnRefId: ILike(`%${search}%`),
       });
+    } else {
+      query.push(whereQuery);
     }
 
     const [collections, totalItems] =
@@ -253,7 +254,6 @@ export class CollectionsService {
         netPayableAmount: true,
         settlementStatus: true,
         user: {
-          id: true,
           fullName: true,
           email: true,
           mobile: true,

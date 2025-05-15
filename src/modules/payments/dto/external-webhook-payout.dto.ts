@@ -141,3 +141,55 @@ export class ExternalPayOutWebhookFlakPayDto {
   @IsOptional()
   utr?: string;
 }
+
+export class ExternalEritechWebhookDto {
+  @ApiProperty()
+  success: boolean;
+
+  @ApiProperty()
+  data: {
+    status: string;
+    response: {
+      merchantId: string;
+      orderId: number;
+      txn_status: {
+        utrNo: string;
+        transactionStatus: string;
+      };
+      custUniqRef: string;
+      amount: number;
+    };
+  };
+}
+
+export class ExternalPayOutWebhookEritechDto {
+  @ApiProperty()
+  @IsString()
+  orderId: string;
+
+  @ApiProperty()
+  @IsString()
+  status: string;
+
+  @ApiProperty()
+  @IsString()
+  transferId: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  utr?: string;
+}
+
+export class PayoutWebhookResponseDto {
+  @ApiProperty()
+  message: string;
+
+  @ApiProperty({ type: String, format: "date-time" })
+  timestamp: string;
+}

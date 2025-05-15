@@ -41,3 +41,17 @@ export const FALKPAY = {
     STATUS_CHECK: "digi-payout/api/v1/external/transaction-status",
   },
 };
+
+export const ERTITECH = {
+  BASE_URL: " https://api.ertipay.com/uat",
+  AUTH: "login",
+  PAYOUT: {
+    LIVE: "payout",
+    BALANCE: "balance",
+    BULK_TRANSFER: "bulk-transfer",
+    FUND: "fund",
+    STATUS_CHECK: "status",
+    ENCRYPT: "encrypt",
+    DECRYPT: "decrypt",
+  },
+};

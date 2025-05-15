@@ -54,6 +54,11 @@ export const appConfig = registerAs("appConfig", () => ({
       clientSecret: getOsEnv("FLAKPAY_PAYMENT_CLIENT_SECRET"),
       webhookIps: getOsEnv("FLAKPAY_PAYMENT_WEBHOOK_IPS").split(","),
     },
+    ertech: {
+      encryptionKey: getOsEnv("ERTITECH_ENCRYPTION_KEY"),
+      email: getOsEnv("ERTITECH_EMAIL"),
+      password: getOsEnv("ERTITECH_PASSWORD"),
+    },
     paynpro: {
       payin: {
         clientId: getOsEnv("PAYNPRO_PAYIN_PAYMENT_CLIENT_ID"),

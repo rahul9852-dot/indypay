@@ -327,7 +327,7 @@ export class SettlementsService {
 
   async findAllSettlementsTransactions(
     {
-      limit = 10,
+      limit = 50,
       page = 1,
       order = "DESC",
       sort = "id",
@@ -337,32 +337,42 @@ export class SettlementsService {
     }: PaginationWithDateDto,
     user: UsersEntity,
   ) {
+    // Create base query with date filters
+    const baseWhereQuery: FindOptionsWhere<SettlementsEntity> = {};
+
+    // Date Filter
+    if (startDate && endDate) {
+      baseWhereQuery.createdAt = Between(
+        new Date(startDate),
+        new Date(endDate),
+      );
+    } else if (startDate) {
+      baseWhereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
+    } else if (endDate) {
+      baseWhereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+    }
+
     // for admin user
     if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
-      const whereQuery:
-        | FindOptionsWhere<SettlementsEntity>
-        | FindOptionsWhere<SettlementsEntity>[] = {};
-
-      // Date Filter
-      if (startDate && endDate) {
-        whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
-      } else if (startDate) {
-        whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
-      } else if (endDate) {
-        whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
-      }
-
-      const query = [whereQuery];
+      const query = [];
 
       if (search) {
+        // Search by transferId with date filters
         query.push({
+          ...baseWhereQuery,
           transferId: ILike(`%${search}%`),
         });
+
+        // Search by user fullName with date filters
         query.push({
+          ...baseWhereQuery,
           user: {
             fullName: ILike(`%${search}%`),
           },
         });
+      } else {
+        // No search, just use base query
+        query.push(baseWhereQuery);
       }
 
       const [data, totalItems] = await this.settlementsRepository.findAndCount({
@@ -416,32 +426,31 @@ export class SettlementsService {
         pagination,
       };
     } else {
-      const whereQuery:
-        | FindOptionsWhere<SettlementsEntity>
-        | FindOptionsWhere<SettlementsEntity>[] = {};
+      // For non-admin users, always filter by user ID
+      baseWhereQuery.user = { id: user.id };
 
-      // Date Filter
-      if (startDate && endDate) {
-        whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
-      } else if (startDate) {
-        whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
-      } else if (endDate) {
-        whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
-      }
+      const query = [];
 
       if (search) {
-        whereQuery.transferId = ILike(`%${search}%`);
-        whereQuery.user = {
-          id: user.id,
-        };
+        // Search by transferId while maintaining user filter
+        query.push({
+          ...baseWhereQuery,
+          transferId: ILike(`%${search}%`),
+        });
+
+        // Optionally add more search conditions if needed
+        // For example, search by UTR
+        query.push({
+          ...baseWhereQuery,
+          utr: ILike(`%${search}%`),
+        });
       } else {
-        whereQuery.user = {
-          id: user.id,
-        };
+        // No search, just use base query with user filter
+        query.push(baseWhereQuery);
       }
 
       const [data, totalItems] = await this.settlementsRepository.findAndCount({
-        where: whereQuery,
+        where: query,
         relations: {
           user: true,
           settledBy: true,

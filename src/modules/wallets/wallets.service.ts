@@ -126,9 +126,15 @@ export class WalletsService {
       .where("user.id = :userId", { userId });
 
     if (search) {
-      topupQueryBuilder.andWhere("user.fullName ILIKE :search", {
-        search: `%${search}%`,
-      });
+      topupQueryBuilder.andWhere(
+        `(CAST(topup.id AS TEXT) ILIKE :search OR 
+          topupBy.fullName ILIKE :search OR 
+          CAST(topup.topUpAmount AS TEXT) ILIKE :search OR 
+          CAST(topup.collectionAmount AS TEXT) ILIKE :search)`,
+        {
+          search: `%${search}%`,
+        },
+      );
     }
 
     const topupAmountPromise = this.walletTopupRepository.sum("topUpAmount", {

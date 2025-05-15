@@ -25,6 +25,8 @@ export const convertExternalPaymentStatusToInternal = (status: string) => {
       return PAYMENT_STATUS.PENDING;
     case "SUCCESS":
       return PAYMENT_STATUS.SUCCESS;
+    case "PROCESSED":
+      return PAYMENT_STATUS.SUCCESS;
     case "200":
       return PAYMENT_STATUS.SUCCESS;
     case "400":
