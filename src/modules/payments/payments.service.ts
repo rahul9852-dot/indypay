@@ -675,6 +675,10 @@ export class PaymentsService {
         },
       );
 
+    if (!encryptedErtechPayload) {
+      throw new Error("Payload not formatted correctly.");
+    }
+
     return encryptedErtechPayload;
   }
   async getDecryptedPayload(
@@ -696,6 +700,10 @@ export class PaymentsService {
           key: externalPaymentConfig.ertech.encryptionKey,
         },
       );
+
+    if (!decryptedErtechPayload) {
+      throw new Error("Payload not formatted correctly.");
+    }
 
     return decryptedErtechPayload;
   }
@@ -1005,6 +1013,10 @@ export class PaymentsService {
           ERTITECH.PAYOUT.FUND,
           getEncryptedPayload,
         );
+
+      if (!responseEritech.success) {
+        throw new Error(responseEritech.message);
+      }
 
       this.logger.info(
         `Fund transfer Eritech Response: ${LoggerPlaceHolder.Json}`,
