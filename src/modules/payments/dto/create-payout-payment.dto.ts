@@ -110,10 +110,10 @@ export class SinglePayoutDto {
   @IsPositive()
   amount: number;
 
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  custUniqRef: string;
+  // @ApiProperty()
+  // @IsString()
+  // @IsNotEmpty()
+  // custUniqRef: string;
 
   @ApiProperty()
   @IsString()

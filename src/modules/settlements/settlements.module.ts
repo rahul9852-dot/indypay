@@ -13,6 +13,7 @@ import { InvoiceService } from "@/shared/services/invoice.service";
 import { UserAddressEntity } from "@/entities/user-address.entity";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { WalletTopupEntity } from "@/entities/wallet-topup.entity";
+import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
 
 @Module({
   imports: [
@@ -27,7 +28,13 @@ import { WalletTopupEntity } from "@/entities/wallet-topup.entity";
       WalletTopupEntity,
     ]),
   ],
-  providers: [SettlementsService, BanksService, EmailService, InvoiceService],
+  providers: [
+    SettlementsService,
+    BanksService,
+    EmailService,
+    InvoiceService,
+    ThirdPartyAuthService,
+  ],
   controllers: [SettlementsController],
 })
 export class SettlementsModule {}

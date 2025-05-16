@@ -1,11 +1,11 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CustomerRefEntity1747321266923 implements MigrationInterface {
-  name = "CustomerRefEntity1747321266923";
+export class DeleteCustomerUnique1747404420541 implements MigrationInterface {
+  name = "DeleteCustomerUnique1747404420541";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "payout_orders" ADD "custUniqRef" character varying`,
+      `ALTER TABLE "payout_orders" DROP COLUMN "custUniqRef"`,
     );
     await queryRunner.query(
       `ALTER TABLE "payin_orders" ALTER COLUMN "commissionInPercentage" SET DEFAULT '4.5'`,
@@ -29,7 +29,7 @@ export class CustomerRefEntity1747321266923 implements MigrationInterface {
       `ALTER TABLE "payin_orders" ALTER COLUMN "commissionInPercentage" SET DEFAULT 4.5`,
     );
     await queryRunner.query(
-      `ALTER TABLE "payout_orders" DROP COLUMN "custUniqRef"`,
+      `ALTER TABLE "payout_orders" ADD "custUniqRef" character varying`,
     );
   }
 }

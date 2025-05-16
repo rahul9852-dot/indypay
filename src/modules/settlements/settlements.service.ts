@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  HttpStatus,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -22,7 +21,10 @@ import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
 import { SettlementsEntity } from "@/entities/settlements.entity";
-import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
+import {
+  ERTITECH,
+  ISMART_PAY,
+} from "@/constants/external-api.constant";
 import { BanksService } from "@/modules/banks/banks.service";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
@@ -38,21 +40,22 @@ import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { getCommissions } from "@/utils/commissions.utils";
 import {
-  IExternalPayoutRequestFlakPay,
-  IExternalPayoutResponseFlakPay,
   IExternalPayoutStatusResponseIsmart,
+  IExternalEritecPayoutFundResponse,
 } from "@/interface/external-api.interface";
 
 import { EmailService } from "@/shared/services/email.service";
 import { InvoiceService } from "@/shared/services/invoice.service";
 import { UserAddressEntity } from "@/entities/user-address.entity";
 import {
-  getFlakPayPgConfig,
+  // getFlakPayPgConfig,
   getIsmartPayPgConfig,
+  getEritechPgConfig,
 } from "@/utils/pg-config.utils";
 import { decryptData } from "@/utils/encode-decode.utils";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { WalletTopupEntity } from "@/entities/wallet-topup.entity";
+import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
 
 const { externalPaymentConfig } = appConfig();
 @Injectable()
@@ -79,6 +82,7 @@ export class SettlementsService {
     private readonly dataSource: DataSource,
     private readonly emailService: EmailService,
     private readonly invoiceService: InvoiceService,
+    private readonly thirdPartyAuthService: ThirdPartyAuthService,
   ) {}
 
   async createWalletForMerchants() {
@@ -973,7 +977,205 @@ export class SettlementsService {
     return { clientId, clientSecret };
   }
 
-  async initiateSettlementFalkPay(
+  // async initiateSettlementFalkPay(
+  //   {
+  //     amount: collectionAmount,
+  //     bankId,
+  //     remarks,
+  //     userId,
+  //     transferMode,
+  //   }: InitiateSettlementAdminDto,
+  //   settledBy: UsersEntity,
+  // ) {
+  //   const user = await this.usersRepository.findOne({
+  //     where: { id: userId },
+  //     relations: {
+  //       address: true,
+  //     },
+  //   });
+
+  //   if (!user) {
+  //     throw new NotFoundException(new MessageResponseDto("User not found"));
+  //   }
+
+  //   const { clientId, clientSecret } = externalPaymentConfig.flakPay;
+
+  //   const axiosServiceFlakPay = new AxiosService(
+  //     FALKPAY.BASE_URL,
+  //     getFlakPayPgConfig({
+  //       clientId,
+  //       clientSecret,
+  //     }),
+  //   );
+
+  //   if (!user.address) {
+  //     throw new NotFoundException(
+  //       new MessageResponseDto("User address not found"),
+  //     );
+  //   }
+
+  //   const banks = await this.bankService.getAllBanks(userId);
+
+  //   const targetBank = banks.find((bank) => bank.id === bankId);
+
+  //   if (!targetBank) {
+  //     throw new NotFoundException(new MessageResponseDto("Bank not found"));
+  //   }
+
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   try {
+  //     // Start transaction
+  //     await queryRunner.connect();
+  //     await queryRunner.startTransaction();
+
+  //     const wallet = await this.walletRepository.findOne({
+  //       where: {
+  //         user: {
+  //           id: userId,
+  //         },
+  //       },
+  //       relations: {
+  //         user: true,
+  //       },
+  //     });
+
+  //     if (!wallet) {
+  //       throw new NotFoundException(
+  //         new MessageResponseDto("User wallet not found"),
+  //       );
+  //     }
+
+  //     if (+wallet.totalCollections < +collectionAmount) {
+  //       throw new BadRequestException(
+  //         new MessageResponseDto(
+  //           `Amount is greater than Total Collections amount: ${wallet.totalCollections}`,
+  //         ),
+  //       );
+  //     }
+
+  //     const {
+  //       totalServiceChange,
+  //       netPayableAmount: collectionAfterPayinDeduction,
+  //     } = getCommissions({
+  //       amount: +collectionAmount,
+  //       commissionInPercentage: +wallet.user.commissionInPercentagePayin, // PAYIN Commission
+  //       gstInPercentage: +wallet.user.gstInPercentagePayin,
+  //     });
+
+  //     const newWallet = this.walletRepository.create({
+  //       id: wallet.id,
+  //       totalCollections: +wallet.totalCollections - +collectionAmount,
+  //     });
+
+  //     await queryRunner.manager.save(newWallet);
+
+  //     const settlement = this.settlementsRepository.create({
+  //       collectionAmount: +collectionAmount,
+  //       serviceCharge: totalServiceChange,
+  //       amountAfterDeduction: collectionAfterPayinDeduction,
+  //       settlementType: SETTLEMENT_TYPE.MANUAL,
+  //       transferMode,
+  //       user,
+  //       settledBy,
+  //       remarks,
+  //       bankDetails: targetBank,
+  //     });
+
+  //     const savedSettlement = await queryRunner.manager.save(settlement);
+
+  //     this.logger.info(
+  //       `SETTLEMENT - initiateSettlements - Sending Settlements Amount: ${collectionAfterPayinDeduction} for Collection Amount: ${collectionAmount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
+  //       targetBank,
+  //     );
+
+  //     const payload: IExternalPayoutRequestFlakPay = {
+  //       amount: +collectionAfterPayinDeduction.toFixed(2),
+  //       orderId: savedSettlement.id,
+  //       transferMode,
+  //       beneDetails: {
+  //         beneAccountNo: targetBank.accountNumber,
+  //         beneBankName: targetBank.bankName,
+  //         beneIfsc: targetBank.bankIFSC,
+  //         beneName: targetBank.name,
+  //       },
+  //     };
+
+  //     this.logger.info(
+  //       `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${FALKPAY.BASE_URL}${FALKPAY.PAYOUT.LIVE} with payload: ${LoggerPlaceHolder.Json}`,
+  //       payload,
+  //     );
+
+  //     const externalPayoutResponse =
+  //       await axiosServiceFlakPay.postRequest<IExternalPayoutResponseFlakPay>(
+  //         FALKPAY.PAYOUT.LIVE,
+  //         payload,
+  //       );
+
+  //     this.logger.info(
+  //       `SETTLEMENT - initiateSettlements - External Payout Response: ${LoggerPlaceHolder.Json}`,
+  //       externalPayoutResponse,
+  //     );
+
+  //     if (externalPayoutResponse.statusCode !== HttpStatus.OK) {
+  //       throw new BadRequestException(
+  //         externalPayoutResponse?.message || "Something went wrong",
+  //       );
+  //     }
+
+  //     const status = convertExternalPaymentStatusToInternal(
+  //       externalPayoutResponse.data.status.toUpperCase(),
+  //     );
+
+  //     await queryRunner.manager.update(
+  //       SettlementsEntity,
+  //       { id: savedSettlement.id },
+  //       {
+  //         transferId: externalPayoutResponse.data.transferId,
+  //         utr: externalPayoutResponse.data.utr,
+  //         status,
+  //       },
+  //     );
+
+  //     if (status === PAYMENT_STATUS.FAILED) {
+  //       // update wallet
+  //       await this.walletRepository.save(
+  //         this.walletRepository.create({
+  //           id: wallet.id,
+  //           totalCollections: +wallet.totalCollections + +collectionAmount,
+  //         }),
+  //       );
+  //     }
+
+  //     await queryRunner.commitTransaction();
+
+  //     // await this.sendSettlementInvoice(savedSettlement.id, "Initiated");
+  //     if (status === PAYMENT_STATUS.SUCCESS) {
+  //       // await this.sendSettlementInvoice(savedSettlement.id, "Completed");
+  //     }
+
+  //     return {
+  //       orderId: savedSettlement.id,
+  //       collectionAmount: savedSettlement.collectionAmount,
+  //       serviceCharge: savedSettlement.serviceCharge,
+  //       amountAfterDeduction: savedSettlement.amountAfterDeduction,
+  //       transferId: externalPayoutResponse.data.transferId,
+  //       utr: externalPayoutResponse.data.utr,
+  //       status,
+  //     };
+  //   } catch (err) {
+  //     this.logger.error(
+  //       `SETTLEMENT - initiateSettlements - error: ${LoggerPlaceHolder.Json}`,
+  //       err,
+  //     );
+  //     await queryRunner.rollbackTransaction();
+
+  //     throw new BadRequestException(err.message);
+  //   } finally {
+  //     await queryRunner.release();
+  //   }
+  // }
+
+  async initiateSettlementEritech(
     {
       amount: collectionAmount,
       bankId,
@@ -994,13 +1196,22 @@ export class SettlementsService {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
 
-    const { clientId, clientSecret } = externalPaymentConfig.flakPay;
+    // const { clientId, clientSecret } = externalPaymentConfig.flakPay;
 
-    const axiosServiceFlakPay = new AxiosService(
-      FALKPAY.BASE_URL,
-      getFlakPayPgConfig({
-        clientId,
-        clientSecret,
+    // const axiosServiceFlakPay = new AxiosService(
+    //   FALKPAY.BASE_URL,
+    //   getFlakPayPgConfig({
+    //     clientId,
+    //     clientSecret,
+    //   }),
+    // );
+
+    const token = await this.thirdPartyAuthService.getEritechToken();
+
+    const axiosErtech = new AxiosService(
+      ERTITECH.BASE_URL,
+      getEritechPgConfig({
+        token,
       }),
     );
 
@@ -1084,50 +1295,76 @@ export class SettlementsService {
         targetBank,
       );
 
-      const payload: IExternalPayoutRequestFlakPay = {
-        amount: +collectionAfterPayinDeduction.toFixed(2),
-        orderId: savedSettlement.id,
-        transferMode,
-        beneDetails: {
-          beneAccountNo: targetBank.accountNumber,
-          beneBankName: targetBank.bankName,
-          beneIfsc: targetBank.bankIFSC,
+      // const payload: IExternalPayoutRequestEritech = {
+      //   orderId: savedSettlement.id,
+      //   transferMode,
+      //   beneDetails: {
+      //     beneAccountNo: targetBank.accountNumber,
+      //     beneBankName: targetBank.bankName,
+      //     beneIfsc: targetBank.bankIFSC,
+      //     beneName: targetBank.name,
+      //   },
+      // };
+
+      // this.logger.info(
+      //   `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${FALKPAY.BASE_URL}${FALKPAY.PAYOUT.LIVE} with payload: ${LoggerPlaceHolder.Json}`,
+      //   payload,
+      // );
+
+      const ertechPayload = {
+        paymentDetails: {
+          txnPaymode: transferMode,
+          txnAmount: +collectionAfterPayinDeduction.toFixed(2),
+          beneIfscCode: targetBank.bankIFSC,
+          beneAccNum: targetBank.accountNumber,
           beneName: targetBank.name,
+          custUniqRef: savedSettlement.id.split("_").join(""),
+          beneMobileNo: user.mobile,
         },
       };
 
-      this.logger.info(
-        `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${FALKPAY.BASE_URL}${FALKPAY.PAYOUT.LIVE} with payload: ${LoggerPlaceHolder.Json}`,
-        payload,
-      );
+      const encryptedPayload =
+        await this.thirdPartyAuthService.getEncryptedPayload(
+          ertechPayload,
+          token,
+        );
 
-      const externalPayoutResponse =
-        await axiosServiceFlakPay.postRequest<IExternalPayoutResponseFlakPay>(
-          FALKPAY.PAYOUT.LIVE,
-          payload,
+      const ertechSettlementResponse =
+        await axiosErtech.postRequest<IExternalEritecPayoutFundResponse>(
+          ERTITECH.PAYOUT.LIVE,
+          encryptedPayload,
         );
 
       this.logger.info(
         `SETTLEMENT - initiateSettlements - External Payout Response: ${LoggerPlaceHolder.Json}`,
-        externalPayoutResponse,
+        ertechSettlementResponse,
       );
 
-      if (externalPayoutResponse.statusCode !== HttpStatus.OK) {
-        throw new BadRequestException(
-          externalPayoutResponse?.message || "Something went wrong",
-        );
+      if (!ertechSettlementResponse.success) {
+        throw new Error(ertechSettlementResponse.message);
       }
 
+      const ertechDecryptedResponse =
+        await this.thirdPartyAuthService.getDecryptedPayload(
+          ertechSettlementResponse.data.encryptedResponseData,
+          token,
+        );
+
+      this.logger.info(
+        `Ertitech Response: ${LoggerPlaceHolder.Json}`,
+        ertechDecryptedResponse,
+      );
+
       const status = convertExternalPaymentStatusToInternal(
-        externalPayoutResponse.data.status.toUpperCase(),
+        ertechDecryptedResponse.txn_status.transactionStatus.toUpperCase(),
       );
 
       await queryRunner.manager.update(
         SettlementsEntity,
         { id: savedSettlement.id },
         {
-          transferId: externalPayoutResponse.data.transferId,
-          utr: externalPayoutResponse.data.utr,
+          transferId: ertechDecryptedResponse.custUniqRef,
+          utr: ertechDecryptedResponse.utrNo,
           status,
         },
       );
@@ -1154,8 +1391,8 @@ export class SettlementsService {
         collectionAmount: savedSettlement.collectionAmount,
         serviceCharge: savedSettlement.serviceCharge,
         amountAfterDeduction: savedSettlement.amountAfterDeduction,
-        transferId: externalPayoutResponse.data.transferId,
-        utr: externalPayoutResponse.data.utr,
+        transferId: ertechDecryptedResponse.custUniqRef,
+        utr: ertechDecryptedResponse.utrNo,
         status,
       };
     } catch (err) {

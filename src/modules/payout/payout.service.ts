@@ -577,7 +577,7 @@ export class PayoutService {
       await axiosErtech.postRequest<IExternalEritechStatusResponse>(
         ERTITECH.PAYOUT.STATUS_CHECK,
         {
-          custUniqRef: payoutOrder.custUniqRef,
+          custUniqRef: payoutOrder.orderId.split("_").join(""),
         },
       );
     if (!ertechStatusResponse.success) {
@@ -586,10 +586,20 @@ export class PayoutService {
       );
     }
 
+    this.logger.info(
+      `Eritech Status Response: ${LoggerPlaceHolder.Json}`,
+      ertechStatusResponse,
+    );
+
     // update payout order
 
     const status = convertExternalPaymentStatusToInternal(
       ertechStatusResponse.data.response.txn_status.transactionStatus.toUpperCase(),
+    );
+
+    this.logger.info(
+      `Internal Status Response: ${LoggerPlaceHolder.Json}`,
+      status,
     );
 
     const savedPayout = await this.payoutRepository.save(

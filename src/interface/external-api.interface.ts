@@ -334,7 +334,7 @@ export interface IExternalEritecPayoutFundResponse {
 export interface IExternalEritecPayoutFundResponseDecrypted {
   orderId: string;
   merchantId: string;
-  crn: string;
+  utrNo: string;
   txn_status: { transactionStatus: string };
   amount: string;
   txnAmount: number;
