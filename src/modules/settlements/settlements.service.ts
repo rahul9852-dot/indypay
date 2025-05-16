@@ -21,10 +21,7 @@ import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { AxiosService } from "@/shared/axios/axios.service";
 import { appConfig } from "@/config/app.config";
 import { SettlementsEntity } from "@/entities/settlements.entity";
-import {
-  ERTITECH,
-  ISMART_PAY,
-} from "@/constants/external-api.constant";
+import { ERTITECH, ISMART_PAY } from "@/constants/external-api.constant";
 import { BanksService } from "@/modules/banks/banks.service";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
