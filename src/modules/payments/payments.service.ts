@@ -2109,6 +2109,15 @@ export class PaymentsService {
   async externalWebhookPayoutEritech(
     rawWebhookData: ExternalEritechWebhookDto,
   ): Promise<PayoutWebhookResponseDto> {
+    this.logger.info(
+      `Raw Eritech Webhook Data: ${LoggerPlaceHolder.Json}`,
+      rawWebhookData,
+    );
+
+    this.logger.info(
+      `Payout Eritech Webhook Data: ${LoggerPlaceHolder.Json}`,
+      PayoutWebhookResponseDto,
+    );
     const webhookData = mapToFilteredDto(rawWebhookData);
 
     this.logger.info(

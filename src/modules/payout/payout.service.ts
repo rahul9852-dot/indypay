@@ -577,7 +577,7 @@ export class PayoutService {
       await axiosErtech.postRequest<IExternalEritechStatusResponse>(
         ERTITECH.PAYOUT.STATUS_CHECK,
         {
-          custUniqRef: payoutOrder.orderId,
+          custUniqRef: payoutOrder.custUniqRef,
         },
       );
     if (!ertechStatusResponse.success) {
