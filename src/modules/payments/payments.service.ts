@@ -2111,6 +2111,11 @@ export class PaymentsService {
   ): Promise<PayoutWebhookResponseDto> {
     const webhookData = mapToFilteredDto(rawWebhookData);
 
+    this.logger.info(
+      `Eritech Webhook Data: ${LoggerPlaceHolder.Json}`,
+      webhookData,
+    );
+
     const {
       status: status_code,
       orderId: order_id,
