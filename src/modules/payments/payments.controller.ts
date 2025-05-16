@@ -133,7 +133,6 @@ export class PaymentsController {
   @ApiOperation({
     summary: "Check status of pay-out transaction",
   })
-  @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)
   @Post("payout/status")
   async checkStatusTransactionPayout(

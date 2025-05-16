@@ -52,6 +52,21 @@ export class SettlementsController {
     return this.settlementsService.getSettlementsStats();
   }
 
+  // @ApiOperation({
+  //   summary: "Initiate settlement payout - Admin, Ops, Owner",
+  // })
+  // @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  // @Post("initiate")
+  // async initiateSettlementPayout(
+  //   @Body() initiateSettlementAdminDto: InitiateSettlementAdminDto,
+  //   @User() user: UsersEntity,
+  // ) {
+  //   return this.settlementsService.initiateSettlementFalkPay(
+  //     initiateSettlementAdminDto,
+  //     user,
+  //   );
+  // }
+
   @ApiOperation({
     summary: "Initiate settlement payout - Admin, Ops, Owner",
   })
@@ -61,7 +76,7 @@ export class SettlementsController {
     @Body() initiateSettlementAdminDto: InitiateSettlementAdminDto,
     @User() user: UsersEntity,
   ) {
-    return this.settlementsService.initiateSettlementFalkPay(
+    return this.settlementsService.initiateSettlementEritech(
       initiateSettlementAdminDto,
       user,
     );

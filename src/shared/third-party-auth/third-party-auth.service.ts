@@ -5,8 +5,13 @@ import { Cache } from "cache-manager";
 import { ERTITECH } from "@/constants/external-api.constant";
 import { appConfig } from "@/config/app.config";
 import { AxiosService } from "@/shared/axios/axios.service";
-import { IExternalPayoutRequestEritechToken } from "@/interface/external-api.interface";
+import {
+  IExternalEritecPayoutFundResponseDecrypted,
+  IExternalPayoutRequestEritechEncrypt,
+  IExternalPayoutRequestEritechToken,
+} from "@/interface/external-api.interface";
 import { CustomLogger } from "@/logger";
+import { getEritechPgConfig } from "@/utils/pg-config.utils";
 
 const { externalPaymentConfig } = appConfig();
 @Injectable()
@@ -63,6 +68,57 @@ export class ThirdPartyAuthService {
       this.logger.error("Eritech authentication failed:", error);
       throw error;
     }
+  }
+
+  async getEncryptedPayload(payload: any, token: string) {
+    const axiosErtech = new AxiosService(
+      ERTITECH.BASE_URL,
+      getEritechPgConfig({
+        token,
+      }),
+    );
+
+    const encryptedErtechPayload =
+      await axiosErtech.postRequest<IExternalPayoutRequestEritechEncrypt>(
+        ERTITECH.PAYOUT.ENCRYPT,
+        {
+          data: payload,
+          key: externalPaymentConfig.ertech.encryptionKey,
+        },
+      );
+
+    if (!encryptedErtechPayload) {
+      throw new Error("Payload not formatted correctly.");
+    }
+
+    return encryptedErtechPayload;
+  }
+
+  async getDecryptedPayload(
+    payload: any,
+    token: string,
+  ): Promise<IExternalEritecPayoutFundResponseDecrypted> {
+    const axiosErtech = new AxiosService(
+      ERTITECH.BASE_URL,
+      getEritechPgConfig({
+        token,
+      }),
+    );
+
+    const decryptedErtechPayload =
+      await axiosErtech.postRequest<IExternalEritecPayoutFundResponseDecrypted>(
+        ERTITECH.PAYOUT.DECRYPT,
+        {
+          data: payload,
+          key: externalPaymentConfig.ertech.encryptionKey,
+        },
+      );
+
+    if (!decryptedErtechPayload) {
+      throw new Error("Payload not formatted correctly.");
+    }
+
+    return decryptedErtechPayload;
   }
 
   async invalidateEritechToken(): Promise<void> {

@@ -81,9 +81,7 @@ import {
   IExternalPayoutResponseFlakPay,
   IExternalPayinStatusResponseFlakPay,
   IExternalPayoutStatusResponseFlakPay,
-  IExternalPayoutRequestEritechEncrypt,
   IExternalEritecPayoutFundResponse,
-  IExternalEritecPayoutFundResponseDecrypted,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
@@ -98,6 +96,7 @@ import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { decryptData } from "@/utils/encode-decode.utils";
 import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
 import { mapToFilteredDto } from "@/utils/interface-mapping.utils";
+import customerUniqueGenerate from "@/utils/customer-unique.utils";
 
 const { beBaseUrl, externalPaymentConfig } = appConfig();
 
@@ -658,56 +657,6 @@ export class PaymentsService {
     }
   }
 
-  async getEncryptedPayload(payload: any, token: string) {
-    const axiosErtech = new AxiosService(
-      ERTITECH.BASE_URL,
-      getEritechPgConfig({
-        token,
-      }),
-    );
-
-    const encryptedErtechPayload =
-      await axiosErtech.postRequest<IExternalPayoutRequestEritechEncrypt>(
-        ERTITECH.PAYOUT.ENCRYPT,
-        {
-          data: payload,
-          key: externalPaymentConfig.ertech.encryptionKey,
-        },
-      );
-
-    if (!encryptedErtechPayload) {
-      throw new Error("Payload not formatted correctly.");
-    }
-
-    return encryptedErtechPayload;
-  }
-  async getDecryptedPayload(
-    payload: any,
-    token: string,
-  ): Promise<IExternalEritecPayoutFundResponseDecrypted> {
-    const axiosErtech = new AxiosService(
-      ERTITECH.BASE_URL,
-      getEritechPgConfig({
-        token,
-      }),
-    );
-
-    const decryptedErtechPayload =
-      await axiosErtech.postRequest<IExternalEritecPayoutFundResponseDecrypted>(
-        ERTITECH.PAYOUT.DECRYPT,
-        {
-          data: payload,
-          key: externalPaymentConfig.ertech.encryptionKey,
-        },
-      );
-
-    if (!decryptedErtechPayload) {
-      throw new Error("Payload not formatted correctly.");
-    }
-
-    return decryptedErtechPayload;
-  }
-
   async createPayoutFlakPaySingle(
     singlePayoutDto: SinglePayoutDto,
     user: UsersEntity,
@@ -920,15 +869,15 @@ export class PaymentsService {
       }
     }
 
-    if (singlePayoutDto.custUniqRef) {
-      const payoutOrder = await this.payOutOrdersRepository.findOne({
-        where: { custUniqRef: singlePayoutDto.custUniqRef },
-      });
+    // if (singlePayoutDto.custUniqRef) {
+    //   const payoutOrder = await this.payOutOrdersRepository.findOne({
+    //     where: { custUniqRef: singlePayoutDto.custUniqRef },
+    //   });
 
-      if (payoutOrder) {
-        throw new ConflictException("Customer unique reference already exists");
-      }
-    }
+    //   if (payoutOrder) {
+    //     throw new ConflictException("Customer unique reference already exists");
+    //   }
+    // }
 
     const queryRunner = this.dataSource.createQueryRunner();
     try {
@@ -961,7 +910,6 @@ export class PaymentsService {
         remarks: singlePayoutDto.remarks,
         purpose: singlePayoutDto.purpose,
         payoutId: singlePayoutDto.payoutId,
-        custUniqRef: singlePayoutDto.custUniqRef,
       });
 
       this.logger.info(
@@ -981,6 +929,8 @@ export class PaymentsService {
         }),
       );
 
+      const customerUniqueRef = payoutOrder.orderId.split("_").join("");
+
       const eriTechPayload = {
         paymentDetails: {
           txnPaymode: payoutOrder.transferMode,
@@ -988,7 +938,7 @@ export class PaymentsService {
           beneIfscCode: payoutOrder.bankIfsc,
           beneAccNum: payoutOrder.bankAccountNumber,
           beneName: payoutOrder.name,
-          custUniqRef: singlePayoutDto.custUniqRef,
+          custUniqRef: customerUniqueRef,
           beneMobileNo: singlePayoutDto.mobile,
         },
       };
@@ -1001,10 +951,11 @@ export class PaymentsService {
       //   eriTechPayload,
       // );
 
-      const getEncryptedPayload = await this.getEncryptedPayload(
-        eriTechPayload,
-        token,
-      );
+      const getEncryptedPayload =
+        await this.thirdPartyAuthService.getEncryptedPayload(
+          eriTechPayload,
+          token,
+        );
 
       this.logger.info(`${LoggerPlaceHolder.Json}`, getEncryptedPayload);
 
@@ -1023,10 +974,11 @@ export class PaymentsService {
         responseEritech,
       );
 
-      const eriTechDecryptedResponse = await this.getDecryptedPayload(
-        responseEritech.data.encryptedResponseData,
-        token,
-      );
+      const eriTechDecryptedResponse =
+        await this.thirdPartyAuthService.getDecryptedPayload(
+          responseEritech.data.encryptedResponseData,
+          token,
+        );
 
       this.logger.info(
         `Ertitech Response: ${LoggerPlaceHolder.Json}`,
@@ -1061,7 +1013,7 @@ export class PaymentsService {
             status,
           ) && { status }),
 
-          utr: eriTechDecryptedResponse.crn,
+          utr: eriTechDecryptedResponse.utrNo,
         }),
       );
       // 3. create transaction
@@ -1093,7 +1045,7 @@ export class PaymentsService {
           amount: savedPayoutOrder.amountBeforeDeduction,
           txnRefId: eriTechDecryptedResponse.custUniqRef,
           payoutId: savedPayoutOrder.payoutId,
-          utr: eriTechDecryptedResponse.crn,
+          utr: eriTechDecryptedResponse.utrNo,
         };
 
         this.logger.info(
@@ -2127,8 +2079,8 @@ export class PaymentsService {
 
     const {
       status: status_code,
-      orderId: order_id,
-      transferId: custUniqRef,
+      orderId: custUniqRef,
+      // transferId: custUniqRef,
       amount,
       utr,
     } = webhookData;
@@ -2145,9 +2097,8 @@ export class PaymentsService {
     //   utr,
     // });
 
-    const [idPrefix] = order_id.split("_");
-
-    const isSettlement = idPrefix === ID_TYPE.SETTLEMENT_PAYOUT;
+    const { order_id, isSettlement, isPayout } =
+      customerUniqueGenerate(custUniqRef);
 
     if (isSettlement) {
       const settlement = await this.settlementRepository.findOne({
