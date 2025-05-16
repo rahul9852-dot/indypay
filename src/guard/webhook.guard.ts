@@ -9,7 +9,7 @@ import { appConfig } from "@/config/app.config";
 // import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 const {
-  externalPaymentConfig: { flakPay, ismart, paynpro },
+  externalPaymentConfig: { flakPay, ismart, paynpro, ertech },
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -30,6 +30,7 @@ export class WebhookGuard implements CanActivate {
       ...flakPay.webhookIps,
       ...ismart.webhookIps,
       ...paynpro.webhookIps,
+      ...ertech.webhookIps,
     ];
 
     if (!webhookIps.includes(requestIp)) {
