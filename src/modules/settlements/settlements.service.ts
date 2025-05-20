@@ -1338,7 +1338,7 @@ export class SettlementsService {
 
       const ertechSettlementResponse =
         await axiosErtech.postRequest<IExternalEritecPayoutFundResponse>(
-          ERTITECH.PAYOUT.LIVE,
+          ERTITECH.PAYOUT.FUND,
           encryptedPayload,
         );
 
