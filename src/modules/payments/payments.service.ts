@@ -2188,10 +2188,10 @@ export class PaymentsService {
         relations: ["user"],
       });
 
-      // this.logger.info(
-      //   `PAYOUT WEBHOOK - For OrderId: ${order_id} :`,
-      //   payOutOrder,
-      // );
+      this.logger.info(
+        `PAYOUT WEBHOOK - For OrderId: ${order_id} :`,
+        payOutOrder,
+      );
 
       if (!payOutOrder) {
         throw new NotFoundException(
@@ -2217,6 +2217,11 @@ export class PaymentsService {
           transferId: custUniqRef,
           utr,
         });
+
+        this.logger.info(
+          `PAYOUT - Eritech Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
+          payOutOrderRaw,
+        );
 
         await this.payOutOrdersRepository.save(payOutOrderRaw);
       }
