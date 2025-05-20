@@ -140,10 +140,10 @@ export class SinglePayoutDto {
   @IsNotEmpty()
   ifscCode: string;
 
-  @ApiProperty()
-  @IsNumberString()
-  @IsNotEmpty()
-  mobile: string;
+  // @ApiProperty()
+  // @IsNumberString()
+  // @IsNotEmpty()
+  // mobile: string;
 
   @ApiProperty()
   @IsString()

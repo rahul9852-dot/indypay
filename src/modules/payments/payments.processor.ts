@@ -399,18 +399,6 @@ export class PayoutProcessor {
               setTimeout(resolve, DELAY_BETWEEN_REQUESTS),
             );
 
-            const payloadFlakPay = {
-              amount: order.amount,
-              orderId: order.orderId,
-              transferMode: order.transferMode,
-              beneDetails: {
-                beneBankName: order.bankName,
-                beneAccountNo: order.bankAccountNumber,
-                beneIfsc: order.bankIfsc,
-                beneName: order.name,
-              },
-            };
-
             const customerUniqueRef = order.orderId.split("_").join("");
 
             const eriTechPayload = {

@@ -938,7 +938,7 @@ export class PaymentsService {
           beneAccNum: payoutOrder.bankAccountNumber,
           beneName: payoutOrder.name,
           custUniqRef: customerUniqueRef,
-          beneMobileNo: singlePayoutDto.mobile,
+          beneMobileNo: user.mobile,
         },
       };
 
