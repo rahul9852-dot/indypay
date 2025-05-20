@@ -29,7 +29,6 @@ import {
   SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
 import { ExternalPayinWebhookFlakPayDto } from "./dto/external-webhook-payin.dto";
-import { ExternalEritechWebhookDto } from "./dto/external-webhook-payout.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -189,9 +188,7 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payout/webhook")
-  async externalWebhookPayout(
-    @Body() externalWebhookPayout: ExternalEritechWebhookDto,
-  ) {
+  async externalWebhookPayout(@Body() externalWebhookPayout: any) {
     return this.paymentsService.externalWebhookPayoutEritech(
       externalWebhookPayout,
     );
