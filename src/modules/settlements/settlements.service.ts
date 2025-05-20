@@ -1320,11 +1320,21 @@ export class SettlementsService {
         },
       };
 
+      this.logger.info(
+        `Eritech settlement before encryption Payload: ${LoggerPlaceHolder.Json}`,
+        ertechPayload,
+      );
+
       const encryptedPayload =
         await this.thirdPartyAuthService.getEncryptedPayload(
           ertechPayload,
           token,
         );
+
+      this.logger.info(
+        `Eritech settlement Payload: ${LoggerPlaceHolder.Json}`,
+        encryptedPayload,
+      );
 
       const ertechSettlementResponse =
         await axiosErtech.postRequest<IExternalEritecPayoutFundResponse>(
