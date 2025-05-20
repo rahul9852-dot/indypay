@@ -5,7 +5,7 @@ export function mapToFilteredDto(
   rawData: ExternalEritechWebhookDto,
 ): ExternalPayOutWebhookEritechDto {
   return {
-    orderId: rawData.data.response.orderId.toString(),
+    orderId: rawData.data.response.custUniqRef,
     status: rawData.data.response.txn_status.transactionStatus,
     transferId: rawData.data.response.custUniqRef,
     amount: rawData.data.response.amount,
