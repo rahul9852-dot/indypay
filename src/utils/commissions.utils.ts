@@ -1,3 +1,5 @@
+import { Logger } from "@nestjs/common";
+
 export const getCommissions = ({
   amount,
   commissionInPercentage,
@@ -44,10 +46,21 @@ export const calculateOriginalAmountFromNetPayable = ({
   gstInPercentage: number;
   flatCommission?: number;
 }) => {
+  const logger = new Logger("calculateOriginalAmountFromNetPayable");
+
+  logger.log(
+    `Calculating original amount from net payable: ${netPayableAmount}`,
+  );
+  logger.log(`Flat commission: ${flatCommission}`);
+
   if (netPayableAmount <= 1000) {
     const gstAmount = (flatCommission * gstInPercentage) / 100;
     const totalServiceCharge = flatCommission + gstAmount;
     const originalAmount = netPayableAmount + totalServiceCharge;
+
+    logger.log(
+      `Original amount calculated for flat commission: ${originalAmount}`,
+    );
 
     return originalAmount;
   }
