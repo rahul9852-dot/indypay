@@ -878,6 +878,10 @@ export class PaymentsService {
         user,
         singlePayoutDto.amount,
       );
+      this.logger.info(
+        `Payout amount: ${singlePayoutDto.amount}`,
+        user.flatCommission,
+      );
       const settlementAmount = calculateOriginalAmountFromNetPayable({
         netPayableAmount: +singlePayoutDto.amount,
         commissionInPercentage: +user.commissionInPercentagePayout,
