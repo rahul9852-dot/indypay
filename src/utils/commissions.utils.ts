@@ -7,6 +7,19 @@ export const getCommissions = ({
   gstInPercentage: number;
   amount: number;
 }) => {
+  if (amount < 1000) {
+    const flatCommission = 5;
+    const gstAmount = (flatCommission * gstInPercentage) / 100;
+    const totalServiceCharge = flatCommission + gstAmount;
+    const netPayableAmount = amount - totalServiceCharge;
+
+    return {
+      commissionAmount: flatCommission,
+      gstAmount,
+      netPayableAmount,
+      totalServiceChange: totalServiceCharge,
+    };
+  }
   const commissionAmount = (amount * commissionInPercentage) / 100;
   const gstAmount = (commissionAmount * gstInPercentage) / 100;
   const totalServiceChange = commissionAmount + gstAmount;
@@ -29,6 +42,14 @@ export const calculateOriginalAmountFromNetPayable = ({
   commissionInPercentage: number;
   gstInPercentage: number;
 }) => {
+  const flatCommission = 5;
+  const flatGst = (flatCommission * gstInPercentage) / 100;
+  const candidateFlatOriginal = netPayableAmount + flatCommission + flatGst;
+
+  if (candidateFlatOriginal < 1000) {
+    return candidateFlatOriginal;
+  }
+
   const commissionRate = commissionInPercentage / 100;
   const gstRate = (commissionRate * gstInPercentage) / 100;
 
