@@ -868,16 +868,6 @@ export class PaymentsService {
       }
     }
 
-    // if (singlePayoutDto.custUniqRef) {
-    //   const payoutOrder = await this.payOutOrdersRepository.findOne({
-    //     where: { custUniqRef: singlePayoutDto.custUniqRef },
-    //   });
-
-    //   if (payoutOrder) {
-    //     throw new ConflictException("Customer unique reference already exists");
-    //   }
-    // }
-
     const queryRunner = this.dataSource.createQueryRunner();
     try {
       await queryRunner.connect();
@@ -892,6 +882,7 @@ export class PaymentsService {
         netPayableAmount: +singlePayoutDto.amount,
         commissionInPercentage: +user.commissionInPercentagePayout,
         gstInPercentage: +user.gstInPercentagePayout,
+        flatCommission: +user.flatCommission,
       });
 
       const payoutOrder = this.payOutOrdersRepository.create({

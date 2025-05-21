@@ -107,6 +107,14 @@ export class UsersEntity {
   })
   gstInPercentagePayin?: number;
 
+  @Column({
+    type: "decimal",
+    precision: 10,
+    scale: 2,
+    default: 6,
+  })
+  flatCommission?: number;
+
   @Column({ default: 0 })
   jumpingCount?: number;
 
