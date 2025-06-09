@@ -145,7 +145,7 @@ export class PaymentsService {
       const clientCode = "PAYB79";
       const transUserName = "paybolttechnologiespvtltd@gmail.com";
       const transUserPassword = "PAYB79_SP21734";
-      const callbackUrl = "http://localhost:3000/getPgResponse";
+      const callbackUrl = "http://localhost:4000/api/v1/payments/getPgResponse";
       const mcc = "35275";
       const channelId = "W";
       const transDate = new Date();
@@ -170,10 +170,7 @@ export class PaymentsService {
         clientCode: code,
       };
 
-      return {
-        template: "pg-form-request",
-        data: { formData },
-      };
+      return formData;
     } catch (error) {
       this.logger.error("Error in checkout:", error);
       throw error;

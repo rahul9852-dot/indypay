@@ -89,11 +89,15 @@ async function bootstrap() {
   app.setBaseViewsDir(viewsPath);
 
   // Configure Handlebars
-  app.engine("html", hbs.__express);
-  app.setViewEngine("html");
+  app.engine("hbs", hbs.__express);
+  app.setViewEngine("hbs");
 
   // Register Handlebars partials
   hbs.registerPartials(join(viewsPath, "partials"));
+
+  hbs.registerHelper("json", function (context) {
+    return JSON.stringify(context, null, 2);
+  });
 
   // Start server
   await app.listen(port, () => {

@@ -30,7 +30,6 @@ import {
   PayoutStatusDto,
   SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
-import { PaymentResponseDto } from "./dto/payment-response.dto";
 import { ExternalPayinWebhookFlakPayDto } from "./dto/external-webhook-payin.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
@@ -242,11 +241,9 @@ export class PaymentsController {
   async initPgRequest() {
     try {
       const formData = await this.paymentsService.checkout();
-      this.logger.debug("Form data:", formData.data.formData);
+      // console.log("Form data:", formData);
 
-      return {
-        formData: formData.data.formData,
-      };
+      return formData;
     } catch (error) {
       this.logger.error("Error handling payment request:", error);
       throw error;
@@ -257,11 +254,14 @@ export class PaymentsController {
   @Post("getPgResponse")
   @ApiOperation({ summary: "Handle payment gateway response" })
   @Render("pg-form-response")
-  async handlePaymentResponse(@Body() responseDto: PaymentResponseDto) {
+  async handlePaymentResponse(@Body() responseDto: any) {
     try {
+      // console.log("Response data:", responseDto);
       const decryptedResponse =
-        await this.paymentsService.handlePaymentResponse(responseDto.encData);
-      this.logger.debug("Decrypted response:", decryptedResponse);
+        await this.paymentsService.handlePaymentResponse(
+          responseDto.encResponse,
+        );
+      // console.log("Decrypted response:", decryptedResponse);
 
       return { decryptedResponse: JSON.stringify(decryptedResponse, null, 2) };
     } catch (error) {

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Payment Form</title>
+</head>
+
+<body>
+    <header>
+        <h1>Merchant Payment Gateway</h1>
+    </header>
+    <main>
+        <!-- Debug output -->
+        <p><strong>spURL:</strong> {{data.spURL}}</p>
+        <p><strong>encData:</strong> {{data.encData}}</p>
+        <p><strong>clientCode:</strong> {{data.clientCode}}</p>
+
+        <form id="paymentForm" action="{{data.spURL}}" method="post">
+            <input name="encData" value="{{data.encData}}" />
+            <input name="clientCode" value="{{data.clientCode}}" />
+            <button type="submit">Proceed to Pay</button>
+        </form>
+    </main>
+    <footer>
+        <p>© 2025 Merchant Payment Gateway. All rights reserved.</p>
+    </footer>
+</body>
+
+</html>
