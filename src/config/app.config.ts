@@ -13,6 +13,9 @@ export const appConfig = registerAs("appConfig", () => ({
   isProduction: getOsEnv("NODE_ENV") === NODE_ENV.PRODUCTION,
   isStaging: getOsEnv("NODE_ENV") === NODE_ENV.STAGING,
   encryptionKey: getOsEnv("ENCRYPTION_KEY"),
+  encryptionAlgorithm: getOsEnv("ENCRYPTION_ALGORITHM"),
+  authKey: getOsEnv("AUTH_KEY"),
+  encryptionIV: getOsEnv("AUTH_IV"),
   allowCookiesDomain: getOsEnv("ALLOW_COOKIES_DOMAIN"),
   database: {
     host: getOsEnv("DB_HOST"),

@@ -66,6 +66,7 @@ import {
   ERTITECH,
   FALKPAY,
   ISMART_PAY,
+  SABPAISA,
 } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
 import {
@@ -93,7 +94,7 @@ import {
 } from "@/utils/pg-config.utils";
 import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
-import { decryptData } from "@/utils/encode-decode.utils";
+import { decryptData, encrypt } from "@/utils/encode-decode.utils";
 import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
 import { mapToFilteredDto } from "@/utils/interface-mapping.utils";
 import customerUniqueGenerate from "@/utils/customer-unique.utils";
@@ -129,10 +130,36 @@ export class PaymentsService {
       payerName,
       payerEmail,
       payerMobile,
+      clientTxnId,
       payerAddress,
       amount,
+      clientCode,
+      transUserName,
+      transUserPassword,
       callbackUrl,
+      mcc,
+      channelId,
+      transDate,
     } = checkoutDto;
+
+    const Class = "123";
+    const role = "234";
+
+    const stringRequest = `payerName=${payerName}&payerEmail=${payerEmail}&payerMobile=${payerMobile}&clientTxnId=${clientTxnId}&payerAddress=${payerAddress}&amount=${amount}&clientCode=${clientCode}&transUserName=${transUserName}&transUserPassword=${transUserPassword}&callbackUrl=${callbackUrl}&mcc=${mcc}&channelId=${channelId}&transDate=${transDate}&Class=${Class}&role=${role}`;
+    const url = SABPAISA.BASE_URL;
+    const code = clientCode;
+
+    const encryptedString = encrypt(stringRequest);
+
+    const formData = {
+      spURL: url,
+      encData: encryptedString,
+      clientCode: code,
+    };
+
+    const response = await axios.post(url, formData);
+
+    return response.data;
   }
 
   async checkPayOutWalletFlakPay(user: UsersEntity) {
