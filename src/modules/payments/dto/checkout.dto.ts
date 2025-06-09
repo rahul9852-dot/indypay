@@ -5,65 +5,65 @@ export class CheckoutDto {
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  payerName: string;
+  payerName?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  payerEmail: string;
+  payerEmail?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  payerMobile: string;
+  payerMobile?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  payerAddress: string;
+  payerAddress?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  amount: string;
+  amount?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  callbackUrl: string;
+  callbackUrl?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  mcc: string;
+  mcc?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  channelId: string;
+  channelId?: string;
 
   @ApiResponseProperty()
   @IsDate()
   @IsNotEmpty()
-  transDate: Date;
+  transDate?: Date;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  transUserName: string;
+  transUserName?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  transUserPassword: string;
+  transUserPassword?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  clientCode: string;
+  clientCode?: string;
 
   @ApiResponseProperty()
   @IsString()
   @IsNotEmpty()
-  clientTxnId: string;
+  clientTxnId?: string;
 }
