@@ -27,6 +27,7 @@ import { PayoutService } from "@/modules/payout/payout.service";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth.module";
+import { CryptoService } from "@/utils/encryption-algo.utils";
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth
     SESService,
     PayoutProcessor,
     PayoutService,
+    CryptoService,
   ],
   controllers: [PaymentsController],
   exports: [PaymentsService],

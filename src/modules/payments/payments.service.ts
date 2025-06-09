@@ -93,7 +93,8 @@ import {
   getIsmartPayPgConfig,
 } from "@/utils/pg-config.utils";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
-import { decryptData, encrypt } from "@/utils/encode-decode.utils";
+import { decryptData } from "@/utils/encode-decode.utils";
+import { CryptoService } from "@/utils/encryption-algo.utils";
 import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
 import { mapToFilteredDto } from "@/utils/interface-mapping.utils";
 import customerUniqueGenerate from "@/utils/customer-unique.utils";
@@ -122,6 +123,7 @@ export class PaymentsService {
 
     private readonly dataSource: DataSource,
     private readonly thirdPartyAuthService: ThirdPartyAuthService,
+    private readonly encryptionAlgoService: CryptoService,
   ) {}
   public randomStr(len: number, arr: string) {
     let ans = "";
@@ -133,65 +135,49 @@ export class PaymentsService {
   }
 
   async checkout() {
-    // payerName,
-    // payerEmail,
-    // payerMobile,
-    // clientTxnId,
-    // payerAddress,
-    // amount,
-    // clientCode,
-    // transUserName,
-    // transUserPassword,
-    // callbackUrl,
-    // mcc,
-    // channelId,
-    // transDate,
-    const payerName = "Rahul";
-    const payerEmail = "raorahul5432@gmail.com";
-    const payerMobile = "9123184896";
-    const clientTxnId = this.randomStr(10, "0123456789");
-    const payerAddress = "123, Main St, Anytown, USA";
-    const amount = "1";
-    const clientCode = "PAYB79";
-    const transUserName = "paybolttechnologiespvtltd@gmail.com";
-    const transUserPassword = "PAYB79_SP21734";
-    const callbackUrl = "http://localhost:3000/getPgResponse";
-    const mcc = "35275";
-    const channelId = "W";
-    const transDate = new Date();
+    try {
+      const payerName = "Rahul";
+      const payerEmail = "raorahul5432@gmail.com";
+      const payerMobile = "9123184896";
+      const clientTxnId = this.randomStr(10, "0123456789");
+      const payerAddress = "123, Main St, Anytown, USA";
+      const amount = "1";
+      const clientCode = "PAYB79";
+      const transUserName = "paybolttechnologiespvtltd@gmail.com";
+      const transUserPassword = "PAYB79_SP21734";
+      const callbackUrl = "http://localhost:3000/getPgResponse";
+      const mcc = "35275";
+      const channelId = "W";
+      const transDate = new Date();
+      const Class = "IIV";
+      const role = "234";
 
-    const Class = "IIV";
-    const role = "234";
+      const stringRequest =
+        `payerName=${payerName}&payerEmail=${payerEmail}&payerMobile=${payerMobile}` +
+        `&clientTxnId=${clientTxnId}&payerAddress=${payerAddress}&amount=${amount}` +
+        `&clientCode=${clientCode}&transUserName=${transUserName}&transUserPassword=${transUserPassword}` +
+        `&callbackUrl=${callbackUrl}&mcc=${mcc}&channelId=${channelId}` +
+        `&transDate=${transDate}&Class=${Class}&role=${role}`;
 
-    const stringRequest =
-      `payerName=${payerName}&payerEmail=${payerEmail}&payerMobile=${payerMobile}` +
-      `&clientTxnId=${clientTxnId}&payerAddress=${payerAddress}&amount=${amount}` +
-      `&clientCode=${clientCode}&transUserName=${transUserName}&transUserPassword=${transUserPassword}` +
-      `&callbackUrl=${callbackUrl}&mcc=${mcc}&channelId=${channelId}` +
-      `&transDate=${transDate}&Class=${Class}&role=${role}`;
+      const url = SABPAISA.BASE_URL;
+      const code = "PAYB79";
 
-    // console.log("String request::", stringRequest);
+      const encryptedString = this.encryptionAlgoService.encrypt(stringRequest);
 
-    const url = SABPAISA.BASE_URL;
-    const code = "PAYB79";
+      const formData = {
+        spURL: url,
+        encData: encryptedString,
+        clientCode: code,
+      };
 
-    const encryptedString = encrypt(stringRequest);
-
-    const formData = {
-      spURL: url,
-      encData: encryptedString,
-      clientCode: code,
-    };
-
-    const response = await axios.post(url, formData, {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    });
-
-    // console.log("Response::", response.data);
-
-    return response.data;
+      return {
+        template: "pg-form-request",
+        data: { formData },
+      };
+    } catch (error) {
+      this.logger.error("Error in checkout:", error);
+      throw error;
+    }
   }
 
   async checkPayOutWalletFlakPay(user: UsersEntity) {
@@ -3336,4 +3322,46 @@ export class PaymentsService {
   //       }),
   //     );
   // }
+
+  async handlePaymentResponse(encData: string) {
+    try {
+      this.logger.info("Received payment response:", encData);
+
+      const decryptedString = this.encryptionAlgoService.decrypt(
+        decodeURIComponent(encData),
+      );
+
+      this.logger.info("Decrypted payment response:", decryptedString);
+
+      // Parse the decrypted string into an object
+      const responseData = this.parsePaymentResponse(decryptedString);
+
+      return {
+        template: "pg-form-response",
+        data: {
+          decryptedResponse: JSON.stringify(responseData, null, 2),
+        },
+      };
+    } catch (error) {
+      this.logger.error("Error processing payment response:", error);
+      throw error;
+    }
+  }
+
+  private parsePaymentResponse(responseString: string) {
+    try {
+      // Convert the URL-encoded string to an object
+      const params = new URLSearchParams(responseString);
+      const responseObj: Record<string, string> = {};
+
+      for (const [key, value] of params.entries()) {
+        responseObj[key] = value;
+      }
+
+      return responseObj;
+    } catch (error) {
+      this.logger.error("Error parsing payment response:", error);
+      throw new Error("Invalid payment response format");
+    }
+  }
 }

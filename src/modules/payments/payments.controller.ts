@@ -8,6 +8,8 @@ import {
   Get,
   Query,
   BadRequestException,
+  Render,
+  Logger,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -28,6 +30,7 @@ import {
   PayoutStatusDto,
   SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
+import { PaymentResponseDto } from "./dto/payment-response.dto";
 import { ExternalPayinWebhookFlakPayDto } from "./dto/external-webhook-payin.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
@@ -45,12 +48,16 @@ import { USERS_ROLE } from "@/enums";
 import { PayoutService } from "@/modules/payout/payout.service";
 import { PaginationWithDateDto } from "@/dtos/common.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { AuthGuard } from "@/guard/auth.guard";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
 @ApiTags("Payments")
 @Controller("payments")
+@UseGuards(AuthGuard)
 export class PaymentsController {
+  private readonly logger = new Logger(PaymentsController.name);
+
   constructor(
     private readonly paymentsService: PaymentsService,
     private readonly payoutService: PayoutService,
@@ -169,19 +176,6 @@ export class PaymentsController {
     );
   }
 
-  // @Public()
-  // @ApiOperation({ summary: "External webhook for pay-out" })
-  // @UseGuards(WebhookGuard)
-  // @HttpCode(HttpStatus.OK)
-  // @ApiOkResponse({ type: MessageResponseDto })
-  // @Post("payout/webhook")
-  // async externalWebhookPayout(
-  //   @Body() externalWebhookPayout: ExternalPayOutWebhookFlakPayDto,
-  // ) {
-  //   return this.paymentsService.externalWebhookPayoutFlaPay(
-  //     externalWebhookPayout,
-  //   );
-  // }
   @Public()
   @ApiOperation({ summary: "External webhook for pay-out" })
   @UseGuards(WebhookGuard)
@@ -239,6 +233,41 @@ export class PaymentsController {
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   async getMisspelledTransactions(@Query() query: PaginationWithDateDto) {
     return this.paymentsService.getMisspelledPayinTransactions(query);
+  }
+
+  @Public()
+  @Get("initPgReq")
+  @ApiOperation({ summary: "Initialize payment gateway request" })
+  @Render("pg-form-request")
+  async initPgRequest() {
+    try {
+      const formData = await this.paymentsService.checkout();
+      this.logger.debug("Form data:", formData.data.formData);
+
+      return {
+        formData: formData.data.formData,
+      };
+    } catch (error) {
+      this.logger.error("Error handling payment request:", error);
+      throw error;
+    }
+  }
+
+  @Public()
+  @Post("getPgResponse")
+  @ApiOperation({ summary: "Handle payment gateway response" })
+  @Render("pg-form-response")
+  async handlePaymentResponse(@Body() responseDto: PaymentResponseDto) {
+    try {
+      const decryptedResponse =
+        await this.paymentsService.handlePaymentResponse(responseDto.encData);
+      this.logger.debug("Decrypted response:", decryptedResponse);
+
+      return { decryptedResponse: JSON.stringify(decryptedResponse, null, 2) };
+    } catch (error) {
+      this.logger.error("Error handling payment response:", error);
+      throw error;
+    }
   }
 
   // this api is used to redirect user to payment link UI

@@ -3,8 +3,7 @@ import { promisify } from "util";
 import { appConfig } from "@/config/app.config";
 
 const alg = "aes-256-ctr";
-const { encryptionIV, authKey, encryptionAlgorithm, encryptionKey } =
-  appConfig();
+const { encryptionKey } = appConfig();
 
 export const encryptData = async (data: string) => {
   const iv = randomBytes(16); // IV should be random for each encryption
@@ -30,31 +29,3 @@ export const decryptData = async (data: string) => {
 
   return decryptedText.toString("utf-8");
 };
-
-export function encrypt(text: string) {
-  // console.log("text log::=======>", text);
-  const cipher = createCipheriv(
-    encryptionAlgorithm,
-    Buffer.from(authKey),
-    encryptionIV,
-  );
-
-  // console.log("cipher log::", cipher);
-  const encrypted = cipher.update(text);
-  const finalEncrypted = Buffer.concat([encrypted, cipher.final()]);
-
-  return finalEncrypted.toString("base64");
-}
-
-// decrypt function
-export function decrypt(text: string) {
-  const decipher = createDecipheriv(
-    encryptionAlgorithm,
-    Buffer.from(authKey),
-    encryptionIV,
-  );
-  const decrypted = decipher.update(Buffer.from(text, "base64"));
-  const finalDecrypted = Buffer.concat([decrypted, decipher.final()]);
-
-  return finalDecrypted.toString("utf8");
-}

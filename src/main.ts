@@ -4,6 +4,9 @@ import * as cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import * as path from "path";
+import { join } from "path";
+import * as hbs from "hbs";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
@@ -70,6 +73,27 @@ async function bootstrap() {
 
   // Load swagger integration for development environment
   !isProduction && loadSwaggerConfigs(app);
+
+  // Set up Swagger
+  const config = new DocumentBuilder()
+    .setTitle("Paybolt API")
+    .setDescription("The Paybolt API description")
+    .setVersion("1.0")
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup("api", app, document);
+
+  // Set up template engine
+  const viewsPath = join(__dirname, "modules", "payments", "templates");
+  app.setBaseViewsDir(viewsPath);
+
+  // Configure Handlebars
+  app.engine("html", hbs.__express);
+  app.setViewEngine("html");
+
+  // Register Handlebars partials
+  hbs.registerPartials(join(viewsPath, "partials"));
 
   // Start server
   await app.listen(port, () => {
