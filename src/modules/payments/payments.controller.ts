@@ -45,6 +45,7 @@ import { USERS_ROLE } from "@/enums";
 import { PayoutService } from "@/modules/payout/payout.service";
 import { PaginationWithDateDto } from "@/dtos/common.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -203,6 +204,12 @@ export class PaymentsController {
     @Query() paginationDto: PaginationWithDateAndStatusDto,
   ) {
     return this.paymentsService.getTransactionsDetails(user, paginationDto);
+  }
+
+  @ApiOperation({ summary: "Checkout API" })
+  @Post("checkout")
+  async checkout(@Body() checkoutDto: CheckoutDto) {
+    return this.paymentsService.checkout(checkoutDto);
   }
 
   @ApiExcludeEndpoint()

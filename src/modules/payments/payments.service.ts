@@ -91,6 +91,7 @@ import {
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
 } from "@/utils/pg-config.utils";
+import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { decryptData } from "@/utils/encode-decode.utils";
 import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
@@ -122,6 +123,17 @@ export class PaymentsService {
     private readonly dataSource: DataSource,
     private readonly thirdPartyAuthService: ThirdPartyAuthService,
   ) {}
+
+  async checkout(checkoutDto: CheckoutDto) {
+    const {
+      payerName,
+      payerEmail,
+      payerMobile,
+      payerAddress,
+      amount,
+      callbackUrl,
+    } = checkoutDto;
+  }
 
   async checkPayOutWalletFlakPay(user: UsersEntity) {
     const wallet = await this.walletRepository.findOne({
