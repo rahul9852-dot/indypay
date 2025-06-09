@@ -10,6 +10,7 @@ import {
   BadRequestException,
   Render,
   Logger,
+  Res,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -18,6 +19,7 @@ import {
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
+import { Response } from "express";
 import { PaymentsService } from "./payments.service";
 import {
   CreatePayinPaymentResponseDto,
@@ -46,6 +48,7 @@ import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { PayoutService } from "@/modules/payout/payout.service";
 import { PaginationWithDateDto } from "@/dtos/common.dto";
+import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 
@@ -201,8 +204,11 @@ export class PaymentsController {
   @Public()
   @ApiOperation({ summary: "Checkout API" })
   @Post("checkout")
-  async checkout() {
-    return this.paymentsService.checkout();
+  @Render("pg-form-request")
+  async checkout(@Body() checkoutDto: CheckoutDto) {
+    const data = await this.paymentsService.checkout(checkoutDto);
+
+    return data;
   }
 
   @ApiExcludeEndpoint()
@@ -235,39 +241,20 @@ export class PaymentsController {
   }
 
   @Public()
-  @Get("initPgReq")
-  @ApiOperation({ summary: "Initialize payment gateway request" })
-  @Render("pg-form-request")
-  async initPgRequest() {
-    try {
-      const formData = await this.paymentsService.checkout();
-      // console.log("Form data:", formData);
-
-      return formData;
-    } catch (error) {
-      this.logger.error("Error handling payment request:", error);
-      throw error;
-    }
-  }
-
-  @Public()
-  @Post("getPgResponse")
-  @ApiOperation({ summary: "Handle payment gateway response" })
-  @Render("pg-form-response")
-  async handlePaymentResponse(@Body() responseDto: any) {
-    try {
-      // console.log("Response data:", responseDto);
-      const decryptedResponse =
-        await this.paymentsService.handlePaymentResponse(
-          responseDto.encResponse,
-        );
-      // console.log("Decrypted response:", decryptedResponse);
-
-      return { decryptedResponse: JSON.stringify(decryptedResponse, null, 2) };
-    } catch (error) {
-      this.logger.error("Error handling payment response:", error);
-      throw error;
-    }
+  @ApiOperation({ summary: "External webhook for checkout" })
+  @Post("webhook/checkout")
+  async sabpaisaWebhook(@Body() body: any, @Res() res: Response) {
+    this.logger.debug("sabpaisaWebhook endpoint hit", body);
+    res.status(200).send("OK");
+    setImmediate(async () => {
+      try {
+        const rawBody = typeof body === "string" ? body : JSON.stringify(body);
+        await this.paymentsService.handleCheckoutWebhookRawBody(rawBody);
+        this.logger.debug("Webhook processed successfully");
+      } catch (error) {
+        this.logger.error("Webhook processing failed:", error);
+      }
+    });
   }
 
   // this api is used to redirect user to payment link UI

@@ -75,6 +75,7 @@ export enum DESIGNATION {
 export enum ID_TYPE {
   API_CREDENTIALS = "apic",
   BUSINESS_DETAILS = "bsd",
+  CHECKOUT = "chk",
   CUSTOMER = "cst",
   INTERNAL_USER = "itu",
   INVOICES = "inv",

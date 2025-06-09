@@ -53,6 +53,7 @@ import {
   PAYOUT_PAYMENT_MODE,
 } from "@/enums/payment.enum";
 import { UsersEntity } from "@/entities/user.entity";
+import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
@@ -98,6 +99,7 @@ import { CryptoService } from "@/utils/encryption-algo.utils";
 import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
 import { mapToFilteredDto } from "@/utils/interface-mapping.utils";
 import customerUniqueGenerate from "@/utils/customer-unique.utils";
+import { CheckoutEntity } from "@/entities/checkout.entity";
 
 const { beBaseUrl, externalPaymentConfig } = appConfig();
 
@@ -118,6 +120,8 @@ export class PaymentsService {
     private readonly settlementRepository: Repository<SettlementsEntity>,
     @InjectRepository(ApiCredentialsEntity)
     private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
+    @InjectRepository(CheckoutEntity)
+    private readonly checkoutRepository: Repository<CheckoutEntity>,
     @InjectQueue("payouts") private payoutQueue: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
@@ -134,24 +138,64 @@ export class PaymentsService {
     return ans;
   }
 
-  async checkout() {
-    try {
-      const payerName = "Rahul";
-      const payerEmail = "raorahul5432@gmail.com";
-      const payerMobile = "9123184896";
-      const clientTxnId = this.randomStr(10, "0123456789");
-      const payerAddress = "123, Main St, Anytown, USA";
-      const amount = "1";
-      const clientCode = "PAYB79";
-      const transUserName = "paybolttechnologiespvtltd@gmail.com";
-      const transUserPassword = "PAYB79_SP21734";
-      const callbackUrl = "http://localhost:4000/api/v1/payments/getPgResponse";
-      const mcc = "35275";
-      const channelId = "W";
-      const transDate = new Date();
-      const Class = "IIV";
-      const role = "234";
+  async checkout(checkoutDto: CheckoutDto) {
+    const clientTxnId = this.randomStr(10, "0123456789");
+    const callbackUrl = `${beBaseUrl}/api/v1/payments/webhook/checkout`;
+    const transDate = new Date();
 
+    const {
+      payerName,
+      payerEmail,
+      payerMobile,
+      payerAddress,
+      amount,
+      channelId,
+    } = checkoutDto;
+    const {
+      sabpaisa: {
+        clientCode,
+        transUserName,
+        transUserPassword,
+        mcc,
+        Class,
+        role,
+      },
+    } = appConfig();
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. check if checkout order already exists
+      const existingOrder = await this.checkoutRepository.exists({
+        where: { clientTxnId },
+      });
+      if (existingOrder) {
+        throw new BadRequestException(
+          "Checkout order already exists for given clientTxnId",
+        );
+      }
+
+      // 1. create checkout order
+      const checkoutOrder = this.checkoutRepository.create({
+        payerName,
+        payerEmail,
+        payerMobile,
+        payerAddress,
+        amount,
+        clientTxnId,
+        status: PAYMENT_STATUS.PENDING,
+      });
+
+      // 2. save checkout order
+      const savedCheckoutOrder = await queryRunner.manager.save(checkoutOrder);
+      this.logger.info(
+        `Checkout order created: ${LoggerPlaceHolder.Json}`,
+        savedCheckoutOrder,
+      );
+
+      // 3. create transaction
       const stringRequest =
         `payerName=${payerName}&payerEmail=${payerEmail}&payerMobile=${payerMobile}` +
         `&clientTxnId=${clientTxnId}&payerAddress=${payerAddress}&amount=${amount}` +
@@ -160,17 +204,16 @@ export class PaymentsService {
         `&transDate=${transDate}&Class=${Class}&role=${role}`;
 
       const url = SABPAISA.BASE_URL;
-      const code = "PAYB79";
-
       const encryptedString = this.encryptionAlgoService.encrypt(stringRequest);
 
-      const formData = {
+      await queryRunner.commitTransaction();
+
+      // Return the data directly for the controller/template
+      return {
         spURL: url,
         encData: encryptedString,
-        clientCode: code,
+        clientCode,
       };
-
-      return formData;
     } catch (error) {
       this.logger.error("Error in checkout:", error);
       throw error;
@@ -2828,537 +2871,104 @@ export class PaymentsService {
       throw new BadRequestException(error.message);
     }
   }
-  // check payment status
-  // async checkPaymentStatus(orderId: string, req: Request) {
-  //   const token = req.cookies[COOKIE_KEYS.PAYMENT_LINK_TOKEN];
-  //   if (!token) {
-  //     throw new UnauthorizedException(
-  //       new MessageResponseDto("Payment link token not found"),
-  //     );
-  //   }
 
-  //   const payload = this.jwtService.verify(token, {
-  //     secret: paymentLinkSecret,
-  //   });
-
-  //   if (!payload) {
-  //     throw new UnauthorizedException(
-  //       new MessageResponseDto("Invalid payment link token"),
-  //     );
-  //   }
-
-  //   const cachedStatus = await this.cacheManager.get<PAYMENT_STATUS>(
-  //     REDIS_KEYS.PAYMENT_STATUS(orderId),
-  //   );
-  //   if (cachedStatus) {
-  //     return {
-  //       success: cachedStatus === PAYMENT_STATUS.SUCCESS,
-  //       failed: cachedStatus === PAYMENT_STATUS.FAILED,
-  //       orderId,
-  //     };
-  //   }
-
-  //   const payinOrder = await this.payInOrdersRepository.findOne({
-  //     where: { orderId },
-  //   });
-
-  //   if (!payinOrder) {
-  //     throw new NotFoundException(
-  //       new MessageResponseDto("Payin order not found"),
-  //     );
-  //   }
-
-  //   return {
-  //     success: payinOrder.status === PAYMENT_STATUS.SUCCESS,
-  //     failed: payinOrder.status === PAYMENT_STATUS.FAILED,
-  //     orderId,
-  //   };
-  // }
-
-  // private getHtmlTemplate(
-  //   type: "not_found" | "success" | "failed" | "pending",
-  //   data?: {
-  //     amount?: number;
-  //     txnRefId?: string;
-  //     orderId?: string;
-  //     createdAt?: Date;
-  //     qrCode?: string;
-  //     frontendUrl?: string;
-  //     paytmIntent?: string;
-  //   },
-  // ): string {
-  //   if (!data) {
-  //     data = {};
-  //   }
-  //   const templates = {
-  //     not_found: `
-  //       <html><body><h1>Payin order not found</h1></body></html>
-  //     `,
-  //     success: `
-  //       <html>
-  //         <head>
-  //           <style>
-  //             body {
-  //               font-family: Arial, sans-serif;
-  //               display: flex;
-  //               justify-content: center;
-  //               align-items: center;
-  //               height: 100vh;
-  //               margin: 0;
-  //               background-color: #f4f4f4;
-  //             }
-  //             .message-container {
-  //               background-color: #fff;
-  //               padding: 2rem;
-  //               border-radius: 8px;
-  //               box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  //               max-width: 600px;
-  //               text-align: center;
-  //             }
-  //             h1 { color: #28a745; margin-bottom: 1rem; }
-  //             p { color: #666; line-height: 1.6; }
-  //           </style>
-  //         </head>
-  //         <body>
-  //           <div class="message-container">
-  //             <h1>Payment Successfully Processed</h1>
-  //             <p>
-  //               Hi there, The transaction you attempted to make has already been processed.
-  //               This could happen if you accidentally clicked the payment button multiple times
-  //               or if there was a delay in the payment confirmation being displayed on the website.
-  //             </p>
-  //             <p>
-  //               If you have any doubts or concerns about the transaction, you should contact
-  //               the website's customer support team to confirm that the payment has been
-  //               successfully processed and that there are no issues with your account or the order.
-  //             </p>
-  //           </div>
-  //         </body>
-  //       </html>
-  //     `,
-  //     failed: `
-  //       <html>
-  //         <head>
-  //           <style>
-  //             body {
-  //               font-family: Arial, sans-serif;
-  //               display: flex;
-  //               justify-content: center;
-  //               align-items: center;
-  //               height: 100vh;
-  //               margin: 0;
-  //               background-color: #f4f4f4;
-  //             }
-  //             .message-container {
-  //               background-color: #fff;
-  //               padding: 2rem;
-  //               border-radius: 8px;
-  //               box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  //               max-width: 600px;
-  //               text-align: center;
-  //             }
-  //             h1 { color: #dc3545; margin-bottom: 1rem; }
-  //             p { color: #666; line-height: 1.6; }
-  //           </style>
-  //         </head>
-  //         <body>
-  //           <div class="message-container">
-  //             <h1>Payment Failed</h1>
-  //             <p>
-  //               We're sorry, but your payment could not be processed at this time.
-  //               This could be due to insufficient funds, network issues, or other technical problems.
-  //             </p>
-  //             <p>
-  //               Please try again or contact our support team if you continue to experience issues.
-  //             </p>
-  //           </div>
-  //         </body>
-  //       </html>
-  //     `,
-  //     pending: this.getPendingPaymentTemplate(data),
-  //   };
-
-  //   return templates[type];
-  // }
-
-  // private getPendingPaymentTemplate(data: any): string {
-  //   if (!data) {
-  //     data = {};
-  //   }
-
-  //   const logoImg = "/static/paybolt-icon.svg";
-  //   const upiImg = "/static/upi.png";
-
-  //   return `
-  //     <!DOCTYPE html>
-  //     <html lang="en">
-  //       <head>
-  //         <meta charset="UTF-8" />
-  //         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  //         <title>Payment Page | PayBolt Technologies</title>
-  //         ${this.getStyles()}
-  //       </head>
-  //       <body>
-  //         <div id="status-overlay" style="display: none;" class="status-overlay">
-  //           <div class="status-message"></div>
-  //         </div>
-  //         <img src="${logoImg}" class="logo" alt="PayBolt Logo" />
-  //         <div class="container">
-  //           <div class="details">
-  //             <h2>Amount: ₹ ${data.amount}</h2>
-  //             <p><span style="font-weight: bold; font-size: 18px;">Transaction ID:</span><br /> ${data.txnRefId}</p>
-  //             <p><span style="font-weight: bold; font-size: 18px;">Order ID:</span><br /> ${data.orderId}</p>
-  //             <p><span style="font-weight: bold; font-size: 18px;">Initiated On:</span><br /> ${formatDateTime(data.createdAt)}</p>
-  //           </div>
-  //           <div class="qr-code">
-  //             <img src="${data.qrCode}" alt="QR Code" />
-  //             <a id="pay-button" href="${data.paytmIntent}">Click to Pay Now</a><br/>
-  //             <p>Please wait<br />Once payment is received, it will auto redirect.</p>
-  //             <div class="payment-methods">
-  //               <img class="upi" src="${upiImg}" alt="UPI" />
-  //             </div>
-  //           </div>
-  //         </div>
-  //         ${this.getPollingScript(data.orderId)}
-  //       </body>
-  //     </html>
-  //   `;
-  // }
-
-  // private getPollingScript(orderId: string): string {
-  //   return `
-  //     <script>
-  //       class PaymentPoller {
-  //         constructor(orderId, checkInterval = 4000) {
-  //           this.orderId = orderId;
-  //           this.checkInterval = checkInterval;
-  //           this.timeoutId = null;
-  //           this.overlay = document.getElementById('status-overlay');
-  //           this.statusMessage = document.querySelector('.status-message');
-  //         }
-
-  //         showStatusMessage(type, message) {
-  //           this.overlay.style.display = 'flex';
-  //           this.statusMessage.innerHTML = message;
-  //           this.statusMessage.className = 'status-message ' + type;
-  //         }
-
-  //         async checkStatus() {
-  //           try {
-  //             const response = await fetch(
-  //               '${beBaseUrl}/api/v1/payments/redirect/payment-link/status/' + this.orderId
-  //             );
-  //             const resJson = await response.json();
-
-  //             const data = resJson?.data;
-
-  //             if(!data) {
-  //               throw new Error("token");
-  //             }
-
-  //             if (data?.success) {
-  //               this.stop();
-  //               this.showStatusMessage('success', \`
-  //                 <h1>Payment Successfully Processed</h1>
-  //                 <p>
-  //                   Hi there, The transaction you attempted to make has already been processed.
-  //                   This could happen if you accidentally clicked the payment button multiple times
-  //                   or if there was a delay in the payment confirmation being displayed on the website.
-  //                 </p>
-  //                 <p>
-  //                   If you have any doubts or concerns about the transaction, you should contact
-  //                   the website's customer support team to confirm that the payment has been
-  //                   successfully processed and that there are no issues with your account or the order.
-  //                 </p>
-  //               \`);
-  //             } else if (data?.failed) {
-  //               this.stop();
-  //               this.showStatusMessage('error', \`
-  //                 <h1>Payment Failed</h1>
-  //                 <p>
-  //                   We're sorry, but your payment could not be processed at this time.
-  //                   This could be due to insufficient funds, network issues, or other technical problems.
-  //                 </p>
-  //                 <p>
-  //                   Please try again or contact our support team if you continue to experience issues.
-  //                 </p>
-  //               \`);
-  //             } else {
-  //               this.timeoutId = setTimeout(
-  //                 () => this.checkStatus(),
-  //                 this.checkInterval
-  //               );
-  //             }
-  //           } catch (error) {
-  //             if(error?.message === "token") {
-  //               this.stop();
-  //               this.showStatusMessage('error', \`
-  //                 <h1>Unauthorized</h1>
-  //                 <p>
-  //                   We're sorry, but your payment could not be processed at this time.
-  //                 </p>
-  //                 <p>
-  //                   Please try again or contact our support team if you continue to experience issues.
-  //                 </p>
-  //               \`);
-  //             }else {
-  //               this.stop();
-  //               this.showStatusMessage('error', \`
-  //               <h1>Error</h1>
-  //               <p>An error occurred while processing your payment. Please try again later.</p>
-  //               \`);
-  //             }
-  //           }
-  //         }
-
-  //         start() {
-  //           this.checkStatus();
-  //         }
-
-  //         stop() {
-  //           if (this.timeoutId) {
-  //             clearTimeout(this.timeoutId);
-  //           }
-  //         }
-  //       }
-
-  //       const poller = new PaymentPoller('${orderId}');
-  //       poller.start();
-  //     </script>
-  //   `;
-  // }
-
-  // private getStyles(): string {
-  //   return `
-  //     <style>
-  //       body {
-  //         font-family: Arial, sans-serif;
-  //         margin: 0;
-  //         padding: 0;
-  //         background-color: #f4f4f4;
-  //         display: flex;
-  //         justify-content: center;
-  //         align-items: center;
-  //         flex-direction: column;
-  //         gap: 20px;
-  //         height: 100vh;
-  //       }
-
-  //       .logo {
-  //         max-width: 200px;
-  //         margin: 0 auto;
-  //       }
-
-  //       .container {
-  //         background-color: #fff;
-  //         display: flex;
-  //         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  //         border-radius: 8px;
-  //         overflow: hidden;
-  //       }
-
-  //       #pay-button {
-  //         background-color: #007bff;
-  //         color: #fff;
-  //         border: none;
-  //         padding: 10px 20px;
-  //         border-radius: 4px;
-  //         cursor: pointer;
-  //         text-decoration: none;
-  //       }
-
-  //       #pay-button:hover {
-  //         background-color: #0056b3;
-  //       }
-
-  //       @media (min-width: 768px) {
-  //         #pay-button {
-  //           display: none;
-  //           visible: hidden;
-  //         }
-  //       }
-
-  //       .status-overlay {
-  //         position: fixed;
-  //         top: 0;
-  //         left: 0;
-  //         right: 0;
-  //         bottom: 0;
-  //         background-color: #f5f5f5;
-  //         display: flex;
-  //         justify-content: center;
-  //         align-items: center;
-  //         z-index: 1000;
-  //       }
-
-  //       .status-message {
-  //         background-color: white;
-  //         padding: 2rem;
-  //         border-radius: 8px;
-  //         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  //         max-width: 600px;
-  //         text-align: center;
-  //       }
-
-  //       .status-message.success h1 { color: #28a745; }
-  //       .status-message.error h1 { color: #dc3545; }
-  //       .status-message p { color: #666; line-height: 1.6; }
-
-  //       @media (max-width: 768px) {
-  //         .container {
-  //           flex-direction: column;
-  //         }
-  //       }
-
-  //       .details {
-  //         padding: 20px;
-  //         flex: 1;
-  //         min-width: 300px;
-  //       }
-
-  //       .details h2 {
-  //         color: #6020a0;
-  //         margin: 0 0 20px;
-  //         font-size: 24px;
-  //       }
-
-  //       .details p {
-  //         margin: 10px 0;
-  //         font-size: 14px;
-  //         color: #333;
-  //       }
-
-  //       .details p span {
-  //         font-weight: bold;
-  //       }
-
-  //       .qr-code {
-  //         flex: 1;
-  //         background-color: #f9f9f9;
-  //         display: flex;
-  //         flex-direction: column;
-  //         align-items: center;
-  //         justify-content: center;
-  //         padding: 20px;
-  //       }
-
-  //       .qr-code img {
-  //         width: 150px;
-  //         height: 150px;
-  //         margin-bottom: 20px;
-  //       }
-
-  //       .qr-code p {
-  //         margin: 10px 0;
-  //         font-size: 14px;
-  //         text-align: center;
-  //         color: #555;
-  //       }
-
-  //       .payment-methods {
-  //         display: flex;
-  //         justify-content: center;
-  //         flex-wrap: wrap;
-  //         gap: 10px;
-  //         margin-top: 10px;
-  //       }
-
-  //       .payment-methods img {
-  //         width: 300px;
-  //         height: auto;
-
-  //       }
-  //     </style>
-  //   `;
-  // }
-
-  // async redirectPaymentLink(payinId: string, res: Response) {
-  //   const payinOrder = await this.payInOrdersRepository.findOne({
-  //     where: { id: payinId },
-  //   });
-
-  //   if (!payinOrder) {
-  //     return res.send(this.getHtmlTemplate("not_found"));
-  //   }
-
-  //   if (payinOrder.status === PAYMENT_STATUS.SUCCESS) {
-  //     return res.send(this.getHtmlTemplate("success"));
-  //   }
-
-  //   if (payinOrder.status === PAYMENT_STATUS.FAILED) {
-  //     return res.send(this.getHtmlTemplate("failed"));
-  //   }
-
-  //   const qrCode = await generateQrCode(payinOrder.intent);
-  //   const frontendUrl = "http://localhost:3000";
-
-  //   const token = this.jwtService.sign(
-  //     {
-  //       id: payinOrder.id,
-  //       orderId: payinOrder.orderId,
-  //     },
-  //     {
-  //       secret: paymentLinkSecret,
-  //       expiresIn: 1000 * 60 * 30, // 30m
-  //     },
-  //   );
-
-  //   return res
-  //     .cookie(COOKIE_KEYS.PAYMENT_LINK_TOKEN, token, {
-  //       ...cookieOptions,
-  //     })
-  //     .send(
-  //       this.getHtmlTemplate("pending", {
-  //         amount: payinOrder.amount,
-  //         txnRefId: payinOrder.txnRefId,
-  //         orderId: payinOrder.orderId,
-  //         createdAt: payinOrder.createdAt,
-  //         qrCode,
-  //         frontendUrl,
-  //         ...{ paymentLink: payinOrder.paymentLink },
-  //       }),
-  //     );
-  // }
-
-  async handlePaymentResponse(encData: string) {
+  async handleCheckoutWebhookRawBody(body: string | object): Promise<void> {
+    const startTime = Date.now();
     try {
-      this.logger.info("Received payment response:", encData);
+      // 1. Parse the incoming body
 
-      const decryptedString = this.encryptionAlgoService.decrypt(
-        decodeURIComponent(encData),
-      );
-
-      this.logger.info("Decrypted payment response:", decryptedString);
-
-      // Parse the decrypted string into an object
-      const responseData = this.parsePaymentResponse(decryptedString);
-
-      return {
-        template: "pg-form-response",
-        data: {
-          decryptedResponse: JSON.stringify(responseData, null, 2),
-        },
-      };
-    } catch (error) {
-      this.logger.error("Error processing payment response:", error);
-      throw error;
-    }
-  }
-
-  private parsePaymentResponse(responseString: string) {
-    try {
-      // Convert the URL-encoded string to an object
-      const params = new URLSearchParams(responseString);
-      const responseObj: Record<string, string> = {};
-
-      for (const [key, value] of params.entries()) {
-        responseObj[key] = value;
+      let parsedBody: any;
+      if (typeof body === "string") {
+        try {
+          parsedBody = JSON.parse(body);
+        } catch {
+          const formData = new URLSearchParams(body);
+          parsedBody = Object.fromEntries(formData.entries());
+        }
+      } else {
+        parsedBody = body;
       }
 
-      return responseObj;
+      // 2. Extract the encrypted value (encResponse or other fields)
+      const encrypted =
+        parsedBody.encResponse ||
+        parsedBody.statusResponseData ||
+        parsedBody.encData ||
+        parsedBody.encryptedData ||
+        parsedBody.data;
+      if (!encrypted) {
+        throw new Error("No encrypted data found in payload");
+      }
+
+      // 3. URL-decode and decrypt
+      const decoded = decodeURIComponent(encrypted);
+      let decryptedString: string;
+      try {
+        decryptedString = this.encryptionAlgoService.decrypt(decoded);
+      } catch (err) {
+        this.logger.error("[Webhook] Decryption failed:", err);
+        throw new Error("Decryption failed: " + err.message);
+      }
+
+      // 4. Parse the decrypted string as URL-encoded form data
+      let parsedDecrypted: any;
+      try {
+        const params = new URLSearchParams(decryptedString);
+        parsedDecrypted = Object.fromEntries(params.entries());
+      } catch (err) {
+        throw new Error(
+          "Decryption failed: Invalid form data in decrypted data",
+        );
+      }
+      const clientTxnId =
+        parsedDecrypted.clientTxnId ||
+        parsedDecrypted.transactionId ||
+        parsedDecrypted.orderId;
+      if (!clientTxnId) {
+        throw new Error("No clientTxnId found in decrypted data");
+      }
+      const checkout = await this.checkoutRepository.findOne({
+        where: { clientTxnId },
+      });
+      if (!checkout) {
+        throw new Error(`Checkout not found for clientTxnId: ${clientTxnId}`);
+      }
+
+      // 7. Map statusCode to PAYMENT_STATUS
+      const statusCode =
+        parsedDecrypted.statusCode ||
+        parsedDecrypted.status ||
+        parsedDecrypted.paymentStatus;
+      let status = PAYMENT_STATUS.PENDING;
+      switch (statusCode?.toString()) {
+        case "0000":
+        case "SUCCESS":
+          status = PAYMENT_STATUS.SUCCESS;
+          break;
+        case "0300":
+        case "FAILED":
+          status = PAYMENT_STATUS.FAILED;
+          break;
+        case "0100":
+        case "INITIATED":
+          status = PAYMENT_STATUS.INITIATED;
+          break;
+        case "0200":
+        case "ABORTED":
+          status = PAYMENT_STATUS.ABORTED;
+          break;
+        case "404":
+        case "NOT_FOUND":
+          status = PAYMENT_STATUS.NOT_FOUND;
+          break;
+        default:
+          status = PAYMENT_STATUS.FAILED;
+      }
+      checkout.status = status;
+      await this.checkoutRepository.save(checkout);
     } catch (error) {
-      this.logger.error("Error parsing payment response:", error);
-      throw new Error("Invalid payment response format");
+      this.logger.error("[Webhook] Webhook processing failed:", error);
+      throw error;
     }
   }
 }

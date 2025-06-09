@@ -113,4 +113,12 @@ export const appConfig = registerAs("appConfig", () => ({
     snsTopicArn: getOsEnv("AWS_SNS_TOPIC_ARN"),
     s3BucketName: getOsEnv("AWS_S3_BUCKET_NAME"),
   },
+  sabpaisa: {
+    clientCode: getOsEnv("CLIENT_CODE"),
+    transUserName: getOsEnv("TRANSUSER_NAME"),
+    transUserPassword: getOsEnv("TRANS_USER_PASSWORD"),
+    mcc: getOsEnv("MCC"),
+    Class: getOsEnv("CLASS"),
+    role: getOsEnv("S_ROLE"),
+  },
 }));
