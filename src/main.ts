@@ -85,7 +85,13 @@ async function bootstrap() {
   SwaggerModule.setup("api", app, document);
 
   // Set up template engine
-  const viewsPath = join(__dirname, "modules", "payments", "templates");
+  const viewsPath = join(
+    process.cwd(),
+    "src",
+    "modules",
+    "payments",
+    "templates",
+  );
   app.setBaseViewsDir(viewsPath);
 
   // Configure Handlebars
@@ -94,6 +100,10 @@ async function bootstrap() {
 
   // Register Handlebars partials
   hbs.registerPartials(join(viewsPath, "partials"));
+
+  hbs.registerHelper("eq", function (v1, v2) {
+    return v1 === v2;
+  });
 
   hbs.registerHelper("json", function (context) {
     return JSON.stringify(context, null, 2);

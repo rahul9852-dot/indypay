@@ -11,6 +11,8 @@ import {
   Render,
   Logger,
   Res,
+  Param,
+  NotFoundException,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -51,6 +53,7 @@ import { PaginationWithDateDto } from "@/dtos/common.dto";
 import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
+import { CryptoService } from "@/utils/encryption-algo.utils";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -63,6 +66,7 @@ export class PaymentsController {
   constructor(
     private readonly paymentsService: PaymentsService,
     private readonly payoutService: PayoutService,
+    private readonly encryptionAlgoService: CryptoService,
   ) {}
 
   @Public()
@@ -244,17 +248,105 @@ export class PaymentsController {
   @ApiOperation({ summary: "External webhook for checkout" })
   @Post("webhook/checkout")
   async sabpaisaWebhook(@Body() body: any, @Res() res: Response) {
-    this.logger.debug("sabpaisaWebhook endpoint hit", body);
-    res.status(200).send("OK");
-    setImmediate(async () => {
-      try {
-        const rawBody = typeof body === "string" ? body : JSON.stringify(body);
-        await this.paymentsService.handleCheckoutWebhookRawBody(rawBody);
-        this.logger.debug("Webhook processed successfully");
-      } catch (error) {
-        this.logger.error("Webhook processing failed:", error);
+    this.logger.debug(
+      "sabpaisaWebhook endpoint hit with body structure:",
+      JSON.stringify(body, null, 2),
+    );
+
+    try {
+      // Process the webhook data first
+      const rawBody = typeof body === "string" ? body : JSON.stringify(body);
+      await this.paymentsService.handleCheckoutWebhookRawBody(rawBody);
+
+      // Handle redirection if we have encResponse
+      if (body.encResponse) {
+        try {
+          const decoded = decodeURIComponent(body.encResponse);
+          const decryptedString = this.encryptionAlgoService.decrypt(decoded);
+          const params = new URLSearchParams(decryptedString);
+          const clientTxnId =
+            params.get("clientTxnId") ||
+            params.get("transactionId") ||
+            params.get("orderId");
+
+          if (clientTxnId) {
+            const statusPageUrl = `${process.env.BE_BASE_URL}/api/v1/payments/checkout/status/${clientTxnId}`;
+            this.logger.debug("Redirecting to status page:", statusPageUrl);
+
+            return res.redirect(statusPageUrl);
+          }
+        } catch (decryptError) {
+          this.logger.error("Error decrypting data:", decryptError);
+        }
       }
-    });
+
+      // If no redirection happened, send OK response
+      return res.status(200).send("OK");
+    } catch (error) {
+      this.logger.error("Webhook processing failed:", error);
+
+      return res.status(200).send("OK"); // Still send OK to payment gateway even if processing fails
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Checkout Payment Status Page" })
+  @Get("checkout/status/:clientTxnId")
+  @Render("checkout-response")
+  async checkoutStatusPage(@Param("clientTxnId") clientTxnId: string) {
+    const checkout =
+      await this.paymentsService.getCheckoutByClientTxnId(clientTxnId);
+
+    if (!checkout) {
+      throw new NotFoundException("Checkout not found");
+    }
+
+    const { payerEmail, payerName, amount, status } = checkout;
+
+    const statusConfig = {
+      [PAYMENT_STATUS.SUCCESS]: {
+        title: "Payment Successful",
+        message: "Your payment has been processed successfully.",
+        statusClass: "success",
+      },
+      [PAYMENT_STATUS.FAILED]: {
+        title: "Payment Failed",
+        message: "We couldn't process your payment. Please try again.",
+        statusClass: "failed",
+      },
+      [PAYMENT_STATUS.PENDING]: {
+        title: "Payment Pending",
+        message: "Your payment is being processed. Please wait.",
+        statusClass: "pending",
+      },
+      [PAYMENT_STATUS.INITIATED]: {
+        title: "Payment Initiated",
+        message: "Your payment has been initiated.",
+        statusClass: "pending",
+      },
+      [PAYMENT_STATUS.ABORTED]: {
+        title: "Payment Aborted",
+        message: "Your payment was aborted.",
+        statusClass: "failed",
+      },
+    };
+
+    const config = statusConfig[checkout.status] || {
+      title: "Payment Status",
+      message: "Your payment status is being processed.",
+      statusClass: "pending",
+    };
+
+    return {
+      ...config,
+      status,
+      clientTxnId,
+      amount,
+      payerName,
+      payerEmail,
+      dateTime: new Date().toLocaleString(),
+      returnUrl: `https://paybolt.in`,
+    };
   }
 
   // this api is used to redirect user to payment link UI

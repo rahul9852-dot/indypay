@@ -2933,8 +2933,6 @@ export class PaymentsService {
       if (!checkout) {
         throw new Error(`Checkout not found for clientTxnId: ${clientTxnId}`);
       }
-
-      // 7. Map statusCode to PAYMENT_STATUS
       const statusCode =
         parsedDecrypted.statusCode ||
         parsedDecrypted.status ||
@@ -2965,9 +2963,32 @@ export class PaymentsService {
           status = PAYMENT_STATUS.FAILED;
       }
       checkout.status = status;
+
       await this.checkoutRepository.save(checkout);
     } catch (error) {
       this.logger.error("[Webhook] Webhook processing failed:", error);
+      throw error;
+    }
+  }
+  async getCheckoutByClientTxnId(clientTxnId: string): Promise<CheckoutEntity> {
+    try {
+      const checkout = await this.checkoutRepository.findOne({
+        where: { clientTxnId },
+      });
+
+      if (!checkout) {
+        throw new NotFoundException(
+          `Checkout not found for clientTxnId: ${clientTxnId}`,
+        );
+      }
+      this.logger.info("Checkout entity:", JSON.stringify(checkout, null, 2));
+
+      return checkout;
+    } catch (error) {
+      this.logger.error(
+        `[Checkout] Error fetching checkout by clientTxnId: ${LoggerPlaceHolder.Json}`,
+        error,
+      );
       throw error;
     }
   }
