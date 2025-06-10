@@ -248,11 +248,6 @@ export class PaymentsController {
   @ApiOperation({ summary: "External webhook for checkout" })
   @Post("webhook/checkout")
   async sabpaisaWebhook(@Body() body: any, @Res() res: Response) {
-    this.logger.debug(
-      "sabpaisaWebhook endpoint hit with body structure:",
-      JSON.stringify(body, null, 2),
-    );
-
     try {
       // Process the webhook data first
       const rawBody = typeof body === "string" ? body : JSON.stringify(body);
@@ -271,7 +266,6 @@ export class PaymentsController {
 
           if (clientTxnId) {
             const statusPageUrl = `${process.env.BE_BASE_URL}/api/v1/payments/checkout/status/${clientTxnId}`;
-            this.logger.debug("Redirecting to status page:", statusPageUrl);
 
             return res.redirect(statusPageUrl);
           }
@@ -293,20 +287,20 @@ export class PaymentsController {
   @ApiOperation({ summary: "Checkout Payment Status Page" })
   @Get("checkout/status/:clientTxnId")
   @Render("checkout-response")
-  async checkoutStatusPage(@Param("clientTxnId") clientTxnId: string) {
-    const checkout =
-      await this.paymentsService.getCheckoutByClientTxnId(clientTxnId);
+  async checkoutStatusPage(@Param("clientTxnId") id: string) {
+    const checkout = await this.paymentsService.getCheckoutByClientTxnId(id);
 
     if (!checkout) {
       throw new NotFoundException("Checkout not found");
     }
 
-    const { payerEmail, payerName, amount, status } = checkout;
+    const { payerEmail, payerName, amount, status, clientTxnId } = checkout;
 
     const statusConfig = {
       [PAYMENT_STATUS.SUCCESS]: {
         title: "Payment Successful",
-        message: "Your payment has been processed successfully.",
+        message:
+          "Your payment has been processed successfully thanks for choosing Paybolt",
         statusClass: "success",
       },
       [PAYMENT_STATUS.FAILED]: {
@@ -337,7 +331,7 @@ export class PaymentsController {
       statusClass: "pending",
     };
 
-    return {
+    const result = {
       ...config,
       status,
       clientTxnId,
@@ -347,6 +341,8 @@ export class PaymentsController {
       dateTime: new Date().toLocaleString(),
       returnUrl: `https://paybolt.in`,
     };
+
+    return result;
   }
 
   // this api is used to redirect user to payment link UI

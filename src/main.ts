@@ -99,16 +99,13 @@ async function bootstrap() {
   app.setViewEngine("hbs");
 
   // Register Handlebars partials
-  hbs.registerPartials(join(viewsPath, "partials"));
-
   hbs.registerHelper("eq", function (v1, v2) {
     return v1 === v2;
   });
-
   hbs.registerHelper("json", function (context) {
     return JSON.stringify(context, null, 2);
   });
-
+  hbs.registerPartials(join(viewsPath, "partials"));
   // Start server
   await app.listen(port, () => {
     logger.info(`Server is running on port: ${LoggerPlaceHolder.String}`, port);
