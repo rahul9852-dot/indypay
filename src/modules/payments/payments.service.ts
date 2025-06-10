@@ -2933,10 +2933,11 @@ export class PaymentsService {
       if (!checkout) {
         throw new Error(`Checkout not found for clientTxnId: ${clientTxnId}`);
       }
-      const statusCode =
-        parsedDecrypted.statusCode ||
-        parsedDecrypted.status ||
-        parsedDecrypted.paymentStatus;
+      const {statusCode} = parsedDecrypted;
+
+      this.logger.info(`[Webhook] Status code: ${statusCode}`);
+      this.logger.info(`[Webhook] Status code: ${parsedDecrypted}`);
+
       let status = PAYMENT_STATUS.PENDING;
       switch (statusCode?.toString()) {
         case "0000":
