@@ -3,6 +3,8 @@ import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
+import { ServeStaticModule } from "@nestjs/serve-static";
+import { join } from "path";
 
 import { AuthGuard } from "./guard/auth.guard";
 import { RolesGuard } from "./guard/roles.guard";
@@ -38,6 +40,10 @@ import { DisabledEndpointInterceptor } from "@/interceptors/disabled-endpoint.in
       isGlobal: true,
       load: [appConfig],
       envFilePath: ".env",
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, "..", "src/modules/payments/templates"),
+      serveRoot: "/templates",
     }),
     TypeOrmModule.forRoot(dbConfig),
     TypeOrmModule.forRoot(migrationConfig),

@@ -55,3 +55,10 @@ export const ERTITECH = {
     DECRYPT: "decrypt",
   },
 };
+
+export const SABPAISA = {
+  BASE_URL: "https://securepay.sabpaisa.in/SabPaisa/sabPaisaInit?v=1",
+  PAYIN: "sabPaisaInit",
+  PAYOUT: "sabPaisaInit",
+  PAYOUT_STATUS: "sabPaisaInit",
+};

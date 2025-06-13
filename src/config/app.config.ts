@@ -13,6 +13,9 @@ export const appConfig = registerAs("appConfig", () => ({
   isProduction: getOsEnv("NODE_ENV") === NODE_ENV.PRODUCTION,
   isStaging: getOsEnv("NODE_ENV") === NODE_ENV.STAGING,
   encryptionKey: getOsEnv("ENCRYPTION_KEY"),
+  encryptionAlgorithm: getOsEnv("ENCRYPTION_ALGORITHM"),
+  authKey: getOsEnv("AUTH_KEY"),
+  encryptionIV: getOsEnv("AUTH_IV"),
   allowCookiesDomain: getOsEnv("ALLOW_COOKIES_DOMAIN"),
   database: {
     host: getOsEnv("DB_HOST"),
@@ -109,5 +112,13 @@ export const appConfig = registerAs("appConfig", () => ({
     region: getOsEnv("AWS_REGION"),
     snsTopicArn: getOsEnv("AWS_SNS_TOPIC_ARN"),
     s3BucketName: getOsEnv("AWS_S3_BUCKET_NAME"),
+  },
+  sabpaisa: {
+    clientCode: getOsEnv("CLIENT_CODE"),
+    transUserName: getOsEnv("TRANSUSER_NAME"),
+    transUserPassword: getOsEnv("TRANS_USER_PASSWORD"),
+    mcc: getOsEnv("MCC"),
+    Class: getOsEnv("CLASS"),
+    role: getOsEnv("S_ROLE"),
   },
 }));

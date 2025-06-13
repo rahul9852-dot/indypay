@@ -25,8 +25,10 @@ import { SettlementsEntity } from "@/entities/settlements.entity";
 import { SNSService } from "@/modules/aws/sns.service";
 import { PayoutService } from "@/modules/payout/payout.service";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
+import { CheckoutEntity } from "@/entities/checkout.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth.module";
+import { CryptoService } from "@/utils/encryption-algo.utils";
 
 @Module({
   imports: [
@@ -44,6 +46,7 @@ import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth
       SettlementsEntity,
       ApiCredentialsEntity,
       UserLoginIpsEntity,
+      CheckoutEntity,
     ]),
     BullModule.registerQueue({
       name: "payouts",
@@ -61,6 +64,7 @@ import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth
     SESService,
     PayoutProcessor,
     PayoutService,
+    CryptoService,
   ],
   controllers: [PaymentsController],
   exports: [PaymentsService],

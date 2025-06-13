@@ -12,6 +12,7 @@ export const helmetConfigs: Readonly<HelmetOptions> = {
       upgradeInsecureRequests: [],
       "img-src": ["'self'", "https:", "data:"],
       "connect-src": ["'self'", beBaseUrl],
+      "form-action": ["'self'", "https://securepay.sabpaisa.in"],
     },
   },
   referrerPolicy: { policy: "no-referrer" },

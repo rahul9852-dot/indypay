@@ -8,6 +8,11 @@ import {
   Get,
   Query,
   BadRequestException,
+  Render,
+  Logger,
+  Res,
+  Param,
+  NotFoundException,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -16,6 +21,7 @@ import {
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
+import { Response } from "express";
 import { PaymentsService } from "./payments.service";
 import {
   CreatePayinPaymentResponseDto,
@@ -44,16 +50,23 @@ import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { PayoutService } from "@/modules/payout/payout.service";
 import { PaginationWithDateDto } from "@/dtos/common.dto";
+import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { AuthGuard } from "@/guard/auth.guard";
+import { CryptoService } from "@/utils/encryption-algo.utils";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
 @ApiTags("Payments")
 @Controller("payments")
+@UseGuards(AuthGuard)
 export class PaymentsController {
+  private readonly logger = new Logger(PaymentsController.name);
+
   constructor(
     private readonly paymentsService: PaymentsService,
     private readonly payoutService: PayoutService,
+    private readonly encryptionAlgoService: CryptoService,
   ) {}
 
   @Public()
@@ -169,19 +182,6 @@ export class PaymentsController {
     );
   }
 
-  // @Public()
-  // @ApiOperation({ summary: "External webhook for pay-out" })
-  // @UseGuards(WebhookGuard)
-  // @HttpCode(HttpStatus.OK)
-  // @ApiOkResponse({ type: MessageResponseDto })
-  // @Post("payout/webhook")
-  // async externalWebhookPayout(
-  //   @Body() externalWebhookPayout: ExternalPayOutWebhookFlakPayDto,
-  // ) {
-  //   return this.paymentsService.externalWebhookPayoutFlaPay(
-  //     externalWebhookPayout,
-  //   );
-  // }
   @Public()
   @ApiOperation({ summary: "External webhook for pay-out" })
   @UseGuards(WebhookGuard)
@@ -203,6 +203,16 @@ export class PaymentsController {
     @Query() paginationDto: PaginationWithDateAndStatusDto,
   ) {
     return this.paymentsService.getTransactionsDetails(user, paginationDto);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Checkout API" })
+  @Post("checkout")
+  @Render("pg-form-request")
+  async checkout(@Body() checkoutDto: CheckoutDto) {
+    const data = await this.paymentsService.checkout(checkoutDto);
+
+    return data;
   }
 
   @ApiExcludeEndpoint()
@@ -232,6 +242,107 @@ export class PaymentsController {
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   async getMisspelledTransactions(@Query() query: PaginationWithDateDto) {
     return this.paymentsService.getMisspelledPayinTransactions(query);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "External webhook for checkout" })
+  @Post("webhook/checkout")
+  async sabpaisaWebhook(@Body() body: any, @Res() res: Response) {
+    try {
+      // Process the webhook data first
+      const rawBody = typeof body === "string" ? body : JSON.stringify(body);
+      await this.paymentsService.handleCheckoutWebhookRawBody(rawBody);
+
+      // Handle redirection if we have encResponse
+      if (body.encResponse) {
+        try {
+          const decoded = decodeURIComponent(body.encResponse);
+          const decryptedString = this.encryptionAlgoService.decrypt(decoded);
+          const params = new URLSearchParams(decryptedString);
+          const clientTxnId =
+            params.get("clientTxnId") ||
+            params.get("transactionId") ||
+            params.get("orderId");
+
+          if (clientTxnId) {
+            const statusPageUrl = `${process.env.BE_BASE_URL}/api/v1/payments/checkout/status/${clientTxnId}`;
+
+            return res.redirect(statusPageUrl);
+          }
+        } catch (decryptError) {
+          this.logger.error("Error decrypting data:", decryptError);
+        }
+      }
+
+      // If no redirection happened, send OK response
+      return res.status(200).send("OK");
+    } catch (error) {
+      this.logger.error("Webhook processing failed:", error);
+
+      return res.status(200).send("OK"); // Still send OK to payment gateway even if processing fails
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Checkout Payment Status Page" })
+  @Get("checkout/status/:clientTxnId")
+  @Render("checkout-response")
+  async checkoutStatusPage(@Param("clientTxnId") id: string) {
+    const checkout = await this.paymentsService.getCheckoutByClientTxnId(id);
+
+    if (!checkout) {
+      throw new NotFoundException("Checkout not found");
+    }
+
+    const { payerEmail, payerName, amount, status, clientTxnId } = checkout;
+
+    const statusConfig = {
+      [PAYMENT_STATUS.SUCCESS]: {
+        title: "Payment Successful",
+        message:
+          "Your payment has been processed successfully thanks for choosing Paybolt",
+        statusClass: "success",
+      },
+      [PAYMENT_STATUS.FAILED]: {
+        title: "Payment Failed",
+        message: "We couldn't process your payment. Please try again.",
+        statusClass: "failed",
+      },
+      [PAYMENT_STATUS.PENDING]: {
+        title: "Payment Pending",
+        message: "Your payment is being processed. Please wait.",
+        statusClass: "pending",
+      },
+      [PAYMENT_STATUS.INITIATED]: {
+        title: "Payment Initiated",
+        message: "Your payment has been initiated.",
+        statusClass: "pending",
+      },
+      [PAYMENT_STATUS.ABORTED]: {
+        title: "Payment Aborted",
+        message: "Your payment was aborted.",
+        statusClass: "failed",
+      },
+    };
+
+    const config = statusConfig[checkout.status] || {
+      title: "Payment Status",
+      message: "Your payment status is being processed.",
+      statusClass: "pending",
+    };
+
+    const result = {
+      ...config,
+      status,
+      clientTxnId,
+      amount,
+      payerName,
+      payerEmail,
+      dateTime: new Date().toLocaleString(),
+      returnUrl: `https://paybolt.in`,
+    };
+
+    return result;
   }
 
   // this api is used to redirect user to payment link UI
