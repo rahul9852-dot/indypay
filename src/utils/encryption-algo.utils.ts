@@ -2,12 +2,14 @@
 import { Injectable } from "@nestjs/common";
 import * as crypto from "crypto";
 import { Logger } from "@nestjs/common";
+import { appConfig } from "@/config/app.config";
 
+const { authKey, encryptionAlgorithm, encryptionIV } = appConfig();
 @Injectable()
 export class CryptoService {
-  private algorithm = "aes-128-cbc";
-  private authKey = "XcOu75XCz7aTQf51";
-  private authIV = "zDSbtVze14US2iQR";
+  private algorithm = encryptionAlgorithm;
+  private authKey = authKey;
+  private authIV = encryptionIV;
   private logger = new Logger(CryptoService.name);
 
   encrypt(text: string): string {
