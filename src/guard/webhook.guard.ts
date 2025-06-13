@@ -10,6 +10,7 @@ import { appConfig } from "@/config/app.config";
 
 const {
   externalPaymentConfig: { flakPay, ismart, paynpro, ertech },
+  utkarsh: { webhookIps: utkarshWebhookIps },
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -31,6 +32,7 @@ export class WebhookGuard implements CanActivate {
       ...ismart.webhookIps,
       ...paynpro.webhookIps,
       ...ertech.webhookIps,
+      ...utkarshWebhookIps,
     ];
 
     if (!webhookIps.includes(requestIp)) {

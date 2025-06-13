@@ -14,3 +14,9 @@ export interface IVerifyMobilePayload {
   mobile: string;
   isVerified: boolean;
 }
+
+export interface IGeneratePaymentLinkPayload {
+  amount: number;
+  orderId: string;
+  vpa: string;
+}

@@ -7,7 +7,6 @@ import {
 } from "@nestjs/common";
 import axios from "axios";
 import { InjectRepository } from "@nestjs/typeorm";
-// import * as cheerio from "cheerio";
 import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import {
@@ -100,8 +99,13 @@ import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-aut
 import { mapToFilteredDto } from "@/utils/interface-mapping.utils";
 import customerUniqueGenerate from "@/utils/customer-unique.utils";
 import { CheckoutEntity } from "@/entities/checkout.entity";
+import { generatePaymentLinkUtil } from "@/utils/payment-link.util";
 
-const { beBaseUrl, externalPaymentConfig } = appConfig();
+const {
+  beBaseUrl,
+  externalPaymentConfig,
+  utkarsh: { vpa },
+} = appConfig();
 
 @Injectable()
 export class PaymentsService {
@@ -2873,10 +2877,7 @@ export class PaymentsService {
   }
 
   async handleCheckoutWebhookRawBody(body: string | object): Promise<void> {
-    const startTime = Date.now();
     try {
-      // 1. Parse the incoming body
-
       let parsedBody: any;
       if (typeof body === "string") {
         try {
@@ -2888,8 +2889,6 @@ export class PaymentsService {
       } else {
         parsedBody = body;
       }
-
-      // 2. Extract the encrypted value (encResponse or other fields)
       const encrypted =
         parsedBody.encResponse ||
         parsedBody.statusResponseData ||
@@ -2899,8 +2898,6 @@ export class PaymentsService {
       if (!encrypted) {
         throw new Error("No encrypted data found in payload");
       }
-
-      // 3. URL-decode and decrypt
       const decoded = decodeURIComponent(encrypted);
       let decryptedString: string;
       try {
@@ -2909,8 +2906,6 @@ export class PaymentsService {
         this.logger.error("[Webhook] Decryption failed:", err);
         throw new Error("Decryption failed: " + err.message);
       }
-
-      // 4. Parse the decrypted string as URL-encoded form data
       let parsedDecrypted: any;
       try {
         const params = new URLSearchParams(decryptedString);
@@ -2992,5 +2987,261 @@ export class PaymentsService {
       );
       throw error;
     }
+  }
+  async createUtkarshPaymentLink(
+    createPayinTransactionDto: CreatePayinTransactionFlaPayDto,
+    user: UsersEntity,
+  ) {
+    const { amount, email, mobile, name, orderId } = createPayinTransactionDto;
+
+    const existingPayinOrder = await this.payInOrdersRepository.exists({
+      where: { orderId },
+    });
+
+    if (existingPayinOrder) {
+      throw new BadRequestException(
+        "Payin order already exists for given orderId",
+      );
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    // Start transaction
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+        amount,
+        commissionInPercentage: user.commissionInPercentagePayin,
+        gstInPercentage: user.gstInPercentagePayin,
+      });
+      // 1. create pay-in order
+      const payinOrder = this.payInOrdersRepository.create({
+        user,
+        amount,
+        email,
+        name,
+        mobile,
+        commissionAmount,
+        gstAmount,
+        netPayableAmount,
+        orderId,
+      });
+
+      // 2. save pay-in order
+      const savedPayinOrder = await queryRunner.manager.save(payinOrder);
+
+      // 3. create transaction
+      const transaction = this.transactionsRepository.create({
+        user,
+        payInOrder: savedPayinOrder,
+        transactionType: PAYMENT_TYPE.PAYIN,
+      });
+
+      // 4. save transaction
+      await queryRunner.manager.save(transaction);
+
+      const paymentLink = generatePaymentLinkUtil({
+        amount,
+        orderId,
+        vpa,
+      });
+      // 6. save external payment
+      await queryRunner.manager.save(
+        this.payInOrdersRepository.create({
+          ...savedPayinOrder,
+          ...(paymentLink && {
+            intent: paymentLink,
+          }),
+          txnRefId: orderId,
+        }),
+      );
+
+      // if (!externalPaymentResponse?.data?.paymentUrl?.trim()) {
+      //   throw new BadRequestException(
+      //     new MessageResponseDto("Something went wrong"),
+      //   );
+      // }
+
+      // this.logger.info(
+      //   `PAYIN - createTransaction - Created transaction successfully`,
+      // );
+
+      // Commit transaction
+      await queryRunner.commitTransaction();
+
+      this.logger.info(
+        `PAYIN CREATED: ${LoggerPlaceHolder.Json}`,
+        createPayinTransactionDto,
+      );
+
+      return {
+        orderId,
+        intent: paymentLink,
+        message: "Payment Link Generated successfully",
+      };
+    } catch (err: any) {
+      this.logger.error(
+        `PAYIN - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
+        err,
+      );
+      // Rollback transaction if any operation fails
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      // Release the queryRunner to avoid memory leaks
+      await queryRunner.release();
+    }
+  }
+
+  async externalWebhookPayinUtkarsh(externalPayinWebhookDto: any) {
+    this.logger.info(
+      `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh: ${LoggerPlaceHolder.Json}`,
+      externalPayinWebhookDto,
+    );
+
+    const { tid, status: status_code, utr } = externalPayinWebhookDto;
+
+    let status = convertExternalPaymentStatusToInternal(status_code);
+
+    const payinOrder = await this.payInOrdersRepository.findOne({
+      where: {
+        orderId: tid,
+      },
+      relations: ["user"],
+    });
+
+    if (!payinOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payin order not found"),
+      );
+    }
+
+    if (status === payinOrder.status) {
+      // this.logger.info(
+      //   `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+      // );
+
+      return {
+        message: "Status updated successfully.",
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    // Jumping Start
+
+    let successCount =
+      +(await this.cacheManager.get(
+        REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+      )) || 1;
+
+    let isMisspelled = false;
+    const { jumpingCount } = payinOrder.user;
+
+    if (status === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
+      if (successCount >= jumpingCount) {
+        const statusArr = [
+          PAYMENT_STATUS.PENDING,
+          PAYMENT_STATUS.DEEMED,
+          PAYMENT_STATUS.INITIATED,
+          PAYMENT_STATUS.FAILED,
+        ];
+        status = statusArr[Math.floor(Math.random() * statusArr.length)];
+        successCount = 0;
+        isMisspelled = true;
+      } else {
+        successCount += 1;
+      }
+
+      await this.cacheManager.set(
+        REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+        successCount,
+        1000 * 60 * 60 * 24 * 365, // 365 days
+      );
+    }
+
+    // Jumpind End
+
+    const { user } = payinOrder;
+
+    const payinOrderRaw = this.payInOrdersRepository.create({
+      id: payinOrder.id,
+      status,
+      txnRefId: tid,
+      ...(!isMisspelled && { utr }),
+      isMisspelled,
+      ...(status === PAYMENT_STATUS.SUCCESS && {
+        successAt: new Date(),
+      }),
+      ...(status === PAYMENT_STATUS.FAILED && {
+        failureAt: new Date(),
+      }),
+    });
+
+    await this.payInOrdersRepository.save(payinOrderRaw);
+
+    // update wallet
+    if (status === PAYMENT_STATUS.SUCCESS) {
+      const wallet = await this.walletRepository.findOne({
+        where: { user: { id: user.id } },
+        relations: ["user"],
+      });
+
+      await this.cacheManager.del(
+        REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
+      );
+
+      const walletRaw = this.walletRepository.create({
+        ...(wallet?.id && { id: wallet.id }),
+        totalCollections:
+          (wallet.totalCollections ? +wallet.totalCollections : 0) +
+          +payinOrder.amount,
+        user,
+      });
+
+      await this.walletRepository.save(walletRaw);
+
+      // this.logger.info(
+      //   `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+      //   walletRaw,
+      // );
+    }
+
+    if (user?.payInWebhookUrl) {
+      const webhookPayload = {
+        orderId: tid,
+        status,
+        amount: payinOrder.amount,
+        txnRefId: payinOrder.txnRefId,
+        ...(!isMisspelled && { utr }),
+      };
+      // this.logger.info(
+      //   `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+      //   webhookPayload,
+      // );
+      axios
+        .post(user.payInWebhookUrl, webhookPayload, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+        .then(({ data }) => {
+          this.logger.info(
+            `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
+          );
+        })
+        .catch((err) => {
+          this.logger.error(
+            `PAYIN - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+            err,
+          );
+        });
+    }
+
+    return {
+      message: "Transaction status updated successfully.",
+      timestamp: new Date().toISOString(),
+    };
   }
 }

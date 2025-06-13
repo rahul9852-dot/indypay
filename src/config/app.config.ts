@@ -121,4 +121,8 @@ export const appConfig = registerAs("appConfig", () => ({
     Class: getOsEnv("CLASS"),
     role: getOsEnv("S_ROLE"),
   },
+  utkarsh: {
+    vpa: getOsEnv("UPI_ID"),
+    webhookIps: getOsEnv("UTKARSH").split(","),
+  },
 }));

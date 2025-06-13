@@ -34,7 +34,6 @@ import {
   PayoutStatusDto,
   SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
-import { ExternalPayinWebhookFlakPayDto } from "./dto/external-webhook-payin.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -78,7 +77,7 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createTransactionPayinFlakPay(
+    return this.paymentsService.createUtkarshPaymentLink(
       createTransactionDto,
       user,
     );
@@ -174,10 +173,8 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
-  async externalWebhookPayin(
-    @Body() externalPayinWebhookDto: ExternalPayinWebhookFlakPayDto,
-  ) {
-    return this.paymentsService.externalWebhookPayinFlakPay(
+  async externalWebhookPayin(@Body() externalPayinWebhookDto: any) {
+    return this.paymentsService.externalWebhookPayinUtkarsh(
       externalPayinWebhookDto,
     );
   }
