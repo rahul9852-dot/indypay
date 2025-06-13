@@ -69,11 +69,11 @@ export class PaginationWithDateDto extends PaginationDto {
 
 export class PaginationWithDateAndStatusDto extends PaginationWithDateDto {
   @ApiPropertyOptional({
-    enum: ["pending", "success", "failed"],
+    enum: ["pending", "success", "failed", ""],
   })
-  @IsEnum(["pending", "success", "failed"])
+  @IsEnum(["pending", "success", "failed", ""])
   @IsOptional()
-  status?: "pending" | "success" | "failed";
+  status?: "pending" | "success" | "failed" | "";
 }
 
 export class DateDto {
