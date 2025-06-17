@@ -3107,7 +3107,7 @@ export class PaymentsService {
 
       this.logger.info(
         `PAYIN - externalWebhookPayinUtkarsh - Processing webhook data:`,
-        webhookData,
+        JSON.stringify(webhookData),
       );
 
       const {
@@ -3128,7 +3128,7 @@ export class PaymentsService {
 
       this.logger.info(
         `PAYIN - externalWebhookPayinUtkarsh - Extracted values:`,
-        {
+        JSON.stringify({
           txnId,
           txnStatus,
           custRef,
@@ -3142,7 +3142,7 @@ export class PaymentsService {
           payeeVpa,
           txnDateTime,
           remarks,
-        },
+        }),
       );
 
       if (!refId) {
@@ -3158,6 +3158,12 @@ export class PaymentsService {
         },
         relations: ["user"],
       });
+
+      this.logger.info(
+        `PAYIN - externalWebhookPayinUtkarsh - Payin order: ${JSON.stringify(
+          payinOrder,
+        )}`,
+      );
 
       if (!payinOrder) {
         throw new NotFoundException(
