@@ -10,7 +10,6 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
-import { RawBodyMiddleware } from "./utils/raw-body.middleware";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { appConfig } from "@/config/app.config";
@@ -28,18 +27,8 @@ async function bootstrap() {
   // Add cookie parser
   app.use(cookieParser());
 
-  app.use((req, res, next) => {
-    if (req.originalUrl === "/payin/webhook") {
-      next(); // Skip global body parsing for webhook
-    } else {
-      json({ limit: "10mb" })(req, res, (err) => {
-        if (err) return next(err);
-        urlencoded({ extended: true, limit: "10mb" })(req, res, next);
-      });
-    }
-  });
-
-  app.use("/payin/webhook", new RawBodyMiddleware().use);
+  app.use(json({ limit: "10mb" }));
+  app.use(urlencoded({ extended: true, limit: "10mb" }));
 
   // Fix the path to point to the project root's public folder instead of dist
   const publicPath = path.join(process.cwd(), "public");
