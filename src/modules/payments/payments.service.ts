@@ -4,7 +4,6 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  Req,
 } from "@nestjs/common";
 import axios from "axios";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -40,6 +39,7 @@ import {
 import {
   ExternalPayinWebhookFlakPayDto,
   ExternalPayinWebhookIsmartDto,
+  ExternalPayinWebhookUtkarshDto,
 } from "./dto/external-webhook-payin.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import {
@@ -3055,7 +3055,6 @@ export class PaymentsService {
           ...(paymentLink && {
             intent: paymentLink,
           }),
-          txnRefId: orderId,
         }),
       );
 
@@ -3096,19 +3095,22 @@ export class PaymentsService {
     }
   }
 
-  async externalWebhookPayinUtkarsh(@Req() request: any) {
+  async externalWebhookPayinUtkarsh(
+    externalPayinWebhookDto: ExternalPayinWebhookUtkarshDto,
+  ) {
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
-      request.body,
+      externalPayinWebhookDto,
     );
 
-    const { txnId, txnStatus, payerVpa } = request.body;
+    const { txnId, txnStatus, custRef, amount, refId, uniqueId } =
+      externalPayinWebhookDto;
 
     let status = convertExternalPaymentStatusToInternal(txnStatus);
 
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: {
-        orderId: txnId,
+        orderId: refId,
       },
       relations: ["user"],
     });
@@ -3170,7 +3172,7 @@ export class PaymentsService {
       id: payinOrder.id,
       status,
       txnRefId: txnId,
-      ...(!isMisspelled && { utr: payerVpa }),
+      ...(!isMisspelled && { utr: uniqueId }),
       isMisspelled,
       ...(status === PAYMENT_STATUS.SUCCESS && {
         successAt: new Date(),
@@ -3211,11 +3213,11 @@ export class PaymentsService {
 
     if (user?.payInWebhookUrl) {
       const webhookPayload = {
-        orderId: txnId,
+        orderId: refId,
         status,
         amount: payinOrder.amount,
         txnRefId: payinOrder.txnRefId,
-        ...(!isMisspelled && { utr: payerVpa }),
+        ...(!isMisspelled && { utr: uniqueId }),
       };
       // this.logger.info(
       //   `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,

@@ -175,27 +175,32 @@ export class ExternalPayinWebhookPayNProDto {
 
 export class ExternalPayinWebhookUtkarshDto {
   @ApiProperty()
-  @IsNumber()
-  @IsPositive()
-  amount: number;
+  @IsString()
+  @IsNotEmpty()
+  txnId: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  status: string;
+  custRef: string;
 
   @ApiProperty()
   @IsString()
   @IsOptional()
-  tid?: string;
+  amount?: number;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  orderId: string;
+  txnStatus: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  utr?: string;
+  refId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  uniqueId?: string;
 }

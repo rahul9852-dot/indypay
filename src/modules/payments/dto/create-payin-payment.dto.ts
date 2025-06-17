@@ -153,35 +153,3 @@ export class CreatePayinTransactionFlaPayDto {
   @Length(10, 10)
   mobile: string;
 }
-
-export class ExternalPayinWebhookUtkarshDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  txnId: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  upiTxnId: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  custRef: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  amount: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  txnStatus: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  payerVpa: string;
-}
