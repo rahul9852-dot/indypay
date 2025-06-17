@@ -1209,6 +1209,7 @@ export class SettlementsService {
       ERTITECH.BASE_URL,
       getEritechPgConfig({
         token,
+        merchantId: externalPaymentConfig.ertech.merchantId,
       }),
     );
 

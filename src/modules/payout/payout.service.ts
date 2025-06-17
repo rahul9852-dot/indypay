@@ -570,6 +570,7 @@ export class PayoutService {
       ERTITECH.BASE_URL,
       getEritechPgConfig({
         token,
+        merchantId: externalPaymentConfig.ertech.merchantId,
       }),
     );
 
