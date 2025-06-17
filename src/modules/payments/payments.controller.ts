@@ -168,17 +168,15 @@ export class PaymentsController {
     return this.paymentsService.checkPayOutWalletFlakPay(user);
   }
 
-  @Public()
-  @ApiOperation({ summary: "External webhook for pay-in" })
-  @UseGuards(WebhookGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOkResponse({ type: MessageResponseDto })
-  @Post("payin/webhook")
   async externalWebhookPayin(@Body("") body: any, @Req() request: Request) {
-    this.logger.info(
-      `PAYIN - externalWebhookPayin - Got webhook from Utkarsh:`,
-      JSON.stringify(body),
-    );
+    const rawBody = request["rawBody"];
+
+    this.logger.info(`✅ Got RAW webhook body: ${rawBody}`);
+    this.logger.info(`✅ Parsed body: ${JSON.stringify(body)}`);
+    this.logger.info(`✅ Headers: ${JSON.stringify(request.headers)}`);
+    this.logger.info(`Got RAW webhook body: ${rawBody}`);
+    this.logger.info(`Parsed body: ${JSON.stringify(body)}`);
+    this.logger.info(`Headers: ${JSON.stringify(request.headers)}`);
 
     return this.paymentsService.externalWebhookPayinUtkarsh(body);
   }
