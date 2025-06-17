@@ -61,6 +61,7 @@ export const appConfig = registerAs("appConfig", () => ({
       encryptionKey: getOsEnv("ERTITECH_ENCRYPTION_KEY"),
       email: getOsEnv("ERTITECH_EMAIL"),
       password: getOsEnv("ERTITECH_PASSWORD"),
+      merchantId: getOsEnv("ERTITECH_MERCHANT_ID"),
       webhookIps: getOsEnv("ERTITECH_WEBHOOK_IPS").split(","),
     },
     paynpro: {

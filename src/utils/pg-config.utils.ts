@@ -18,11 +18,12 @@ export const getFlakPayPgConfig = ({ clientId, clientSecret }) => {
   };
 };
 
-export const getEritechPgConfig = ({ token }) => {
+export const getEritechPgConfig = ({ token, merchantId }) => {
   return {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      merchantid: merchantId,
     },
   };
 };
