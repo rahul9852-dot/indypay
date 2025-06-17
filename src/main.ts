@@ -28,7 +28,7 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.use((req, res, next) => {
-    if (req.originalUrl === "/payin/webhook") {
+    if (req.originalUrl === "/api/v1/payments/payin/webhook") {
       let data = "";
       req.setEncoding("utf8");
 
