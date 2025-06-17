@@ -53,7 +53,6 @@ import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { CustomLogger } from "@/logger";
-import { ExternalPayinWebhookUtkarshDto } from "@/modules/payments/dto/external-webhook-payin.dto";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -174,15 +173,15 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
-  async externalWebhookPayin(
-    @Body() utkarshWebhookDto: ExternalPayinWebhookUtkarshDto,
-  ) {
+  async externalWebhookPayin(@Body() utkarshWebhookDto: any) {
     this.logger.info(
       `PAYIN - externalWebhookPayin - Got webhook from Utkarsh:`,
-      utkarshWebhookDto,
+      JSON.stringify(utkarshWebhookDto),
     );
 
-    return this.paymentsService.externalWebhookPayinUtkarsh(utkarshWebhookDto);
+    return this.paymentsService.externalWebhookPayinUtkarsh(
+      JSON.stringify(utkarshWebhookDto),
+    );
   }
 
   @Public()

@@ -39,7 +39,6 @@ import {
 import {
   ExternalPayinWebhookFlakPayDto,
   ExternalPayinWebhookIsmartDto,
-  ExternalPayinWebhookUtkarshDto,
 } from "./dto/external-webhook-payin.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import {
@@ -3097,9 +3096,7 @@ export class PaymentsService {
     }
   }
 
-  async externalWebhookPayinUtkarsh(
-    externalPayinWebhookDto: ExternalPayinWebhookUtkarshDto,
-  ) {
+  async externalWebhookPayinUtkarsh(externalPayinWebhookDto: any) {
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
       externalPayinWebhookDto,
@@ -3107,6 +3104,18 @@ export class PaymentsService {
 
     const { txnId, txnStatus, custRef, amount, refId, uniqueId } =
       externalPayinWebhookDto;
+
+    this.logger.info(
+      `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
+      JSON.stringify({
+        txnId,
+        txnStatus,
+        custRef,
+        amount,
+        refId,
+        uniqueId,
+      }),
+    );
 
     let status = convertExternalPaymentStatusToInternal(txnStatus);
 
