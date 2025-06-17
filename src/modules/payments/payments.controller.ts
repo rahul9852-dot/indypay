@@ -168,6 +168,12 @@ export class PaymentsController {
     return this.paymentsService.checkPayOutWalletFlakPay(user);
   }
 
+  @Public()
+  @ApiOperation({ summary: "External webhook for pay-in" })
+  @UseGuards(WebhookGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payin/webhook")
   async externalWebhookPayin(@Body("") body: any, @Req() request: Request) {
     const rawBody = request["rawBody"];
 
