@@ -3105,32 +3105,13 @@ export class PaymentsService {
     );
 
     try {
-      // Ensure body is an object
-      const webhookData =
-        typeof externalWebhookPayin === "string"
-          ? JSON.parse(externalWebhookPayin)
-          : externalWebhookPayin;
-
       this.logger.info(
         `PAYIN - externalWebhookPayinUtkarsh - Processing webhook data: ${LoggerPlaceHolder.Json}`,
-        webhookData,
+        externalWebhookPayin,
       );
 
-      const {
-        txnId,
-        txnStatus,
-        custRef,
-        amount,
-        refId,
-        uniqueId,
-        upiTxnId,
-        payerVpa,
-        payerVerifiedName,
-        payerMobile,
-        payeeVpa,
-        txnDateTime,
-        remarks,
-      } = webhookData;
+      const { txnId, txnStatus, custRef, amount, refId, uniqueId } =
+        externalWebhookPayin;
 
       this.logger.info(
         `PAYIN - externalWebhookPayinUtkarsh - Extracted values: ${LoggerPlaceHolder.Json}`,
@@ -3141,13 +3122,6 @@ export class PaymentsService {
           amount,
           refId,
           uniqueId,
-          upiTxnId,
-          payerVpa,
-          payerVerifiedName,
-          payerMobile,
-          payeeVpa,
-          txnDateTime,
-          remarks,
         },
       );
 
