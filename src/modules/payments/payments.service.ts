@@ -24,6 +24,7 @@ import { InjectQueue } from "@nestjs/bull";
 import {
   CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionIsmartDto,
+  ExternalPayinWebhookUtkarshDto,
   PayinStatusDto,
 } from "./dto/create-payin-payment.dto";
 import {
@@ -3095,19 +3096,21 @@ export class PaymentsService {
     }
   }
 
-  async externalWebhookPayinUtkarsh(webhookBody: any) {
+  async externalWebhookPayinUtkarsh(
+    webhookBody: ExternalPayinWebhookUtkarshDto,
+  ) {
     this.logger.info(
-      `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh: ${LoggerPlaceHolder.Json}`,
+      `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
       webhookBody,
     );
 
-    const { tid, status: status_code, utr } = webhookBody;
+    const { txnId, txnStatus, payerVpa } = webhookBody;
 
-    let status = convertExternalPaymentStatusToInternal(status_code);
+    let status = convertExternalPaymentStatusToInternal(txnStatus);
 
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: {
-        orderId: tid,
+        orderId: txnId,
       },
       relations: ["user"],
     });
@@ -3168,8 +3171,8 @@ export class PaymentsService {
     const payinOrderRaw = this.payInOrdersRepository.create({
       id: payinOrder.id,
       status,
-      txnRefId: tid,
-      ...(!isMisspelled && { utr }),
+      txnRefId: txnId,
+      ...(!isMisspelled && { utr: payerVpa }),
       isMisspelled,
       ...(status === PAYMENT_STATUS.SUCCESS && {
         successAt: new Date(),
@@ -3210,11 +3213,11 @@ export class PaymentsService {
 
     if (user?.payInWebhookUrl) {
       const webhookPayload = {
-        orderId: tid,
+        orderId: txnId,
         status,
         amount: payinOrder.amount,
         txnRefId: payinOrder.txnRefId,
-        ...(!isMisspelled && { utr }),
+        ...(!isMisspelled && { utr: payerVpa }),
       };
       // this.logger.info(
       //   `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
