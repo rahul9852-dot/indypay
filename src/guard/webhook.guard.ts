@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { Request } from "express";
 import { appConfig } from "@/config/app.config";
-import { CustomLogger } from "@/logger";
+import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 // import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 const {
@@ -22,11 +22,10 @@ export class WebhookGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
 
     const requestIp = this.parseIp(request);
-    const requestBody = JSON.stringify(request.body);
 
-    this.logger.info(`WEBHOOK REQUEST :`, {
+    this.logger.info(`WEBHOOK REQUEST : ${LoggerPlaceHolder.Json}`, {
       requestIp,
-      requestBody,
+      ...request.body,
     });
 
     const webhookIps = [
