@@ -175,14 +175,16 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
   async externalWebhookPayin(@Req() request: Request) {
-    const rawBody = request.body;
-    // const body = JSON.parse(rawBody);
+    const {body} = request;
+
+    this.logger.info(`Got webhook body: ${JSON.stringify(body)}`);
+    this.logger.info(`Headers: ${JSON.stringify(request.headers)}`);
     this.logger.info(
       `PAYIN - externalWebhookPayin - Got webhook from Utkarsh: ${LoggerPlaceHolder.Json}`,
-      { rawBody: JSON.stringify(rawBody) },
+      { rawBody: JSON.stringify(body) },
     );
 
-    return this.paymentsService.externalWebhookPayinUtkarsh(rawBody);
+    return this.paymentsService.externalWebhookPayinUtkarsh(body);
   }
 
   @Public()
