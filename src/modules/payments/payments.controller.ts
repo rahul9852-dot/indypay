@@ -186,7 +186,6 @@ export class PaymentsController {
     try {
       // Extract the requestBody from the webhook data
       const webhookData = body.requestBody || body;
-
       this.logger.info(
         `✅ Extracted webhook data: ${JSON.stringify(webhookData)}`,
       );
