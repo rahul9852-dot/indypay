@@ -3095,13 +3095,13 @@ export class PaymentsService {
     }
   }
 
-  async externalWebhookPayinUtkarsh(externalPayinWebhookDto: any) {
+  async externalWebhookPayinUtkarsh(webhookBody: any) {
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh: ${LoggerPlaceHolder.Json}`,
-      externalPayinWebhookDto,
+      webhookBody,
     );
 
-    const { tid, status: status_code, utr } = externalPayinWebhookDto;
+    const { tid, status: status_code, utr } = webhookBody;
 
     let status = convertExternalPaymentStatusToInternal(status_code);
 

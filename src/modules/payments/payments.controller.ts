@@ -53,6 +53,7 @@ import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
+import { LoggerPlaceHolder } from "@/logger";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -173,10 +174,13 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
-  async externalWebhookPayin(@Body() externalPayinWebhookDto: any) {
-    return this.paymentsService.externalWebhookPayinUtkarsh(
-      externalPayinWebhookDto,
+  async externalWebhookPayin(@Body() webhookBody: any) {
+    this.logger.log(
+      `PAYIN - externalWebhookPayin - Got webhook from Utkarsh: ${LoggerPlaceHolder.Json}`,
+      webhookBody,
     );
+
+    return this.paymentsService.externalWebhookPayinUtkarsh(webhookBody);
   }
 
   @Public()
