@@ -28,8 +28,16 @@ async function bootstrap() {
   // Add cookie parser
   app.use(cookieParser());
 
-  app.use(json({ limit: "10mb" }));
-  app.use(urlencoded({ extended: true, limit: "10mb" }));
+  app.use((req, res, next) => {
+    if (req.originalUrl === "/payin/webhook") {
+      next(); // Skip global body parsing for webhook
+    } else {
+      json({ limit: "10mb" })(req, res, (err) => {
+        if (err) return next(err);
+        urlencoded({ extended: true, limit: "10mb" })(req, res, next);
+      });
+    }
+  });
 
   app.use("/payin/webhook", new RawBodyMiddleware().use);
 
