@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Req,
 } from "@nestjs/common";
 import axios from "axios";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -3096,14 +3097,13 @@ export class PaymentsService {
     }
   }
 
-  async externalWebhookPayinUtkarsh(externalPayinWebhookDto: any) {
+  async externalWebhookPayinUtkarsh(@Req() req: any) {
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
-      externalPayinWebhookDto,
+      req.body,
     );
 
-    const { txnId, txnStatus, custRef, amount, refId, uniqueId } =
-      externalPayinWebhookDto;
+    const { txnId, txnStatus, custRef, amount, refId, uniqueId } = req.body;
 
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
