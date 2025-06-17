@@ -174,7 +174,7 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
-  async externalWebhookPayin(@Body("") body: any, @Req() request: Request) {
+  async externalWebhookPayin(@Body() body: any, @Req() request: Request) {
     this.logger.info(
       `PAYIN - externalWebhookPayin - Got webhook from Utkarsh:`,
       JSON.stringify(body),
