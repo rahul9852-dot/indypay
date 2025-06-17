@@ -27,7 +27,6 @@ import {
   CreatePayinPaymentResponseDto,
   PayinStatusDto,
   CreatePayinTransactionFlaPayDto,
-  ExternalPayinWebhookUtkarshDto,
 } from "./dto/create-payin-payment.dto";
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
@@ -174,9 +173,7 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
-  async externalWebhookPayin(
-    @Body() webhookBody: ExternalPayinWebhookUtkarshDto,
-  ) {
+  async externalWebhookPayin(@Body() webhookBody: any) {
     this.logger.log(
       `PAYIN - externalWebhookPayin - Got webhook from Utkarsh:`,
       webhookBody,
