@@ -12,7 +12,6 @@ import {
   Res,
   Param,
   NotFoundException,
-  Req,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -53,6 +52,7 @@ import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
+import { ExternalPayinWebhookUtkarshDto } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 
 @IgnoreKyc()
@@ -174,36 +174,33 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
-  async externalWebhookPayin(@Body("") body: any, @Req() request: Request) {
-    const rawBody = request["rawBody"];
+  async externalWebhookPayin(
+    @Body() externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
+  ) {
+    this.logger.info(
+      `✅ Got RAW webhook body: ${JSON.stringify(externalWebhookPayin)}`,
+    );
+    this.logger.info(`✅ Parsed body: ${JSON.stringify(externalWebhookPayin)}`);
+    this.logger.info(`✅ Body type: ${typeof externalWebhookPayin}`);
+    this.logger.info(`✅ Body keys: ${Object.keys(externalWebhookPayin)}`);
 
-    this.logger.info(`✅ Got RAW webhook body: ${rawBody}`);
-    this.logger.info(`✅ Parsed body: ${JSON.stringify(body)}`);
-    this.logger.info(`✅ Headers: ${JSON.stringify(request.headers)}`);
-    this.logger.info(`✅ Body type: ${typeof body}`);
-    this.logger.info(`✅ Body keys: ${Object.keys(body)}`);
+    // try {
+    //   // Extract the requestBody from the webhook data
 
-    try {
-      // Extract the requestBody from the webhook data
-      const webhookData = body.requestBody || body;
-      this.logger.info(
-        `✅ Extracted webhook data: ${JSON.stringify(webhookData)}`,
-      );
+    // } catch (error) {
+    //   this.logger.error(
+    //     `❌ Error processing webhook: ${error.message}`,
+    //     error.stack,
+    //   );
+    //   throw error;
+    // }
 
-      const result =
-        await this.paymentsService.externalWebhookPayinUtkarsh(webhookData);
-      this.logger.info(
-        `✅ Webhook processed successfully: ${JSON.stringify(result)}`,
-      );
+    const webhookData = externalWebhookPayin;
+    this.logger.info(
+      `✅ Extracted webhook data: ${JSON.stringify(webhookData)}`,
+    );
 
-      return result;
-    } catch (error) {
-      this.logger.error(
-        `❌ Error processing webhook: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
+    return this.paymentsService.externalWebhookPayinUtkarsh(webhookData);
   }
 
   @Public()

@@ -39,6 +39,7 @@ import {
 import {
   ExternalPayinWebhookFlakPayDto,
   ExternalPayinWebhookIsmartDto,
+  ExternalPayinWebhookUtkarshDto,
 } from "./dto/external-webhook-payin.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import {
@@ -3096,14 +3097,19 @@ export class PaymentsService {
     }
   }
 
-  async externalWebhookPayinUtkarsh(body: any) {
+  async externalWebhookPayinUtkarsh(
+    externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
+  ) {
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Starting webhook processing`,
     );
 
     try {
       // Ensure body is an object
-      const webhookData = typeof body === "string" ? JSON.parse(body) : body;
+      const webhookData =
+        typeof externalWebhookPayin === "string"
+          ? JSON.parse(externalWebhookPayin)
+          : externalWebhookPayin;
 
       this.logger.info(
         `PAYIN - externalWebhookPayinUtkarsh - Processing webhook data: ${LoggerPlaceHolder.Json}`,
