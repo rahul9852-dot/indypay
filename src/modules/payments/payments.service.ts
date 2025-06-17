@@ -3254,11 +3254,16 @@ export class PaymentsService {
 
         await this.walletRepository.save(walletRaw);
 
-        // this.logger.info(
-        //   `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
-        //   walletRaw,
-        // );
+        this.logger.info(
+          `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+          walletRaw,
+        );
       }
+
+      this.logger.info(
+        `PAYIN ============> User: ${LoggerPlaceHolder.Json}`,
+        user,
+      );
 
       if (user?.payInWebhookUrl) {
         const webhookPayload = {
@@ -3268,14 +3273,14 @@ export class PaymentsService {
           txnRefId: payinOrder.txnRefId,
           ...(!isMisspelled && { utr: uniqueId }),
         };
-        // this.logger.info(
-        //   `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
-        //   webhookPayload,
-        // );
+        this.logger.info(
+          `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+          webhookPayload,
+        );
         axios
           .post(user.payInWebhookUrl, webhookPayload, {
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type": "application/json ",
             },
           })
           .then(({ data }) => {
