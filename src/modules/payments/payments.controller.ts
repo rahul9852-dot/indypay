@@ -12,6 +12,7 @@ import {
   Res,
   Param,
   NotFoundException,
+  Req,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -173,15 +174,13 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
-  async externalWebhookPayin(@Body("") utkarshWebhookDto: any) {
+  async externalWebhookPayin(@Body("") body: any, @Req() request: Request) {
     this.logger.info(
       `PAYIN - externalWebhookPayin - Got webhook from Utkarsh:`,
-      JSON.stringify(utkarshWebhookDto),
+      JSON.stringify(body),
     );
 
-    return this.paymentsService.externalWebhookPayinUtkarsh(
-      JSON.stringify(utkarshWebhookDto),
-    );
+    return this.paymentsService.externalWebhookPayinUtkarsh(body);
   }
 
   @Public()
