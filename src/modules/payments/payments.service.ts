@@ -3095,14 +3095,13 @@ export class PaymentsService {
     }
   }
 
-  async externalWebhookPayinUtkarsh(@Req() utkarshWebhookDto: any) {
+  async externalWebhookPayinUtkarsh(@Req() request: any) {
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
-      utkarshWebhookDto.body,
+      request.body,
     );
 
-    const { txnId, txnStatus, custRef, amount, refId, uniqueId } =
-      utkarshWebhookDto.body;
+    const { txnId, txnStatus, custRef, amount, refId, uniqueId } = request.body;
 
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
