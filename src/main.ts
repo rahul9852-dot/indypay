@@ -8,6 +8,7 @@ import { join } from "path";
 import * as hbs from "hbs";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
+import { json } from "express";
 import { AppModule } from "./app.module";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
@@ -25,6 +26,8 @@ async function bootstrap() {
 
   // Add cookie parser
   app.use(cookieParser());
+
+  app.use(json({ limit: "10mb" }));
 
   // Fix the path to point to the project root's public folder instead of dist
   const publicPath = path.join(process.cwd(), "public");
