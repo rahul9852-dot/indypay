@@ -3106,8 +3106,8 @@ export class PaymentsService {
       const webhookData = typeof body === "string" ? JSON.parse(body) : body;
 
       this.logger.info(
-        `PAYIN - externalWebhookPayinUtkarsh - Processing webhook data:`,
-        JSON.stringify(webhookData),
+        `PAYIN - externalWebhookPayinUtkarsh - Processing webhook data: ${LoggerPlaceHolder.Json}`,
+        webhookData,
       );
 
       const {
@@ -3127,8 +3127,8 @@ export class PaymentsService {
       } = webhookData;
 
       this.logger.info(
-        `PAYIN - externalWebhookPayinUtkarsh - Extracted values:`,
-        JSON.stringify({
+        `PAYIN - externalWebhookPayinUtkarsh - Extracted values: ${LoggerPlaceHolder.Json}`,
+        {
           txnId,
           txnStatus,
           custRef,
@@ -3142,7 +3142,7 @@ export class PaymentsService {
           payeeVpa,
           txnDateTime,
           remarks,
-        }),
+        },
       );
 
       if (!refId) {
@@ -3160,9 +3160,8 @@ export class PaymentsService {
       });
 
       this.logger.info(
-        `PAYIN - externalWebhookPayinUtkarsh - Payin order: ${JSON.stringify(
-          payinOrder,
-        )}`,
+        `PAYIN - externalWebhookPayinUtkarsh - Payin order: ${LoggerPlaceHolder.Json}`,
+        payinOrder,
       );
 
       if (!payinOrder) {
