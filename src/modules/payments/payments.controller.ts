@@ -184,8 +184,15 @@ export class PaymentsController {
     this.logger.info(`✅ Body keys: ${Object.keys(body)}`);
 
     try {
+      // Extract the requestBody from the webhook data
+      const webhookData = body.requestBody || body;
+
+      this.logger.info(
+        `✅ Extracted webhook data: ${JSON.stringify(webhookData)}`,
+      );
+
       const result =
-        await this.paymentsService.externalWebhookPayinUtkarsh(body);
+        await this.paymentsService.externalWebhookPayinUtkarsh(webhookData);
       this.logger.info(
         `✅ Webhook processed successfully: ${JSON.stringify(result)}`,
       );
