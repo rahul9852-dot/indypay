@@ -176,9 +176,10 @@ export class PaymentsController {
   @Post("payin/webhook")
   async externalWebhookPayin(@Req() request: Request) {
     const rawBody = request.body.toString();
+    const body = JSON.parse(rawBody);
     this.logger.info(
       `PAYIN - externalWebhookPayin - Got webhook from Utkarsh: ${LoggerPlaceHolder.Json}`,
-      { rawBody },
+      { body },
     );
 
     return this.paymentsService.externalWebhookPayinUtkarsh(rawBody);
