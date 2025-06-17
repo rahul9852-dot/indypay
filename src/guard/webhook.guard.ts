@@ -28,6 +28,8 @@ export class WebhookGuard implements CanActivate {
     this.logger.info(`REQUEST : ${LoggerPlaceHolder.Json}`, {
       data: stringify(request),
       body: stringify(request.body),
+      params: stringify(request.params),
+      headers: stringify(request.headers),
     });
 
     this.logger.info(`WEBHOOK REQUEST : ${LoggerPlaceHolder.Json}`, {

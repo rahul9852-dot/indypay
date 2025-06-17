@@ -26,6 +26,12 @@ async function bootstrap() {
   // Add cookie parser
   app.use(cookieParser());
 
+  app.use(
+    require("express").urlencoded({
+      extended: true,
+    }),
+  );
+
   // Fix the path to point to the project root's public folder instead of dist
   const publicPath = path.join(process.cwd(), "public");
 
