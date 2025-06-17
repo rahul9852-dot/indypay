@@ -180,10 +180,24 @@ export class PaymentsController {
     this.logger.info(`✅ Got RAW webhook body: ${rawBody}`);
     this.logger.info(`✅ Parsed body: ${JSON.stringify(body)}`);
     this.logger.info(`✅ Headers: ${JSON.stringify(request.headers)}`);
+    this.logger.info(`✅ Body type: ${typeof body}`);
+    this.logger.info(`✅ Body keys: ${Object.keys(body)}`);
 
-    return this.paymentsService.externalWebhookPayinUtkarsh(
-      JSON.stringify(body),
-    );
+    try {
+      const result =
+        await this.paymentsService.externalWebhookPayinUtkarsh(body);
+      this.logger.info(
+        `✅ Webhook processed successfully: ${JSON.stringify(result)}`,
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `❌ Error processing webhook: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   @Public()
