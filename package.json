@@ -53,6 +53,7 @@
     "@types/hbs": "^4.0.5",
     "axios": "^1.7.3",
     "bcryptjs": "^2.4.3",
+    "body-parser": "^2.2.0",
     "bull": "^4.16.5",
     "cache-manager": "^5.7.6",
     "cache-manager-redis-yet": "^5.1.5",
