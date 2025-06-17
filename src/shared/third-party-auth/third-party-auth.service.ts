@@ -75,6 +75,7 @@ export class ThirdPartyAuthService {
       ERTITECH.BASE_URL,
       getEritechPgConfig({
         token,
+        merchantId: externalPaymentConfig.ertech.merchantId,
       }),
     );
 
@@ -102,6 +103,7 @@ export class ThirdPartyAuthService {
       ERTITECH.BASE_URL,
       getEritechPgConfig({
         token,
+        merchantId: externalPaymentConfig.ertech.merchantId,
       }),
     );
 
