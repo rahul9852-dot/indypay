@@ -9,7 +9,6 @@ import {
   Query,
   BadRequestException,
   Render,
-  Logger,
   Res,
   Param,
   NotFoundException,
@@ -53,6 +52,7 @@ import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
+import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -60,7 +60,7 @@ import { CryptoService } from "@/utils/encryption-algo.utils";
 @Controller("payments")
 @UseGuards(AuthGuard)
 export class PaymentsController {
-  private readonly logger = new Logger(PaymentsController.name);
+  private readonly logger = new CustomLogger(PaymentsController.name);
 
   constructor(
     private readonly paymentsService: PaymentsService,
@@ -174,8 +174,8 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
   async externalWebhookPayin(@Body() webhookBody: any) {
-    this.logger.log(
-      `PAYIN - externalWebhookPayin - Got webhook from Utkarsh:`,
+    this.logger.info(
+      `PAYIN - externalWebhookPayin - Got webhook from Utkarsh: ${LoggerPlaceHolder.Json}`,
       webhookBody,
     );
 
