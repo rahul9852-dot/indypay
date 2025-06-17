@@ -25,7 +25,7 @@ export class WebhookGuard implements CanActivate {
 
     this.logger.info(`WEBHOOK REQUEST : ${LoggerPlaceHolder.Json}`, {
       requestIp,
-      requestBody: request.body,
+      requestBody: request,
     });
 
     const webhookIps = [
