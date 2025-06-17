@@ -10,6 +10,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
+import { RawBodyMiddleware } from "./utils/raw-body.middleware";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { appConfig } from "@/config/app.config";
@@ -29,6 +30,8 @@ async function bootstrap() {
 
   app.use(json({ limit: "10mb" }));
   app.use(urlencoded({ extended: true, limit: "10mb" }));
+
+  app.use("/payin/webhook", new RawBodyMiddleware().use);
 
   // Fix the path to point to the project root's public folder instead of dist
   const publicPath = path.join(process.cwd(), "public");
