@@ -1037,6 +1037,7 @@ export class PaymentsService {
           beneName: payoutOrder.name,
           custUniqRef: customerUniqueRef,
           beneMobileNo: user.mobile,
+          preferredBank: "pnb",
         },
       };
 
