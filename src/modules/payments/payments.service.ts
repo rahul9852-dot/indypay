@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Req,
 } from "@nestjs/common";
 import axios from "axios";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -24,7 +25,6 @@ import { InjectQueue } from "@nestjs/bull";
 import {
   CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionIsmartDto,
-  ExternalPayinWebhookUtkarshDto,
   PayinStatusDto,
 } from "./dto/create-payin-payment.dto";
 import {
@@ -3096,15 +3096,13 @@ export class PaymentsService {
     }
   }
 
-  async externalWebhookPayinUtkarsh(
-    webhookBody: ExternalPayinWebhookUtkarshDto,
-  ) {
+  async externalWebhookPayinUtkarsh(@Req() request: any) {
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
-      webhookBody,
+      request.body,
     );
 
-    const { txnId, txnStatus, payerVpa } = webhookBody;
+    const { txnId, txnStatus, payerVpa } = request.body;
 
     let status = convertExternalPaymentStatusToInternal(txnStatus);
 
