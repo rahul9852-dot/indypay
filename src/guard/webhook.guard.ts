@@ -5,8 +5,10 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { Request } from "express";
+import safeStableStringify from "safe-stable-stringify";
 import { appConfig } from "@/config/app.config";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+
 // import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 const {
@@ -22,6 +24,10 @@ export class WebhookGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
 
     const requestIp = this.parseIp(request);
+
+    this.logger.info(`REQUEST BODY : ${LoggerPlaceHolder.Json}`, {
+      body: safeStableStringify(request.body),
+    });
 
     this.logger.info(`WEBHOOK REQUEST : ${LoggerPlaceHolder.Json}`, {
       requestIp,
