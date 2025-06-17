@@ -177,30 +177,9 @@ export class PaymentsController {
   async externalWebhookPayin(
     @Body() externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
   ) {
-    this.logger.info(
-      `✅ Got RAW webhook body: ${JSON.stringify(externalWebhookPayin)}`,
+    return this.paymentsService.externalWebhookPayinUtkarsh(
+      externalWebhookPayin,
     );
-    this.logger.info(`✅ Parsed body: ${JSON.stringify(externalWebhookPayin)}`);
-    this.logger.info(`✅ Body type: ${typeof externalWebhookPayin}`);
-    this.logger.info(`✅ Body keys: ${Object.keys(externalWebhookPayin)}`);
-
-    // try {
-    //   // Extract the requestBody from the webhook data
-
-    // } catch (error) {
-    //   this.logger.error(
-    //     `❌ Error processing webhook: ${error.message}`,
-    //     error.stack,
-    //   );
-    //   throw error;
-    // }
-
-    const webhookData = externalWebhookPayin;
-    this.logger.info(
-      `✅ Extracted webhook data: ${JSON.stringify(webhookData)}`,
-    );
-
-    return this.paymentsService.externalWebhookPayinUtkarsh(webhookData);
   }
 
   @Public()

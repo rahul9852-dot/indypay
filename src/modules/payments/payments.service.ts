@@ -3100,35 +3100,9 @@ export class PaymentsService {
   async externalWebhookPayinUtkarsh(
     externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
   ) {
-    this.logger.info(
-      `PAYIN - externalWebhookPayinUtkarsh - Starting webhook processing`,
-    );
-
     try {
-      this.logger.info(
-        `PAYIN - externalWebhookPayinUtkarsh - Processing webhook data: ${LoggerPlaceHolder.Json}`,
-        externalWebhookPayin,
-      );
-
-      const { txnId, txnStatus, custRef, amount, refId, uniqueId } =
+      const { txnId, txnStatus, custRef, amount, refId, uniqueId, upiTxnId } =
         externalWebhookPayin;
-
-      this.logger.info(
-        `PAYIN - externalWebhookPayinUtkarsh - Extracted values: ${LoggerPlaceHolder.Json}`,
-        {
-          txnId,
-          txnStatus,
-          custRef,
-          amount,
-          refId,
-          uniqueId,
-        },
-      );
-
-      if (!refId) {
-        this.logger.error("Missing refId in webhook data");
-        throw new BadRequestException("Missing refId in webhook data");
-      }
 
       let status = convertExternalPaymentStatusToInternal(txnStatus);
 
@@ -3240,11 +3214,6 @@ export class PaymentsService {
         );
       }
 
-      this.logger.info(
-        `PAYIN ============> User: ${LoggerPlaceHolder.Json}`,
-        user,
-      );
-
       if (user?.payInWebhookUrl) {
         const webhookPayload = {
           orderId: refId,
@@ -3253,10 +3222,10 @@ export class PaymentsService {
           txnRefId: payinOrder.txnRefId,
           ...(!isMisspelled && { utr: uniqueId }),
         };
-        this.logger.info(
-          `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
-          webhookPayload,
-        );
+        // this.logger.info(
+        //   `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+        //   webhookPayload,
+        // );
         axios
           .post(user.payInWebhookUrl, webhookPayload, {
             headers: {

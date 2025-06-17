@@ -203,4 +203,9 @@ export class ExternalPayinWebhookUtkarshDto {
   @IsString()
   @IsOptional()
   uniqueId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  upiTxnId?: string;
 }
