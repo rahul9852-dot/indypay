@@ -177,9 +177,9 @@ export class PaymentsController {
   async externalWebhookPayin(@Body("") body: any, @Req() request: Request) {
     const rawBody = request["rawBody"];
 
-    this.logger.info(`✅ Got RAW webhook body: ${rawBody}`);
-    this.logger.info(`✅ Parsed body: ${JSON.stringify(body)}`);
-    this.logger.info(`✅ Headers: ${JSON.stringify(request.headers)}`);
+    this.logger.info(`Got RAW webhook body: ${rawBody}`);
+    this.logger.info(`Parsed body: ${JSON.stringify(body)}`);
+    this.logger.info(`Headers: ${JSON.stringify(request.headers)}`);
 
     return this.paymentsService.externalWebhookPayinUtkarsh(body);
   }

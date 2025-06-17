@@ -10,6 +10,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
+import { webhookBodyParser, WEBHOOK_ROUTES } from "./utils/webhook.middleware";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { appConfig } from "@/config/app.config";
@@ -27,36 +28,13 @@ async function bootstrap() {
   // Add cookie parser
   app.use(cookieParser());
 
-  app.use((req, res, next) => {
-    if (req.originalUrl === "/api/v1/payments/payin/webhook") {
-      let data = "";
-      req.setEncoding("utf8");
-
-      req.on("data", (chunk) => {
-        data += chunk;
-      });
-
-      req.on("end", () => {
-        logger.info("🔥 Raw webhook data:", data);
-
-        req.rawBody = data;
-
-        try {
-          req.body = JSON.parse(data);
-        } catch (e) {
-          req.body = {}; // Or keep raw if you prefer
-        }
-
-        next();
-      });
-    } else {
-      // For all other routes, normal JSON and urlencoded parsing
-      json({ limit: "10mb" })(req, res, (err) => {
-        if (err) return next(err);
-        urlencoded({ extended: true, limit: "10mb" })(req, res, next);
-      });
-    }
+  WEBHOOK_ROUTES.forEach((route) => {
+    app.use(route, webhookBodyParser);
   });
+
+  // Apply standard body parsing globally
+  app.use(json({ limit: "10mb" }));
+  app.use(urlencoded({ extended: true, limit: "10mb" }));
 
   // Fix the path to point to the project root's public folder instead of dist
   const publicPath = path.join(process.cwd(), "public");
