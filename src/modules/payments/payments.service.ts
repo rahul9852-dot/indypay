@@ -3098,15 +3098,36 @@ export class PaymentsService {
 
   async externalWebhookPayinUtkarsh(body: any) {
     this.logger.info(
-      `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
-      body,
+      `PAYIN - externalWebhookPayinUtkarsh - Starting webhook processing`,
     );
 
     try {
-      const { txnId, txnStatus, custRef, amount, refId, uniqueId } = body;
+      // Ensure body is an object
+      const webhookData = typeof body === "string" ? JSON.parse(body) : body;
 
       this.logger.info(
-        `PAYIN - externalWebhookPayinUtkarsh - Parsed webhook values:`,
+        `PAYIN - externalWebhookPayinUtkarsh - Processing webhook data:`,
+        webhookData,
+      );
+
+      const {
+        txnId,
+        txnStatus,
+        custRef,
+        amount,
+        refId,
+        uniqueId,
+        upiTxnId,
+        payerVpa,
+        payerVerifiedName,
+        payerMobile,
+        payeeVpa,
+        txnDateTime,
+        remarks,
+      } = webhookData;
+
+      this.logger.info(
+        `PAYIN - externalWebhookPayinUtkarsh - Extracted values:`,
         {
           txnId,
           txnStatus,
@@ -3114,8 +3135,13 @@ export class PaymentsService {
           amount,
           refId,
           uniqueId,
-          bodyType: typeof body,
-          bodyKeys: Object.keys(body),
+          upiTxnId,
+          payerVpa,
+          payerVerifiedName,
+          payerMobile,
+          payeeVpa,
+          txnDateTime,
+          remarks,
         },
       );
 
