@@ -3103,8 +3103,6 @@ export class PaymentsService {
     );
 
     const { txnId, txnStatus, custRef, amount, refId, uniqueId } = body;
-
-
     this.logger.info(
       `PAYIN - externalWebhookPayinUtkarsh - Got webhook from Utkarsh:`,
       JSON.stringify({

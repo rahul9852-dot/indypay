@@ -174,7 +174,6 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
-
   async externalWebhookPayin(@Body("") body: any, @Req() request: Request) {
     const rawBody = request["rawBody"];
 
