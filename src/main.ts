@@ -10,6 +10,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
+import { webhookBodyParser, WEBHOOK_ROUTES } from "./utils/webhook.middleware";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { appConfig } from "@/config/app.config";
@@ -27,6 +28,11 @@ async function bootstrap() {
   // Add cookie parser
   app.use(cookieParser());
 
+  WEBHOOK_ROUTES.forEach((route) => {
+    app.use(route, webhookBodyParser);
+  });
+
+  // Apply standard body parsing globally
   app.use(json({ limit: "10mb" }));
   app.use(urlencoded({ extended: true, limit: "10mb" }));
 

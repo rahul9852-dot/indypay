@@ -12,6 +12,7 @@ import {
   Res,
   Param,
   NotFoundException,
+  Req,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -52,7 +53,7 @@ import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
-import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+import { CustomLogger } from "@/logger";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -173,12 +174,12 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
-  async externalWebhookPayin(@Body() body: any) {
-    this.logger.info(`Got webhook body: ${JSON.stringify(body)}`);
-    this.logger.info(
-      `PAYIN - externalWebhookPayin - Got webhook from Utkarsh: ${LoggerPlaceHolder.Json}`,
-      { body },
-    );
+  async externalWebhookPayin(@Body("") body: any, @Req() request: Request) {
+    const rawBody = request["rawBody"];
+
+    this.logger.info(`Got RAW webhook body: ${rawBody}`);
+    this.logger.info(`Parsed body: ${JSON.stringify(body)}`);
+    this.logger.info(`Headers: ${JSON.stringify(request.headers)}`);
 
     return this.paymentsService.externalWebhookPayinUtkarsh(body);
   }
