@@ -178,7 +178,7 @@ export class PaymentsController {
     const rawBody = request.body.toString();
     this.logger.info(
       `PAYIN - externalWebhookPayin - Got webhook from Utkarsh: ${LoggerPlaceHolder.Json}`,
-      rawBody,
+      { rawBody },
     );
 
     return this.paymentsService.externalWebhookPayinUtkarsh(rawBody);
