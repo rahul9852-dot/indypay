@@ -5,7 +5,6 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { Request } from "express";
-import stringify from "safe-stable-stringify";
 import { appConfig } from "@/config/app.config";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
@@ -24,13 +23,6 @@ export class WebhookGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
 
     const requestIp = this.parseIp(request);
-
-    this.logger.info(`REQUEST : ${LoggerPlaceHolder.Json}`, {
-      data: stringify(request),
-      body: stringify(request.body),
-      params: stringify(request.params),
-      headers: stringify(request.headers),
-    });
 
     this.logger.info(`WEBHOOK REQUEST : ${LoggerPlaceHolder.Json}`, {
       requestIp,
