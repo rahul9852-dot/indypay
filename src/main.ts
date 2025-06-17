@@ -27,8 +27,36 @@ async function bootstrap() {
   // Add cookie parser
   app.use(cookieParser());
 
-  app.use(json({ limit: "10mb" }));
-  app.use(urlencoded({ extended: true, limit: "10mb" }));
+  app.use((req, res, next) => {
+    if (req.originalUrl === "/payin/webhook") {
+      let data = "";
+      req.setEncoding("utf8");
+
+      req.on("data", (chunk) => {
+        data += chunk;
+      });
+
+      req.on("end", () => {
+        logger.info("🔥 Raw webhook data:", data);
+
+        req.rawBody = data;
+
+        try {
+          req.body = JSON.parse(data);
+        } catch (e) {
+          req.body = {}; // Or keep raw if you prefer
+        }
+
+        next();
+      });
+    } else {
+      // For all other routes, normal JSON and urlencoded parsing
+      json({ limit: "10mb" })(req, res, (err) => {
+        if (err) return next(err);
+        urlencoded({ extended: true, limit: "10mb" })(req, res, next);
+      });
+    }
+  });
 
   // Fix the path to point to the project root's public folder instead of dist
   const publicPath = path.join(process.cwd(), "public");
