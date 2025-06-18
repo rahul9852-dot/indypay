@@ -212,6 +212,11 @@ export class PaymentsService {
       const url = SABPAISA.BASE_URL;
       const encryptedString = this.encryptionAlgoService.encrypt(stringRequest);
 
+      this.logger.info(
+        `Checkout - encryptedString: ${LoggerPlaceHolder.Json}`,
+        encryptedString,
+      );
+
       await queryRunner.commitTransaction();
 
       // Return the data directly for the controller/template
@@ -3106,7 +3111,7 @@ export class PaymentsService {
       const { txnId, txnStatus, custRef, amount, refId, uniqueId, upiTxnId } =
         externalWebhookPayin;
 
-      let status = convertExternalPaymentStatusToInternal(txnStatus);
+      const status = convertExternalPaymentStatusToInternal(txnStatus);
 
       const payinOrder = await this.payInOrdersRepository.findOne({
         where: {
@@ -3139,35 +3144,35 @@ export class PaymentsService {
 
       // Jumping Start
 
-      let successCount =
-        +(await this.cacheManager.get(
-          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
-        )) || 1;
+      // let successCount =
+      //   +(await this.cacheManager.get(
+      //     REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+      //   )) || 1;
 
-      let isMisspelled = false;
-      const { jumpingCount } = payinOrder.user;
+      // let isMisspelled = false;
+      // const { jumpingCount } = payinOrder.user;
 
-      if (status === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
-        if (successCount >= jumpingCount) {
-          const statusArr = [
-            PAYMENT_STATUS.PENDING,
-            PAYMENT_STATUS.DEEMED,
-            PAYMENT_STATUS.INITIATED,
-            PAYMENT_STATUS.FAILED,
-          ];
-          status = statusArr[Math.floor(Math.random() * statusArr.length)];
-          successCount = 0;
-          isMisspelled = true;
-        } else {
-          successCount += 1;
-        }
+      // if (status === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
+      //   if (successCount >= jumpingCount) {
+      //     const statusArr = [
+      //       PAYMENT_STATUS.PENDING,
+      //       PAYMENT_STATUS.DEEMED,
+      //       PAYMENT_STATUS.INITIATED,
+      //       PAYMENT_STATUS.FAILED,
+      //     ];
+      //     status = statusArr[Math.floor(Math.random() * statusArr.length)];
+      //     successCount = 0;
+      //     isMisspelled = true;
+      //   } else {
+      //     successCount += 1;
+      //   }
 
-        await this.cacheManager.set(
-          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
-          successCount,
-          1000 * 60 * 60 * 24 * 365, // 365 days
-        );
-      }
+      //   await this.cacheManager.set(
+      //     REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+      //     successCount,
+      //     1000 * 60 * 60 * 24 * 365, // 365 days
+      //   );
+      // }
 
       // Jumpind End
 
@@ -3177,8 +3182,9 @@ export class PaymentsService {
         id: payinOrder.id,
         status,
         txnRefId: txnId,
-        ...(!isMisspelled && { utr: upiTxnId }),
-        isMisspelled,
+        // ...(!isMisspelled && { utr: upiTxnId }),
+        utr: upiTxnId,
+        // isMisspelled,
         ...(status === PAYMENT_STATUS.SUCCESS && {
           successAt: new Date(),
         }),
@@ -3222,7 +3228,8 @@ export class PaymentsService {
           status,
           amount: payinOrder.amount,
           txnRefId: payinOrder.txnRefId,
-          ...(!isMisspelled && { utr: upiTxnId }),
+          // ...(!isMisspelled && { utr: upiTxnId }),
+          utr: upiTxnId,
         };
         this.logger.info(
           `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
