@@ -581,6 +581,12 @@ export class PayoutService {
           custUniqRef: payoutOrder.orderId.split("_").join(""),
         },
       );
+
+    this.logger.info(
+      `Eritech Status Response: ${LoggerPlaceHolder.Json}`,
+      ertechStatusResponse,
+    );
+
     if (!ertechStatusResponse.success) {
       throw new BadRequestException(
         new MessageResponseDto(ertechStatusResponse.message),
@@ -598,10 +604,11 @@ export class PayoutService {
       ertechStatusResponse.data.response.txn_status.transactionStatus.toUpperCase(),
     );
 
-    this.logger.info(
-      `Internal Status Response: ${LoggerPlaceHolder.Json}`,
+    this.logger.info(`Internal Status Response: ${LoggerPlaceHolder.Json}`, {
       status,
-    );
+      status2:
+        ertechStatusResponse.data.response.txn_status.transactionStatus.toUpperCase(),
+    });
 
     const savedPayout = await this.payoutRepository.save(
       this.payoutRepository.create({

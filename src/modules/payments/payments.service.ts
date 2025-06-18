@@ -3177,7 +3177,7 @@ export class PaymentsService {
         id: payinOrder.id,
         status,
         txnRefId: txnId,
-        ...(!isMisspelled && { utr: uniqueId }),
+        ...(!isMisspelled && { utr: upiTxnId }),
         isMisspelled,
         ...(status === PAYMENT_STATUS.SUCCESS && {
           successAt: new Date(),
@@ -3222,12 +3222,12 @@ export class PaymentsService {
           status,
           amount: payinOrder.amount,
           txnRefId: payinOrder.txnRefId,
-          ...(!isMisspelled && { utr: uniqueId }),
+          ...(!isMisspelled && { utr: upiTxnId }),
         };
-        // this.logger.info(
-        //   `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
-        //   webhookPayload,
-        // );
+        this.logger.info(
+          `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+          webhookPayload,
+        );
         axios
           .post(user.payInWebhookUrl, webhookPayload, {
             headers: {

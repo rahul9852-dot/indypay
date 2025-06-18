@@ -1321,6 +1321,7 @@ export class SettlementsService {
           beneName: targetBank.name,
           custUniqRef: savedSettlement.id.split("_").join(""),
           beneMobileNo: user.mobile,
+          preferredBank: "ind",
         },
       };
 
