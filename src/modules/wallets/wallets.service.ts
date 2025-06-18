@@ -11,7 +11,10 @@ import { WalletTopupEntity } from "@/entities/wallet-topup.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
 import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
-import { getCommissions } from "@/utils/commissions.utils";
+import {
+  getCommissions,
+  getPayoutCommissions,
+} from "@/utils/commissions.utils";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
@@ -436,7 +439,7 @@ export class WalletsService {
     const {
       totalServiceChange: payoutCharge,
       netPayableAmount: netPayableAmountPayout,
-    } = getCommissions({
+    } = getPayoutCommissions({
       amount: collectionsAfterDeduction,
       commissionInPercentage: merchantUser.commissionInPercentagePayout,
       gstInPercentage: merchantUser.gstInPercentagePayout,

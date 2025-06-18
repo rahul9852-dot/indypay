@@ -35,7 +35,10 @@ import { getPagination } from "@/utils/pagination.utils";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
-import { getCommissions } from "@/utils/commissions.utils";
+import {
+  getCommissions,
+  getPayoutCommissions,
+} from "@/utils/commissions.utils";
 import {
   IExternalPayoutStatusResponseIsmart,
   IExternalEritecPayoutFundResponse,
@@ -1261,7 +1264,7 @@ export class SettlementsService {
       const {
         totalServiceChange,
         netPayableAmount: collectionAfterPayinDeduction,
-      } = getCommissions({
+      } = getPayoutCommissions({
         amount: +collectionAmount,
         commissionInPercentage: +wallet.user.commissionInPercentagePayin, // PAYIN Commission
         gstInPercentage: +wallet.user.gstInPercentagePayin,
