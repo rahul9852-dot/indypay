@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { PayOutOrdersEntity } from "../src/entities/payout-orders.entity";
 import dataSource from "../src/config/migration.config";
-import { calculateOriginalAmountFromNetPayable } from "../src/utils/commissions.utils";
+import { calculatePayoutOriginalAmountFromNetPayable } from "../src/utils/commissions.utils";
 
 async function updatePayouts(dataSource: DataSource) {
   const queryRunner = dataSource.createQueryRunner();
@@ -20,7 +20,7 @@ async function updatePayouts(dataSource: DataSource) {
         continue;
       }
 
-      const actualValue = calculateOriginalAmountFromNetPayable({
+      const actualValue = calculatePayoutOriginalAmountFromNetPayable({
         netPayableAmount: +payout.amount,
         commissionInPercentage: +payout.user.commissionInPercentagePayout,
         gstInPercentage: +payout.user.gstInPercentagePayout,

@@ -129,6 +129,11 @@ export class PayoutProcessor {
               eriTechDecryptedResponse.txn_status.transactionStatus.toUpperCase(),
             );
 
+            this.logger.info(
+              `Ertitech Converted Status: ${LoggerPlaceHolder.Json}`,
+              status,
+            );
+
             await this.payOutOrdersRepository.save(
               this.payOutOrdersRepository.create({
                 id: order.id,
@@ -145,7 +150,7 @@ export class PayoutProcessor {
                   status,
                 ) && { status }),
 
-                utr: eriTechDecryptedResponse.txn_status.transactionStatus,
+                utr: eriTechDecryptedResponse.txn_status.utrNo,
               }),
             );
 
