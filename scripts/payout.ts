@@ -24,6 +24,7 @@ async function updatePayouts(dataSource: DataSource) {
         netPayableAmount: +payout.amount,
         commissionInPercentage: +payout.user.commissionInPercentagePayout,
         gstInPercentage: +payout.user.gstInPercentagePayout,
+        flatCommission: +payout.user.flatCommission,
       });
 
       // Update the payout with the calculated actual value
