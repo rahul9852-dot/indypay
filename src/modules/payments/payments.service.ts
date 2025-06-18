@@ -72,6 +72,7 @@ import {
 import { WalletEntity } from "@/entities/wallet.entity";
 import {
   calculateOriginalAmountFromNetPayable,
+  calculatePayoutOriginalAmountFromNetPayable,
   getCommissions,
 } from "@/utils/commissions.utils";
 import {
@@ -984,7 +985,7 @@ export class PaymentsService {
         `Payout amount: ${singlePayoutDto.amount}`,
         user.flatCommission,
       );
-      const settlementAmount = calculateOriginalAmountFromNetPayable({
+      const settlementAmount = calculatePayoutOriginalAmountFromNetPayable({
         netPayableAmount: +singlePayoutDto.amount,
         commissionInPercentage: +user.commissionInPercentagePayout,
         gstInPercentage: +user.gstInPercentagePayout,
@@ -1314,10 +1315,11 @@ export class PaymentsService {
   ) {
     return Promise.all(
       payouts.map(async (payment) => {
-        const settlementAmount = calculateOriginalAmountFromNetPayable({
+        const settlementAmount = calculatePayoutOriginalAmountFromNetPayable({
           netPayableAmount: +payment.amount,
           commissionInPercentage: +user.commissionInPercentagePayout,
           gstInPercentage: +user.gstInPercentagePayout,
+          flatCommission: +user.flatCommission,
         });
 
         const payoutOrder = this.payOutOrdersRepository.create({
