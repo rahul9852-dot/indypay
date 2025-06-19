@@ -286,6 +286,14 @@ export class PayoutProcessor {
               );
             }
 
+            this.logger.info(
+              `PAYOUT - Update wallet when error occurs(catch block) - Wallet: ${LoggerPlaceHolder.Json}`,
+              {
+                availablePayoutBalance: wallet.availablePayoutBalance,
+                amount,
+              },
+            );
+
             await this.payOutOrdersRepository.update(
               { id: order.id },
               {

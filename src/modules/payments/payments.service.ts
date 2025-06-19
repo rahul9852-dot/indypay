@@ -1303,6 +1303,14 @@ export class PaymentsService {
       );
     }
 
+    this.logger.info(
+      `PAYOUT - validateAndUpdateWallet - User wallet: ${LoggerPlaceHolder.Json}`,
+      {
+        availablePayoutBalance: userWallet.availablePayoutBalance,
+        totalAmount,
+      },
+    );
+
     return await queryRunner.manager.save(
       this.walletRepository.create({
         id: userWallet.id,
