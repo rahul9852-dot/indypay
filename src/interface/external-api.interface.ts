@@ -380,3 +380,8 @@ export interface IExternalEritechStatusResponse {
   errors: string;
   exception: string;
 }
+
+export interface IExternalPayinStatusResponseUtkarsh {
+  data: string;
+  message: string;
+}
