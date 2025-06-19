@@ -1333,6 +1333,7 @@ export class PaymentsService {
           gstInPercentage: +user.gstInPercentagePayout,
           name: payment.beneficiaryName,
           bankAccountNumber: payment.accountNumber,
+          beneficiaryMobile: payment.beneficiaryMobile,
           bankIfsc: payment.ifscCode,
           bankName: payment.bankName,
           remarks: payment.remarks,

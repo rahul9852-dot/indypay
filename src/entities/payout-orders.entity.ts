@@ -67,6 +67,9 @@ export class PayOutOrdersEntity {
   bankName: string;
 
   @Column({ nullable: true })
+  beneficiaryMobile: string;
+
+  @Column({ nullable: true })
   bankAccountNumber: string;
 
   @Column({ nullable: true })

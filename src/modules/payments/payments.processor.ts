@@ -87,7 +87,7 @@ export class PayoutProcessor {
                 beneAccNum: order.bankAccountNumber,
                 beneName: order.name,
                 custUniqRef: customerUniqueRef,
-                beneMobileNo: user.mobile,
+                beneMobileNo: order.beneficiaryMobile,
                 preferredBank: "ind",
               },
             };
