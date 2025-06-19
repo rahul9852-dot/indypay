@@ -1335,6 +1335,14 @@ export class PaymentsService {
           flatCommission: +user.flatCommission,
         });
 
+        this.logger.info(
+          `PAYOUT - createPayoutOrders - Settlement amount: ${LoggerPlaceHolder.Json}`,
+          {
+            settlementAmount,
+            amount: payment.amount,
+          },
+        );
+
         const payoutOrder = this.payOutOrdersRepository.create({
           amount: +payment.amount,
           amountBeforeDeduction: settlementAmount,

@@ -18,9 +18,11 @@ import {
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 @Injectable()
 export class WalletsService {
+  private readonly logger = new CustomLogger(WalletsService.name);
   constructor(
     @InjectRepository(WalletEntity)
     private readonly walletRepository: Repository<WalletEntity>,
@@ -444,6 +446,16 @@ export class WalletsService {
       commissionInPercentage: merchantUser.commissionInPercentagePayout,
       gstInPercentage: merchantUser.gstInPercentagePayout,
     });
+
+    this.logger.info(
+      `TOPUP - Topup wallet - Net payable amount payout: ${LoggerPlaceHolder.Json}`,
+      {
+        netPayableAmountPayout,
+        payoutCharge,
+        collectionsAfterDeduction,
+        payinCharge,
+      },
+    );
 
     // record a topup transaction
     const topUp = this.walletTopupRepository.create({
