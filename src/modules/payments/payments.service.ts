@@ -1507,7 +1507,7 @@ export class PaymentsService {
       );
     }
 
-    if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
+    if (payinOrder.status !== PAYMENT_STATUS.PENDING) {
       return {
         orderId: payinOrder.orderId,
         status: payinOrder.status,
