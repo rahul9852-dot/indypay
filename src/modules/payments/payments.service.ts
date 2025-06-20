@@ -1339,32 +1339,30 @@ export class PaymentsService {
     return Promise.all(
       payouts.map(async (payment) => {
         // Calculate dynamic commission for this payout
-        const commissionResult = calculateDynamicCommission({
-          amount: +payment.amount,
-          userCommissionRate: +user.commissionInPercentagePayout,
-          userGstRate: +user.gstInPercentagePayout,
+        const commissionResult = calculatePayoutOriginalAmountFromNetPayable({
+          netPayableAmount: +payment.amount,
+          commissionInPercentage: +user.commissionInPercentagePayout,
+          gstInPercentage: +user.gstInPercentagePayout,
         });
 
         this.logger.info(
           `PAYOUT - createPayoutOrders - Dynamic commission result: ${LoggerPlaceHolder.Json}`,
           {
             originalAmount: payment.amount,
-            netPayableAmount: commissionResult.netPayableAmount,
-            commissionAmount: commissionResult.commissionAmount,
-            gstAmount: commissionResult.gstAmount,
-            appliedConfig: commissionResult.appliedConfig,
+            netPayableAmount: commissionResult,
           },
         );
 
         const payoutOrder = this.payOutOrdersRepository.create({
           amount: +payment.amount,
-          amountBeforeDeduction: commissionResult.netPayableAmount,
+          amountBeforeDeduction: +commissionResult,
           transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
           orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
           batchId,
           user,
-          commissionInPercentage: commissionResult.commissionRate,
-          gstInPercentage: commissionResult.gstRate,
+          commissionInPercentage:
+            +payment.amount <= 1000 ? 7.25 : +user.commissionInPercentagePayout,
+          gstInPercentage: +user.gstInPercentagePayout,
           name: payment.beneficiaryName,
           bankAccountNumber: payment.accountNumber,
           beneficiaryMobile: payment.beneficiaryMobile,

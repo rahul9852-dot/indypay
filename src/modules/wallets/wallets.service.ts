@@ -464,7 +464,7 @@ export class WalletsService {
       payInCharge: payinCharge,
       amountAfterPayinDeduction: collectionsAfterDeduction,
       // payOutCharge: payoutCharge,
-      // topUpAmount: netPayableAmountPayout,
+      topUpAmount: collectionsAfterDeduction,
       topupBy: adminUser,
     });
 
