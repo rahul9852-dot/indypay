@@ -21,7 +21,7 @@ import {
 } from "typeorm";
 import { Queue } from "bull";
 import { InjectQueue } from "@nestjs/bull";
-import dayjs from "dayjs";
+import * as dayjs from "dayjs";
 import {
   CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionIsmartDto,
