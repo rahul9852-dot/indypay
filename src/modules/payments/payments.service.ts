@@ -64,7 +64,6 @@ import {
   getUlidId,
 } from "@/utils/helperFunctions.utils";
 import {
-  ERTITECH,
   FALKPAY,
   ISMART_PAY,
   SABPAISA,
@@ -84,14 +83,12 @@ import {
   IExternalPayoutResponseFlakPay,
   IExternalPayinStatusResponseFlakPay,
   IExternalPayoutStatusResponseFlakPay,
-  IExternalEritecPayoutFundResponse,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
 import { ID_TYPE, USERS_ROLE } from "@/enums";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import {
-  getEritechPgConfig,
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
 } from "@/utils/pg-config.utils";
@@ -972,245 +969,245 @@ export class PaymentsService {
   }
 
   // Eritech single fund transfer payout
-  async createPayoutEritechSingle(
-    singlePayoutDto: SinglePayoutDto,
-    user: UsersEntity,
-  ) {
-    if (singlePayoutDto.payoutId) {
-      const payoutOrder = await this.payOutOrdersRepository.findOne({
-        where: { payoutId: singlePayoutDto.payoutId },
-      });
+  // async createPayoutEritechSingle(
+  //   singlePayoutDto: SinglePayoutDto,
+  //   user: UsersEntity,
+  // ) {
+  //   if (singlePayoutDto.payoutId) {
+  //     const payoutOrder = await this.payOutOrdersRepository.findOne({
+  //       where: { payoutId: singlePayoutDto.payoutId },
+  //     });
 
-      if (payoutOrder) {
-        throw new ConflictException("Payout order already exists");
-      }
-    }
+  //     if (payoutOrder) {
+  //       throw new ConflictException("Payout order already exists");
+  //     }
+  //   }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    try {
-      await queryRunner.connect();
-      await queryRunner.startTransaction();
-      // Check and update wallet balance
-      await this.validateAndUpdateWallet(
-        queryRunner,
-        user,
-        singlePayoutDto.amount,
-      );
-      this.logger.info(
-        `Payout amount: ${singlePayoutDto.amount}`,
-        user.flatCommission,
-      );
-      const settlementAmount = calculatePayoutOriginalAmountFromNetPayable({
-        netPayableAmount: +singlePayoutDto.amount,
-        commissionInPercentage: +user.commissionInPercentagePayout,
-        gstInPercentage: +user.gstInPercentagePayout,
-        flatCommission: +user.flatCommission,
-      });
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   try {
+  //     await queryRunner.connect();
+  //     await queryRunner.startTransaction();
+  //     // Check and update wallet balance
+  //     await this.validateAndUpdateWallet(
+  //       queryRunner,
+  //       user,
+  //       singlePayoutDto.amount,
+  //     );
+  //     this.logger.info(
+  //       `Payout amount: ${singlePayoutDto.amount}`,
+  //       user.flatCommission,
+  //     );
+  //     const settlementAmount = calculatePayoutOriginalAmountFromNetPayable({
+  //       netPayableAmount: +singlePayoutDto.amount,
+  //       commissionInPercentage: +user.commissionInPercentagePayout,
+  //       gstInPercentage: +user.gstInPercentagePayout,
+  //       flatCommission: +user.flatCommission,
+  //     });
 
-      const payoutOrder = this.payOutOrdersRepository.create({
-        amount: +singlePayoutDto.amount,
-        amountBeforeDeduction: settlementAmount,
-        transferMode: singlePayoutDto.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
-        orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
-        user,
-        commissionInPercentage: +user.commissionInPercentagePayout,
-        gstInPercentage: +user.gstInPercentagePayout,
-        name: singlePayoutDto.beneficiaryName,
-        bankAccountNumber: singlePayoutDto.accountNumber,
-        bankIfsc: singlePayoutDto.ifscCode,
-        bankName: singlePayoutDto.bankName,
-        remarks: singlePayoutDto.remarks,
-        purpose: singlePayoutDto.purpose,
-        payoutId: singlePayoutDto.payoutId,
-      });
+  //     const payoutOrder = this.payOutOrdersRepository.create({
+  //       amount: +singlePayoutDto.amount,
+  //       amountBeforeDeduction: settlementAmount,
+  //       transferMode: singlePayoutDto.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
+  //       orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
+  //       user,
+  //       commissionInPercentage: +user.commissionInPercentagePayout,
+  //       gstInPercentage: +user.gstInPercentagePayout,
+  //       name: singlePayoutDto.beneficiaryName,
+  //       bankAccountNumber: singlePayoutDto.accountNumber,
+  //       bankIfsc: singlePayoutDto.ifscCode,
+  //       bankName: singlePayoutDto.bankName,
+  //       remarks: singlePayoutDto.remarks,
+  //       purpose: singlePayoutDto.purpose,
+  //       payoutId: singlePayoutDto.payoutId,
+  //     });
 
-      this.logger.info(
-        `PAYOUT - createTransaction - Created payout order successfully: ${payoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
-        payoutOrder,
-      );
+  //     this.logger.info(
+  //       `PAYOUT - createTransaction - Created payout order successfully: ${payoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
+  //       payoutOrder,
+  //     );
 
-      // Call API
+  //     // Call API
 
-      // Get authentication token from ThirdPartyAuthService
-      const token = await this.thirdPartyAuthService.getEritechToken();
+  //     // Get authentication token from ThirdPartyAuthService
+  //     const token = await this.thirdPartyAuthService.getEritechToken();
 
-      const axiosErtech = new AxiosService(
-        ERTITECH.BASE_URL,
-        getEritechPgConfig({
-          token,
-          merchantId: externalPaymentConfig.ertech.merchantId,
-        }),
-      );
+  //     const axiosErtech = new AxiosService(
+  //       ERTITECH.BASE_URL,
+  //       getEritechPgConfig({
+  //         token,
+  //         merchantId: externalPaymentConfig.ertech.merchantId,
+  //       }),
+  //     );
 
-      const customerUniqueRef = payoutOrder.orderId.split("_").join("");
+  //     const customerUniqueRef = payoutOrder.orderId.split("_").join("");
 
-      const eriTechPayload = {
-        paymentDetails: {
-          txnPaymode: payoutOrder.transferMode,
-          txnAmount: payoutOrder.amount,
-          beneIfscCode: payoutOrder.bankIfsc,
-          beneAccNum: payoutOrder.bankAccountNumber,
-          beneName: payoutOrder.name,
-          custUniqRef: customerUniqueRef,
-          beneMobileNo: user.mobile,
-          preferredBank: "ind",
-        },
-      };
+  //     const eriTechPayload = {
+  //       paymentDetails: {
+  //         txnPaymode: payoutOrder.transferMode,
+  //         txnAmount: payoutOrder.amount,
+  //         beneIfscCode: payoutOrder.bankIfsc,
+  //         beneAccNum: payoutOrder.bankAccountNumber,
+  //         beneName: payoutOrder.name,
+  //         custUniqRef: customerUniqueRef,
+  //         beneMobileNo: user.mobile,
+  //         preferredBank: "ind",
+  //       },
+  //     };
 
-      // this.logger.info(
-      //   "eriTechPayload",
-      // this.logger.info(
-      //   "eriTechPayload",
-      //   `${LoggerPlaceHolder.Json}`,
-      //   eriTechPayload,
-      // );
+  //     // this.logger.info(
+  //     //   "eriTechPayload",
+  //     // this.logger.info(
+  //     //   "eriTechPayload",
+  //     //   `${LoggerPlaceHolder.Json}`,
+  //     //   eriTechPayload,
+  //     // );
 
-      const getEncryptedPayload =
-        await this.thirdPartyAuthService.getEncryptedPayload(
-          eriTechPayload,
-          token,
-        );
+  //     const getEncryptedPayload =
+  //       await this.thirdPartyAuthService.getEncryptedPayload(
+  //         eriTechPayload,
+  //         token,
+  //       );
 
-      this.logger.info(`${LoggerPlaceHolder.Json}`, getEncryptedPayload);
+  //     this.logger.info(`${LoggerPlaceHolder.Json}`, getEncryptedPayload);
 
-      const responseEritech =
-        await axiosErtech.postRequest<IExternalEritecPayoutFundResponse>(
-          ERTITECH.PAYOUT.FUND,
-          getEncryptedPayload,
-        );
+  //     const responseEritech =
+  //       await axiosErtech.postRequest<IExternalEritecPayoutFundResponse>(
+  //         ERTITECH.PAYOUT.FUND,
+  //         getEncryptedPayload,
+  //       );
 
-      if (!responseEritech.success) {
-        throw new Error(responseEritech.message);
-      }
+  //     if (!responseEritech.success) {
+  //       throw new Error(responseEritech.message);
+  //     }
 
-      this.logger.info(
-        `Fund transfer Eritech Response: ${LoggerPlaceHolder.Json}`,
-        responseEritech,
-      );
+  //     this.logger.info(
+  //       `Fund transfer Eritech Response: ${LoggerPlaceHolder.Json}`,
+  //       responseEritech,
+  //     );
 
-      const eriTechDecryptedResponse =
-        await this.thirdPartyAuthService.getDecryptedPayload(
-          responseEritech.data.encryptedResponseData,
-          token,
-        );
+  //     const eriTechDecryptedResponse =
+  //       await this.thirdPartyAuthService.getDecryptedPayload(
+  //         responseEritech.data.encryptedResponseData,
+  //         token,
+  //       );
 
-      this.logger.info(
-        `Ertitech Response: ${LoggerPlaceHolder.Json}`,
-        eriTechDecryptedResponse,
-      );
+  //     this.logger.info(
+  //       `Ertitech Response: ${LoggerPlaceHolder.Json}`,
+  //       eriTechDecryptedResponse,
+  //     );
 
-      if (!responseEritech.success) {
-        throw new Error(responseEritech.errors);
-      }
-      this.logger.info(
-        `Payout processed for order: ${payoutOrder.orderId}`,
-        responseEritech.message,
-      );
+  //     if (!responseEritech.success) {
+  //       throw new Error(responseEritech.errors);
+  //     }
+  //     this.logger.info(
+  //       `Payout processed for order: ${payoutOrder.orderId}`,
+  //       responseEritech.message,
+  //     );
 
-      const status = convertExternalPaymentStatusToInternal(
-        eriTechDecryptedResponse.txn_status.transactionStatus.toUpperCase(),
-      );
+  //     const status = convertExternalPaymentStatusToInternal(
+  //       eriTechDecryptedResponse.txn_status.transactionStatus.toUpperCase(),
+  //     );
 
-      const savedPayoutOrder = await this.payOutOrdersRepository.save(
-        this.payOutOrdersRepository.create({
-          ...payoutOrder,
-          transferId: eriTechDecryptedResponse.custUniqRef,
-          ...(status === PAYMENT_STATUS.SUCCESS && {
-            status,
-            successAt: new Date(),
-          }),
-          ...(status === PAYMENT_STATUS.FAILED && {
-            status,
-            failureAt: new Date(),
-          }),
-          ...(![PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.FAILED].includes(
-            status,
-          ) && { status }),
+  //     const savedPayoutOrder = await this.payOutOrdersRepository.save(
+  //       this.payOutOrdersRepository.create({
+  //         ...payoutOrder,
+  //         transferId: eriTechDecryptedResponse.custUniqRef,
+  //         ...(status === PAYMENT_STATUS.SUCCESS && {
+  //           status,
+  //           successAt: new Date(),
+  //         }),
+  //         ...(status === PAYMENT_STATUS.FAILED && {
+  //           status,
+  //           failureAt: new Date(),
+  //         }),
+  //         ...(![PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.FAILED].includes(
+  //           status,
+  //         ) && { status }),
 
-          utr: eriTechDecryptedResponse.utrNo,
-        }),
-      );
-      // 3. create transaction
-      const transaction = this.transactionsRepository.create({
-        user,
-        payOutOrder: savedPayoutOrder,
-        transactionType: PAYMENT_TYPE.PAYOUT,
-      });
+  //         utr: eriTechDecryptedResponse.utrNo,
+  //       }),
+  //     );
+  //     // 3. create transaction
+  //     const transaction = this.transactionsRepository.create({
+  //       user,
+  //       payOutOrder: savedPayoutOrder,
+  //       transactionType: PAYMENT_TYPE.PAYOUT,
+  //     });
 
-      // 4. save transaction
-      await queryRunner.manager.save(transaction);
+  //     // 4. save transaction
+  //     await queryRunner.manager.save(transaction);
 
-      if (status === PAYMENT_STATUS.FAILED) {
-        throw new Error(responseEritech.message || "Payout failed");
-      }
+  //     if (status === PAYMENT_STATUS.FAILED) {
+  //       throw new Error(responseEritech.message || "Payout failed");
+  //     }
 
-      if (user?.payOutWebhookUrl) {
-        const payOutOrder = await this.payOutOrdersRepository.findOne({
-          where: { id: savedPayoutOrder.id },
-        });
+  //     if (user?.payOutWebhookUrl) {
+  //       const payOutOrder = await this.payOutOrdersRepository.findOne({
+  //         where: { id: savedPayoutOrder.id },
+  //       });
 
-        this.logger.info(
-          `Payout webhook payOutOrder: ${LoggerPlaceHolder.Json}`,
-          payOutOrder,
-        );
-        const payload = {
-          orderId: savedPayoutOrder.orderId,
-          status,
-          amount: savedPayoutOrder.amountBeforeDeduction,
-          txnRefId: eriTechDecryptedResponse.custUniqRef,
-          payoutId: savedPayoutOrder.payoutId,
-          utr: eriTechDecryptedResponse.utrNo,
-        };
+  //       this.logger.info(
+  //         `Payout webhook payOutOrder: ${LoggerPlaceHolder.Json}`,
+  //         payOutOrder,
+  //       );
+  //       const payload = {
+  //         orderId: savedPayoutOrder.orderId,
+  //         status,
+  //         amount: savedPayoutOrder.amountBeforeDeduction,
+  //         txnRefId: eriTechDecryptedResponse.custUniqRef,
+  //         payoutId: savedPayoutOrder.payoutId,
+  //         utr: eriTechDecryptedResponse.utrNo,
+  //       };
 
-        this.logger.info(
-          `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
-          payload,
-        );
-        axios
-          .post(user.payOutWebhookUrl, payload)
-          .then(({ data }) => {
-            this.logger.info(
-              `Payout webhook sent successfully - ${user.payOutWebhookUrl} - ${savedPayoutOrder.orderId} RES: ${JSON.stringify(data)}`,
-            );
-          })
-          .catch((error) => {
-            this.logger.error(
-              `Payout webhook failed for order: ${savedPayoutOrder.orderId} : ${LoggerPlaceHolder.Json}`,
-              error,
-            );
-          });
-      }
+  //       this.logger.info(
+  //         `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+  //         payload,
+  //       );
+  //       axios
+  //         .post(user.payOutWebhookUrl, payload)
+  //         .then(({ data }) => {
+  //           this.logger.info(
+  //             `Payout webhook sent successfully - ${user.payOutWebhookUrl} - ${savedPayoutOrder.orderId} RES: ${JSON.stringify(data)}`,
+  //           );
+  //         })
+  //         .catch((error) => {
+  //           this.logger.error(
+  //             `Payout webhook failed for order: ${savedPayoutOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+  //             error,
+  //           );
+  //         });
+  //     }
 
-      this.logger.info(
-        `Payout processed successfully: ${savedPayoutOrder.orderId} : ${LoggerPlaceHolder.Json}`,
-        eriTechDecryptedResponse,
-      );
+  //     this.logger.info(
+  //       `Payout processed successfully: ${savedPayoutOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+  //       eriTechDecryptedResponse,
+  //     );
 
-      await queryRunner.commitTransaction();
+  //     await queryRunner.commitTransaction();
 
-      return {
-        message: "Payout process initiated",
-        payoutOrder: {
-          orderId: savedPayoutOrder.orderId,
-          payoutId: singlePayoutDto.payoutId,
-          amount: singlePayoutDto.amount,
-          status,
-          accountNumber: savedPayoutOrder.bankAccountNumber,
-          bankName: savedPayoutOrder.bankName,
-          ifscCode: savedPayoutOrder.bankIfsc,
-        },
-      };
-    } catch (err) {
-      this.logger.error(
-        `PAYOUT - createTransaction - Error initiating payouts`,
-        err,
-      );
-      await queryRunner.rollbackTransaction();
-      throw new BadRequestException(err.message);
-    } finally {
-      await queryRunner.release();
-    }
-  }
+  //     return {
+  //       message: "Payout process initiated",
+  //       payoutOrder: {
+  //         orderId: savedPayoutOrder.orderId,
+  //         payoutId: singlePayoutDto.payoutId,
+  //         amount: singlePayoutDto.amount,
+  //         status,
+  //         accountNumber: savedPayoutOrder.bankAccountNumber,
+  //         bankName: savedPayoutOrder.bankName,
+  //         ifscCode: savedPayoutOrder.bankIfsc,
+  //       },
+  //     };
+  //   } catch (err) {
+  //     this.logger.error(
+  //       `PAYOUT - createTransaction - Error initiating payouts`,
+  //       err,
+  //     );
+  //     await queryRunner.rollbackTransaction();
+  //     throw new BadRequestException(err.message);
+  //   } finally {
+  //     await queryRunner.release();
+  //   }
+  // }
 
   async createPayoutIsmart(
     createPayoutDto: CreatePayoutDto,

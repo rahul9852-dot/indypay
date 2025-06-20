@@ -31,7 +31,6 @@ import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
   CreatePayoutDto,
   PayoutStatusDto,
-  SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
@@ -112,19 +111,19 @@ export class PaymentsController {
     return this.paymentsService.createPayoutFlakPayBulk(createPayoutDto, user);
   }
 
-  @Public()
-  @ApiOperation({ summary: "Create pay-out transaction" })
-  @UseGuards(ApiKeyGuard)
-  @Post("payout/single-create")
-  async createPayout(
-    @Body() singlePayoutDto: SinglePayoutDto,
-    @User() user: UsersEntity,
-  ) {
-    return this.paymentsService.createPayoutEritechSingle(
-      singlePayoutDto,
-      user,
-    );
-  }
+  // @Public()
+  // @ApiOperation({ summary: "Create pay-out transaction" })
+  // @UseGuards(ApiKeyGuard)
+  // @Post("payout/single-create")
+  // async createPayout(
+  //   @Body() singlePayoutDto: SinglePayoutDto,
+  //   @User() user: UsersEntity,
+  // ) {
+  //   return this.paymentsService.createPayoutEritechSingle(
+  //     singlePayoutDto,
+  //     user,
+  //   );
+  // }
 
   @ApiOperation({
     summary: "Create pay-out transaction for dashboard",
