@@ -1530,8 +1530,8 @@ export class PaymentsService {
       }),
     );
 
-    this.logger.debug(`Utkarsh encrypted data: ${encryptedData}`);
-    this.logger.debug(
+    this.logger.info(`Utkarsh encrypted data: ${encryptedData}`);
+    this.logger.info(
       `Utkarsh formatted date: ${utkarshCryptoService.decrypt(encryptedData)}`,
     );
 
@@ -1555,7 +1555,7 @@ export class PaymentsService {
         JSON.stringify(utkarshPayload),
       );
 
-    this.logger.debug(`Utkarsh response: ${JSON.stringify(utkarshResponse)}`);
+    this.logger.info(`Utkarsh response: ${JSON.stringify(utkarshResponse)}`);
 
     const { data: utkarshRaw } = utkarshResponse;
 
@@ -1568,13 +1568,13 @@ export class PaymentsService {
 
     // ✅ Only decrypt when everything is valid
     const decryptedJson = utkarshCryptoService.decrypt(utkarshRaw);
-    this.logger.debug(
+    this.logger.info(
       `Utkarsh  json decrypted data: ${JSON.stringify({ decryptedJson })}`,
     );
 
     const { status: utkarshStatus, transactionId } = JSON.parse(decryptedJson);
 
-    this.logger.debug(
+    this.logger.info(
       `Utkarsh transactionId: ${transactionId}, status: ${utkarshStatus}`,
     );
 
@@ -1582,7 +1582,7 @@ export class PaymentsService {
       utkarshStatus.toUpperCase(),
     );
 
-    this.logger.info(
+    this.logger.error(
       `UTKARSH PAYIN API RESPONSE -:`,
       JSON.parse(decryptedJson),
     );
@@ -1602,7 +1602,7 @@ export class PaymentsService {
         utr: payInOrder.utr,
       };
       this.logger.info(
-        `Payout webhook for ${payInOrder.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
+        `Payin webhook for ${payInOrder.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
         payload,
       );
       axios

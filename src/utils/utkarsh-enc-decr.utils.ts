@@ -14,20 +14,7 @@ export class UtkarshCryptoService {
   private authIV = utkarshAuthIV;
   private logger = new Logger(UtkarshCryptoService.name);
 
-  constructor() {
-    this.logger.debug(`Utkarsh auth key: ${this.authKey}`);
-    this.logger.debug(`Utkarsh auth IV: ${this.authIV}`);
-    this.logger.debug(`Utkarsh algorithm: ${this.algorithm}`);
-  }
-
   encrypt(text: string): string {
-    this.logger.debug(
-      `Utkarsh auth key length: ${Buffer.from(this.authKey, "base64").length}`,
-    );
-    this.logger.debug(
-      `Utkarsh auth IV length: ${Buffer.from(this.authIV, "base64").length}`,
-    );
-
     const key = Buffer.from(this.authKey, "base64");
     const iv = Buffer.from(this.authIV, "base64");
     const cipher = crypto.createCipheriv(this.algorithm, key, iv);
