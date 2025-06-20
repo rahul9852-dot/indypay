@@ -1343,6 +1343,7 @@ export class PaymentsService {
           netPayableAmount: +payment.amount,
           commissionInPercentage: +user.commissionInPercentagePayout,
           gstInPercentage: +user.gstInPercentagePayout,
+          flatCommission: +user.flatCommission,
         });
 
         this.logger.info(
