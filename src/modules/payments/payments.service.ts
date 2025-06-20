@@ -1346,14 +1346,6 @@ export class PaymentsService {
           flatCommission: +user.flatCommission,
         });
 
-        this.logger.info(
-          `PAYOUT - createPayoutOrders - Dynamic commission result: ${LoggerPlaceHolder.Json}`,
-          {
-            originalAmount: payment.amount,
-            netPayableAmount: commissionResult,
-          },
-        );
-
         const payoutOrder = this.payOutOrdersRepository.create({
           amount: +payment.amount,
           amountBeforeDeduction: +commissionResult,

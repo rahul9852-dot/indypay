@@ -1,5 +1,26 @@
 import { Logger } from "@nestjs/common";
 
+export const getCommissions = ({
+  amount,
+  commissionInPercentage,
+  gstInPercentage,
+}: {
+  commissionInPercentage: number;
+  gstInPercentage: number;
+  amount: number;
+}) => {
+  const commissionAmount = (amount * commissionInPercentage) / 100;
+  const gstAmount = (commissionAmount * gstInPercentage) / 100;
+  const totalServiceChange = commissionAmount + gstAmount;
+  const netPayableAmount = amount - totalServiceChange;
+
+  return {
+    commissionAmount,
+    gstAmount,
+    netPayableAmount,
+    totalServiceChange,
+  };
+};
 export const getPayoutCommissions = ({
   amount,
   commissionInPercentage,
@@ -65,42 +86,32 @@ export const calculatePayoutOriginalAmountFromNetPayable = ({
     return originalAmount;
   }
 
-  const commissionRate = commissionInPercentage / 100;
-  const gstRate = (commissionRate * gstInPercentage) / 100;
+  logger.log(
+    `Calculating commissions for amount: ${netPayableAmount}, commissionInPercentage: ${commissionInPercentage}, gstInPercentage: ${gstInPercentage}`,
+  );
 
-  const totalDeductionRate = commissionRate + gstRate;
+  const commissionResult = getCommissions({
+    amount: netPayableAmount,
+    commissionInPercentage,
+    gstInPercentage,
+  });
 
-  if (totalDeductionRate >= 1) {
-    throw new Error(
-      "Invalid rates: Total deduction cannot be equal or greater than 1.",
-    );
-  }
+  return commissionResult;
 
-  const originalAmount = netPayableAmount / (1 - totalDeductionRate);
+  // const commissionRate = commissionInPercentage / 100;
+  // const gstRate = (commissionRate * gstInPercentage) / 100;
 
-  return originalAmount;
-};
+  // const totalDeductionRate = commissionRate + gstRate;
 
-export const getCommissions = ({
-  amount,
-  commissionInPercentage,
-  gstInPercentage,
-}: {
-  commissionInPercentage: number;
-  gstInPercentage: number;
-  amount: number;
-}) => {
-  const commissionAmount = (amount * commissionInPercentage) / 100;
-  const gstAmount = (commissionAmount * gstInPercentage) / 100;
-  const totalServiceChange = commissionAmount + gstAmount;
-  const netPayableAmount = amount - totalServiceChange;
+  // if (totalDeductionRate >= 1) {
+  //   throw new Error(
+  //     "Invalid rates: Total deduction cannot be equal or greater than 1.",
+  //   );
+  // }
 
-  return {
-    commissionAmount,
-    gstAmount,
-    netPayableAmount,
-    totalServiceChange,
-  };
+  // const originalAmount = netPayableAmount / (1 - totalDeductionRate);
+
+  // return originalAmount;
 };
 
 export const calculateOriginalAmountFromNetPayable = ({
