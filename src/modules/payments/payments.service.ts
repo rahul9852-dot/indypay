@@ -21,6 +21,7 @@ import {
 } from "typeorm";
 import { Queue } from "bull";
 import { InjectQueue } from "@nestjs/bull";
+import dayjs from "dayjs";
 import {
   CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionIsmartDto,
@@ -1471,34 +1472,44 @@ export class PaymentsService {
     user: UsersEntity,
   ) {
     this.logger.debug(`Utkarsh checkPayInStatusTransaction: ${orderId}`);
-    // const payinOrder = await this.payInOrdersRepository.findOne({
-    //   where: { orderId },
-    // });
 
-    // if (!payinOrder) {
-    //   throw new NotFoundException(
-    //     new MessageResponseDto("Payin order not found"),
-    //   );
-    // }
+    const payinOrder = await this.payInOrdersRepository.findOne({
+      where: { orderId },
+    });
 
-    // if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
-    //   return {
-    //     orderId: payinOrder.orderId,
-    //     status: payinOrder.status,
-    //     txnRefId: payinOrder.txnRefId,
-    //   };
-    // }
+    if (!payinOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payin order not found"),
+      );
+    }
+
+    if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
+      return {
+        orderId: payinOrder.orderId,
+        status: payinOrder.status,
+        txnRefId: payinOrder.txnRefId,
+      };
+    }
+
+    const formattedDate = dayjs(payinOrder.createdAt).format("YYYY-MM-DD");
+    this.logger.info(
+      `Payin order & formatted date: ${LoggerPlaceHolder.Json}`,
+      { payinOrder, "================": formattedDate },
+    );
 
     const utkarshCryptoService = new UtkarshCryptoService();
 
     const encryptedData = utkarshCryptoService.encrypt(
       JSON.stringify({
         merchantOrderNumber: orderId,
-        transactionDate: "2025-06-19",
+        transactionDate: "2025-06-20",
       }),
     );
 
     this.logger.debug(`Utkarsh encrypted data: ${encryptedData}`);
+    this.logger.debug(
+      `Utkarsh formatted date: ${utkarshCryptoService.decrypt(encryptedData)}`,
+    );
 
     const axiosServiceUtkarsh = new AxiosService(
       UTKARSH.BASE_URL,
@@ -1533,56 +1544,64 @@ export class PaymentsService {
 
     // ✅ Only decrypt when everything is valid
     const decryptedJson = utkarshCryptoService.decrypt(utkarshRaw);
-    this.logger.debug(`Utkarsh  json decrypted data: ${decryptedJson}`);
+    this.logger.debug(
+      `Utkarsh  json decrypted data: ${JSON.stringify({ decryptedJson })}`,
+    );
 
-    // const status = convertExternalPaymentStatusToInternal(
-    //   utkarshResponse.data.status.toUpperCase(),
-    // );
+    const { status: utkarshStatus, transactionId } = JSON.parse(decryptedJson);
+
+    this.logger.debug(
+      `Utkarsh transactionId: ${transactionId}, status: ${utkarshStatus}`,
+    );
+
+    const status = convertExternalPaymentStatusToInternal(
+      utkarshStatus.toUpperCase(),
+    );
 
     this.logger.info(
-      `FLAKPAY PAYIN API RESPONSE -:`,
-      JSON.stringify(utkarshResponse.data),
+      `UTKARSH PAYIN API RESPONSE -:`,
+      JSON.parse(decryptedJson),
     );
-    // const payInOrder = await this.payInOrdersRepository.save(
-    //   this.payInOrdersRepository.create({
-    //     ...payinOrder,
-    //     status,
-    //     txnRefId: utkarshResponse.data.transferId,
-    //   }),
-    // );
-    // if (user?.payInWebhookUrl) {
-    //   const payload = {
-    //     orderId: payInOrder.orderId,
-    //     status,
-    //     amount: +payInOrder.amount,
-    //     txnRefId: payInOrder.txnRefId,
-    //     utr: payInOrder.utr,
-    //   };
-    //   this.logger.info(
-    //     `Payout webhook for ${payInOrder.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
-    //     payload,
-    //   );
-    //   axios
-    //     .post(user.payInWebhookUrl, payload)
-    //     .then((res) => {
-    //       this.logger.info(
-    //         `Payout webhook sent successfully: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
-    //         res,
-    //       );
-    //     })
-    //     .catch((error) => {
-    //       this.logger.error(
-    //         `Payout webhook failed for order: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
-    //         error,
-    //       );
-    //     });
-    // }
+    const payInOrder = await this.payInOrdersRepository.save(
+      this.payInOrdersRepository.create({
+        ...payinOrder,
+        status,
+        txnRefId: transactionId,
+      }),
+    );
+    if (user?.payInWebhookUrl) {
+      const payload = {
+        orderId: payInOrder.orderId,
+        status,
+        amount: +payInOrder.amount,
+        txnRefId: transactionId,
+        utr: payInOrder.utr,
+      };
+      this.logger.info(
+        `Payout webhook for ${payInOrder.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
+      axios
+        .post(user.payInWebhookUrl, payload)
+        .then((res) => {
+          this.logger.info(
+            `Payout webhook sent successfully: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+            res,
+          );
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Payout webhook failed for order: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+            error,
+          );
+        });
+    }
 
-    // return {
-    //   orderId: payinOrder.orderId,
-    //   status,
-    //   txnRefId: utkarshResponse.data.transferId,
-    // };
+    return {
+      orderId: payinOrder.orderId,
+      status,
+      txnRefId: transactionId,
+    };
   }
 
   // flakpay status check
