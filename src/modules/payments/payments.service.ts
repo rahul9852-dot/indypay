@@ -1582,7 +1582,9 @@ export class PaymentsService {
       utkarshStatus.toUpperCase(),
     );
 
-    this.logger.info(`Utkarsh status: ${status}, ${user.payInWebhookUrl}`);
+    this.logger.info(
+      `Utkarsh status: ${status}, ${user.payInWebhookUrl}, json.LoggerPlaceHolder${JSON.stringify(user)}`,
+    );
 
     // this.logger.error(
     //   `UTKARSH PAYIN API RESPONSE -:`,
