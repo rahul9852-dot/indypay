@@ -1,6 +1,5 @@
 import * as ExcelJS from "exceljs";
 import { Response } from "express";
-import { Writable } from "stream";
 
 interface StreamingExcelOptions<T> {
   res: Response;
@@ -26,16 +25,9 @@ export async function writeRecordsToWorkbookInChunksStreaming<T>({
   batchSize = 50_000,
 }: StreamingExcelOptions<T>): Promise<void> {
   const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
-    stream: new Writable({
-      write(chunk, encoding, callback) {
-        res.write(chunk);
-        callback();
-      },
-      final(callback) {
-        res.end();
-        callback();
-      },
-    }),
+    stream: res,
+    useStyles: false,
+    useSharedStrings: false,
   });
   let sheetIndex = 1;
   let sheet = workbook.addWorksheet(`${sheetName} ${sheetIndex}`);
@@ -70,6 +62,6 @@ export async function writeRecordsToWorkbookInChunksStreaming<T>({
     if (batch.length < batchSize) break;
   }
 
-  sheet.commit();
-  workbook.commit();
+  await sheet.commit();
+  await workbook.commit();
 }
