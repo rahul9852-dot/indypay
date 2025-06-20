@@ -1507,32 +1507,23 @@ export class PaymentsService {
       );
     }
 
-    // if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
-    //   return {
-    //     orderId: payinOrder.orderId,
-    //     status: payinOrder.status,
-    //     txnRefId: payinOrder.txnRefId,
-    //   };
-    // }
+    if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
+      return {
+        orderId: payinOrder.orderId,
+        status: payinOrder.status,
+        txnRefId: payinOrder.txnRefId,
+      };
+    }
 
     const formattedDate = dayjs(payinOrder.createdAt).format("YYYY-MM-DD");
-    this.logger.info(
-      `Payin order & formatted date: ${LoggerPlaceHolder.Json}`,
-      { payinOrder, "================": formattedDate },
-    );
 
     const utkarshCryptoService = new UtkarshCryptoService();
 
     const encryptedData = utkarshCryptoService.encrypt(
       JSON.stringify({
         merchantOrderNumber: orderId,
-        transactionDate: "2025-06-20",
+        transactionDate: formattedDate,
       }),
-    );
-
-    this.logger.info(`Utkarsh encrypted data: ${encryptedData}`);
-    this.logger.info(
-      `Utkarsh formatted date: ${utkarshCryptoService.decrypt(encryptedData)}`,
     );
 
     const axiosServiceUtkarsh = new AxiosService(
@@ -1554,8 +1545,6 @@ export class PaymentsService {
         UTKARSH.PAYIN.STATUS_CHECK,
         JSON.stringify(utkarshPayload),
       );
-
-    this.logger.info(`Utkarsh response: ${JSON.stringify(utkarshResponse)}`);
 
     const { data: utkarshRaw } = utkarshResponse;
 
@@ -1582,14 +1571,6 @@ export class PaymentsService {
       utkarshStatus.toUpperCase(),
     );
 
-    this.logger.info(
-      `Utkarsh status: ${status}, ${user.payInWebhookUrl}, json.LoggerPlaceHolder${JSON.stringify(user)}`,
-    );
-
-    // this.logger.error(
-    //   `UTKARSH PAYIN API RESPONSE -:`,
-    //   JSON.parse(decryptedJson),
-    // );
     const payInOrder = await this.payInOrdersRepository.save(
       this.payInOrdersRepository.create({
         ...payinOrder,
@@ -1613,13 +1594,13 @@ export class PaymentsService {
         .post(user.payInWebhookUrl, payload)
         .then((res) => {
           this.logger.info(
-            `Payout webhook sent successfully: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+            `Payin webhook sent successfully: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
             res,
           );
         })
         .catch((error) => {
           this.logger.error(
-            `Payout webhook failed for order: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+            `Payin webhook failed for order: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
             error,
           );
         });
