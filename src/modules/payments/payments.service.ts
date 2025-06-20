@@ -1582,10 +1582,10 @@ export class PaymentsService {
       utkarshStatus.toUpperCase(),
     );
 
-    this.logger.error(
-      `UTKARSH PAYIN API RESPONSE -:`,
-      JSON.parse(decryptedJson),
-    );
+    // this.logger.error(
+    //   `UTKARSH PAYIN API RESPONSE -:`,
+    //   JSON.parse(decryptedJson),
+    // );
     const payInOrder = await this.payInOrdersRepository.save(
       this.payInOrdersRepository.create({
         ...payinOrder,
