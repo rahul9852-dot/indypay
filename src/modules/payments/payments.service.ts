@@ -1507,7 +1507,7 @@ export class PaymentsService {
       );
     }
 
-    if (payinOrder.status !== PAYMENT_STATUS.PENDING) {
+    if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
       return {
         orderId: payinOrder.orderId,
         status: payinOrder.status,
@@ -1594,13 +1594,13 @@ export class PaymentsService {
         .post(user.payInWebhookUrl, payload)
         .then((res) => {
           this.logger.info(
-            `Payin webhook sent successfully: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+            `Payin webhook sent successfully: ${payInOrder.orderId} - Status: ${res.status}`,
             res,
           );
         })
         .catch((error) => {
           this.logger.error(
-            `Payin webhook failed for order: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+            `Payin webhook failed for order: ${payInOrder.orderId} - Status: ${error.status}`,
             error,
           );
         });
