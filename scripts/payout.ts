@@ -29,7 +29,7 @@ async function updatePayouts(dataSource: DataSource) {
 
       // Update the payout with the calculated actual value
       await queryRunner.manager.update(PayOutOrdersEntity, payout.id, {
-        amountBeforeDeduction: actualValue,
+        amountBeforeDeduction: +actualValue,
       });
 
       console.log(
