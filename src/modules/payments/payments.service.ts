@@ -1507,13 +1507,13 @@ export class PaymentsService {
       );
     }
 
-    if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
-      return {
-        orderId: payinOrder.orderId,
-        status: payinOrder.status,
-        txnRefId: payinOrder.txnRefId,
-      };
-    }
+    // if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
+    //   return {
+    //     orderId: payinOrder.orderId,
+    //     status: payinOrder.status,
+    //     txnRefId: payinOrder.txnRefId,
+    //   };
+    // }
 
     const formattedDate = dayjs(payinOrder.createdAt).format("YYYY-MM-DD");
     this.logger.info(
