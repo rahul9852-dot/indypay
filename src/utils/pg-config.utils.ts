@@ -27,3 +27,13 @@ export const getEritechPgConfig = ({ token, merchantId }) => {
     },
   };
 };
+
+export const getUtkarshPgConfig = ({ mid, terminalId }) => {
+  return {
+    headers: {
+      "Content-Type": "application/json",
+      mid,
+      terminalId,
+    },
+  };
+};

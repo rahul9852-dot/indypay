@@ -125,5 +125,9 @@ export const appConfig = registerAs("appConfig", () => ({
   utkarsh: {
     vpa: getOsEnv("UPI_ID"),
     webhookIps: getOsEnv("UTKARSH").split(","),
+    utkarshMid: getOsEnv("UTKARSH_MID"),
+    utkarshTerminalId: getOsEnv("UTKARSH_TERMINAL_ID"),
+    utkarshAuthIV: getOsEnv("UTKARSH_AUTH_IV"),
+    utkarshAuthKey: getOsEnv("UTKARSH_AUTH_KEY"),
   },
 }));

@@ -21,6 +21,7 @@ import {
 } from "typeorm";
 import { Queue } from "bull";
 import { InjectQueue } from "@nestjs/bull";
+import dayjs from "dayjs";
 import {
   CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionIsmartDto,
@@ -68,6 +69,7 @@ import {
   FALKPAY,
   ISMART_PAY,
   SABPAISA,
+  UTKARSH,
 } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
 import {
@@ -82,9 +84,9 @@ import {
   IExternalPayinPaymentResponseFlakPay,
   IExternalPayinPaymentResponseIsmart,
   IExternalPayoutResponseFlakPay,
-  IExternalPayinStatusResponseFlakPay,
   IExternalPayoutStatusResponseFlakPay,
   IExternalEritecPayoutFundResponse,
+  IExternalPayinStatusResponseUtkarsh,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
@@ -94,6 +96,7 @@ import {
   getEritechPgConfig,
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
+  getUtkarshPgConfig,
 } from "@/utils/pg-config.utils";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { decryptData } from "@/utils/encode-decode.utils";
@@ -103,11 +106,12 @@ import { mapToFilteredDto } from "@/utils/interface-mapping.utils";
 import customerUniqueGenerate from "@/utils/customer-unique.utils";
 import { CheckoutEntity } from "@/entities/checkout.entity";
 import { generatePaymentLinkUtil } from "@/utils/payment-link.util";
+import { UtkarshCryptoService } from "@/utils/utkarsh-enc-decr.utils";
 
 const {
   beBaseUrl,
   externalPaymentConfig,
-  utkarsh: { vpa },
+  utkarsh: { vpa, utkarshMid, utkarshTerminalId },
 } = appConfig();
 
 @Injectable()
@@ -1391,10 +1395,108 @@ export class PaymentsService {
     );
   }
 
+  // async checkPayInStatusTransaction(
+  //   { orderId }: PayinStatusDto,
+  //   user: UsersEntity,
+  // ) {
+  //   const payinOrder = await this.payInOrdersRepository.findOne({
+  //     where: { orderId },
+  //   });
+
+  //   if (!payinOrder) {
+  //     throw new NotFoundException(
+  //       new MessageResponseDto("Payin order not found"),
+  //     );
+  //   }
+
+  //   if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
+  //     return {
+  //       orderId: payinOrder.orderId,
+  //       status: payinOrder.status,
+  //       txnRefId: payinOrder.txnRefId,
+  //     };
+  //   }
+
+  //   const { clientId, clientSecret } = await this.getFlakPayCredentials(
+  //     user.id,
+  //   );
+
+  //   const axiosServiceFlakPay = new AxiosService(
+  //     FALKPAY.BASE_URL,
+  //     getFlakPayPgConfig({
+  //       clientId,
+  //       clientSecret,
+  //     }),
+  //   );
+
+  //   // this.logger.info(`Calling FLAKPAY PAYIN STATUS API - orderId: ${orderId}`, {
+  //   //   orderId,
+  //   // });
+
+  //   const flakPayResponse =
+  //     await axiosServiceFlakPay.postRequest<IExternalPayinStatusResponseFlakPay>(
+  //       FALKPAY.PAYIN.STATUS_CHECK,
+  //       {
+  //         orderId,
+  //       },
+  //     );
+
+  //   const status = convertExternalPaymentStatusToInternal(
+  //     flakPayResponse.data.status.toUpperCase(),
+  //   );
+
+  //   this.logger.info(
+  //     `FLAKPAY PAYIN API RESPONSE -:`,
+  //     JSON.stringify(flakPayResponse.data),
+  //   );
+  //   const payInOrder = await this.payInOrdersRepository.save(
+  //     this.payInOrdersRepository.create({
+  //       ...payinOrder,
+  //       status,
+  //       txnRefId: flakPayResponse.data.transferId,
+  //     }),
+  //   );
+  //   if (user?.payInWebhookUrl) {
+  //     const payload = {
+  //       orderId: payInOrder.orderId,
+  //       status,
+  //       amount: +payInOrder.amount,
+  //       txnRefId: payInOrder.txnRefId,
+  //       utr: payInOrder.utr,
+  //     };
+  //     this.logger.info(
+  //       `Payout webhook for ${payInOrder.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
+  //       payload,
+  //     );
+  //     axios
+  //       .post(user.payInWebhookUrl, payload)
+  //       .then((res) => {
+  //         this.logger.info(
+  //           `Payout webhook sent successfully: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+  //           res,
+  //         );
+  //       })
+  //       .catch((error) => {
+  //         this.logger.error(
+  //           `Payout webhook failed for order: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
+  //           error,
+  //         );
+  //       });
+  //   }
+
+  //   return {
+  //     orderId: payinOrder.orderId,
+  //     status,
+  //     txnRefId: flakPayResponse.data.transferId,
+  //   };
+  // }
+
   async checkPayInStatusTransaction(
     { orderId }: PayinStatusDto,
     user: UsersEntity,
   ) {
+    this.logger.debug(`Utkarsh checkPayInStatusTransaction: ${orderId}`);
+
     const payinOrder = await this.payInOrdersRepository.findOne({
       where: { orderId },
     });
@@ -1413,43 +1515,82 @@ export class PaymentsService {
       };
     }
 
-    const { clientId, clientSecret } = await this.getFlakPayCredentials(
-      user.id,
+    const formattedDate = dayjs(payinOrder.createdAt).format("YYYY-MM-DD");
+    this.logger.info(
+      `Payin order & formatted date: ${LoggerPlaceHolder.Json}`,
+      { payinOrder, "================": formattedDate },
     );
 
-    const axiosServiceFlakPay = new AxiosService(
-      FALKPAY.BASE_URL,
-      getFlakPayPgConfig({
-        clientId,
-        clientSecret,
+    const utkarshCryptoService = new UtkarshCryptoService();
+
+    const encryptedData = utkarshCryptoService.encrypt(
+      JSON.stringify({
+        merchantOrderNumber: orderId,
+        transactionDate: "2025-06-20",
       }),
     );
 
-    // this.logger.info(`Calling FLAKPAY PAYIN STATUS API - orderId: ${orderId}`, {
-    //   orderId,
-    // });
+    this.logger.debug(`Utkarsh encrypted data: ${encryptedData}`);
+    this.logger.debug(
+      `Utkarsh formatted date: ${utkarshCryptoService.decrypt(encryptedData)}`,
+    );
 
-    const flakPayResponse =
-      await axiosServiceFlakPay.postRequest<IExternalPayinStatusResponseFlakPay>(
-        FALKPAY.PAYIN.STATUS_CHECK,
-        {
-          orderId,
-        },
+    const axiosServiceUtkarsh = new AxiosService(
+      UTKARSH.BASE_URL,
+      getUtkarshPgConfig({
+        mid: utkarshMid,
+        terminalId: utkarshTerminalId,
+      }),
+    );
+
+    const utkarshPayload = {
+      mid: utkarshMid,
+      req: encryptedData,
+      terminalId: utkarshTerminalId,
+    };
+
+    const utkarshResponse =
+      await axiosServiceUtkarsh.postRequest<IExternalPayinStatusResponseUtkarsh>(
+        UTKARSH.PAYIN.STATUS_CHECK,
+        JSON.stringify(utkarshPayload),
       );
 
+    this.logger.debug(`Utkarsh response: ${JSON.stringify(utkarshResponse)}`);
+
+    const { data: utkarshRaw } = utkarshResponse;
+
+    if (!utkarshRaw || typeof utkarshRaw !== "string") {
+      this.logger.error(`UTKARSH API failed: ${JSON.stringify(utkarshRaw)}`);
+      throw new Error(
+        "Invalid or missing encrypted hex string in UTKARSH response",
+      );
+    }
+
+    // ✅ Only decrypt when everything is valid
+    const decryptedJson = utkarshCryptoService.decrypt(utkarshRaw);
+    this.logger.debug(
+      `Utkarsh  json decrypted data: ${JSON.stringify({ decryptedJson })}`,
+    );
+
+    const { status: utkarshStatus, transactionId } = JSON.parse(decryptedJson);
+
+    this.logger.debug(
+      `Utkarsh transactionId: ${transactionId}, status: ${utkarshStatus}`,
+    );
+
     const status = convertExternalPaymentStatusToInternal(
-      flakPayResponse.data.status.toUpperCase(),
+      utkarshStatus.toUpperCase(),
     );
 
     this.logger.info(
-      `FLAKPAY PAYIN API RESPONSE -:`,
-      JSON.stringify(flakPayResponse.data),
+      `UTKARSH PAYIN API RESPONSE -:`,
+      JSON.parse(decryptedJson),
     );
     const payInOrder = await this.payInOrdersRepository.save(
       this.payInOrdersRepository.create({
         ...payinOrder,
         status,
-        txnRefId: flakPayResponse.data.transferId,
+        txnRefId: transactionId,
       }),
     );
     if (user?.payInWebhookUrl) {
@@ -1457,7 +1598,7 @@ export class PaymentsService {
         orderId: payInOrder.orderId,
         status,
         amount: +payInOrder.amount,
-        txnRefId: payInOrder.txnRefId,
+        txnRefId: transactionId,
         utr: payInOrder.utr,
       };
       this.logger.info(
@@ -1483,7 +1624,7 @@ export class PaymentsService {
     return {
       orderId: payinOrder.orderId,
       status,
-      txnRefId: flakPayResponse.data.transferId,
+      txnRefId: transactionId,
     };
   }
 

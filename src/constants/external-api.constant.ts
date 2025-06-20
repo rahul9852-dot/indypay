@@ -62,3 +62,10 @@ export const SABPAISA = {
   PAYOUT: "sabPaisaInit",
   PAYOUT_STATUS: "sabPaisaInit",
 };
+
+export const UTKARSH = {
+  BASE_URL: "https://portal.getepay.in:8443/getepayPortal",
+  PAYIN: {
+    STATUS_CHECK: "/payment/getStaticQrRequery",
+  },
+};

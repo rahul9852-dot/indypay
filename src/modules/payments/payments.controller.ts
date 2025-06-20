@@ -83,6 +83,23 @@ export class PaymentsController {
     );
   }
 
+  // @Public()
+  // @ApiOperation({
+  //   summary: "Check status of pay-in transaction",
+  // })
+  // @UseGuards(ApiKeyGuard)
+  // @HttpCode(HttpStatus.OK)
+  // @Post("payin/status")
+  // async checkStatusTransactionPayin(
+  //   @Body() payinStatusDto: PayinStatusDto,
+  //   @User() user: UsersEntity,
+  // ) {
+  //   return this.paymentsService.checkPayInStatusTransaction(
+  //     payinStatusDto,
+  //     user,
+  //   );
+  // }
+
   @Public()
   @ApiOperation({
     summary: "Check status of pay-in transaction",
@@ -90,7 +107,7 @@ export class PaymentsController {
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)
   @Post("payin/status")
-  async checkStatusTransactionPayin(
+  async checkStatusTransactionPayinUtkarsh(
     @Body() payinStatusDto: PayinStatusDto,
     @User() user: UsersEntity,
   ) {
