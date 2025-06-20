@@ -74,6 +74,7 @@ import {
   calculateOriginalAmountFromNetPayable,
   calculatePayoutOriginalAmountFromNetPayable,
   getCommissions,
+  calculateDynamicCommission,
 } from "@/utils/commissions.utils";
 import {
   IExternalPayinPaymentRequestFlakPay,
@@ -698,13 +699,17 @@ export class PaymentsService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      // Validate amounts and calculate total
       const totalAmount = payoutDataArr.reduce((acc, curr) => {
         if (curr.amount <= 0) {
           throw new BadRequestException("Amount should be greater than 0");
         }
+        const commissionResult = calculateDynamicCommission({
+          amount: +curr.amount,
+          userCommissionRate: user.commissionInPercentagePayout,
+          userGstRate: user.gstInPercentagePayout,
+        });
 
-        return acc + +curr.amount;
+        return acc + commissionResult.netPayableAmount;
       }, 0);
 
       // Check and update wallet balance
@@ -788,21 +793,26 @@ export class PaymentsService {
         user,
         singlePayoutDto.amount,
       );
+      this.logger.info(
+        `Payout amount: ${singlePayoutDto.amount}`,
+        user.flatCommission,
+      );
 
-      const settlementAmount = calculateOriginalAmountFromNetPayable({
-        netPayableAmount: +singlePayoutDto.amount,
-        commissionInPercentage: +user.commissionInPercentagePayout,
-        gstInPercentage: +user.gstInPercentagePayout,
+      // Calculate dynamic commission for this payout
+      const commissionResult = calculateDynamicCommission({
+        amount: +singlePayoutDto.amount,
+        userCommissionRate: +user.commissionInPercentagePayout,
+        userGstRate: +user.gstInPercentagePayout,
       });
 
       const payoutOrder = this.payOutOrdersRepository.create({
         amount: +singlePayoutDto.amount,
-        amountBeforeDeduction: settlementAmount,
+        amountBeforeDeduction: commissionResult.netPayableAmount,
         transferMode: singlePayoutDto.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
         orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
         user,
-        commissionInPercentage: +user.commissionInPercentagePayout,
-        gstInPercentage: +user.gstInPercentagePayout,
+        commissionInPercentage: commissionResult.commissionRate,
+        gstInPercentage: commissionResult.gstRate,
         name: singlePayoutDto.beneficiaryName,
         bankAccountNumber: singlePayoutDto.accountNumber,
         bankIfsc: singlePayoutDto.ifscCode,
@@ -1328,30 +1338,33 @@ export class PaymentsService {
   ) {
     return Promise.all(
       payouts.map(async (payment) => {
-        const settlementAmount = calculatePayoutOriginalAmountFromNetPayable({
-          netPayableAmount: +payment.amount,
-          commissionInPercentage: +user.commissionInPercentagePayout,
-          gstInPercentage: +user.gstInPercentagePayout,
-          flatCommission: +user.flatCommission,
+        // Calculate dynamic commission for this payout
+        const commissionResult = calculateDynamicCommission({
+          amount: +payment.amount,
+          userCommissionRate: +user.commissionInPercentagePayout,
+          userGstRate: +user.gstInPercentagePayout,
         });
 
         this.logger.info(
-          `PAYOUT - createPayoutOrders - Settlement amount: ${LoggerPlaceHolder.Json}`,
+          `PAYOUT - createPayoutOrders - Dynamic commission result: ${LoggerPlaceHolder.Json}`,
           {
-            settlementAmount,
-            amount: payment.amount,
+            originalAmount: payment.amount,
+            netPayableAmount: commissionResult.netPayableAmount,
+            commissionAmount: commissionResult.commissionAmount,
+            gstAmount: commissionResult.gstAmount,
+            appliedConfig: commissionResult.appliedConfig,
           },
         );
 
         const payoutOrder = this.payOutOrdersRepository.create({
           amount: +payment.amount,
-          amountBeforeDeduction: settlementAmount,
+          amountBeforeDeduction: commissionResult.netPayableAmount,
           transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
           orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
           batchId,
           user,
-          commissionInPercentage: +user.commissionInPercentagePayout,
-          gstInPercentage: +user.gstInPercentagePayout,
+          commissionInPercentage: commissionResult.commissionRate,
+          gstInPercentage: commissionResult.gstRate,
           name: payment.beneficiaryName,
           bankAccountNumber: payment.accountNumber,
           beneficiaryMobile: payment.beneficiaryMobile,
@@ -1363,11 +1376,6 @@ export class PaymentsService {
         });
 
         const savedPayoutOrder = await queryRunner.manager.save(payoutOrder);
-
-        // this.logger.info(
-        //   `PAYOUT - createTransaction - Created payout order successfully: ${savedPayoutOrder.orderId}, ${LoggerPlaceHolder.Json}`,
-        //   savedPayoutOrder,
-        // );
 
         // 3. create transaction
         const transaction = this.transactionsRepository.create({

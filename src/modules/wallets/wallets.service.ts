@@ -13,7 +13,7 @@ import { getPagination } from "@/utils/pagination.utils";
 import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 import {
   getCommissions,
-  getPayoutCommissions,
+  // getPayoutCommissions,
 } from "@/utils/commissions.utils";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
@@ -438,20 +438,20 @@ export class WalletsService {
       gstInPercentage: merchantUser.gstInPercentagePayin,
     });
 
-    const {
-      totalServiceChange: payoutCharge,
-      netPayableAmount: netPayableAmountPayout,
-    } = getPayoutCommissions({
-      amount: collectionsAfterDeduction,
-      commissionInPercentage: merchantUser.commissionInPercentagePayout,
-      gstInPercentage: merchantUser.gstInPercentagePayout,
-    });
+    // const {
+    //   totalServiceChange: payoutCharge,
+    //   netPayableAmount: netPayableAmountPayout,
+    // } = getPayoutCommissions({
+    //   amount: collectionsAfterDeduction,
+    //   commissionInPercentage: merchantUser.commissionInPercentagePayout,
+    //   gstInPercentage: merchantUser.gstInPercentagePayout,
+    // });
 
     this.logger.info(
       `TOPUP - Topup wallet - Net payable amount payout: ${LoggerPlaceHolder.Json}`,
       {
-        netPayableAmountPayout,
-        payoutCharge,
+        // netPayableAmountPayout,
+        // payoutCharge,
         collectionsAfterDeduction,
         payinCharge,
       },
@@ -463,8 +463,8 @@ export class WalletsService {
       collectionAmount,
       payInCharge: payinCharge,
       amountAfterPayinDeduction: collectionsAfterDeduction,
-      payOutCharge: payoutCharge,
-      topUpAmount: netPayableAmountPayout,
+      // payOutCharge: payoutCharge,
+      // topUpAmount: netPayableAmountPayout,
       topupBy: adminUser,
     });
 
@@ -477,7 +477,9 @@ export class WalletsService {
         user: wallet.user,
         totalCollections: +wallet.totalCollections - collectionAmount,
         availablePayoutBalance:
-          +wallet.availablePayoutBalance + netPayableAmountPayout,
+          +wallet.availablePayoutBalance + collectionsAfterDeduction,
+        // availablePayoutBalance:
+        //   +wallet.availablePayoutBalance + netPayableAmountPayout,
       }),
     );
 
