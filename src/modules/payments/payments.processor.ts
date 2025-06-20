@@ -155,7 +155,17 @@ export class PayoutProcessor {
             );
 
             if (status === PAYMENT_STATUS.FAILED) {
-              throw new Error(responseEritech.message || "Payout failed");
+              throw {
+                status: PAYMENT_STATUS.FAILED,
+                message: responseEritech.message || "Payout failed",
+              };
+            }
+
+            if (status === PAYMENT_STATUS.REJECTED) {
+              throw {
+                status: PAYMENT_STATUS.REJECTED,
+                message: responseEritech.message || "Payout rejected",
+              };
             }
 
             if (user?.payOutWebhookUrl) {
@@ -244,7 +254,7 @@ export class PayoutProcessor {
             if (user?.payOutWebhookUrl) {
               const payload = {
                 orderId,
-                status: PAYMENT_STATUS.FAILED,
+                status: error.status,
                 amount,
                 txnRefId: null,
                 payoutId,
@@ -276,28 +286,49 @@ export class PayoutProcessor {
               relations: { user: true },
             });
 
-            if (wallet) {
-              await this.walletRepository.save(
-                this.walletRepository.create({
-                  id: wallet.id,
-                  availablePayoutBalance:
-                    +wallet.availablePayoutBalance + +amount,
-                }),
+            // if (wallet) {
+            //   await this.walletRepository.save(
+            //     this.walletRepository.create({
+            //       id: wallet.id,
+            //       availablePayoutBalance:
+            //         +wallet.availablePayoutBalance + +amount,
+            //     }),
+            //   );
+            // }
+
+            // this.logger.info(
+            //   `PAYOUT - Update wallet when error occurs(catch block) - Wallet: ${LoggerPlaceHolder.Json}`,
+            //   {
+            //     availablePayoutBalance: wallet.availablePayoutBalance,
+            //     amount,
+            //   },
+            // );
+
+            if (error.status === PAYMENT_STATUS.REJECTED) {
+              // Immediately add back to wallet
+              if (wallet) {
+                await this.walletRepository.save(
+                  this.walletRepository.create({
+                    id: wallet.id,
+                    availablePayoutBalance:
+                      +wallet.availablePayoutBalance + +amount,
+                  }),
+                );
+              }
+
+              this.logger.info(
+                `PAYOUT - REJECTED - Wallet updated successfully - Wallet: ${LoggerPlaceHolder.Json}`,
+                {
+                  availablePayoutBalance: wallet.availablePayoutBalance,
+                  amount,
+                },
               );
             }
-
-            this.logger.info(
-              `PAYOUT - Update wallet when error occurs(catch block) - Wallet: ${LoggerPlaceHolder.Json}`,
-              {
-                availablePayoutBalance: wallet.availablePayoutBalance,
-                amount,
-              },
-            );
 
             await this.payOutOrdersRepository.update(
               { id: order.id },
               {
-                status: PAYMENT_STATUS.FAILED,
+                status: error.status || PAYMENT_STATUS.FAILED,
                 failureAt: new Date(),
               },
             );
