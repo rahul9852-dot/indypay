@@ -107,7 +107,19 @@ export class PayoutProcessor {
               );
 
             if (!responseEritech.success) {
-              throw new Error(responseEritech.message);
+              const apiStatus = responseEritech.data?.status?.toUpperCase();
+
+              if (apiStatus === PAYMENT_STATUS.REJECTED) {
+                throw {
+                  status: PAYMENT_STATUS.REJECTED,
+                  message: responseEritech.message || "Payout rejected",
+                };
+              }
+
+              throw {
+                status: apiStatus,
+                message: responseEritech.message || "Payout ertitechfailed",
+              };
             }
 
             const eriTechDecryptedResponse =
@@ -120,10 +132,6 @@ export class PayoutProcessor {
               `Ertitech Response: ${LoggerPlaceHolder.Json}`,
               eriTechDecryptedResponse,
             );
-
-            if (!responseEritech.success) {
-              throw new Error(responseEritech.message);
-            }
 
             const status = convertExternalPaymentStatusToInternal(
               eriTechDecryptedResponse.txn_status.transactionStatus.toUpperCase(),

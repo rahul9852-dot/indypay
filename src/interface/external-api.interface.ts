@@ -325,6 +325,7 @@ export interface IExternalEritecPayoutFundResponse {
   data: {
     encryptedResponseData: string;
     creationDateTime: string;
+    status?: string;
   };
   message: string;
   errors: string;
