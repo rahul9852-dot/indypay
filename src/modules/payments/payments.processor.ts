@@ -212,7 +212,7 @@ export class PayoutProcessor {
           } catch (error) {
             this.logger.error(
               `Payout failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-              error,
+              JSON.stringify(error),
             );
 
             const { amount, orderId, payoutId } = order;
