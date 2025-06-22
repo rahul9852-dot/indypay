@@ -3428,6 +3428,8 @@ export class PaymentsService {
           );
         }
 
+        await queryRunner.commitTransaction();
+
         if (user?.payInWebhookUrl) {
           const webhookPayload = {
             orderId: refId,
