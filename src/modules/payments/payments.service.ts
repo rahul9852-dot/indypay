@@ -3305,6 +3305,26 @@ export class PaymentsService {
     }
   }
 
+  private async safeUpdateWalletBalance(
+    queryRunner: QueryRunner,
+    userId: string,
+    updateFn: (wallet: WalletEntity) => void,
+  ): Promise<WalletEntity> {
+    const wallet = await queryRunner.manager
+      .createQueryBuilder(WalletEntity, "wallet")
+      .setLock("pessimistic_write")
+      .leftJoinAndSelect("wallet.user", "user")
+      .where("user.id = :userId", { userId })
+      .getOne();
+
+    if (!wallet) {
+      throw new NotFoundException(`Wallet not found for user: ${userId}`);
+    }
+    updateFn(wallet);
+
+    return await queryRunner.manager.save(wallet);
+  }
+
   async externalWebhookPayinUtkarsh(
     externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
   ) {
@@ -3343,122 +3363,117 @@ export class PaymentsService {
         };
       }
 
-      // Jumping Start
-
-      // let successCount =
-      //   +(await this.cacheManager.get(
-      //     REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
-      //   )) || 1;
-
-      // let isMisspelled = false;
-      // const { jumpingCount } = payinOrder.user;
-
-      // if (status === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
-      //   if (successCount >= jumpingCount) {
-      //     const statusArr = [
-      //       PAYMENT_STATUS.PENDING,
-      //       PAYMENT_STATUS.DEEMED,
-      //       PAYMENT_STATUS.INITIATED,
-      //       PAYMENT_STATUS.FAILED,
-      //     ];
-      //     status = statusArr[Math.floor(Math.random() * statusArr.length)];
-      //     successCount = 0;
-      //     isMisspelled = true;
-      //   } else {
-      //     successCount += 1;
-      //   }
-
-      //   await this.cacheManager.set(
-      //     REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
-      //     successCount,
-      //     1000 * 60 * 60 * 24 * 365, // 365 days
-      //   );
-      // }
-
-      // Jumpind End
-
       const { user } = payinOrder;
 
-      const payinOrderRaw = this.payInOrdersRepository.create({
-        id: payinOrder.id,
-        status,
-        txnRefId: txnId,
-        // ...(!isMisspelled && { utr: upiTxnId }),
-        utr: upiTxnId,
-        // isMisspelled,
-        ...(status === PAYMENT_STATUS.SUCCESS && {
-          successAt: new Date(),
-        }),
-        ...(status === PAYMENT_STATUS.FAILED && {
-          failureAt: new Date(),
-        }),
-      });
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
 
-      await this.payInOrdersRepository.save(payinOrderRaw);
-
-      // update wallet
-      if (status === PAYMENT_STATUS.SUCCESS) {
-        const wallet = await this.walletRepository.findOne({
-          where: { user: { id: user.id } },
-          relations: ["user"],
-        });
-
-        await this.cacheManager.del(
-          REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
-        );
-
-        const walletRaw = this.walletRepository.create({
-          ...(wallet?.id && { id: wallet.id }),
-          totalCollections:
-            (wallet.totalCollections ? +wallet.totalCollections : 0) +
-            +payinOrder.amount,
-          user,
-        });
-
-        await this.walletRepository.save(walletRaw);
-
-        this.logger.info(
-          `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
-          walletRaw,
-        );
-      }
-
-      if (user?.payInWebhookUrl) {
-        const webhookPayload = {
-          orderId: refId,
+      try {
+        const payinOrderRaw = this.payInOrdersRepository.create({
+          id: payinOrder.id,
           status,
-          amount: payinOrder.amount,
-          txnRefId: payinOrder.txnRefId,
+          txnRefId: txnId,
           // ...(!isMisspelled && { utr: upiTxnId }),
           utr: upiTxnId,
-        };
-        this.logger.info(
-          `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
-          webhookPayload,
-        );
-        axios
-          .post(user.payInWebhookUrl, webhookPayload, {
-            headers: {
-              "Content-Type": "application/json ",
-            },
-          })
-          .then(({ data }) => {
-            this.logger.info(
-              `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
-            );
-          })
-          .catch((err) => {
-            this.logger.error(
-              `PAYIN - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
-              err,
-            );
-          });
-      }
+          // isMisspelled,
+          ...(status === PAYMENT_STATUS.SUCCESS && {
+            successAt: new Date(),
+          }),
+          ...(status === PAYMENT_STATUS.FAILED && {
+            failureAt: new Date(),
+          }),
+        });
 
-      return {
-        message: "Transaction status updated successfully.",
-        timestamp: new Date().toISOString(),
-      };
+        await this.payInOrdersRepository.save(payinOrderRaw);
+
+        // update wallet
+        if (status === PAYMENT_STATUS.SUCCESS) {
+          const wallet = await this.walletRepository.findOne({
+            where: { user: { id: user.id } },
+            relations: ["user"],
+          });
+
+          await this.cacheManager.del(
+            REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
+          );
+
+          // const walletRaw = this.walletRepository.create({
+          //   ...(wallet?.id && { id: wallet.id }),
+          //   totalCollections:
+          //     (wallet.totalCollections ? +wallet.totalCollections : 0) +
+          //     +payinOrder.amount,
+          //   user,
+          // });
+
+          // await this.walletRepository.save(walletRaw);
+
+          // Use safeUpdateWalletBalance for proper locking - only update totalCollections
+          const updatedWallet = await this.safeUpdateWalletBalance(
+            queryRunner,
+            user.id,
+            (wallet) => {
+              wallet.totalCollections =
+                (wallet.totalCollections ? +wallet.totalCollections : 0) +
+                +payinOrder.amount;
+            },
+          );
+
+          this.logger.info(
+            `PAYIN WEBHOOK - Wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+            {
+              walletId: updatedWallet.id,
+              newTotalCollections: updatedWallet.totalCollections,
+            },
+          );
+        }
+
+        if (user?.payInWebhookUrl) {
+          const webhookPayload = {
+            orderId: refId,
+            status,
+            amount: payinOrder.amount,
+            txnRefId: payinOrder.txnRefId,
+            // ...(!isMisspelled && { utr: upiTxnId }),
+            utr: upiTxnId,
+          };
+          this.logger.info(
+            `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+            webhookPayload,
+          );
+          axios
+            .post(user.payInWebhookUrl, webhookPayload, {
+              headers: {
+                "Content-Type": "application/json ",
+              },
+            })
+            .then(({ data }) => {
+              this.logger.info(
+                `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
+              );
+            })
+            .catch((err) => {
+              this.logger.error(
+                `PAYIN - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+                err,
+              );
+            });
+        }
+
+        return {
+          message: "Transaction status updated successfully.",
+          timestamp: new Date().toISOString(),
+        };
+      } catch (err) {
+        await queryRunner.rollbackTransaction();
+        this.logger.error(
+          `PAYIN - handleCheckoutWebhookRawBody - Error processing webhook: ${LoggerPlaceHolder.Json}`,
+          err,
+        );
+        throw new BadRequestException(err.message);
+      } finally {
+        await queryRunner.release();
+      }
     } catch (error) {
       this.logger.error(
         `PAYIN - externalWebhookPayinUtkarsh - Error processing webhook: ${LoggerPlaceHolder.Json}`,
