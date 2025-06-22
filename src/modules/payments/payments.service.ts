@@ -1295,15 +1295,56 @@ export class PaymentsService {
     }
   }
 
+  // private async validateAndUpdateWallet(
+  //   queryRunner: QueryRunner,
+  //   user: UsersEntity,
+  //   totalAmount: number,
+  // ) {
+  //   let userWallet = await this.walletRepository.findOne({
+  //     where: { user: { id: user.id } },
+  //     relations: { user: true },
+  //   });
+
+  //   if (!userWallet) {
+  //     userWallet = await queryRunner.manager.save(
+  //       this.walletRepository.create({ user }),
+  //     );
+  //   }
+
+  //   if (totalAmount > +userWallet.availablePayoutBalance) {
+  //     throw new BadRequestException(
+  //       `Insufficient balance. Gross Total Amount: ${totalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
+  //     );
+  //   }
+
+  //   this.logger.info(
+  //     `PAYOUT - validateAndUpdateWallet - User wallet: ${LoggerPlaceHolder.Json}`,
+  //     {
+  //       availablePayoutBalance: userWallet.availablePayoutBalance,
+  //       totalAmount,
+  //     },
+  //   );
+
+  //   return await queryRunner.manager.save(
+  //     this.walletRepository.create({
+  //       id: userWallet.id,
+  //       availablePayoutBalance:
+  //         +userWallet.availablePayoutBalance - totalAmount,
+  //     }),
+  //   );
+  // }
+
   private async validateAndUpdateWallet(
     queryRunner: QueryRunner,
     user: UsersEntity,
     totalAmount: number,
   ) {
-    let userWallet = await this.walletRepository.findOne({
-      where: { user: { id: user.id } },
-      relations: { user: true },
-    });
+    let userWallet = await queryRunner.manager
+      .createQueryBuilder(WalletEntity, "wallet")
+      .setLock("pessimistic_write")
+      .leftJoinAndSelect("wallet.user", "user")
+      .where("user.id = :userId", { userId: user.id })
+      .getOne();
 
     if (!userWallet) {
       userWallet = await queryRunner.manager.save(
@@ -1311,27 +1352,38 @@ export class PaymentsService {
       );
     }
 
-    if (totalAmount > +userWallet.availablePayoutBalance) {
+    const currentBalance = +userWallet.availablePayoutBalance;
+    const newBalance = currentBalance - totalAmount;
+
+    if (newBalance < 0) {
       throw new BadRequestException(
-        `Insufficient balance. Gross Total Amount: ${totalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
+        `Insufficient balance. Required: ${totalAmount}, Available: ${currentBalance}`,
       );
     }
 
     this.logger.info(
-      `PAYOUT - validateAndUpdateWallet - User wallet: ${LoggerPlaceHolder.Json}`,
+      `PAYOUT - validateAndUpdateWallet - User wallet update: ${LoggerPlaceHolder.Json}`,
       {
-        availablePayoutBalance: userWallet.availablePayoutBalance,
+        userId: user.id,
+        currentBalance,
         totalAmount,
+        newBalance,
+        userFullName: user.fullName,
       },
     );
 
-    return await queryRunner.manager.save(
-      this.walletRepository.create({
-        id: userWallet.id,
-        availablePayoutBalance:
-          +userWallet.availablePayoutBalance - totalAmount,
-      }),
+    userWallet.availablePayoutBalance = newBalance;
+    const updatedWallet = await queryRunner.manager.save(userWallet);
+
+    this.logger.info(
+      `PAYOUT - validateAndUpdateWallet - Wallet updated successfully: ${LoggerPlaceHolder.Json}`,
+      {
+        walletId: updatedWallet.id,
+        newBalance: updatedWallet.availablePayoutBalance,
+      },
     );
+
+    return updatedWallet;
   }
 
   private async createPayoutOrders(
