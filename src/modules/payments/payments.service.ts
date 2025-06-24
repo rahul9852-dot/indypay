@@ -3373,6 +3373,7 @@ export class PaymentsService {
         const payinOrderRaw = this.payInOrdersRepository.create({
           id: payinOrder.id,
           status,
+          amount,
           txnRefId: txnId,
           // ...(!isMisspelled && { utr: upiTxnId }),
           utr: upiTxnId,
@@ -3384,10 +3385,6 @@ export class PaymentsService {
             failureAt: new Date(),
           }),
         });
-
-        if (amount !== payinOrder.amount) {
-          throw new BadRequestException("Amount mismatch in payin order");
-        }
 
         await this.payInOrdersRepository.save(payinOrderRaw);
 
