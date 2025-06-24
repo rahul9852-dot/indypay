@@ -3367,6 +3367,13 @@ export class PaymentsService {
 
       const isAmountMismatch = +payinOrder.amount !== +amount;
 
+      if (isAmountMismatch) {
+        throw new BadRequestException({
+          message: "Amount mismatch in payin order",
+          status: PAYMENT_STATUS.MISMATCH,
+        });
+      }
+
       const queryRunner = this.dataSource.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
@@ -3375,7 +3382,6 @@ export class PaymentsService {
         const payinOrderRaw = this.payInOrdersRepository.create({
           id: payinOrder.id,
           status,
-          amount,
           txnRefId: txnId,
           // ...(!isMisspelled && { utr: upiTxnId }),
           utr: upiTxnId,
@@ -3385,6 +3391,9 @@ export class PaymentsService {
           }),
           ...(status === PAYMENT_STATUS.FAILED && {
             failureAt: new Date(),
+          }),
+          ...(isAmountMismatch && {
+            status: PAYMENT_STATUS.MISMATCH,
           }),
         });
 
@@ -3472,13 +3481,42 @@ export class PaymentsService {
           message: "Transaction status updated successfully.",
           timestamp: new Date().toISOString(),
         };
-      } catch (err) {
+      } catch (err: any) {
         await queryRunner.rollbackTransaction();
-        this.logger.error(
-          `PAYIN - handleCheckoutWebhookRawBody - Error processing webhook: ${LoggerPlaceHolder.Json}`,
-          err,
-        );
-        throw new BadRequestException(err.message);
+        if (err.status === PAYMENT_STATUS.MISMATCH) {
+          if (user?.payInWebhookUrl) {
+            const webhookPayload = {
+              orderId: refId,
+              status: PAYMENT_STATUS.FAILED,
+              amount,
+              txnRefId: payinOrder.txnRefId,
+              // ...(!isMisspelled && { utr: upiTxnId }),
+              utr: upiTxnId,
+              message: "Amount mismatch in payin order",
+            };
+            this.logger.info(
+              `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+              webhookPayload,
+            );
+            axios
+              .post(user.payInWebhookUrl, webhookPayload, {
+                headers: {
+                  "Content-Type": "application/json ",
+                },
+              })
+              .then(({ data }) => {
+                this.logger.info(
+                  `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
+                );
+              })
+              .catch((err) => {
+                this.logger.error(
+                  `PAYIN - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+                  err,
+                );
+              });
+          }
+        }
       } finally {
         await queryRunner.release();
       }
