@@ -3365,6 +3365,8 @@ export class PaymentsService {
 
       const { user } = payinOrder;
 
+      const isAmountMismatch = +payinOrder.amount !== +amount;
+
       const queryRunner = this.dataSource.createQueryRunner();
       await queryRunner.connect();
       await queryRunner.startTransaction();
@@ -3439,6 +3441,9 @@ export class PaymentsService {
             txnRefId: payinOrder.txnRefId,
             // ...(!isMisspelled && { utr: upiTxnId }),
             utr: upiTxnId,
+            message: isAmountMismatch
+              ? "Amount mismatch in payin order"
+              : undefined,
           };
           this.logger.info(
             `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
