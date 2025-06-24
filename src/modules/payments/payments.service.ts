@@ -3438,7 +3438,7 @@ export class PaymentsService {
         if (user?.payInWebhookUrl) {
           const webhookPayload = {
             orderId: refId,
-            status: isAmountMismatch ? PAYMENT_STATUS.FAILED : status,
+            status,
             amount,
             txnRefId: payinOrder.txnRefId,
             // ...(!isMisspelled && { utr: upiTxnId }),
