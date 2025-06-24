@@ -3372,23 +3372,43 @@ export class PaymentsService {
       await queryRunner.startTransaction();
 
       try {
-        const payinOrderRaw = this.payInOrdersRepository.create({
-          id: payinOrder.id,
-          status,
-          txnRefId: txnId,
-          // ...(!isMisspelled && { utr: upiTxnId }),
-          utr: upiTxnId,
-          // isMisspelled,
-          ...(status === PAYMENT_STATUS.SUCCESS && {
-            successAt: new Date(),
-          }),
-          ...(status === PAYMENT_STATUS.FAILED && {
-            failureAt: new Date(),
-          }),
-          ...(isAmountMismatch && {
-            status: PAYMENT_STATUS.MISMATCH,
-          }),
-        });
+        let payinOrderRaw;
+        if (isAmountMismatch) {
+          const { commissionAmount, gstAmount, netPayableAmount } =
+            getCommissions({
+              amount,
+              commissionInPercentage: user.commissionInPercentagePayin,
+              gstInPercentage: user.gstInPercentagePayin,
+            });
+
+          payinOrderRaw = this.payInOrdersRepository.create({
+            id: payinOrder.id,
+            status,
+            amount,
+            commissionAmount,
+            gstAmount,
+            netPayableAmount,
+            txnRefId: txnId,
+            utr: upiTxnId,
+            ...(isAmountMismatch && {
+              status: PAYMENT_STATUS.MISMATCH,
+            }),
+          });
+        } else {
+          payinOrderRaw = this.payInOrdersRepository.create({
+            id: payinOrder.id,
+            status,
+            amount,
+            txnRefId: txnId,
+            utr: upiTxnId,
+            ...(status === PAYMENT_STATUS.SUCCESS && {
+              successAt: new Date(),
+            }),
+            ...(status === PAYMENT_STATUS.FAILED && {
+              failureAt: new Date(),
+            }),
+          });
+        }
 
         await this.payInOrdersRepository.save(payinOrderRaw);
 
