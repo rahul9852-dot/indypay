@@ -3385,6 +3385,10 @@ export class PaymentsService {
           }),
         });
 
+        if (amount !== payinOrder.amount) {
+          throw new BadRequestException("Amount mismatch in payin order");
+        }
+
         await this.payInOrdersRepository.save(payinOrderRaw);
 
         // update wallet
@@ -3415,7 +3419,7 @@ export class PaymentsService {
             (wallet) => {
               wallet.totalCollections =
                 (wallet.totalCollections ? +wallet.totalCollections : 0) +
-                +payinOrder.amount;
+                +amount;
             },
           );
 
@@ -3434,7 +3438,7 @@ export class PaymentsService {
           const webhookPayload = {
             orderId: refId,
             status,
-            amount: payinOrder.amount,
+            amount,
             txnRefId: payinOrder.txnRefId,
             // ...(!isMisspelled && { utr: upiTxnId }),
             utr: upiTxnId,
