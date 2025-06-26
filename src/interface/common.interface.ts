@@ -18,5 +18,6 @@ export interface IVerifyMobilePayload {
 export interface IGeneratePaymentLinkPayload {
   amount: number;
   orderId: string;
-  vpa: string;
+  vpa?: string;
+  userId?: string;
 }

@@ -69,6 +69,24 @@ export class PaymentsController {
   ) {}
 
   @Public()
+  @ApiOperation({ summary: "Get VPA routing statistics" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/stats")
+  async getVPAStats() {
+    return this.paymentsService.getVPAStats();
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Get active VPAs" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/active")
+  async getActiveVPAs() {
+    return this.paymentsService.getActiveVPAs();
+  }
+
+  @Public()
   @ApiOperation({ summary: "Create pay-in transaction" })
   @UseGuards(ApiKeyGuard)
   @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })

@@ -107,6 +107,7 @@ import customerUniqueGenerate from "@/utils/customer-unique.utils";
 import { CheckoutEntity } from "@/entities/checkout.entity";
 import { generatePaymentLinkUtil } from "@/utils/payment-link.util";
 import { UtkarshCryptoService } from "@/utils/utkarsh-enc-decr.utils";
+import { vpaRoutingService } from "@/utils/vpa-routing.util";
 
 const {
   beBaseUrl,
@@ -147,6 +148,20 @@ export class PaymentsService {
     }
 
     return ans;
+  }
+
+  /**
+   * Get VPA routing statistics
+   */
+  getVPAStats() {
+    return vpaRoutingService.getVPAStats();
+  }
+
+  /**
+   * Get active VPAs
+   */
+  getActiveVPAs() {
+    return vpaRoutingService.getActiveVPAs();
   }
 
   async checkout(checkoutDto: CheckoutDto) {
@@ -3128,7 +3143,7 @@ export class PaymentsService {
       const paymentLink = generatePaymentLinkUtil({
         amount,
         orderId,
-        vpa,
+        userId: user.id,
       });
       // 6. save external payment
       await queryRunner.manager.save(

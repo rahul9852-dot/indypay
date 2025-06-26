@@ -124,6 +124,18 @@ export const appConfig = registerAs("appConfig", () => ({
   },
   utkarsh: {
     vpa: getOsEnv("UPI_ID"),
+    vpas: getOsEnv("UTKARSH_VPAS") ? JSON.parse(getOsEnv("UTKARSH_VPAS")) : [],
+    vpaRouting: {
+      strategy: getOsEnv("UTKARSH_VPA_ROUTING_STRATEGY") || "round_robin", // round_robin, load_balance, user_based, amount_based
+      loadBalanceThreshold:
+        +getOsEnv("UTKARSH_LOAD_BALANCE_THRESHOLD") || 10000,
+      userBasedMapping: getOsEnv("UTKARSH_USER_BASED_MAPPING")
+        ? JSON.parse(getOsEnv("UTKARSH_USER_BASED_MAPPING"))
+        : {},
+      amountBasedMapping: getOsEnv("UTKARSH_AMOUNT_BASED_MAPPING")
+        ? JSON.parse(getOsEnv("UTKARSH_AMOUNT_BASED_MAPPING"))
+        : {},
+    },
     webhookIps: getOsEnv("UTKARSH").split(","),
     utkarshMid: getOsEnv("UTKARSH_MID"),
     utkarshTerminalId: getOsEnv("UTKARSH_TERMINAL_ID"),
