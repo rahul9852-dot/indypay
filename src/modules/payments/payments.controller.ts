@@ -12,6 +12,8 @@ import {
   Res,
   Param,
   NotFoundException,
+  Put,
+  Delete,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -84,6 +86,74 @@ export class PaymentsController {
   @Get("vpa/active")
   async getActiveVPAs() {
     return this.paymentsService.getActiveVPAs();
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Get VPA monitoring status" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/monitoring/status")
+  async getVPAMonitoringStatus() {
+    return this.paymentsService.getVPAMonitoringStatus();
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Get VPA alerts" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/alerts")
+  async getVPAlerts() {
+    return this.paymentsService.getVPAlerts();
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Get VPA configuration" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/config")
+  async getVPAConfig() {
+    return this.paymentsService.getVPAConfig();
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Add new VPA" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @Post("vpa")
+  async addVPA(@Body() vpaConfig: any) {
+    return this.paymentsService.addVPA(vpaConfig);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Update VPA" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Put("vpa/:vpa")
+  async updateVPA(@Param("vpa") vpa: string, @Body() updates: any) {
+    return this.paymentsService.updateVPA(vpa, updates);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Remove VPA" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Delete("vpa/:vpa")
+  async removeVPA(@Param("vpa") vpa: string) {
+    return this.paymentsService.removeVPA(vpa);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Update routing strategy" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Put("vpa/routing/strategy")
+  async updateRoutingStrategy(
+    @Body() body: { strategy: string; config?: any },
+  ) {
+    return this.paymentsService.updateRoutingStrategy(
+      body.strategy,
+      body.config,
+    );
   }
 
   @Public()

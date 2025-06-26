@@ -126,7 +126,7 @@ export const appConfig = registerAs("appConfig", () => ({
     vpa: getOsEnv("UPI_ID"),
     vpas: getOsEnv("UTKARSH_VPAS") ? JSON.parse(getOsEnv("UTKARSH_VPAS")) : [],
     vpaRouting: {
-      strategy: getOsEnv("UTKARSH_VPA_ROUTING_STRATEGY") || "round_robin", // round_robin, load_balance, user_based, amount_based
+      strategy: getOsEnv("UTKARSH_VPA_ROUTING_STRATEGY") || "round_robin", // round_robin, load_balance, user_based, amount_based, health_based, adaptive
       loadBalanceThreshold:
         +getOsEnv("UTKARSH_LOAD_BALANCE_THRESHOLD") || 10000,
       userBasedMapping: getOsEnv("UTKARSH_USER_BASED_MAPPING")
@@ -135,6 +135,34 @@ export const appConfig = registerAs("appConfig", () => ({
       amountBasedMapping: getOsEnv("UTKARSH_AMOUNT_BASED_MAPPING")
         ? JSON.parse(getOsEnv("UTKARSH_AMOUNT_BASED_MAPPING"))
         : {},
+    },
+    enhancedVpaRouting: {
+      enabled: getOsEnv("ENHANCED_VPA_ROUTING_ENABLED") === "true" || true,
+      strategy: getOsEnv("ENHANCED_VPA_ROUTING_STRATEGY") || "round_robin", // round_robin, load_balance, user_based, amount_based, health_based, adaptive
+      loadBalanceThreshold:
+        +getOsEnv("ENHANCED_VPA_LOAD_BALANCE_THRESHOLD") || 10000,
+    },
+    // Enhanced VPA configuration
+    vpaMonitoring: {
+      enabled: getOsEnv("VPA_MONITORING_ENABLED") === "true" || true,
+      healthCheckInterval: +getOsEnv("VPA_HEALTH_CHECK_INTERVAL") || 60,
+      alertThresholds: getOsEnv("VPA_ALERT_THRESHOLDS")
+        ? JSON.parse(getOsEnv("VPA_ALERT_THRESHOLDS"))
+        : {
+            healthScoreMin: 50,
+            failureRateMax: 0.1,
+            responseTimeMax: 5000,
+            circuitBreakerFailures: 5,
+          },
+    },
+    vpaRateLimiting: {
+      enabled: getOsEnv("VPA_RATE_LIMITING_ENABLED") === "true" || true,
+      defaultLimitPerMinute: +getOsEnv("VPA_DEFAULT_RATE_LIMIT") || 1000,
+    },
+    vpaCircuitBreaker: {
+      enabled: getOsEnv("VPA_CIRCUIT_BREAKER_ENABLED") === "true" || true,
+      defaultThreshold: +getOsEnv("VPA_CIRCUIT_BREAKER_THRESHOLD") || 5,
+      defaultTimeoutMs: +getOsEnv("VPA_CIRCUIT_BREAKER_TIMEOUT") || 30000,
     },
     webhookIps: getOsEnv("UTKARSH").split(","),
     utkarshMid: getOsEnv("UTKARSH_MID"),

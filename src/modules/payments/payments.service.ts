@@ -107,7 +107,9 @@ import customerUniqueGenerate from "@/utils/customer-unique.utils";
 import { CheckoutEntity } from "@/entities/checkout.entity";
 import { generatePaymentLinkUtil } from "@/utils/payment-link.util";
 import { UtkarshCryptoService } from "@/utils/utkarsh-enc-decr.utils";
-import { vpaRoutingService } from "@/utils/vpa-routing.util";
+import { enhancedVpaRoutingService } from "@/utils/enhanced-vpa-routing.util";
+import { vpaMonitoringService } from "@/utils/vpa-monitoring.util";
+import { vpaConfigManager } from "@/utils/vpa-config-manager.util";
 
 const {
   beBaseUrl,
@@ -153,15 +155,64 @@ export class PaymentsService {
   /**
    * Get VPA routing statistics
    */
-  getVPAStats() {
-    return vpaRoutingService.getVPAStats();
+  async getVPAStats() {
+    return await enhancedVpaRoutingService.getEnhancedVPAStats();
   }
 
   /**
    * Get active VPAs
    */
   getActiveVPAs() {
-    return vpaRoutingService.getActiveVPAs();
+    return enhancedVpaRoutingService.getActiveVPAs();
+  }
+
+  /**
+   * Get VPA monitoring status
+   */
+  async getVPAMonitoringStatus() {
+    return vpaMonitoringService.getStatus();
+  }
+
+  /**
+   * Get VPA alerts
+   */
+  async getVPAlerts() {
+    return await vpaMonitoringService.getActiveAlerts();
+  }
+
+  /**
+   * Get VPA configuration
+   */
+  async getVPAConfig() {
+    return vpaConfigManager.getConfig();
+  }
+
+  /**
+   * Add new VPA
+   */
+  async addVPA(vpaConfig: any) {
+    return await vpaConfigManager.addVPA(vpaConfig);
+  }
+
+  /**
+   * Update VPA
+   */
+  async updateVPA(vpa: string, updates: any) {
+    return await vpaConfigManager.updateVPA(vpa, updates);
+  }
+
+  /**
+   * Remove VPA
+   */
+  async removeVPA(vpa: string) {
+    return await vpaConfigManager.removeVPA(vpa);
+  }
+
+  /**
+   * Update routing strategy
+   */
+  async updateRoutingStrategy(strategy: string, config?: any) {
+    return await vpaConfigManager.updateRoutingStrategy(strategy, config);
   }
 
   async checkout(checkoutDto: CheckoutDto) {
@@ -3140,7 +3191,7 @@ export class PaymentsService {
       // 4. save transaction
       await queryRunner.manager.save(transaction);
 
-      const paymentLink = generatePaymentLinkUtil({
+      const paymentLink = await generatePaymentLinkUtil({
         amount,
         orderId,
         userId: user.id,
