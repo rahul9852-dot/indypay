@@ -1,7 +1,7 @@
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { WalletsService } from "./wallets.service";
-import { WalletTopUpDto } from "./dto/wallet.dto";
+import { RefundWalletDto, WalletTopUpDto } from "./dto/wallet.dto";
 import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -78,5 +78,15 @@ export class WalletsController {
     @Body() { amount, userId: merchantUserId }: WalletTopUpDto,
   ) {
     return this.walletsService.topUpWallet(merchantUserId, user, amount);
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Refund user - Admin" })
+  @Post("refund")
+  refundWallet(
+    @User() user: UsersEntity,
+    @Body() { userId: merchantUserId, amount }: RefundWalletDto,
+  ) {
+    return this.walletsService.refundWallet(merchantUserId, user, amount);
   }
 }

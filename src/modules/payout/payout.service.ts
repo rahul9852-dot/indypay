@@ -314,19 +314,28 @@ export class PayoutService {
         pagination,
       };
     } else {
-      const { todayPayouts, todaySuccess, todayFailed } =
-        await this.calculateStats(userId, {
-          startDate,
-          endDate,
-        });
+      const {
+        todayPayouts,
+        todaySuccess,
+        todayFailed,
+        todayPayoutsWithCharges,
+        todaySuccessWithCharges,
+        todayFailedWithCharges,
+      } = await this.calculateStats(userId, {
+        startDate,
+        endDate,
+      });
 
       return {
         data: payouts,
         pagination,
         stats: {
           totalPayouts: +todayPayouts,
+          totalPayoutsWithCharges: +todayPayoutsWithCharges,
           totalSuccess: +todaySuccess,
+          totalSuccessWithCharges: +todaySuccessWithCharges,
           totalFailed: +todayFailed,
+          totalFailedWithCharges: +todayFailedWithCharges,
         },
       };
     }
@@ -353,16 +362,55 @@ export class PayoutService {
       user: { id: userId },
     });
 
-    const [todayPayouts, todaySuccess, todayFailed] = await Promise.all([
+    const todayPayoutsPromiseWithCharges = this.payoutRepository.sum(
+      "amountBeforeDeduction",
+      {
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+        user: { id: userId },
+      },
+    );
+
+    const todaySuccessPromiseWithCharges = this.payoutRepository.sum(
+      "amountBeforeDeduction",
+      {
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+        status: PAYMENT_STATUS.SUCCESS,
+        user: { id: userId },
+      },
+    );
+
+    const todayFailedPromiseWithCharges = this.payoutRepository.sum(
+      "amountBeforeDeduction",
+      {
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+        status: PAYMENT_STATUS.FAILED,
+        user: { id: userId },
+      },
+    );
+
+    const [
+      todayPayouts,
+      todaySuccess,
+      todayFailed,
+      todayPayoutsWithCharges,
+      todaySuccessWithCharges,
+      todayFailedWithCharges,
+    ] = await Promise.all([
       todayPayoutsPromise,
       todaySuccessPromise,
       todayFailedPromise,
+      todayPayoutsPromiseWithCharges,
+      todaySuccessPromiseWithCharges,
+      todayFailedPromiseWithCharges,
     ]);
 
     return {
       todayPayouts: +todayPayouts,
       todaySuccess: +todaySuccess,
       todayFailed: +todayFailed,
+      todayPayoutsWithCharges: +todayPayoutsWithCharges,
+      todaySuccessWithCharges: +todaySuccessWithCharges,
+      todayFailedWithCharges: +todayFailedWithCharges,
     };
   }
 

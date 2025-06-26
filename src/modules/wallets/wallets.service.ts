@@ -17,7 +17,6 @@ import {
 } from "@/utils/commissions.utils";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
-import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 @Injectable()
@@ -147,37 +146,36 @@ export class WalletsService {
       createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
     });
 
-    const totalPayoutPromise = this.payoutRepository.sum("amount", {
-      user: { id: userId },
-      status: PAYMENT_STATUS.SUCCESS,
-      createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
-    });
+    // const totalPayoutPromise = this.payoutRepository.sum("amount", {
+    //   user: { id: userId },
+    //   status: PAYMENT_STATUS.SUCCESS,
+    //   createdAt: Between(new Date(todayStartDate()), new Date(todayEndDate())),
+    // });
 
-    const [[transactions, totalItems], topupAmount, totalPayout] =
-      await Promise.all([
-        topupQueryBuilder
-          .select([
-            "topup.id",
-            "topup.collectionAmount",
-            "topup.payInCharge",
-            "topup.amountAfterPayinDeduction",
-            "topup.payOutCharge",
-            "topup.topUpAmount",
-            "topup.createdAt",
-            "user.id",
-            "user.fullName",
-            "user.email",
-            "user.mobile",
-            "topupBy.id",
-            "topupBy.fullName",
-          ])
-          .orderBy(`topup.${sort}`, order as "ASC" | "DESC")
-          .skip((page - 1) * limit)
-          .take(limit)
-          .getManyAndCount(),
-        topupAmountPromise,
-        totalPayoutPromise,
-      ]);
+    const [[transactions, totalItems], topupAmount] = await Promise.all([
+      topupQueryBuilder
+        .select([
+          "topup.id",
+          "topup.collectionAmount",
+          "topup.payInCharge",
+          "topup.amountAfterPayinDeduction",
+          "topup.payOutCharge",
+          "topup.topUpAmount",
+          "topup.createdAt",
+          "user.id",
+          "user.fullName",
+          "user.email",
+          "user.mobile",
+          "topupBy.id",
+          "topupBy.fullName",
+        ])
+        .orderBy(`topup.${sort}`, order as "ASC" | "DESC")
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount(),
+      topupAmountPromise,
+      // totalRefundPromise,
+    ]);
 
     const pagination = getPagination({
       totalItems,
@@ -191,7 +189,7 @@ export class WalletsService {
       stats: {
         totalTopup: topupAmount || 0,
         availablePayoutBalance: wallet.availablePayoutBalance || 0,
-        totalPayout: totalPayout || 0,
+        // totalRefund: totalRefund || 0,
       },
     };
   }
@@ -487,6 +485,58 @@ export class WalletsService {
       userId: merchantUserId,
       availablePayoutBalance: savedWallet.availablePayoutBalance,
       message: "Topup successful",
+    };
+  }
+
+  async refundWallet(
+    merchantUserId: string,
+    adminUser: UsersEntity,
+    amount: number,
+  ) {
+    const wallet = await this.walletRepository.findOne({
+      where: { user: { id: merchantUserId } },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException(new MessageResponseDto("Wallet not found"));
+    }
+
+    const merchantUser = await this.usersRepository.findOne({
+      where: { id: merchantUserId },
+    });
+
+    this.logger.info(
+      `REFUND - Refund wallet - Net payable amount payout: ${LoggerPlaceHolder.Json}`,
+      {
+        amount,
+      },
+    );
+
+    const topUp = this.walletTopupRepository.create({
+      user: merchantUser,
+      collectionAmount: amount,
+      payInCharge: 0,
+      amountAfterPayinDeduction: amount,
+      // payOutCharge: payoutCharge,
+      topUpAmount: amount,
+      topupBy: adminUser,
+    });
+
+    await this.walletTopupRepository.save(topUp);
+
+    // update wallet balance
+    const savedWallet = await this.walletRepository.save(
+      this.walletRepository.create({
+        id: wallet.id,
+        user: wallet.user,
+        availablePayoutBalance: +wallet.availablePayoutBalance + amount,
+      }),
+    );
+
+    return {
+      userId: merchantUserId,
+      availablePayoutBalance: savedWallet.availablePayoutBalance,
+      message: "Refund successful",
     };
   }
 }

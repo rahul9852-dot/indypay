@@ -216,6 +216,8 @@ export class ReportsService {
         "UTR",
         "Status",
         "Created At",
+        "Amount Before Deduction",
+        "Payout Charge",
       ],
       rowMapper: (order) => [
         order.id,
@@ -225,6 +227,8 @@ export class ReportsService {
         order.utr,
         order.status,
         formatDateTime(order.createdAt),
+        order.amountBeforeDeduction,
+        (+order.amountBeforeDeduction - +order.amount).toFixed(2),
       ],
       batchFetch: (offset, limit) =>
         this.getPayoutOrdersBatch(
@@ -270,6 +274,7 @@ export class ReportsService {
           orderId: true,
           payoutId: true,
           amount: true,
+          amountBeforeDeduction: true,
           utr: true,
           status: true,
           createdAt: true,
