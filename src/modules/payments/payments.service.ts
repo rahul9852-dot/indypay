@@ -1295,45 +1295,6 @@ export class PaymentsService {
     }
   }
 
-  // private async validateAndUpdateWallet(
-  //   queryRunner: QueryRunner,
-  //   user: UsersEntity,
-  //   totalAmount: number,
-  // ) {
-  //   let userWallet = await this.walletRepository.findOne({
-  //     where: { user: { id: user.id } },
-  //     relations: { user: true },
-  //   });
-
-  //   if (!userWallet) {
-  //     userWallet = await queryRunner.manager.save(
-  //       this.walletRepository.create({ user }),
-  //     );
-  //   }
-
-  //   if (totalAmount > +userWallet.availablePayoutBalance) {
-  //     throw new BadRequestException(
-  //       `Insufficient balance. Gross Total Amount: ${totalAmount} exceeds Available Payout Balance: ${userWallet.availablePayoutBalance}`,
-  //     );
-  //   }
-
-  //   this.logger.info(
-  //     `PAYOUT - validateAndUpdateWallet - User wallet: ${LoggerPlaceHolder.Json}`,
-  //     {
-  //       availablePayoutBalance: userWallet.availablePayoutBalance,
-  //       totalAmount,
-  //     },
-  //   );
-
-  //   return await queryRunner.manager.save(
-  //     this.walletRepository.create({
-  //       id: userWallet.id,
-  //       availablePayoutBalance:
-  //         +userWallet.availablePayoutBalance - totalAmount,
-  //     }),
-  //   );
-  // }
-
   private async validateAndUpdateWallet(
     queryRunner: QueryRunner,
     user: UsersEntity,
@@ -1354,10 +1315,17 @@ export class PaymentsService {
 
     const currentBalance = +userWallet.availablePayoutBalance;
     const newBalance = currentBalance - totalAmount;
+    const MINIMUM_BALANCE = 10000;
 
     if (newBalance < 0) {
       throw new BadRequestException(
         `Insufficient balance. Required: ${totalAmount}, Available: ${currentBalance}`,
+      );
+    }
+
+    if (newBalance < MINIMUM_BALANCE) {
+      throw new BadRequestException(
+        `Minimum balance of ₹${MINIMUM_BALANCE} must be maintained. After this transaction, balance would be ₹${newBalance}`,
       );
     }
 
@@ -1445,102 +1413,6 @@ export class PaymentsService {
       }),
     );
   }
-
-  // async checkPayInStatusTransaction(
-  //   { orderId }: PayinStatusDto,
-  //   user: UsersEntity,
-  // ) {
-  //   const payinOrder = await this.payInOrdersRepository.findOne({
-  //     where: { orderId },
-  //   });
-
-  //   if (!payinOrder) {
-  //     throw new NotFoundException(
-  //       new MessageResponseDto("Payin order not found"),
-  //     );
-  //   }
-
-  //   if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
-  //     return {
-  //       orderId: payinOrder.orderId,
-  //       status: payinOrder.status,
-  //       txnRefId: payinOrder.txnRefId,
-  //     };
-  //   }
-
-  //   const { clientId, clientSecret } = await this.getFlakPayCredentials(
-  //     user.id,
-  //   );
-
-  //   const axiosServiceFlakPay = new AxiosService(
-  //     FALKPAY.BASE_URL,
-  //     getFlakPayPgConfig({
-  //       clientId,
-  //       clientSecret,
-  //     }),
-  //   );
-
-  //   // this.logger.info(`Calling FLAKPAY PAYIN STATUS API - orderId: ${orderId}`, {
-  //   //   orderId,
-  //   // });
-
-  //   const flakPayResponse =
-  //     await axiosServiceFlakPay.postRequest<IExternalPayinStatusResponseFlakPay>(
-  //       FALKPAY.PAYIN.STATUS_CHECK,
-  //       {
-  //         orderId,
-  //       },
-  //     );
-
-  //   const status = convertExternalPaymentStatusToInternal(
-  //     flakPayResponse.data.status.toUpperCase(),
-  //   );
-
-  //   this.logger.info(
-  //     `FLAKPAY PAYIN API RESPONSE -:`,
-  //     JSON.stringify(flakPayResponse.data),
-  //   );
-  //   const payInOrder = await this.payInOrdersRepository.save(
-  //     this.payInOrdersRepository.create({
-  //       ...payinOrder,
-  //       status,
-  //       txnRefId: flakPayResponse.data.transferId,
-  //     }),
-  //   );
-  //   if (user?.payInWebhookUrl) {
-  //     const payload = {
-  //       orderId: payInOrder.orderId,
-  //       status,
-  //       amount: +payInOrder.amount,
-  //       txnRefId: payInOrder.txnRefId,
-  //       utr: payInOrder.utr,
-  //     };
-  //     this.logger.info(
-  //       `Payout webhook for ${payInOrder.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
-  //       payload,
-  //     );
-  //     axios
-  //       .post(user.payInWebhookUrl, payload)
-  //       .then((res) => {
-  //         this.logger.info(
-  //           `Payout webhook sent successfully: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
-  //           res,
-  //         );
-  //       })
-  //       .catch((error) => {
-  //         this.logger.error(
-  //           `Payout webhook failed for order: ${payInOrder.orderId} : ${LoggerPlaceHolder.Json}`,
-  //           error,
-  //         );
-  //       });
-  //   }
-
-  //   return {
-  //     orderId: payinOrder.orderId,
-  //     status,
-  //     txnRefId: flakPayResponse.data.transferId,
-  //   };
-  // }
 
   async checkPayInStatusTransaction(
     { orderId }: PayinStatusDto,
