@@ -2416,23 +2416,23 @@ export class PaymentsService {
 
         await this.payOutOrdersRepository.save(payOutOrderRaw);
 
-        const wallet = await this.walletRepository.findOne({
-          where: {
-            user: {
-              id: payOutOrder.user.id,
-            },
-          },
-          relations: {
-            user: true,
-          },
-        });
+        // const wallet = await this.walletRepository.findOne({
+        //   where: {
+        //     user: {
+        //       id: payOutOrder.user.id,
+        //     },
+        //   },
+        //   relations: {
+        //     user: true,
+        //   },
+        // });
 
-        await this.walletRepository.save(
-          this.walletRepository.create({
-            id: wallet.id,
-            availablePayoutBalance: +wallet.availablePayoutBalance + +amount,
-          }),
-        );
+        // await this.walletRepository.save(
+        //   this.walletRepository.create({
+        //     id: wallet.id,
+        //     availablePayoutBalance: +wallet.availablePayoutBalance + +amount,
+        //   }),
+        // );
       }
 
       // send webhook
@@ -2440,7 +2440,7 @@ export class PaymentsService {
         const webhookPayload = {
           orderId: order_id,
           status,
-          amount,
+          amount: payOutOrder.amount,
           txnRefId: custUniqRef,
           payoutId: payOutOrder.payoutId,
           utr,
