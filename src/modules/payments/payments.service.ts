@@ -1323,11 +1323,11 @@ export class PaymentsService {
       );
     }
 
-    // if (newBalance < MINIMUM_BALANCE) {
-    //   throw new BadRequestException(
-    //     `Minimum balance of ₹${MINIMUM_BALANCE} must be maintained. After this transaction, balance would be ₹${newBalance}`,
-    //   );
-    // }
+    if (newBalance < MINIMUM_BALANCE) {
+      throw new BadRequestException(
+        `Minimum balance of ₹${MINIMUM_BALANCE} must be maintained. After this transaction, balance would be ₹${newBalance}`,
+      );
+    }
 
     this.logger.info(
       `PAYOUT - validateAndUpdateWallet - User wallet update: ${LoggerPlaceHolder.Json}`,
