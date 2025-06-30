@@ -1,6 +1,9 @@
+import { Repository } from "typeorm";
 import { Cache } from "cache-manager";
 import { appConfig } from "@/config/app.config";
 import { CustomLogger } from "@/logger";
+import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
+import { PAYMENT_STATUS } from "@/enums/payment.enum";
 
 const {
   utkarsh: { vpas, vpaRouting },
@@ -43,6 +46,27 @@ export interface VPAHealthMetrics {
   lastFailureTime: Date;
   isHealthy: boolean;
   healthScore: number; // 0-100
+  // Real-time metrics
+  dailySuccessCount: number;
+  dailyFailureCount: number;
+  dailyTotalAmount: number;
+  lastTransactionTime: Date;
+  // Historical data
+  weeklySuccessCount: number;
+  weeklyFailureCount: number;
+  monthlySuccessCount: number;
+  monthlyFailureCount: number;
+}
+
+export interface VPATransactionRecord {
+  orderId: string;
+  vpa: string;
+  amount: number;
+  userId: string;
+  status: PAYMENT_STATUS;
+  createdAt: Date;
+  completedAt?: Date;
+  responseTime?: number;
 }
 
 export class EnhancedVPARoutingService {
@@ -56,22 +80,145 @@ export class EnhancedVPARoutingService {
   private rateLimitCounters: Map<string, { count: number; resetTime: Date }> =
     new Map();
   private cacheManager: Cache | null = null;
+  private payInOrdersRepository: Repository<PayInOrdersEntity> | null = null;
+  private transactionRecords: Map<string, VPATransactionRecord> = new Map();
 
-  constructor(cacheManager?: Cache) {
+  constructor(
+    cacheManager?: Cache,
+    payInOrdersRepository?: Repository<PayInOrdersEntity>,
+  ) {
     this.cacheManager = cacheManager || null;
+    this.payInOrdersRepository = payInOrdersRepository || null;
     this.initializeMetrics();
+    this.loadHistoricalMetrics();
   }
 
-  /**
-   * Set cache manager (for dependency injection)
-   */
   setCacheManager(cacheManager: Cache) {
     this.cacheManager = cacheManager;
   }
 
+  setPayInOrdersRepository(repository: Repository<PayInOrdersEntity>) {
+    this.payInOrdersRepository = repository;
+  }
+
   /**
-   * Initialize VPA metrics from cache or defaults
+   * Load historical metrics from database
    */
+  private async loadHistoricalMetrics() {
+    if (!this.payInOrdersRepository) {
+      this.logger.warn(
+        "PayInOrders repository not available, skipping historical metrics",
+      );
+
+      return;
+    }
+
+    try {
+      // Get last 30 days of transaction data
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const historicalData = await this.payInOrdersRepository
+        .createQueryBuilder("payin")
+        .select([
+          "payin.intent",
+          "payin.amount",
+          "payin.status",
+          "payin.createdAt",
+          "payin.successAt",
+          "payin.failureAt",
+        ])
+        .where("payin.createdAt >= :date", { date: thirtyDaysAgo })
+        .andWhere("payin.intent IS NOT NULL")
+        .getMany();
+
+      // Process historical data to build metrics
+      const vpaStats = new Map<
+        string,
+        {
+          successCount: number;
+          failureCount: number;
+          totalAmount: number;
+          totalTransactions: number;
+          lastTransaction: Date;
+          averageResponseTime: number;
+        }
+      >();
+
+      historicalData.forEach((transaction) => {
+        // Extract VPA from payment intent (upi://pay?pa=VPA&...)
+        const vpaMatch = transaction.intent?.match(/pa=([^&]+)/);
+        if (!vpaMatch) return;
+
+        const vpa = vpaMatch[1];
+        const stats = vpaStats.get(vpa) || {
+          successCount: 0,
+          failureCount: 0,
+          totalAmount: 0,
+          totalTransactions: 0,
+          lastTransaction: new Date(0),
+          averageResponseTime: 0,
+        };
+
+        stats.totalTransactions++;
+        stats.totalAmount += transaction.amount || 0;
+        stats.lastTransaction = new Date(
+          Math.max(
+            stats.lastTransaction.getTime(),
+            transaction.createdAt.getTime(),
+          ),
+        );
+
+        // Calculate response time if we have success/failure timestamps
+        if (
+          transaction.status === PAYMENT_STATUS.SUCCESS &&
+          transaction.successAt
+        ) {
+          const responseTime =
+            transaction.successAt.getTime() - transaction.createdAt.getTime();
+          stats.averageResponseTime =
+            (stats.averageResponseTime * stats.successCount + responseTime) /
+            (stats.successCount + 1);
+          stats.successCount++;
+        } else if (
+          transaction.status === PAYMENT_STATUS.FAILED &&
+          transaction.failureAt
+        ) {
+          const responseTime =
+            transaction.failureAt.getTime() - transaction.createdAt.getTime();
+          stats.averageResponseTime =
+            (stats.averageResponseTime * stats.failureCount + responseTime) /
+            (stats.failureCount + 1);
+          stats.failureCount++;
+        }
+
+        vpaStats.set(vpa, stats);
+      });
+
+      // Update metrics with historical data
+      vpaStats.forEach((stats, vpa) => {
+        const existingMetrics = this.vpaMetrics.get(vpa);
+        if (existingMetrics) {
+          existingMetrics.successCount = stats.successCount;
+          existingMetrics.failureCount = stats.failureCount;
+          existingMetrics.totalTransactions = stats.totalTransactions;
+          existingMetrics.dailySuccessCount = stats.successCount;
+          existingMetrics.dailyFailureCount = stats.failureCount;
+          existingMetrics.dailyTotalAmount = stats.totalAmount;
+          existingMetrics.lastTransactionTime = stats.lastTransaction;
+          existingMetrics.averageResponseTime = stats.averageResponseTime;
+          existingMetrics.healthScore =
+            this.calculateHealthScore(existingMetrics);
+          existingMetrics.isHealthy = existingMetrics.healthScore > 50;
+        }
+      });
+
+      this.logger.info(`Loaded historical metrics for ${vpaStats.size} VPAs`);
+    } catch (error) {
+      this.logger.error(`Failed to load historical metrics: ${error.message}`);
+    }
+  }
+
   private async initializeMetrics() {
     try {
       if (this.cacheManager) {
@@ -91,7 +238,7 @@ export class EnhancedVPARoutingService {
       this.logger.warn("Failed to load metrics from cache, using defaults");
     }
 
-    // Initialize default metrics for all VPAs
+    // Initialize with real data if available
     vpas?.forEach((vpa) => {
       this.vpaMetrics.set(vpa.vpa, {
         vpa: vpa.vpa,
@@ -103,15 +250,20 @@ export class EnhancedVPARoutingService {
         lastFailureTime: new Date(),
         isHealthy: true,
         healthScore: 100,
+        dailySuccessCount: 0,
+        dailyFailureCount: 0,
+        dailyTotalAmount: 0,
+        lastTransactionTime: new Date(),
+        weeklySuccessCount: 0,
+        weeklyFailureCount: 0,
+        monthlySuccessCount: 0,
+        monthlyFailureCount: 0,
       });
     });
 
-    this.logger.info("Initialized default VPA metrics");
+    this.logger.info("Initialized VPA metrics");
   }
 
-  /**
-   * Enhanced VPA selection with health checks and circuit breakers
-   */
   async selectVPA(
     userId?: string,
     amount?: number,
@@ -140,15 +292,104 @@ export class EnhancedVPARoutingService {
       orderId,
     );
 
-    // Update metrics
+    // Record transaction start for metrics tracking
+    if (orderId) {
+      this.recordTransactionStart(
+        orderId,
+        result.selectedVpa,
+        amount || 0,
+        userId,
+      );
+    }
+
+    // Update usage metrics
     await this.updateUsageMetrics(result.selectedVpa);
 
     return result;
   }
 
   /**
-   * Get VPAs that are healthy and not rate limited
+   * Record transaction start for metrics tracking
    */
+  private recordTransactionStart(
+    orderId: string,
+    vpa: string,
+    amount: number,
+    userId?: string,
+  ) {
+    const record: VPATransactionRecord = {
+      orderId,
+      vpa,
+      amount,
+      userId: userId || "unknown",
+      status: PAYMENT_STATUS.PENDING,
+      createdAt: new Date(),
+    };
+
+    this.transactionRecords.set(orderId, record);
+
+    // Store in cache for webhook processing
+    if (this.cacheManager) {
+      this.cacheManager.set(`vpa_transaction_${orderId}`, record, 3600000); // 1 hour
+    }
+
+    this.logger.debug(
+      `Recorded transaction start: orderId=${orderId}, vpa=${vpa}, amount=${amount}`,
+    );
+  }
+
+  /**
+   * Process payment webhook and update real metrics
+   */
+  async processPaymentWebhook(
+    orderId: string,
+    status: PAYMENT_STATUS,
+    responseTime?: number,
+  ) {
+    try {
+      // Get transaction record
+      let record = this.transactionRecords.get(orderId);
+
+      if (!record && this.cacheManager) {
+        record = await this.cacheManager.get<VPATransactionRecord>(
+          `vpa_transaction_${orderId}`,
+        );
+      }
+
+      if (!record) {
+        this.logger.warn(`No transaction record found for orderId: ${orderId}`);
+
+        return;
+      }
+
+      // Update record
+      record.status = status;
+      record.completedAt = new Date();
+      record.responseTime = responseTime;
+
+      // Update real metrics based on actual payment status
+      if (status === PAYMENT_STATUS.SUCCESS) {
+        await this.recordSuccess(record.vpa, responseTime || 0, record.amount);
+      } else if (status === PAYMENT_STATUS.FAILED) {
+        await this.recordFailure(record.vpa, record.amount);
+      }
+
+      // Clean up
+      this.transactionRecords.delete(orderId);
+      if (this.cacheManager) {
+        this.cacheManager.del(`vpa_transaction_${orderId}`);
+      }
+
+      this.logger.info(
+        `Processed webhook: orderId=${orderId}, status=${status}, vpa=${record.vpa}, responseTime=${responseTime}ms`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to process webhook for orderId: ${orderId}: ${error.message}`,
+      );
+    }
+  }
+
   private async getAvailableVPAs(): Promise<VPARoute[]> {
     const activeVPAs = vpas?.filter((vpa) => vpa.isActive) || [];
     const availableVPAs: VPARoute[] = [];
@@ -166,21 +407,16 @@ export class EnhancedVPARoutingService {
     return availableVPAs;
   }
 
-  /**
-   * Check if VPA is healthy based on metrics
-   */
   private async isVPAHealthy(vpa: string): Promise<boolean> {
     const metrics = this.vpaMetrics.get(vpa);
-    if (!metrics) return true; // Default to healthy if no metrics
+    if (!metrics) return true;
 
     const healthScore = this.calculateHealthScore(metrics);
-    const isHealthy = healthScore > 50; // Threshold for healthy
+    const isHealthy = healthScore > 50;
 
-    // this.logger.debug(`VPA ${vpa} health check: ${LoggerPlaceHolder.Json}`, {
-    //   healthScore,
-    //   isHealthy,
-    //   successRate: metrics.successCount / Math.max(metrics.totalTransactions, 1)
-    // });
+    this.logger.debug(
+      `VPA ${vpa} health check: healthScore=${healthScore}, isHealthy=${isHealthy}, totalTransactions=${metrics.totalTransactions}`,
+    );
 
     return isHealthy;
   }
@@ -189,11 +425,11 @@ export class EnhancedVPARoutingService {
    * Calculate health score based on success rate and response time
    */
   private calculateHealthScore(metrics: VPAHealthMetrics): number {
-    const successRate =
-      metrics.totalTransactions > 0
-        ? metrics.successCount / metrics.totalTransactions
-        : 1;
+    if (metrics.totalTransactions === 0) {
+      return 100; // Default score for new VPAs
+    }
 
+    const successRate = metrics.successCount / metrics.totalTransactions;
     const responseTimeScore = Math.max(
       0,
       100 - metrics.averageResponseTime / 10,
@@ -214,7 +450,6 @@ export class EnhancedVPARoutingService {
     const now = new Date();
 
     if (!counter || now > counter.resetTime) {
-      // Reset counter
       this.rateLimitCounters.set(vpa, {
         count: 1,
         resetTime: new Date(now.getTime() + 60000), // 1 minute from now
@@ -235,7 +470,7 @@ export class EnhancedVPARoutingService {
   }
 
   /**
-   * Check circuit breaker state
+   * Check if circuit breaker is closed
    */
   private isCircuitBreakerClosed(vpa: string): boolean {
     const state = this.circuitBreakerState.get(vpa);
@@ -255,9 +490,6 @@ export class EnhancedVPARoutingService {
     return !state.isOpen;
   }
 
-  /**
-   * Apply routing strategy with enhanced logic
-   */
   private async applyRoutingStrategy(
     availableVPAs: VPARoute[],
     userId?: string,
@@ -284,9 +516,7 @@ export class EnhancedVPARoutingService {
     }
   }
 
-  /**
-   * Enhanced round-robin with health consideration
-   */
+  // Round Robin Strategy
   private async enhancedRoundRobinStrategy(
     vpas: VPARoute[],
   ): Promise<VPARoutingResult> {
@@ -310,9 +540,9 @@ export class EnhancedVPARoutingService {
     return {
       selectedVpa: selectedVpa.vpa,
       strategy: "enhanced_round_robin",
-      reason: `Selected VPA ${selectedVpa.vpa} (health score: ${metrics ? this.calculateHealthScore(metrics) : 100})`,
+      reason: `Selected VPA ${selectedVpa.vpa} (round-robin index: ${this.currentRoundRobinIndex})`,
       metadata: {
-        healthScore: metrics ? this.calculateHealthScore(metrics) : 100,
+        healthScore: metrics?.healthScore || 100,
         currentLoad: metrics?.totalTransactions || 0,
         lastUsed: new Date(),
         successRate: metrics
@@ -322,9 +552,7 @@ export class EnhancedVPARoutingService {
     };
   }
 
-  /**
-   * Health-based strategy - always use the healthiest VPA
-   */
+  // Health-based strategy - always use the healthiest VPA
   private async healthBasedStrategy(
     vpas: VPARoute[],
   ): Promise<VPARoutingResult> {
@@ -333,10 +561,10 @@ export class EnhancedVPARoutingService {
 
     for (const vpa of vpas) {
       const metrics = this.vpaMetrics.get(vpa.vpa);
-      const score = metrics ? this.calculateHealthScore(metrics) : 100;
+      const healthScore = metrics ? this.calculateHealthScore(metrics) : 100;
 
-      if (score > bestScore) {
-        bestScore = score;
+      if (healthScore > bestScore) {
+        bestScore = healthScore;
         bestVPA = vpa;
       }
     }
@@ -344,7 +572,7 @@ export class EnhancedVPARoutingService {
     return {
       selectedVpa: bestVPA.vpa,
       strategy: "health_based",
-      reason: `Selected healthiest VPA ${bestVPA.vpa} (score: ${bestScore})`,
+      reason: `Selected VPA ${bestVPA.vpa} (health score: ${bestScore.toFixed(2)})`,
       metadata: {
         healthScore: bestScore,
         currentLoad: this.vpaMetrics.get(bestVPA.vpa)?.totalTransactions || 0,
@@ -359,9 +587,7 @@ export class EnhancedVPARoutingService {
     };
   }
 
-  /**
-   * Adaptive strategy - combines multiple factors
-   */
+  // Adaptive strategy - combines health, priority, and load
   private async adaptiveStrategy(
     vpas: VPARoute[],
     userId?: string,
@@ -371,7 +597,7 @@ export class EnhancedVPARoutingService {
     const scoredVPAs = vpas.map((vpa) => {
       const metrics = this.vpaMetrics.get(vpa.vpa);
       const healthScore = metrics ? this.calculateHealthScore(metrics) : 100;
-      const priorityScore = (10 - vpa.priority) * 10; // Higher priority = higher score
+      const priorityScore = (10 - vpa.priority) * 10;
       const loadScore = Math.max(
         0,
         100 - (metrics?.totalTransactions || 0) / 10,
@@ -414,7 +640,6 @@ export class EnhancedVPARoutingService {
     vpas: VPARoute[],
     amount?: number,
   ): Promise<VPARoutingResult> {
-    // Implementation similar to original but with health checks
     return this.enhancedRoundRobinStrategy(vpas);
   }
 
@@ -422,7 +647,6 @@ export class EnhancedVPARoutingService {
     vpas: VPARoute[],
     userId?: string,
   ): Promise<VPARoutingResult> {
-    // Implementation similar to original but with health checks
     return this.enhancedRoundRobinStrategy(vpas);
   }
 
@@ -430,25 +654,21 @@ export class EnhancedVPARoutingService {
     vpas: VPARoute[],
     amount?: number,
   ): Promise<VPARoutingResult> {
-    // Implementation similar to original but with health checks
     return this.enhancedRoundRobinStrategy(vpas);
   }
 
   private async enhancedPriorityBasedStrategy(
     vpas: VPARoute[],
   ): Promise<VPARoutingResult> {
-    // Implementation similar to original but with health checks
     return this.enhancedRoundRobinStrategy(vpas);
   }
 
-  /**
-   * Update usage metrics for a VPA
-   */
+  // Update usage metrics for a VPA
   private async updateUsageMetrics(vpa: string) {
     const metrics = this.vpaMetrics.get(vpa);
     if (metrics) {
       metrics.totalTransactions++;
-      metrics.lastSuccessTime = new Date();
+      metrics.lastTransactionTime = new Date();
       this.vpaMetrics.set(vpa, metrics);
 
       // Cache metrics only if cache manager is available
@@ -462,15 +682,18 @@ export class EnhancedVPARoutingService {
     }
   }
 
-  /**
-   * Record success for a VPA
-   */
-  async recordSuccess(vpa: string, responseTime: number) {
+  // Record success for a VPA with real data
+  async recordSuccess(vpa: string, responseTime: number, amount = 0) {
     const metrics = this.vpaMetrics.get(vpa);
     if (metrics) {
       metrics.successCount++;
       metrics.totalTransactions++;
       metrics.lastSuccessTime = new Date();
+      metrics.lastTransactionTime = new Date();
+      metrics.dailySuccessCount++;
+      metrics.dailyTotalAmount += amount;
+      metrics.weeklySuccessCount++;
+      metrics.monthlySuccessCount++;
 
       // Update average response time
       const totalTime =
@@ -480,6 +703,7 @@ export class EnhancedVPARoutingService {
 
       // Update health score
       metrics.healthScore = this.calculateHealthScore(metrics);
+      metrics.isHealthy = metrics.healthScore > 50;
 
       this.vpaMetrics.set(vpa, metrics);
 
@@ -498,19 +722,27 @@ export class EnhancedVPARoutingService {
         circuitState.failures = 0;
         circuitState.isOpen = false;
       }
+
+      this.logger.info(
+        `Recorded SUCCESS for VPA ${vpa}: responseTime=${responseTime}ms, amount=${amount}, newHealthScore=${metrics.healthScore.toFixed(2)}`,
+      );
     }
   }
 
-  /**
-   * Record failure for a VPA
-   */
-  async recordFailure(vpa: string) {
+  // Record failure for a VPA with real data
+  async recordFailure(vpa: string, amount = 0) {
     const metrics = this.vpaMetrics.get(vpa);
     if (metrics) {
       metrics.failureCount++;
       metrics.totalTransactions++;
       metrics.lastFailureTime = new Date();
+      metrics.lastTransactionTime = new Date();
+      metrics.dailyFailureCount++;
+      metrics.dailyTotalAmount += amount;
+      metrics.weeklyFailureCount++;
+      metrics.monthlyFailureCount++;
       metrics.healthScore = this.calculateHealthScore(metrics);
+      metrics.isHealthy = metrics.healthScore > 50;
 
       this.vpaMetrics.set(vpa, metrics);
 
@@ -541,12 +773,14 @@ export class EnhancedVPARoutingService {
       }
 
       this.circuitBreakerState.set(vpa, circuitState);
+
+      this.logger.info(
+        `Recorded FAILURE for VPA ${vpa}: amount=${amount}, newHealthScore=${metrics.healthScore.toFixed(2)}`,
+      );
     }
   }
 
-  /**
-   * Get comprehensive VPA statistics
-   */
+  // Get comprehensive VPA statistics with real data
   async getEnhancedVPAStats(): Promise<any> {
     const activeVPAs = this.getActiveVPAs();
     const healthMetrics = Array.from(this.vpaMetrics.values());
@@ -574,6 +808,14 @@ export class EnhancedVPARoutingService {
         totalTransactions: metrics.totalTransactions,
         averageResponseTime: metrics.averageResponseTime,
         isHealthy: metrics.healthScore > 50,
+        dailySuccessCount: metrics.dailySuccessCount,
+        dailyFailureCount: metrics.dailyFailureCount,
+        dailyTotalAmount: metrics.dailyTotalAmount,
+        lastTransactionTime: metrics.lastTransactionTime,
+        weeklySuccessCount: metrics.weeklySuccessCount,
+        weeklyFailureCount: metrics.weeklyFailureCount,
+        monthlySuccessCount: metrics.monthlySuccessCount,
+        monthlyFailureCount: metrics.monthlyFailureCount,
       })),
       vpas: activeVPAs.map((vpa) => ({
         vpa: vpa.vpa,
@@ -582,25 +824,67 @@ export class EnhancedVPARoutingService {
         description: vpa.description,
         healthScore: this.vpaMetrics.get(vpa.vpa)?.healthScore || 100,
       })),
+      realTimeData: {
+        totalActiveTransactions: this.transactionRecords.size,
+        lastUpdated: new Date(),
+      },
     };
   }
 
-  /**
-   * Get all active VPAs
-   */
+  // Get all active VPAs
   getActiveVPAs(): VPARoute[] {
     return vpas?.filter((vpa) => vpa.isActive) || [];
   }
 
-  /**
-   * Create fallback result
-   */
   private createFallbackResult(reason: string): VPARoutingResult {
     return {
       selectedVpa: appConfig().utkarsh.vpa,
       strategy: "fallback",
       reason,
     };
+  }
+
+  // Reset daily metrics (call this daily at midnight)
+  async resetDailyMetrics() {
+    this.vpaMetrics.forEach((metrics) => {
+      metrics.dailySuccessCount = 0;
+      metrics.dailyFailureCount = 0;
+      metrics.dailyTotalAmount = 0;
+    });
+
+    if (this.cacheManager) {
+      await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000);
+    }
+
+    this.logger.info("Reset daily VPA metrics");
+  }
+
+  // Reset weekly metrics (call this weekly)
+  async resetWeeklyMetrics() {
+    this.vpaMetrics.forEach((metrics) => {
+      metrics.weeklySuccessCount = 0;
+      metrics.weeklyFailureCount = 0;
+    });
+
+    if (this.cacheManager) {
+      await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000);
+    }
+
+    this.logger.info("Reset weekly VPA metrics");
+  }
+
+  // Reset monthly metrics (call this monthly)
+  async resetMonthlyMetrics() {
+    this.vpaMetrics.forEach((metrics) => {
+      metrics.monthlySuccessCount = 0;
+      metrics.monthlyFailureCount = 0;
+    });
+
+    if (this.cacheManager) {
+      await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000);
+    }
+
+    this.logger.info("Reset monthly VPA metrics");
   }
 }
 
