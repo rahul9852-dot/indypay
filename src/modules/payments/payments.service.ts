@@ -3185,8 +3185,7 @@ export class PaymentsService {
     const wallet = await queryRunner.manager
       .createQueryBuilder(WalletEntity, "wallet")
       .setLock("pessimistic_write")
-      .leftJoinAndSelect("wallet.user", "user")
-      .where("user.id = :userId", { userId })
+      .where("wallet.userId = :userId", { userId })
       .getOne();
 
     if (!wallet) {
