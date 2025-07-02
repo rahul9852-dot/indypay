@@ -1430,7 +1430,13 @@ export class PaymentsService {
       );
     }
 
-    if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
+    // Only skip API call if status is already SUCCESS and we have a txnRefId
+    // This prevents unnecessary API calls for completed transactions
+    if (payinOrder.status === PAYMENT_STATUS.SUCCESS && payinOrder.txnRefId) {
+      this.logger.info(
+        `Transaction already completed: ${orderId}, returning cached status`,
+      );
+
       return {
         orderId: payinOrder.orderId,
         status: payinOrder.status,
