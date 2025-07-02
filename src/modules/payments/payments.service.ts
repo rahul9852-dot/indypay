@@ -3266,7 +3266,7 @@ export class PaymentsService {
             gstAmount,
             netPayableAmount,
             txnRefId: txnId,
-            utr: upiTxnId,
+            utr: custRef,
             ...(isAmountMismatch && {
               status: PAYMENT_STATUS.MISMATCH,
             }),
@@ -3277,7 +3277,7 @@ export class PaymentsService {
             status,
             amount,
             txnRefId: txnId,
-            utr: upiTxnId,
+            utr: custRef,
             ...(status === PAYMENT_STATUS.SUCCESS && {
               successAt: new Date(),
             }),
@@ -3291,10 +3291,10 @@ export class PaymentsService {
 
         // update wallet
         if (status === PAYMENT_STATUS.SUCCESS) {
-          const wallet = await this.walletRepository.findOne({
-            where: { user: { id: user.id } },
-            relations: ["user"],
-          });
+          // const wallet = await this.walletRepository.findOne({
+          //   where: { user: { id: user.id } },
+          //   relations: ["user"],
+          // });
 
           await this.cacheManager.del(
             REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
@@ -3339,7 +3339,7 @@ export class PaymentsService {
             amount,
             txnRefId: payinOrder.txnRefId,
             // ...(!isMisspelled && { utr: upiTxnId }),
-            utr: upiTxnId,
+            utr: custRef,
             message: isAmountMismatch
               ? "Amount mismatch in payin order"
               : undefined,
