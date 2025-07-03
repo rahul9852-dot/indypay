@@ -8,10 +8,9 @@ export const generatePaymentLinkUtil = async (
   payload: IGeneratePaymentLinkPayload,
 ): Promise<string> => {
   const { amount, orderId, vpa, userId } = payload;
-  const startTime = Date.now();
 
   try {
-    // Use enhanced VPA routing service
+    // Use enhanced VPA routing service to select the best VPA
     const routingResult = await enhancedVpaRoutingService.selectVPA(
       userId,
       amount,
@@ -19,16 +18,10 @@ export const generatePaymentLinkUtil = async (
     );
     const selectedVpa = vpa || routingResult.selectedVpa;
 
-    const responseTime = Date.now() - startTime;
-
-    // Record success metrics
-    await enhancedVpaRoutingService.recordSuccess(selectedVpa, responseTime);
-
     logger.info(`VPA Selection: ${LoggerPlaceHolder.Json}`, {
       selectedVpa,
       strategy: routingResult.strategy,
       reason: routingResult.reason,
-      responseTime,
       metadata: routingResult.metadata,
     });
 
@@ -38,11 +31,6 @@ export const generatePaymentLinkUtil = async (
 
     return `upi://pay?${paymentStr}`;
   } catch (error) {
-    // Record failure metrics if we have a selected VPA
-    if (vpa) {
-      await enhancedVpaRoutingService.recordFailure(vpa);
-    }
-
     logger.error(`VPA Selection Failed: ${LoggerPlaceHolder.Json}`, {
       error: error.message,
       payload,

@@ -142,7 +142,13 @@ export class PaymentsService {
     private readonly dataSource: DataSource,
     private readonly thirdPartyAuthService: ThirdPartyAuthService,
     private readonly encryptionAlgoService: CryptoService,
-  ) {}
+  ) {
+    // Initialize enhanced VPA routing service with dependencies
+    enhancedVpaRoutingService.setCacheManager(this.cacheManager);
+    enhancedVpaRoutingService.setPayInOrdersRepository(
+      this.payInOrdersRepository,
+    );
+  }
   public randomStr(len: number, arr: string) {
     let ans = "";
     for (let i = 0; i < len; i++) {
@@ -3392,6 +3398,33 @@ export class PaymentsService {
         }
 
         await queryRunner.commitTransaction();
+
+        // Process VPA routing metrics after successful transaction update
+        try {
+          const responseTime =
+            status === PAYMENT_STATUS.SUCCESS && payinOrderRaw.successAt
+              ? payinOrderRaw.successAt.getTime() -
+                payinOrder.createdAt.getTime()
+              : status === PAYMENT_STATUS.FAILED && payinOrderRaw.failureAt
+                ? payinOrderRaw.failureAt.getTime() -
+                  payinOrder.createdAt.getTime()
+                : undefined;
+
+          await enhancedVpaRoutingService.processPaymentWebhook(
+            refId, // orderId
+            status,
+            responseTime,
+          );
+
+          this.logger.info(
+            `VPA routing metrics processed for orderId: ${refId}, status: ${status}, responseTime: ${responseTime}ms`,
+          );
+        } catch (vpaError) {
+          this.logger.error(
+            `Failed to process VPA routing metrics for orderId: ${refId}: ${vpaError.message}`,
+          );
+          // Don't throw error - VPA metrics are not critical for payment processing
+        }
 
         if (user?.payInWebhookUrl) {
           const webhookPayload = {
