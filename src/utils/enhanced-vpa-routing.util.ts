@@ -1,7 +1,7 @@
 import { Repository } from "typeorm";
 import { Cache } from "cache-manager";
 import { appConfig } from "@/config/app.config";
-import { CustomLogger } from "@/logger";
+import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 
@@ -278,6 +278,10 @@ export class EnhancedVPARoutingService {
     // Get healthy and available VPAs
     const availableVPAs = await this.getAvailableVPAs();
 
+    this.logger.info(`Available VPAs: ${LoggerPlaceHolder.Json}`, {
+      availableVPAs: availableVPAs.map((vpa) => vpa.vpa),
+    });
+
     if (availableVPAs.length === 0) {
       this.logger.warn("No available VPAs found, using fallback");
 
@@ -399,6 +403,10 @@ export class EnhancedVPARoutingService {
       const isNotRateLimited = await this.checkRateLimit(vpa.vpa);
       const isCircuitBreakerClosed = this.isCircuitBreakerClosed(vpa.vpa);
 
+      this.logger.debug(
+        `VPA ${vpa.vpa} availability check: isHealthy=${isHealthy}, isNotRateLimited=${isNotRateLimited}, isCircuitBreakerClosed=${isCircuitBreakerClosed}`,
+      );
+
       if (isHealthy && isNotRateLimited && isCircuitBreakerClosed) {
         availableVPAs.push(vpa);
       }
@@ -409,6 +417,9 @@ export class EnhancedVPARoutingService {
 
   private async isVPAHealthy(vpa: string): Promise<boolean> {
     const metrics = this.vpaMetrics.get(vpa);
+    this.logger.debug(
+      `VPA ${vpa} health check: metrics=${JSON.stringify(metrics)}`,
+    );
     if (!metrics) return true;
 
     const healthScore = this.calculateHealthScore(metrics);
@@ -435,6 +446,11 @@ export class EnhancedVPARoutingService {
       100 - metrics.averageResponseTime / 10,
     );
     const successRateScore = successRate * 100;
+
+    this.logger.debug(
+      `VPA ${metrics.vpa} health score calculation: successRate=${successRate}, responseTimeScore=${responseTimeScore}, successRateScore=${successRateScore},
+      Final health score: ${successRateScore * 0.7 + responseTimeScore * 0.3}`,
+    );
 
     return successRateScore * 0.7 + responseTimeScore * 0.3;
   }
@@ -496,6 +512,7 @@ export class EnhancedVPARoutingService {
     amount?: number,
     orderId?: string,
   ): Promise<VPARoutingResult> {
+    this.logger.info(`Applying routing strategy: ${vpaRouting.strategy}`);
     switch (vpaRouting.strategy) {
       case "round_robin":
         return this.enhancedRoundRobinStrategy(availableVPAs);
@@ -593,6 +610,7 @@ export class EnhancedVPARoutingService {
     userId?: string,
     amount?: number,
   ): Promise<VPARoutingResult> {
+    this.logger.info(`Applying adaptive strategy`);
     // Score each VPA based on multiple factors
     const scoredVPAs = vpas.map((vpa) => {
       const metrics = this.vpaMetrics.get(vpa.vpa);
@@ -609,10 +627,16 @@ export class EnhancedVPARoutingService {
       return { vpa, score: totalScore };
     });
 
+    this.logger.info(`Scored VPAs: ${JSON.stringify(scoredVPAs)}`);
+
     // Select VPA with highest score
     const bestVPA = scoredVPAs.reduce((best, current) =>
       current.score > best.score ? current : best,
     );
+
+    this.logger.info(`Selected VPA: ${bestVPA.vpa.vpa}`);
+    this.logger.info(`Selected VPA score: ${bestVPA.score.toFixed(2)}`);
+    this.logger.info(`Selected VPA priority: ${bestVPA.vpa.priority}`);
 
     return {
       selectedVpa: bestVPA.vpa.vpa,

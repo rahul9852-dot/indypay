@@ -126,9 +126,9 @@ export const appConfig = registerAs("appConfig", () => ({
     vpa: getOsEnv("UPI_ID"),
     vpas: getOsEnv("UTKARSH_VPAS") ? JSON.parse(getOsEnv("UTKARSH_VPAS")) : [],
     vpaRouting: {
-      strategy: getOsEnv("UTKARSH_VPA_ROUTING_STRATEGY") || "round_robin", // round_robin, load_balance, user_based, amount_based, health_based, adaptive
+      strategy: getOsEnv("ENHANCED_VPA_ROUTING_STRATEGY") || "round_robin", // round_robin, load_balance, user_based, amount_based, health_based, adaptive
       loadBalanceThreshold:
-        +getOsEnv("UTKARSH_LOAD_BALANCE_THRESHOLD") || 10000,
+        +getOsEnv("ENHANCED_VPA_LOAD_BALANCE_THRESHOLD") || 1000000,
       userBasedMapping: getOsEnv("UTKARSH_USER_BASED_MAPPING")
         ? JSON.parse(getOsEnv("UTKARSH_USER_BASED_MAPPING"))
         : {},
@@ -140,7 +140,7 @@ export const appConfig = registerAs("appConfig", () => ({
       enabled: getOsEnv("ENHANCED_VPA_ROUTING_ENABLED") === "true" || true,
       strategy: getOsEnv("ENHANCED_VPA_ROUTING_STRATEGY") || "round_robin", // round_robin, load_balance, user_based, amount_based, health_based, adaptive
       loadBalanceThreshold:
-        +getOsEnv("ENHANCED_VPA_LOAD_BALANCE_THRESHOLD") || 10000,
+        +getOsEnv("ENHANCED_VPA_LOAD_BALANCE_THRESHOLD") || 200000,
     },
     // Enhanced VPA configuration
     vpaMonitoring: {
