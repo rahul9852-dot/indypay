@@ -179,7 +179,7 @@ export class EnhancedVPARoutingService {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       this.logger.info(
-        `Loading historical metrics for last 30 days: ${thirtyDaysAgo.toISOString()}`,
+        `Loading historical metrics for last 30 days: ${thirtyDaysAgo}`,
       );
 
       const historicalData = await this.payInOrdersRepository
