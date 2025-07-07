@@ -89,8 +89,8 @@ export class EnhancedVPARoutingService {
   ) {
     this.cacheManager = cacheManager || null;
     this.payInOrdersRepository = payInOrdersRepository || null;
-    this.initializeMetrics();
-    this.loadHistoricalMetrics();
+    // Initialize with default values, load cache/historical data asynchronously
+    this.initializeDefaultMetrics();
   }
 
   setCacheManager(cacheManager: Cache) {
@@ -99,6 +99,66 @@ export class EnhancedVPARoutingService {
 
   setPayInOrdersRepository(repository: Repository<PayInOrdersEntity>) {
     this.payInOrdersRepository = repository;
+  }
+
+  /**
+   * Manually trigger cache and historical data loading
+   */
+  async refreshMetrics() {
+    this.logger.info("Manually refreshing VPA metrics from cache and database");
+    await this.loadCacheAndHistoricalData();
+  }
+
+  /**
+   * Initialize with default metrics (non-blocking)
+   */
+  private initializeDefaultMetrics() {
+    // Initialize with real data if available
+    vpas?.forEach((vpa) => {
+      this.vpaMetrics.set(vpa.vpa, {
+        vpa: vpa.vpa,
+        successCount: 0,
+        failureCount: 0,
+        totalTransactions: 0,
+        averageResponseTime: 0,
+        lastSuccessTime: new Date(),
+        lastFailureTime: new Date(),
+        isHealthy: true,
+        healthScore: 100,
+        dailySuccessCount: 0,
+        dailyFailureCount: 0,
+        dailyTotalAmount: 0,
+        lastTransactionTime: new Date(),
+        weeklySuccessCount: 0,
+        weeklyFailureCount: 0,
+        monthlySuccessCount: 0,
+        monthlyFailureCount: 0,
+      });
+    });
+
+    this.logger.info("Initialized default VPA metrics");
+
+    // Load cache and historical data asynchronously
+    this.loadCacheAndHistoricalData();
+  }
+
+  /**
+   * Load cache and historical data asynchronously
+   */
+  private async loadCacheAndHistoricalData() {
+    try {
+      // First try to load from cache
+      await this.initializeMetrics();
+
+      // Then load historical data if repository is available
+      if (this.payInOrdersRepository) {
+        await this.loadHistoricalMetrics();
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to load cache/historical data: ${error.message}`,
+      );
+    }
   }
 
   /**
@@ -118,6 +178,10 @@ export class EnhancedVPARoutingService {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+      this.logger.info(
+        `Loading historical metrics for last 30 days: ${thirtyDaysAgo.toISOString()}`,
+      );
+
       const historicalData = await this.payInOrdersRepository
         .createQueryBuilder("payin")
         .select([
@@ -132,6 +196,10 @@ export class EnhancedVPARoutingService {
         .andWhere("payin.intent IS NOT NULL")
         .getMany();
 
+      this.logger.info(
+        `Found ${historicalData.length} historical transactions for VPA analysis`,
+      );
+
       // Process historical data to build metrics
       const vpaStats = new Map<
         string,
@@ -145,12 +213,17 @@ export class EnhancedVPARoutingService {
         }
       >();
 
+      let processedCount = 0;
+      const extractedVPAs = new Set<string>();
+
       historicalData.forEach((transaction) => {
         // Extract VPA from payment intent (upi://pay?pa=VPA&...)
         const vpaMatch = transaction.intent?.match(/pa=([^&]+)/);
         if (!vpaMatch) return;
 
         const vpa = vpaMatch[1];
+        extractedVPAs.add(vpa);
+        processedCount++;
         const stats = vpaStats.get(vpa) || {
           successCount: 0,
           failureCount: 0,
@@ -195,21 +268,36 @@ export class EnhancedVPARoutingService {
         vpaStats.set(vpa, stats);
       });
 
-      // Update metrics with historical data
+      this.logger.info(
+        `Processed ${processedCount} transactions, extracted ${extractedVPAs.size} unique VPAs: ${Array.from(extractedVPAs).join(", ")}`,
+      );
+
+      // Update metrics with historical data (only if no recent activity)
       vpaStats.forEach((stats, vpa) => {
         const existingMetrics = this.vpaMetrics.get(vpa);
         if (existingMetrics) {
-          existingMetrics.successCount = stats.successCount;
-          existingMetrics.failureCount = stats.failureCount;
-          existingMetrics.totalTransactions = stats.totalTransactions;
-          existingMetrics.dailySuccessCount = stats.successCount;
-          existingMetrics.dailyFailureCount = stats.failureCount;
-          existingMetrics.dailyTotalAmount = stats.totalAmount;
-          existingMetrics.lastTransactionTime = stats.lastTransaction;
-          existingMetrics.averageResponseTime = stats.averageResponseTime;
-          existingMetrics.healthScore =
-            this.calculateHealthScore(existingMetrics);
-          existingMetrics.isHealthy = existingMetrics.healthScore > 50;
+          // Only update if there's no recent activity (older than 1 hour)
+          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+          const hasRecentActivity =
+            existingMetrics.lastTransactionTime > oneHourAgo;
+
+          if (!hasRecentActivity) {
+            existingMetrics.successCount = stats.successCount;
+            existingMetrics.failureCount = stats.failureCount;
+            existingMetrics.totalTransactions = stats.totalTransactions;
+            existingMetrics.dailySuccessCount = stats.successCount;
+            existingMetrics.dailyFailureCount = stats.failureCount;
+            existingMetrics.dailyTotalAmount = stats.totalAmount;
+            existingMetrics.lastTransactionTime = stats.lastTransaction;
+            existingMetrics.averageResponseTime = stats.averageResponseTime;
+            existingMetrics.healthScore =
+              this.calculateHealthScore(existingMetrics);
+            existingMetrics.isHealthy = existingMetrics.healthScore > 50;
+          } else {
+            this.logger.debug(
+              `Skipping historical update for ${vpa} - has recent activity`,
+            );
+          }
         }
       });
 
@@ -228,8 +316,15 @@ export class EnhancedVPARoutingService {
           );
 
         if (cachedMetrics) {
-          this.vpaMetrics = cachedMetrics;
-          this.logger.info("Loaded VPA metrics from cache");
+          // Only update if we have cached data and current metrics are empty
+          if (this.vpaMetrics.size === 0) {
+            this.vpaMetrics = cachedMetrics;
+            this.logger.info("Loaded VPA metrics from cache");
+          } else {
+            this.logger.info(
+              "Skipping cache load - metrics already initialized",
+            );
+          }
 
           return;
         }
@@ -238,30 +333,33 @@ export class EnhancedVPARoutingService {
       this.logger.warn("Failed to load metrics from cache, using defaults");
     }
 
-    // Initialize with real data if available
-    vpas?.forEach((vpa) => {
-      this.vpaMetrics.set(vpa.vpa, {
-        vpa: vpa.vpa,
-        successCount: 0,
-        failureCount: 0,
-        totalTransactions: 0,
-        averageResponseTime: 0,
-        lastSuccessTime: new Date(),
-        lastFailureTime: new Date(),
-        isHealthy: true,
-        healthScore: 100,
-        dailySuccessCount: 0,
-        dailyFailureCount: 0,
-        dailyTotalAmount: 0,
-        lastTransactionTime: new Date(),
-        weeklySuccessCount: 0,
-        weeklyFailureCount: 0,
-        monthlySuccessCount: 0,
-        monthlyFailureCount: 0,
+    // Only initialize if metrics are empty
+    if (this.vpaMetrics.size === 0) {
+      // Initialize with real data if available
+      vpas?.forEach((vpa) => {
+        this.vpaMetrics.set(vpa.vpa, {
+          vpa: vpa.vpa,
+          successCount: 0,
+          failureCount: 0,
+          totalTransactions: 0,
+          averageResponseTime: 0,
+          lastSuccessTime: new Date(),
+          lastFailureTime: new Date(),
+          isHealthy: true,
+          healthScore: 100,
+          dailySuccessCount: 0,
+          dailyFailureCount: 0,
+          dailyTotalAmount: 0,
+          lastTransactionTime: new Date(),
+          weeklySuccessCount: 0,
+          weeklyFailureCount: 0,
+          monthlySuccessCount: 0,
+          monthlyFailureCount: 0,
+        });
       });
-    });
 
-    this.logger.info("Initialized VPA metrics");
+      this.logger.info("Initialized VPA metrics from defaults");
+    }
   }
 
   async selectVPA(
