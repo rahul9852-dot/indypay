@@ -1,8 +1,8 @@
 import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Inject } from "@nestjs/common";
-import { VPAHealthMetrics } from "./enhanced-vpa-routing.util";
 import { CustomLogger } from "@/logger";
+import { VPAHealthMetrics } from "@/interface/common.interface";
 
 export interface VPAAlert {
   id: string;
