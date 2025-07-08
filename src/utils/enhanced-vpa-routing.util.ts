@@ -234,7 +234,7 @@ export class EnhancedVPARoutingService {
           lastSuccessTime: new Date(),
           lastFailureTime: new Date(),
           isHealthy: true,
-          healthScore: 100,
+          healthScore: 10,
           // Real-time metrics
           dailySuccessCount: 0,
           dailyFailureCount: 0,
@@ -247,8 +247,8 @@ export class EnhancedVPARoutingService {
           monthlyFailureCount: 0,
           // Volume tracking for limits
           dailyTransactionCount: 0,
-          dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
-          dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Default 5000 transactions
+          dailyVolumeLimit: vpa.maxDailyAmount || 100, // Test with 100 rupees
+          dailyTransactionLimit: vpa.maxDailyTransactions || 10, // Test with 10 transactions
           isVolumeLimitReached: false,
           isTransactionLimitReached: false,
           volumeLimitPercentage: 0,
@@ -334,8 +334,8 @@ export class EnhancedVPARoutingService {
                 monthlyFailureCount: 0,
                 // Volume tracking for limits
                 dailyTransactionCount: 0,
-                dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
-                dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Default 5000 transactions
+                dailyVolumeLimit: vpa.maxDailyAmount || 100, // Test with 100 rupees
+                dailyTransactionLimit: vpa.maxDailyTransactions || 10, // Test with 10 transactions
                 isVolumeLimitReached: false,
                 isTransactionLimitReached: false,
                 volumeLimitPercentage: 0,
@@ -379,8 +379,8 @@ export class EnhancedVPARoutingService {
           monthlyFailureCount: 0,
           // Volume tracking for limits
           dailyTransactionCount: 0,
-          dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
-          dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Default 5000 transactions
+          dailyVolumeLimit: vpa.maxDailyAmount || 100, // Test with 100 rupees
+          dailyTransactionLimit: vpa.maxDailyTransactions || 10, // Test with 10 transactions
           isVolumeLimitReached: false,
           isTransactionLimitReached: false,
           volumeLimitPercentage: 0,
@@ -560,8 +560,8 @@ export class EnhancedVPARoutingService {
             monthlyFailureCount: 0,
             // Volume tracking for limits
             dailyTransactionCount: 0,
-            dailyVolumeLimit: 2000000, // Default 20L
-            dailyTransactionLimit: 5000, // Default 5000 transactions
+            dailyVolumeLimit: 10, // Test with 100 rupees
+            dailyTransactionLimit: 5, // Test with 10 transactions
             isVolumeLimitReached: false,
             isTransactionLimitReached: false,
             volumeLimitPercentage: 0,
