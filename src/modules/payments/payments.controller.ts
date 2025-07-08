@@ -168,6 +168,16 @@ export class PaymentsController {
   }
 
   @Public()
+  @ApiOperation({ summary: "Debug VPA health scores (no auth required)" })
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/debug-health")
+  async debugVPAHealthScores() {
+    this.logger.info("Debug VPA health scores endpoint called");
+
+    return this.paymentsService.debugVPAHealthScores();
+  }
+
+  @Public()
   @ApiOperation({ summary: "Get VPA volume limits status" })
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.OK)

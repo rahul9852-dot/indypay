@@ -193,39 +193,38 @@ export class PaymentsService {
    * Debug VPA service data availability
    */
   async debugVPAService() {
-    this.logger.info("Starting VPA service debug...");
+    this.logger.info("Debug VPA service called");
 
-    try {
-      // Call the debug method from enhanced VPA routing service
-      await enhancedVpaRoutingService.debugDataAvailability();
+    return await enhancedVpaRoutingService.debugDataAvailability();
+  }
 
-      // Get basic stats to see what's available
-      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
+  async debugVPAHealthScores() {
+    this.logger.info("Debug VPA health scores called");
 
-      return {
-        message: "VPA service debug completed",
-        timestamp: new Date().toISOString(),
-        serviceHealth: enhancedVpaRoutingService.isServiceHealthy(),
-        stats,
-        debugInfo: {
-          hasRepository: !!this.payInOrdersRepository,
-          hasCache: !!this.cacheManager,
-          repositoryType: this.payInOrdersRepository
-            ? "PayInOrdersEntity"
-            : "null",
-          cacheType: this.cacheManager ? "Cache" : "null",
-        },
-      };
-    } catch (error) {
-      this.logger.error(`VPA service debug failed: ${error.message}`);
+    const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
 
-      return {
-        message: "VPA service debug failed",
-        error: error.message,
-        timestamp: new Date().toISOString(),
-        serviceHealth: false,
-      };
-    }
+    // Return only the health metrics for debugging
+    return {
+      message: "VPA Health Scores Debug",
+      healthMetrics:
+        stats.healthMetrics?.map((metric: any) => ({
+          vpa: metric.vpa,
+          healthScore: metric.healthScore,
+          isHealthy: metric.isHealthy,
+          successCount: metric.successCount,
+          failureCount: metric.failureCount,
+          totalTransactions: metric.totalTransactions,
+          successRate:
+            metric.totalTransactions > 0
+              ? (
+                  (metric.successCount / metric.totalTransactions) *
+                  100
+                ).toFixed(2) + "%"
+              : "0%",
+          averageResponseTime:
+            metric.averageResponseTime?.toFixed(2) + "ms" || "0ms",
+        })) || [],
+    };
   }
 
   /**
