@@ -176,6 +176,31 @@ export class EnhancedVPARoutingService {
       );
     });
 
+    // Check configured VPAs vs metrics
+    const configuredVPAs = vpas?.map((v) => v.vpa) || [];
+    const metricsVPAs = Array.from(this.vpaMetrics.keys());
+
+    this.logger.info(`Configured VPAs: ${configuredVPAs.join(", ")}`);
+    this.logger.info(`VPAs with metrics: ${metricsVPAs.join(", ")}`);
+
+    const onlyInMetrics = metricsVPAs.filter(
+      (vpa) => !configuredVPAs.includes(vpa),
+    );
+    const onlyInConfig = configuredVPAs.filter(
+      (vpa) => !metricsVPAs.includes(vpa),
+    );
+
+    if (onlyInMetrics.length > 0) {
+      this.logger.warn(
+        `VPAs only in metrics (historical): ${onlyInMetrics.join(", ")}`,
+      );
+    }
+    if (onlyInConfig.length > 0) {
+      this.logger.warn(
+        `VPAs only in config (no metrics): ${onlyInConfig.join(", ")}`,
+      );
+    }
+
     this.logger.info("=== End Debug Information ===");
   }
 
@@ -185,47 +210,55 @@ export class EnhancedVPARoutingService {
   async refreshMetrics() {
     this.logger.info("Manually refreshing VPA metrics from cache and database");
     await this.loadCacheAndHistoricalData();
+    this.checkAndResetDailyMetricsIfNeeded();
   }
 
   /**
-   * Initialize with default metrics (non-blocking)
+   * Initialize default metrics for all VPAs
    */
   private initializeDefaultMetrics() {
-    // Initialize with real data if available
-    vpas?.forEach((vpa) => {
-      this.vpaMetrics.set(vpa.vpa, {
-        vpa: vpa.vpa,
-        successCount: 0,
-        failureCount: 0,
-        totalTransactions: 0,
-        averageResponseTime: 0,
-        lastSuccessTime: new Date(),
-        lastFailureTime: new Date(),
-        isHealthy: true,
-        healthScore: 100,
-        dailySuccessCount: 0,
-        dailyFailureCount: 0,
-        dailyTotalAmount: 0,
-        lastTransactionTime: new Date(),
-        weeklySuccessCount: 0,
-        weeklyFailureCount: 0,
-        monthlySuccessCount: 0,
-        monthlyFailureCount: 0,
-        // Volume tracking for limits
-        dailyTransactionCount: 0,
-        dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
-        dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Default 5000 transactions
-        isVolumeLimitReached: false,
-        isTransactionLimitReached: false,
-        volumeLimitPercentage: 0,
-        transactionLimitPercentage: 0,
-      });
+    if (!vpas) {
+      this.logger.warn("No VPAs configured");
+
+      return;
+    }
+
+    vpas.forEach((vpa) => {
+      if (!this.vpaMetrics.has(vpa.vpa)) {
+        this.vpaMetrics.set(vpa.vpa, {
+          vpa: vpa.vpa,
+          successCount: 0,
+          failureCount: 0,
+          totalTransactions: 0,
+          averageResponseTime: 0,
+          lastSuccessTime: new Date(),
+          lastFailureTime: new Date(),
+          isHealthy: true,
+          healthScore: 100,
+          // Real-time metrics
+          dailySuccessCount: 0,
+          dailyFailureCount: 0,
+          dailyTotalAmount: 0,
+          lastTransactionTime: new Date(),
+          // Historical data
+          weeklySuccessCount: 0,
+          weeklyFailureCount: 0,
+          monthlySuccessCount: 0,
+          monthlyFailureCount: 0,
+          // Volume tracking for limits
+          dailyTransactionCount: 0,
+          dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
+          dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Default 5000 transactions
+          isVolumeLimitReached: false,
+          isTransactionLimitReached: false,
+          volumeLimitPercentage: 0,
+          transactionLimitPercentage: 0,
+        });
+      }
     });
 
-    this.logger.info("Initialized default VPA metrics");
-
-    // Load cache and historical data asynchronously
-    this.loadCacheAndHistoricalData();
+    // Check if daily metrics need to be reset
+    this.checkAndResetDailyMetricsIfNeeded();
   }
 
   /**
@@ -1235,7 +1268,12 @@ export class EnhancedVPARoutingService {
     }
 
     const activeVPAs = this.getActiveVPAs();
-    const healthMetrics = Array.from(this.vpaMetrics.values());
+
+    // Filter health metrics to only include currently configured VPAs
+    const configuredVpaSet = new Set(vpas?.map((v) => v.vpa) || []);
+    const healthMetrics = Array.from(this.vpaMetrics.values()).filter(
+      (metrics) => configuredVpaSet.has(metrics.vpa),
+    );
 
     // Validate metrics data
     const totalTransactions = healthMetrics.reduce(
@@ -1325,7 +1363,9 @@ export class EnhancedVPARoutingService {
     };
   }
 
-  // Reset daily metrics (call this daily at midnight)
+  /**
+   * Reset daily metrics (call this daily at midnight)
+   */
   async resetDailyMetrics() {
     this.vpaMetrics.forEach((metrics) => {
       metrics.dailySuccessCount = 0;
@@ -1343,6 +1383,49 @@ export class EnhancedVPARoutingService {
     await this.saveMetricsToCache();
 
     this.logger.info("Reset daily VPA metrics and volume limits");
+  }
+
+  /**
+   * Check if daily metrics need to be reset (called on service initialization)
+   */
+  private checkAndResetDailyMetricsIfNeeded() {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Check if we have any metrics with daily data from a previous day
+    let needsReset = false;
+
+    this.vpaMetrics.forEach((metrics) => {
+      if (metrics.lastTransactionTime) {
+        const lastTransactionDate = new Date(metrics.lastTransactionTime);
+        const lastTransactionDay = new Date(
+          lastTransactionDate.getFullYear(),
+          lastTransactionDate.getMonth(),
+          lastTransactionDate.getDate(),
+        );
+
+        // If last transaction was on a different day, we need to reset daily metrics
+        if (lastTransactionDay.getTime() !== today.getTime()) {
+          needsReset = true;
+        }
+      }
+    });
+
+    if (needsReset) {
+      this.logger.info(
+        "Detected daily metrics from previous day, resetting daily counters",
+      );
+      this.vpaMetrics.forEach((metrics) => {
+        metrics.dailySuccessCount = 0;
+        metrics.dailyFailureCount = 0;
+        metrics.dailyTotalAmount = 0;
+        metrics.dailyTransactionCount = 0;
+        metrics.isVolumeLimitReached = false;
+        metrics.isTransactionLimitReached = false;
+        metrics.volumeLimitPercentage = 0;
+        metrics.transactionLimitPercentage = 0;
+      });
+    }
   }
 
   // Reset weekly metrics (call this weekly)

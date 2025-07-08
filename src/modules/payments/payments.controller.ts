@@ -55,6 +55,8 @@ import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { ExternalPayinWebhookUtkarshDto } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
+import { appConfig } from "@/config/app.config";
+import { enhancedVpaRoutingService } from "@/utils/enhanced-vpa-routing.util";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -506,4 +508,31 @@ export class PaymentsController {
   // ) {
   //   return this.paymentsService.checkPaymentStatus(orderId, req);
   // }
+
+  @Get("vpa-debug")
+  @Public()
+  async getVPADebugInfo() {
+    const {
+      utkarsh: { vpas },
+    } = appConfig();
+
+    return {
+      statusCode: 200,
+      message: "VPA Debug Information",
+      success: true,
+      data: {
+        configuredVPAs:
+          vpas?.map((v) => ({
+            vpa: v.vpa,
+            priority: v.priority,
+            isActive: v.isActive,
+            description: v.description,
+          })) || [],
+        metricsVPAs: Array.from(enhancedVpaRoutingService["vpaMetrics"].keys()),
+        totalConfigured: vpas?.length || 0,
+        totalWithMetrics: enhancedVpaRoutingService["vpaMetrics"].size,
+        serviceHealth: enhancedVpaRoutingService.isServiceHealthy(),
+      },
+    };
+  }
 }
