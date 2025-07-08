@@ -191,12 +191,12 @@ export class EnhancedVPARoutingService {
     );
 
     if (onlyInMetrics.length > 0) {
-      this.logger.warn(
+      this.logger.info(
         `VPAs only in metrics (historical): ${onlyInMetrics.join(", ")}`,
       );
     }
     if (onlyInConfig.length > 0) {
-      this.logger.warn(
+      this.logger.info(
         `VPAs only in config (no metrics): ${onlyInConfig.join(", ")}`,
       );
     }
