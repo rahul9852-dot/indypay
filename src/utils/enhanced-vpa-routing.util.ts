@@ -56,6 +56,14 @@ export interface VPAHealthMetrics {
   weeklyFailureCount: number;
   monthlySuccessCount: number;
   monthlyFailureCount: number;
+  // Volume tracking for limits
+  dailyTransactionCount: number; // Total transactions today (success + failure)
+  dailyVolumeLimit: number; // Max daily amount limit
+  dailyTransactionLimit: number; // Max daily transaction count limit
+  isVolumeLimitReached: boolean; // Whether daily volume limit is reached
+  isTransactionLimitReached: boolean; // Whether daily transaction limit is reached
+  volumeLimitPercentage: number; // Percentage of volume limit used (0-100)
+  transactionLimitPercentage: number; // Percentage of transaction limit used (0-100)
 }
 
 export interface VPATransactionRecord {
@@ -89,6 +97,12 @@ export class EnhancedVPARoutingService {
   ) {
     this.cacheManager = cacheManager || null;
     this.payInOrdersRepository = payInOrdersRepository || null;
+
+    // Log injection status for debugging
+    this.logger.info(
+      `VPA Service initialized with: cacheManager=${!!this.cacheManager}, repository=${!!this.payInOrdersRepository}`,
+    );
+
     // Initialize with default values, load cache/historical data asynchronously
     this.initializeDefaultMetrics();
   }
@@ -98,7 +112,81 @@ export class EnhancedVPARoutingService {
   }
 
   setPayInOrdersRepository(repository: Repository<PayInOrdersEntity>) {
+    if (!repository) {
+      this.logger.error(
+        "PayInOrders repository is null - this will cause issues!",
+      );
+
+      return;
+    }
+
     this.payInOrdersRepository = repository;
+    this.logger.info("PayInOrders repository injected successfully");
+
+    // Trigger historical data loading if repository is now available
+    if (this.vpaMetrics.size > 0) {
+      this.loadHistoricalMetrics().catch((error) => {
+        this.logger.error(
+          `Failed to load historical metrics after repository injection: ${error.message}`,
+        );
+      });
+    }
+  }
+
+  /**
+   * Check if service is properly initialized
+   */
+  isServiceHealthy(): boolean {
+    const hasRepository = this.payInOrdersRepository !== null;
+    const hasCache = this.cacheManager !== null;
+    const hasMetrics = this.vpaMetrics.size > 0;
+
+    this.logger.info(
+      `VPA Service Health Check: Repository=${hasRepository}, Cache=${hasCache}, Metrics=${hasMetrics}`,
+    );
+
+    return hasRepository && hasCache && hasMetrics;
+  }
+
+  /**
+   * Debug method to check what data is available
+   */
+  async debugDataAvailability() {
+    this.logger.info("=== VPA Service Debug Information ===");
+
+    // Check repository
+    if (this.payInOrdersRepository) {
+      try {
+        const count = await this.payInOrdersRepository.count();
+        this.logger.info(`Database has ${count} payin orders`);
+      } catch (error) {
+        this.logger.error(`Failed to count payin orders: ${error.message}`);
+      }
+    } else {
+      this.logger.error("Repository is null!");
+    }
+
+    // Check cache
+    if (this.cacheManager) {
+      try {
+        const cachedMetrics = await this.cacheManager.get("vpa_metrics");
+        this.logger.info(`Cache has metrics: ${!!cachedMetrics}`);
+      } catch (error) {
+        this.logger.error(`Failed to check cache: ${error.message}`);
+      }
+    } else {
+      this.logger.error("Cache manager is null!");
+    }
+
+    // Check metrics
+    this.logger.info(`Memory has ${this.vpaMetrics.size} VPA metrics`);
+    this.vpaMetrics.forEach((metrics, vpa) => {
+      this.logger.info(
+        `VPA ${vpa}: ${metrics.totalTransactions} transactions, ${metrics.successCount} success, ${metrics.failureCount} failures`,
+      );
+    });
+
+    this.logger.info("=== End Debug Information ===");
   }
 
   /**
@@ -133,6 +221,14 @@ export class EnhancedVPARoutingService {
         weeklyFailureCount: 0,
         monthlySuccessCount: 0,
         monthlyFailureCount: 0,
+        // Volume tracking for limits
+        dailyTransactionCount: 0,
+        dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
+        dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Default 5000 transactions
+        isVolumeLimitReached: false,
+        isTransactionLimitReached: false,
+        volumeLimitPercentage: 0,
+        transactionLimitPercentage: 0,
       });
     });
 
@@ -282,17 +378,28 @@ export class EnhancedVPARoutingService {
             existingMetrics.lastTransactionTime > oneHourAgo;
 
           if (!hasRecentActivity) {
-            existingMetrics.successCount = stats.successCount;
-            existingMetrics.failureCount = stats.failureCount;
-            existingMetrics.totalTransactions = stats.totalTransactions;
-            existingMetrics.dailySuccessCount = stats.successCount;
-            existingMetrics.dailyFailureCount = stats.failureCount;
-            existingMetrics.dailyTotalAmount = stats.totalAmount;
-            existingMetrics.lastTransactionTime = stats.lastTransaction;
-            existingMetrics.averageResponseTime = stats.averageResponseTime;
-            existingMetrics.healthScore =
-              this.calculateHealthScore(existingMetrics);
-            existingMetrics.isHealthy = existingMetrics.healthScore > 50;
+            // Only update if we don't have real-time data
+            if (existingMetrics.totalTransactions === 0) {
+              existingMetrics.successCount = stats.successCount;
+              existingMetrics.failureCount = stats.failureCount;
+              existingMetrics.totalTransactions = stats.totalTransactions;
+              existingMetrics.dailySuccessCount = stats.successCount;
+              existingMetrics.dailyFailureCount = stats.failureCount;
+              existingMetrics.dailyTotalAmount = stats.totalAmount;
+              existingMetrics.lastTransactionTime = stats.lastTransaction;
+              existingMetrics.averageResponseTime = stats.averageResponseTime;
+              existingMetrics.healthScore =
+                this.calculateHealthScore(existingMetrics);
+              existingMetrics.isHealthy = existingMetrics.healthScore > 50;
+
+              this.logger.info(
+                `Loaded historical data for ${vpa}: ${stats.totalTransactions} transactions`,
+              );
+            } else {
+              this.logger.debug(
+                `Skipping historical update for ${vpa} - has real-time data`,
+              );
+            }
           } else {
             this.logger.debug(
               `Skipping historical update for ${vpa} - has recent activity`,
@@ -355,6 +462,14 @@ export class EnhancedVPARoutingService {
           weeklyFailureCount: 0,
           monthlySuccessCount: 0,
           monthlyFailureCount: 0,
+          // Volume tracking for limits
+          dailyTransactionCount: 0,
+          dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
+          dailyTransactionLimit: vpa.maxDailyTransactions || 1000,
+          isVolumeLimitReached: false,
+          isTransactionLimitReached: false,
+          volumeLimitPercentage: 0,
+          transactionLimitPercentage: 0,
         });
       });
 
@@ -374,11 +489,7 @@ export class EnhancedVPARoutingService {
     }
 
     // Get healthy and available VPAs
-    const availableVPAs = await this.getAvailableVPAs();
-
-    this.logger.info(`Available VPAs: ${LoggerPlaceHolder.Json}`, {
-      availableVPAs: availableVPAs.map((vpa) => vpa.vpa),
-    });
+    const availableVPAs = await this.getAvailableVPAs(amount);
 
     if (availableVPAs.length === 0) {
       this.logger.warn("No available VPAs found, using fallback");
@@ -492,7 +603,7 @@ export class EnhancedVPARoutingService {
     }
   }
 
-  private async getAvailableVPAs(): Promise<VPARoute[]> {
+  private async getAvailableVPAs(amount?: number): Promise<VPARoute[]> {
     const activeVPAs = vpas?.filter((vpa) => vpa.isActive) || [];
     const availableVPAs: VPARoute[] = [];
 
@@ -500,12 +611,18 @@ export class EnhancedVPARoutingService {
       const isHealthy = await this.isVPAHealthy(vpa.vpa);
       const isNotRateLimited = await this.checkRateLimit(vpa.vpa);
       const isCircuitBreakerClosed = this.isCircuitBreakerClosed(vpa.vpa);
+      const isWithinLimits = await this.isVPAWithinLimits(vpa.vpa, amount);
 
       this.logger.debug(
-        `VPA ${vpa.vpa} availability check: isHealthy=${isHealthy}, isNotRateLimited=${isNotRateLimited}, isCircuitBreakerClosed=${isCircuitBreakerClosed}`,
+        `VPA ${vpa.vpa} availability check: isHealthy=${isHealthy}, isNotRateLimited=${isNotRateLimited}, isCircuitBreakerClosed=${isCircuitBreakerClosed}, isWithinLimits=${isWithinLimits}`,
       );
 
-      if (isHealthy && isNotRateLimited && isCircuitBreakerClosed) {
+      if (
+        isHealthy &&
+        isNotRateLimited &&
+        isCircuitBreakerClosed &&
+        isWithinLimits
+      ) {
         availableVPAs.push(vpa);
       }
     }
@@ -528,6 +645,149 @@ export class EnhancedVPARoutingService {
     );
 
     return isHealthy;
+  }
+
+  /**
+   * Check if VPA has reached its daily volume or transaction limits
+   */
+  private async isVPAWithinLimits(
+    vpa: string,
+    amount?: number,
+  ): Promise<boolean> {
+    const metrics = this.vpaMetrics.get(vpa);
+    if (!metrics) return true;
+
+    // Check transaction count limit (applies to ALL transactions - success + failure)
+    if (metrics.isTransactionLimitReached) {
+      this.logger.warn(
+        `VPA ${vpa} has reached daily transaction limit: ${metrics.dailyTransactionCount}/${metrics.dailyTransactionLimit}`,
+      );
+
+      return false;
+    }
+
+    // Check volume limit (applies ONLY to successful transactions)
+    if (metrics.isVolumeLimitReached) {
+      this.logger.warn(
+        `VPA ${vpa} has reached daily volume limit: ${metrics.dailyTotalAmount}/${metrics.dailyVolumeLimit}`,
+      );
+
+      return false;
+    }
+
+    // Check if this transaction would exceed limits
+    if (amount) {
+      const newDailyTransactions = metrics.dailyTransactionCount + 1;
+
+      // Transaction count limit applies to ALL transactions
+      if (newDailyTransactions > metrics.dailyTransactionLimit) {
+        this.logger.warn(
+          `VPA ${vpa} would exceed daily transaction limit: ${newDailyTransactions}/${metrics.dailyTransactionLimit}`,
+        );
+
+        return false;
+      }
+
+      // Volume limit applies ONLY to successful transactions
+      // We can't predict if this transaction will succeed, so we check conservatively
+      // If the current volume + amount would exceed limit, we exclude the VPA
+      const newDailyAmount = metrics.dailyTotalAmount + amount;
+      if (newDailyAmount > metrics.dailyVolumeLimit) {
+        this.logger.warn(
+          `VPA ${vpa} would exceed daily volume limit if successful: ${newDailyAmount}/${metrics.dailyVolumeLimit}`,
+        );
+
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Update volume limit tracking for a VPA (ONLY for successful transactions)
+   */
+  private updateVolumeLimitTracking(vpa: string, amount: number): void {
+    const metrics = this.vpaMetrics.get(vpa);
+    if (!metrics) return;
+
+    // Update transaction count
+    metrics.dailyTransactionCount++;
+
+    // Update volume (ONLY for successful transactions)
+    metrics.dailyTotalAmount += amount;
+
+    // Calculate percentages
+    metrics.volumeLimitPercentage =
+      (metrics.dailyTotalAmount / metrics.dailyVolumeLimit) * 100;
+
+    metrics.transactionLimitPercentage =
+      (metrics.dailyTransactionCount / metrics.dailyTransactionLimit) * 100;
+
+    // Check if limits are reached
+    metrics.isVolumeLimitReached =
+      metrics.dailyTotalAmount >= metrics.dailyVolumeLimit;
+
+    metrics.isTransactionLimitReached =
+      metrics.dailyTransactionCount >= metrics.dailyTransactionLimit;
+
+    this.logger.info(
+      `VPA ${vpa} SUCCESS volume tracking: amount=${amount}, dailyTotal=${metrics.dailyTotalAmount}, dailyCount=${metrics.dailyTransactionCount}, volumeLimit=${metrics.volumeLimitPercentage.toFixed(2)}%, transactionLimit=${metrics.transactionLimitPercentage.toFixed(2)}%`,
+    );
+
+    // Alert if approaching limits (80% threshold)
+    if (
+      metrics.volumeLimitPercentage >= 80 ||
+      metrics.transactionLimitPercentage >= 80
+    ) {
+      this.logger.warn(
+        `VPA ${vpa} approaching limits: volume=${metrics.volumeLimitPercentage.toFixed(2)}%, transactions=${metrics.transactionLimitPercentage.toFixed(2)}%`,
+      );
+    }
+
+    // Alert if limits reached
+    if (metrics.isVolumeLimitReached || metrics.isTransactionLimitReached) {
+      this.logger.error(
+        `VPA ${vpa} LIMIT REACHED: volume=${metrics.isVolumeLimitReached}, transactions=${metrics.isTransactionLimitReached}`,
+      );
+    }
+  }
+
+  /**
+   * Update transaction count tracking for a VPA (for failed transactions)
+   */
+  private updateTransactionCountTracking(vpa: string): void {
+    const metrics = this.vpaMetrics.get(vpa);
+    if (!metrics) return;
+
+    // Update transaction count (but NOT volume for failures)
+    metrics.dailyTransactionCount++;
+
+    // Calculate transaction percentage only
+    metrics.transactionLimitPercentage =
+      (metrics.dailyTransactionCount / metrics.dailyTransactionLimit) * 100;
+
+    // Check if transaction limit is reached
+    metrics.isTransactionLimitReached =
+      metrics.dailyTransactionCount >= metrics.dailyTransactionLimit;
+
+    this.logger.info(
+      `VPA ${vpa} FAILURE transaction tracking: dailyCount=${metrics.dailyTransactionCount}, transactionLimit=${metrics.transactionLimitPercentage.toFixed(2)}%`,
+    );
+
+    // Alert if approaching transaction limit (80% threshold)
+    if (metrics.transactionLimitPercentage >= 80) {
+      this.logger.warn(
+        `VPA ${vpa} approaching transaction limit: ${metrics.transactionLimitPercentage.toFixed(2)}%`,
+      );
+    }
+
+    // Alert if transaction limit reached
+    if (metrics.isTransactionLimitReached) {
+      this.logger.error(
+        `VPA ${vpa} TRANSACTION LIMIT REACHED: ${metrics.dailyTransactionCount}/${metrics.dailyTransactionLimit}`,
+      );
+    }
   }
 
   /**
@@ -717,7 +977,7 @@ export class EnhancedVPARoutingService {
       const loadScore = Math.max(
         0,
         100 - (metrics?.totalTransactions || 0) / 10,
-      ); // Lower load = higher score
+      );
 
       const totalScore =
         healthScore * 0.4 + priorityScore * 0.3 + loadScore * 0.3;
@@ -727,7 +987,6 @@ export class EnhancedVPARoutingService {
 
     this.logger.info(`Scored VPAs: ${JSON.stringify(scoredVPAs)}`);
 
-    // Select VPA with highest score
     const bestVPA = scoredVPAs.reduce((best, current) =>
       current.score > best.score ? current : best,
     );
@@ -797,8 +1056,11 @@ export class EnhancedVPARoutingService {
       if (this.cacheManager) {
         try {
           await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000); // 1 hour
+          this.logger.debug(`Cached VPA metrics for ${vpa}`);
         } catch (error) {
-          this.logger.warn(`Failed to cache VPA metrics: ${error.message}`);
+          this.logger.warn(
+            `Failed to cache VPA metrics for ${vpa}: ${error.message}`,
+          );
         }
       }
     }
@@ -826,6 +1088,9 @@ export class EnhancedVPARoutingService {
       // Update health score
       metrics.healthScore = this.calculateHealthScore(metrics);
       metrics.isHealthy = metrics.healthScore > 50;
+
+      // Update volume limit tracking
+      this.updateVolumeLimitTracking(vpa, amount);
 
       this.vpaMetrics.set(vpa, metrics);
 
@@ -860,11 +1125,15 @@ export class EnhancedVPARoutingService {
       metrics.lastFailureTime = new Date();
       metrics.lastTransactionTime = new Date();
       metrics.dailyFailureCount++;
-      metrics.dailyTotalAmount += amount;
+      // NOTE: Do NOT add amount to dailyTotalAmount for failures
+      // Only successful transactions should count toward volume limits
       metrics.weeklyFailureCount++;
       metrics.monthlyFailureCount++;
       metrics.healthScore = this.calculateHealthScore(metrics);
       metrics.isHealthy = metrics.healthScore > 50;
+
+      // Update transaction count tracking (but NOT volume for failures)
+      this.updateTransactionCountTracking(vpa);
 
       this.vpaMetrics.set(vpa, metrics);
 
@@ -904,8 +1173,41 @@ export class EnhancedVPARoutingService {
 
   // Get comprehensive VPA statistics with real data
   async getEnhancedVPAStats(): Promise<any> {
+    // Check service health first
+    if (!this.isServiceHealthy()) {
+      this.logger.warn("VPA service is not healthy - returning basic stats");
+
+      return {
+        error: "Service not properly initialized",
+        totalVPAs: vpas?.length || 0,
+        activeVPAs: this.getActiveVPAs().length,
+        healthMetrics: [],
+      };
+    }
+
     const activeVPAs = this.getActiveVPAs();
     const healthMetrics = Array.from(this.vpaMetrics.values());
+
+    // Validate metrics data
+    const totalTransactions = healthMetrics.reduce(
+      (sum, metric) => sum + metric.totalTransactions,
+      0,
+    );
+    const totalSuccess = healthMetrics.reduce(
+      (sum, metric) => sum + metric.successCount,
+      0,
+    );
+    const totalFailure = healthMetrics.reduce(
+      (sum, metric) => sum + metric.failureCount,
+      0,
+    );
+
+    this.logger.info(
+      `VPA Stats Summary: Total=${totalTransactions}, Success=${totalSuccess}, Failure=${totalFailure}`,
+    );
+    this.logger.info(`Health Metrics: ${LoggerPlaceHolder.Json}`, {
+      healthMetrics,
+    });
 
     return {
       totalVPAs: vpas?.length || 0,
@@ -938,6 +1240,14 @@ export class EnhancedVPARoutingService {
         weeklyFailureCount: metrics.weeklyFailureCount,
         monthlySuccessCount: metrics.monthlySuccessCount,
         monthlyFailureCount: metrics.monthlyFailureCount,
+        // Volume limit tracking
+        dailyTransactionCount: metrics.dailyTransactionCount,
+        dailyVolumeLimit: metrics.dailyVolumeLimit,
+        dailyTransactionLimit: metrics.dailyTransactionLimit,
+        isVolumeLimitReached: metrics.isVolumeLimitReached,
+        isTransactionLimitReached: metrics.isTransactionLimitReached,
+        volumeLimitPercentage: metrics.volumeLimitPercentage,
+        transactionLimitPercentage: metrics.transactionLimitPercentage,
       })),
       vpas: activeVPAs.map((vpa) => ({
         vpa: vpa.vpa,
@@ -972,13 +1282,19 @@ export class EnhancedVPARoutingService {
       metrics.dailySuccessCount = 0;
       metrics.dailyFailureCount = 0;
       metrics.dailyTotalAmount = 0;
+      // Reset volume tracking
+      metrics.dailyTransactionCount = 0;
+      metrics.isVolumeLimitReached = false;
+      metrics.isTransactionLimitReached = false;
+      metrics.volumeLimitPercentage = 0;
+      metrics.transactionLimitPercentage = 0;
     });
 
     if (this.cacheManager) {
       await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000);
     }
 
-    this.logger.info("Reset daily VPA metrics");
+    this.logger.info("Reset daily VPA metrics and volume limits");
   }
 
   // Reset weekly metrics (call this weekly)

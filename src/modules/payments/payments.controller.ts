@@ -157,6 +157,28 @@ export class PaymentsController {
   }
 
   @Public()
+  @ApiOperation({ summary: "Debug VPA service data availability" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/debug")
+  async debugVPAService() {
+    this.logger.info("Debug VPA service endpoint called");
+
+    return this.paymentsService.debugVPAService();
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Get VPA volume limits status" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/volume-limits")
+  async getVPAVolumeLimits() {
+    this.logger.info("VPA volume limits endpoint called");
+
+    return this.paymentsService.getVPAVolumeLimits();
+  }
+
+  @Public()
   @ApiOperation({ summary: "Create pay-in transaction" })
   @UseGuards(ApiKeyGuard)
   @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })

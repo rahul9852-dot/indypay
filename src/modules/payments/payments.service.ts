@@ -144,10 +144,31 @@ export class PaymentsService {
     private readonly encryptionAlgoService: CryptoService,
   ) {
     // Initialize enhanced VPA routing service with dependencies
-    enhancedVpaRoutingService.setCacheManager(this.cacheManager);
-    enhancedVpaRoutingService.setPayInOrdersRepository(
-      this.payInOrdersRepository,
-    );
+    this.initializeVPAService();
+  }
+
+  /**
+   * Initialize VPA service with proper dependencies
+   */
+  private async initializeVPAService() {
+    try {
+      // Set cache manager
+      enhancedVpaRoutingService.setCacheManager(this.cacheManager);
+
+      // Set repository
+      enhancedVpaRoutingService.setPayInOrdersRepository(
+        this.payInOrdersRepository,
+      );
+
+      // Refresh metrics to load historical data
+      await enhancedVpaRoutingService.refreshMetrics();
+
+      this.logger.info(
+        "VPA service initialized successfully with all dependencies",
+      );
+    } catch (error) {
+      this.logger.error(`Failed to initialize VPA service: ${error.message}`);
+    }
   }
   public randomStr(len: number, arr: string) {
     let ans = "";
@@ -162,7 +183,106 @@ export class PaymentsService {
    * Get VPA routing statistics
    */
   async getVPAStats() {
+    // Debug data availability first
+    await enhancedVpaRoutingService.debugDataAvailability();
+
     return await enhancedVpaRoutingService.getEnhancedVPAStats();
+  }
+
+  /**
+   * Debug VPA service data availability
+   */
+  async debugVPAService() {
+    this.logger.info("Starting VPA service debug...");
+
+    try {
+      // Call the debug method from enhanced VPA routing service
+      await enhancedVpaRoutingService.debugDataAvailability();
+
+      // Get basic stats to see what's available
+      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
+
+      return {
+        message: "VPA service debug completed",
+        timestamp: new Date().toISOString(),
+        serviceHealth: enhancedVpaRoutingService.isServiceHealthy(),
+        stats,
+        debugInfo: {
+          hasRepository: !!this.payInOrdersRepository,
+          hasCache: !!this.cacheManager,
+          repositoryType: this.payInOrdersRepository
+            ? "PayInOrdersEntity"
+            : "null",
+          cacheType: this.cacheManager ? "Cache" : "null",
+        },
+      };
+    } catch (error) {
+      this.logger.error(`VPA service debug failed: ${error.message}`);
+
+      return {
+        message: "VPA service debug failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        serviceHealth: false,
+      };
+    }
+  }
+
+  /**
+   * Get VPA volume limits status
+   */
+  async getVPAVolumeLimits() {
+    this.logger.info("Getting VPA volume limits status...");
+
+    try {
+      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
+
+      // Extract volume limit information
+      const volumeLimits =
+        stats.healthMetrics?.map((metric: any) => ({
+          vpa: metric.vpa,
+          dailyTransactionCount: metric.dailyTransactionCount,
+          dailyTotalAmount: metric.dailyTotalAmount,
+          dailyVolumeLimit: metric.dailyVolumeLimit,
+          dailyTransactionLimit: metric.dailyTransactionLimit,
+          volumeLimitPercentage: metric.volumeLimitPercentage,
+          transactionLimitPercentage: metric.transactionLimitPercentage,
+          isVolumeLimitReached: metric.isVolumeLimitReached,
+          isTransactionLimitReached: metric.isTransactionLimitReached,
+          status:
+            metric.isVolumeLimitReached || metric.isTransactionLimitReached
+              ? "LIMIT_REACHED"
+              : "AVAILABLE",
+        })) || [];
+
+      const summary = {
+        totalVPAs: volumeLimits.length,
+        availableVPAs: volumeLimits.filter((v: any) => v.status === "AVAILABLE")
+          .length,
+        limitReachedVPAs: volumeLimits.filter(
+          (v: any) => v.status === "LIMIT_REACHED",
+        ).length,
+        approachingLimitVPAs: volumeLimits.filter(
+          (v: any) =>
+            v.volumeLimitPercentage >= 80 || v.transactionLimitPercentage >= 80,
+        ).length,
+      };
+
+      return {
+        message: "VPA volume limits status retrieved",
+        timestamp: new Date().toISOString(),
+        summary,
+        volumeLimits,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get VPA volume limits: ${error.message}`);
+
+      return {
+        message: "Failed to get VPA volume limits",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   /**
