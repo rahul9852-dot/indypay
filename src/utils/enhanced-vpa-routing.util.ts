@@ -1411,8 +1411,15 @@ export class EnhancedVPARoutingService {
    * Check if daily metrics need to be reset (called on service initialization)
    */
   private checkAndResetDailyMetricsIfNeeded() {
+    // Use IST timezone for date comparison
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+    const istNow = new Date(now.getTime() + istOffset);
+    const today = new Date(
+      istNow.getFullYear(),
+      istNow.getMonth(),
+      istNow.getDate(),
+    );
 
     // Check if we have any metrics with daily data from a previous day
     let needsReset = false;
@@ -1420,15 +1427,26 @@ export class EnhancedVPARoutingService {
     this.vpaMetrics.forEach((metrics) => {
       if (metrics.lastTransactionTime) {
         const lastTransactionDate = new Date(metrics.lastTransactionTime);
+        // Convert last transaction to IST
+        const istLastTransaction = new Date(
+          lastTransactionDate.getTime() + istOffset,
+        );
         const lastTransactionDay = new Date(
-          lastTransactionDate.getFullYear(),
-          lastTransactionDate.getMonth(),
-          lastTransactionDate.getDate(),
+          istLastTransaction.getFullYear(),
+          istLastTransaction.getMonth(),
+          istLastTransaction.getDate(),
         );
 
         // If last transaction was on a different day, we need to reset daily metrics
         if (lastTransactionDay.getTime() !== today.getTime()) {
           needsReset = true;
+          this.logger.info(
+            `VPA ${metrics.vpa}: Last transaction day (${lastTransactionDay.toISOString()}) != Today (${today.toISOString()}) - will reset daily metrics`,
+          );
+        } else {
+          this.logger.info(
+            `VPA ${metrics.vpa}: Last transaction day (${lastTransactionDay.toISOString()}) == Today (${today.toISOString()}) - keeping daily metrics`,
+          );
         }
       }
     });
@@ -1447,6 +1465,8 @@ export class EnhancedVPARoutingService {
         metrics.volumeLimitPercentage = 0;
         metrics.transactionLimitPercentage = 0;
       });
+    } else {
+      this.logger.info("Daily metrics are from today, no reset needed");
     }
   }
 
