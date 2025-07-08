@@ -4,78 +4,15 @@ import { appConfig } from "@/config/app.config";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
+import {
+  VPAHealthMetrics,
+  VPATransactionRecord,
+} from "@/interface/common.interface";
+import { VPARoute, VPARoutingResult } from "@/utils/vpa-routing.util";
 
 const {
   utkarsh: { vpas, vpaRouting },
 } = appConfig();
-
-export interface VPARoute {
-  vpa: string;
-  priority: number;
-  maxDailyTransactions?: number;
-  maxDailyAmount?: number;
-  isActive: boolean;
-  description?: string;
-  // Enhanced properties
-  healthCheckUrl?: string;
-  timeoutMs?: number;
-  retryAttempts?: number;
-  circuitBreakerThreshold?: number;
-  rateLimitPerMinute?: number;
-}
-
-export interface VPARoutingResult {
-  selectedVpa: string;
-  strategy: string;
-  reason: string;
-  metadata?: {
-    healthScore?: number;
-    currentLoad?: number;
-    lastUsed?: Date;
-    successRate?: number;
-  };
-}
-
-export interface VPAHealthMetrics {
-  vpa: string;
-  successCount: number;
-  failureCount: number;
-  totalTransactions: number;
-  averageResponseTime: number;
-  lastSuccessTime: Date;
-  lastFailureTime: Date;
-  isHealthy: boolean;
-  healthScore: number; // 0-100
-  // Real-time metrics
-  dailySuccessCount: number;
-  dailyFailureCount: number;
-  dailyTotalAmount: number;
-  lastTransactionTime: Date;
-  // Historical data
-  weeklySuccessCount: number;
-  weeklyFailureCount: number;
-  monthlySuccessCount: number;
-  monthlyFailureCount: number;
-  // Volume tracking for limits
-  dailyTransactionCount: number; // Total transactions today (success + failure)
-  dailyVolumeLimit: number; // Max daily amount limit
-  dailyTransactionLimit: number; // Max daily transaction count limit
-  isVolumeLimitReached: boolean; // Whether daily volume limit is reached
-  isTransactionLimitReached: boolean; // Whether daily transaction limit is reached
-  volumeLimitPercentage: number; // Percentage of volume limit used (0-100)
-  transactionLimitPercentage: number; // Percentage of transaction limit used (0-100)
-}
-
-export interface VPATransactionRecord {
-  orderId: string;
-  vpa: string;
-  amount: number;
-  userId: string;
-  status: PAYMENT_STATUS;
-  createdAt: Date;
-  completedAt?: Date;
-  responseTime?: number;
-}
 
 export class EnhancedVPARoutingService {
   private readonly logger = new CustomLogger(EnhancedVPARoutingService.name);

@@ -18,6 +18,12 @@ export interface VPARoutingResult {
   selectedVpa: string;
   strategy: string;
   reason: string;
+  metadata?: {
+    healthScore?: number;
+    currentLoad?: number;
+    lastUsed?: Date;
+    successRate?: number;
+  };
 }
 
 export class VPARoutingService {
