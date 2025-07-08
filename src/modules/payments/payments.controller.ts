@@ -535,4 +535,94 @@ export class PaymentsController {
       },
     };
   }
+
+  @Public()
+  @ApiOperation({ summary: "Debug VPA metrics and cache" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/debug-metrics")
+  async debugVPAMetrics() {
+    this.logger.info("Debug VPA metrics endpoint called");
+
+    try {
+      // Force refresh metrics from cache
+      await enhancedVpaRoutingService.forceRefreshMetricsFromCache();
+
+      // Get current stats
+      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
+
+      // Get debug data availability
+      await enhancedVpaRoutingService.debugDataAvailability();
+
+      return {
+        message: "VPA metrics debug completed",
+        timestamp: new Date().toISOString(),
+        stats,
+        cacheStatus: "Refreshed from cache",
+      };
+    } catch (error) {
+      this.logger.error(`VPA metrics debug failed: ${error.message}`);
+
+      return {
+        message: "VPA metrics debug failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Manually record a transaction for testing" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post("vpa/test-transaction")
+  async testVPATransaction(
+    @Body()
+    body: {
+      orderId: string;
+      vpa: string;
+      amount: number;
+      status: "SUCCESS" | "FAILED";
+      responseTime?: number;
+    },
+  ) {
+    this.logger.info("Test VPA transaction endpoint called", body);
+
+    try {
+      // Record transaction start
+      const routingResult = await enhancedVpaRoutingService.selectVPA(
+        "test-user",
+        body.amount,
+        body.orderId,
+      );
+
+      // Process webhook
+      await enhancedVpaRoutingService.processPaymentWebhook(
+        body.orderId,
+        body.status as any,
+        body.responseTime,
+      );
+
+      // Get updated stats
+      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
+
+      return {
+        message: "Test transaction recorded successfully",
+        orderId: body.orderId,
+        vpa: body.vpa,
+        status: body.status,
+        routingResult,
+        stats,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(`Test VPA transaction failed: ${error.message}`);
+
+      return {
+        message: "Test transaction failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
 }

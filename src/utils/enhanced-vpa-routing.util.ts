@@ -234,7 +234,7 @@ export class EnhancedVPARoutingService {
           lastSuccessTime: new Date(),
           lastFailureTime: new Date(),
           isHealthy: true,
-          healthScore: 10,
+          healthScore: 100,
           // Real-time metrics
           dailySuccessCount: 0,
           dailyFailureCount: 0,
@@ -247,8 +247,8 @@ export class EnhancedVPARoutingService {
           monthlyFailureCount: 0,
           // Volume tracking for limits
           dailyTransactionCount: 0,
-          dailyVolumeLimit: vpa.maxDailyAmount || 100, // Test with 100 rupees
-          dailyTransactionLimit: vpa.maxDailyTransactions || 10, // Test with 10 transactions
+          dailyVolumeLimit: vpa.maxDailyAmount || 10, // Test with 100 rupees
+          dailyTransactionLimit: vpa.maxDailyTransactions || 5, // Test with 10 transactions
           isVolumeLimitReached: false,
           isTransactionLimitReached: false,
           volumeLimitPercentage: 0,
@@ -334,8 +334,8 @@ export class EnhancedVPARoutingService {
                 monthlyFailureCount: 0,
                 // Volume tracking for limits
                 dailyTransactionCount: 0,
-                dailyVolumeLimit: vpa.maxDailyAmount || 100, // Test with 100 rupees
-                dailyTransactionLimit: vpa.maxDailyTransactions || 10, // Test with 10 transactions
+                dailyVolumeLimit: vpa.maxDailyAmount || 10, // Test with 100 rupees
+                dailyTransactionLimit: vpa.maxDailyTransactions || 5, // Test with 10 transactions
                 isVolumeLimitReached: false,
                 isTransactionLimitReached: false,
                 volumeLimitPercentage: 0,
@@ -379,8 +379,8 @@ export class EnhancedVPARoutingService {
           monthlyFailureCount: 0,
           // Volume tracking for limits
           dailyTransactionCount: 0,
-          dailyVolumeLimit: vpa.maxDailyAmount || 100, // Test with 100 rupees
-          dailyTransactionLimit: vpa.maxDailyTransactions || 10, // Test with 10 transactions
+          dailyVolumeLimit: vpa.maxDailyAmount || 10, // Test with 100 rupees
+          dailyTransactionLimit: vpa.maxDailyTransactions || 5, // Test with 10 transactions
           isVolumeLimitReached: false,
           isTransactionLimitReached: false,
           volumeLimitPercentage: 0,
@@ -397,6 +397,8 @@ export class EnhancedVPARoutingService {
    */
   private async saveMetricsToCache() {
     if (!this.cacheManager) {
+      this.logger.warn("Cache manager not available, skipping metrics save");
+
       return;
     }
 
@@ -407,10 +409,12 @@ export class EnhancedVPARoutingService {
         metricsObject[vpa] = metrics;
       });
 
-      // Save with longer TTL for metrics persistence
-      await this.cacheManager.set("vpa_metrics", metricsObject, 86400000); // 24 hours
+      // Save with longer TTL for metrics persistence (7 days instead of 24 hours)
+      await this.cacheManager.set("vpa_metrics", metricsObject, 604800000); // 7 days
+
+      this.logger.debug(`Saved ${this.vpaMetrics.size} VPA metrics to cache`);
     } catch (error) {
-      this.logger.warn(`Failed to save metrics to cache: ${error.message}`);
+      this.logger.error(`Failed to save metrics to cache: ${error.message}`);
     }
   }
 
@@ -515,16 +519,31 @@ export class EnhancedVPARoutingService {
         vpaStats.set(vpa, stats);
       });
 
-      // Merge historical data with existing metrics (don't overwrite recent data)
+      // Merge historical data with existing metrics (IMPORTANT: Don't overwrite recent data)
       vpaStats.forEach((stats, vpa) => {
         const existingMetrics = this.vpaMetrics.get(vpa);
         if (existingMetrics) {
-          // Only update if historical data is more recent or if we don't have recent data
+          // CRITICAL FIX: Only update if historical data is more recent OR if we have no recent data
           const isHistoricalMoreRecent =
             stats.lastTransaction > existingMetrics.lastTransactionTime;
           const hasNoRecentData = existingMetrics.totalTransactions === 0;
+          const isHistoricalDataOlder =
+            stats.lastTransaction < existingMetrics.lastTransactionTime;
+
+          // Don't overwrite recent metrics with older historical data
+          if (isHistoricalDataOlder) {
+            this.logger.debug(
+              `Skipping historical data for ${vpa} - existing data is more recent`,
+            );
+
+            return;
+          }
 
           if (isHistoricalMoreRecent || hasNoRecentData) {
+            this.logger.info(
+              `Updating metrics for ${vpa} with historical data: ${stats.totalTransactions} transactions`,
+            );
+
             existingMetrics.totalTransactions = stats.totalTransactions;
             existingMetrics.successCount = stats.successCount;
             existingMetrics.failureCount = stats.failureCount;
@@ -540,6 +559,10 @@ export class EnhancedVPARoutingService {
           }
         } else {
           // Create new metrics for VPA not in current config
+          this.logger.info(
+            `Creating new metrics for historical VPA: ${vpa} with ${stats.totalTransactions} transactions`,
+          );
+
           this.vpaMetrics.set(vpa, {
             vpa,
             successCount: stats.successCount,
@@ -549,7 +572,7 @@ export class EnhancedVPARoutingService {
             lastSuccessTime: new Date(),
             lastFailureTime: new Date(),
             isHealthy: true,
-            healthScore: 100,
+            healthScore: 10,
             dailySuccessCount: 0,
             dailyFailureCount: 0,
             dailyTotalAmount: 0,
@@ -570,7 +593,7 @@ export class EnhancedVPARoutingService {
         }
       });
 
-      // Save updated metrics to cache
+      // Save updated metrics to cache with longer TTL
       await this.saveMetricsToCache();
 
       // Only log if there's significant data
@@ -667,10 +690,17 @@ export class EnhancedVPARoutingService {
     responseTime?: number,
   ) {
     try {
+      this.logger.info(
+        `Processing webhook: orderId=${orderId}, status=${status}, responseTime=${responseTime}ms`,
+      );
+
       // Get transaction record
       let record = this.transactionRecords.get(orderId);
 
       if (!record && this.cacheManager) {
+        this.logger.debug(
+          `Transaction record not in memory, checking cache for orderId: ${orderId}`,
+        );
         record = await this.cacheManager.get<VPATransactionRecord>(
           `vpa_transaction_${orderId}`,
         );
@@ -678,6 +708,57 @@ export class EnhancedVPARoutingService {
 
       if (!record) {
         this.logger.warn(`No transaction record found for orderId: ${orderId}`);
+        this.logger.debug(
+          `Available transaction records: ${Array.from(this.transactionRecords.keys()).join(", ")}`,
+        );
+
+        // Try to find the VPA from the database as fallback
+        if (this.payInOrdersRepository) {
+          try {
+            const payinOrder = await this.payInOrdersRepository.findOne({
+              where: { orderId },
+              select: [
+                "intent",
+                "amount",
+                "status",
+                "createdAt",
+                "successAt",
+                "failureAt",
+              ],
+            });
+
+            if (payinOrder && payinOrder.intent) {
+              const vpaMatch = payinOrder.intent.match(/pa=([^&]+)/);
+              if (vpaMatch) {
+                const vpa = vpaMatch[1];
+                this.logger.info(
+                  `Found VPA ${vpa} from database for orderId: ${orderId}`,
+                );
+
+                // Update metrics directly from database data
+                if (status === PAYMENT_STATUS.SUCCESS) {
+                  await this.recordSuccess(
+                    vpa,
+                    responseTime || 0,
+                    payinOrder.amount || 0,
+                  );
+                } else if (status === PAYMENT_STATUS.FAILED) {
+                  await this.recordFailure(vpa, payinOrder.amount || 0);
+                }
+
+                this.logger.info(
+                  `Updated metrics from database: orderId=${orderId}, vpa=${vpa}, status=${status}`,
+                );
+
+                return;
+              }
+            }
+          } catch (dbError) {
+            this.logger.error(
+              `Failed to query database for orderId ${orderId}: ${dbError.message}`,
+            );
+          }
+        }
 
         return;
       }
@@ -686,6 +767,10 @@ export class EnhancedVPARoutingService {
       record.status = status;
       record.completedAt = new Date();
       record.responseTime = responseTime;
+
+      this.logger.info(
+        `Found transaction record: vpa=${record.vpa}, amount=${record.amount}, status=${status}`,
+      );
 
       // Update real metrics based on actual payment status
       if (status === PAYMENT_STATUS.SUCCESS) {
@@ -1425,6 +1510,59 @@ export class EnhancedVPARoutingService {
         metrics.volumeLimitPercentage = 0;
         metrics.transactionLimitPercentage = 0;
       });
+    }
+  }
+
+  /**
+   * Force refresh metrics from cache (useful for debugging)
+   */
+  async forceRefreshMetricsFromCache() {
+    try {
+      this.logger.info("Force refreshing metrics from cache...");
+
+      if (!this.cacheManager) {
+        this.logger.warn("Cache manager not available");
+
+        return;
+      }
+
+      const cachedMetrics = await this.cacheManager.get<any>("vpa_metrics");
+
+      if (cachedMetrics && typeof cachedMetrics === "object") {
+        // Convert plain object back to Map
+        const metricsMap = new Map<string, VPAHealthMetrics>();
+
+        Object.entries(cachedMetrics).forEach(
+          ([vpa, metricsData]: [string, any]) => {
+            // Convert date strings back to Date objects
+            const metrics: VPAHealthMetrics = {
+              ...metricsData,
+              lastSuccessTime: new Date(metricsData.lastSuccessTime),
+              lastFailureTime: new Date(metricsData.lastFailureTime),
+              lastTransactionTime: new Date(metricsData.lastTransactionTime),
+            };
+            metricsMap.set(vpa, metrics);
+          },
+        );
+
+        this.vpaMetrics = metricsMap;
+        this.logger.info(
+          `Force refreshed VPA metrics from cache: ${metricsMap.size} VPAs`,
+        );
+
+        // Log current metrics for debugging
+        this.vpaMetrics.forEach((metrics, vpa) => {
+          this.logger.info(
+            `VPA ${vpa}: ${metrics.totalTransactions} transactions, ${metrics.successCount} success, ${metrics.failureCount} failures, healthScore=${metrics.healthScore.toFixed(2)}`,
+          );
+        });
+      } else {
+        this.logger.warn("No cached metrics found");
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to force refresh metrics from cache: ${error.message}`,
+      );
     }
   }
 
