@@ -258,7 +258,144 @@ export class EnhancedVPARoutingService {
   }
 
   /**
-   * Load historical metrics from database
+   * Load metrics from cache with proper serialization handling
+   */
+  private async initializeMetrics() {
+    try {
+      if (this.cacheManager) {
+        const cachedMetrics = await this.cacheManager.get<any>("vpa_metrics");
+
+        if (cachedMetrics && typeof cachedMetrics === "object") {
+          // Convert plain object back to Map
+          const metricsMap = new Map<string, VPAHealthMetrics>();
+
+          Object.entries(cachedMetrics).forEach(
+            ([vpa, metricsData]: [string, any]) => {
+              // Convert date strings back to Date objects
+              const metrics: VPAHealthMetrics = {
+                ...metricsData,
+                lastSuccessTime: new Date(metricsData.lastSuccessTime),
+                lastFailureTime: new Date(metricsData.lastFailureTime),
+                lastTransactionTime: new Date(metricsData.lastTransactionTime),
+              };
+              metricsMap.set(vpa, metrics);
+            },
+          );
+
+          this.vpaMetrics = metricsMap;
+          this.logger.info(
+            `Loaded VPA metrics from cache: ${metricsMap.size} VPAs`,
+          );
+
+          // Ensure all configured VPAs are present
+          vpas?.forEach((vpa) => {
+            if (!this.vpaMetrics.has(vpa.vpa)) {
+              this.logger.info(`Adding missing VPA to metrics: ${vpa.vpa}`);
+              this.vpaMetrics.set(vpa.vpa, {
+                vpa: vpa.vpa,
+                successCount: 0,
+                failureCount: 0,
+                totalTransactions: 0,
+                averageResponseTime: 0,
+                lastSuccessTime: new Date(),
+                lastFailureTime: new Date(),
+                isHealthy: true,
+                healthScore: 100,
+                dailySuccessCount: 0,
+                dailyFailureCount: 0,
+                dailyTotalAmount: 0,
+                lastTransactionTime: new Date(),
+                weeklySuccessCount: 0,
+                weeklyFailureCount: 0,
+                monthlySuccessCount: 0,
+                monthlyFailureCount: 0,
+                // Volume tracking for limits
+                dailyTransactionCount: 0,
+                dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
+                dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Default 5000 transactions
+                isVolumeLimitReached: false,
+                isTransactionLimitReached: false,
+                volumeLimitPercentage: 0,
+                transactionLimitPercentage: 0,
+              });
+            }
+          });
+
+          return;
+        } else {
+          this.logger.info("No cached metrics found, initializing defaults");
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to load metrics from cache: ${error.message}, using defaults`,
+      );
+    }
+
+    // Only initialize if metrics are empty
+    if (this.vpaMetrics.size === 0) {
+      // Initialize with real data if available
+      vpas?.forEach((vpa) => {
+        this.vpaMetrics.set(vpa.vpa, {
+          vpa: vpa.vpa,
+          successCount: 0,
+          failureCount: 0,
+          totalTransactions: 0,
+          averageResponseTime: 0,
+          lastSuccessTime: new Date(),
+          lastFailureTime: new Date(),
+          isHealthy: true,
+          healthScore: 100,
+          dailySuccessCount: 0,
+          dailyFailureCount: 0,
+          dailyTotalAmount: 0,
+          lastTransactionTime: new Date(),
+          weeklySuccessCount: 0,
+          weeklyFailureCount: 0,
+          monthlySuccessCount: 0,
+          monthlyFailureCount: 0,
+          // Volume tracking for limits
+          dailyTransactionCount: 0,
+          dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
+          dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Default 5000 transactions
+          isVolumeLimitReached: false,
+          isTransactionLimitReached: false,
+          volumeLimitPercentage: 0,
+          transactionLimitPercentage: 0,
+        });
+      });
+
+      this.logger.info("Initialized VPA metrics from defaults");
+    }
+  }
+
+  /**
+   * Save metrics to cache with proper serialization
+   */
+  private async saveMetricsToCache() {
+    if (!this.cacheManager) {
+      return;
+    }
+
+    try {
+      // Convert Map to plain object for proper serialization
+      const metricsObject: Record<string, VPAHealthMetrics> = {};
+      this.vpaMetrics.forEach((metrics, vpa) => {
+        metricsObject[vpa] = metrics;
+      });
+
+      // Save with longer TTL for metrics persistence
+      await this.cacheManager.set("vpa_metrics", metricsObject, 86400000); // 24 hours
+      this.logger.debug(
+        `Saved VPA metrics to cache: ${this.vpaMetrics.size} VPAs`,
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to save metrics to cache: ${error.message}`);
+    }
+  }
+
+  /**
+   * Load historical metrics without overwriting recent cache data
    */
   private async loadHistoricalMetrics() {
     if (!this.payInOrdersRepository) {
@@ -365,115 +502,75 @@ export class EnhancedVPARoutingService {
       });
 
       this.logger.info(
-        `Processed ${processedCount} transactions, extracted ${extractedVPAs.size} unique VPAs: ${Array.from(extractedVPAs).join(", ")}`,
+        `Processed ${processedCount} transactions for ${extractedVPAs.size} VPAs`,
       );
 
-      // Update metrics with historical data (only if no recent activity)
+      // Merge historical data with existing metrics (don't overwrite recent data)
       vpaStats.forEach((stats, vpa) => {
         const existingMetrics = this.vpaMetrics.get(vpa);
         if (existingMetrics) {
-          // Only update if there's no recent activity (older than 1 hour)
-          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-          const hasRecentActivity =
-            existingMetrics.lastTransactionTime > oneHourAgo;
+          // Only update if historical data is more recent or if we don't have recent data
+          const isHistoricalMoreRecent =
+            stats.lastTransaction > existingMetrics.lastTransactionTime;
+          const hasNoRecentData = existingMetrics.totalTransactions === 0;
 
-          if (!hasRecentActivity) {
-            // Only update if we don't have real-time data
-            if (existingMetrics.totalTransactions === 0) {
-              existingMetrics.successCount = stats.successCount;
-              existingMetrics.failureCount = stats.failureCount;
-              existingMetrics.totalTransactions = stats.totalTransactions;
-              existingMetrics.dailySuccessCount = stats.successCount;
-              existingMetrics.dailyFailureCount = stats.failureCount;
-              existingMetrics.dailyTotalAmount = stats.totalAmount;
-              existingMetrics.lastTransactionTime = stats.lastTransaction;
-              existingMetrics.averageResponseTime = stats.averageResponseTime;
-              existingMetrics.healthScore =
-                this.calculateHealthScore(existingMetrics);
-              existingMetrics.isHealthy = existingMetrics.healthScore > 50;
+          if (isHistoricalMoreRecent || hasNoRecentData) {
+            existingMetrics.totalTransactions = stats.totalTransactions;
+            existingMetrics.successCount = stats.successCount;
+            existingMetrics.failureCount = stats.failureCount;
+            existingMetrics.averageResponseTime = stats.averageResponseTime;
+            existingMetrics.lastTransactionTime = stats.lastTransaction;
 
-              this.logger.info(
-                `Loaded historical data for ${vpa}: ${stats.totalTransactions} transactions`,
-              );
-            } else {
-              this.logger.debug(
-                `Skipping historical update for ${vpa} - has real-time data`,
-              );
-            }
-          } else {
+            // Update health score
+            existingMetrics.healthScore =
+              this.calculateHealthScore(existingMetrics);
+            existingMetrics.isHealthy = existingMetrics.healthScore > 50;
+
+            this.vpaMetrics.set(vpa, existingMetrics);
             this.logger.debug(
-              `Skipping historical update for ${vpa} - has recent activity`,
+              `Updated metrics for VPA ${vpa} from historical data`,
             );
           }
+        } else {
+          // Create new metrics for VPA not in current config
+          this.vpaMetrics.set(vpa, {
+            vpa,
+            successCount: stats.successCount,
+            failureCount: stats.failureCount,
+            totalTransactions: stats.totalTransactions,
+            averageResponseTime: stats.averageResponseTime,
+            lastSuccessTime: new Date(),
+            lastFailureTime: new Date(),
+            isHealthy: true,
+            healthScore: 100,
+            dailySuccessCount: 0,
+            dailyFailureCount: 0,
+            dailyTotalAmount: 0,
+            lastTransactionTime: stats.lastTransaction,
+            weeklySuccessCount: 0,
+            weeklyFailureCount: 0,
+            monthlySuccessCount: 0,
+            monthlyFailureCount: 0,
+            // Volume tracking for limits
+            dailyTransactionCount: 0,
+            dailyVolumeLimit: 2000000, // Default 20L
+            dailyTransactionLimit: 5000, // Default 5000 transactions
+            isVolumeLimitReached: false,
+            isTransactionLimitReached: false,
+            volumeLimitPercentage: 0,
+            transactionLimitPercentage: 0,
+          });
         }
       });
 
-      this.logger.info(`Loaded historical metrics for ${vpaStats.size} VPAs`);
+      // Save updated metrics to cache
+      await this.saveMetricsToCache();
+
+      this.logger.info(
+        `Successfully loaded historical metrics for ${vpaStats.size} VPAs`,
+      );
     } catch (error) {
       this.logger.error(`Failed to load historical metrics: ${error.message}`);
-    }
-  }
-
-  private async initializeMetrics() {
-    try {
-      if (this.cacheManager) {
-        const cachedMetrics =
-          await this.cacheManager.get<Map<string, VPAHealthMetrics>>(
-            "vpa_metrics",
-          );
-
-        if (cachedMetrics) {
-          // Only update if we have cached data and current metrics are empty
-          if (this.vpaMetrics.size === 0) {
-            this.vpaMetrics = cachedMetrics;
-            this.logger.info("Loaded VPA metrics from cache");
-          } else {
-            this.logger.info(
-              "Skipping cache load - metrics already initialized",
-            );
-          }
-
-          return;
-        }
-      }
-    } catch (error) {
-      this.logger.warn("Failed to load metrics from cache, using defaults");
-    }
-
-    // Only initialize if metrics are empty
-    if (this.vpaMetrics.size === 0) {
-      // Initialize with real data if available
-      vpas?.forEach((vpa) => {
-        this.vpaMetrics.set(vpa.vpa, {
-          vpa: vpa.vpa,
-          successCount: 0,
-          failureCount: 0,
-          totalTransactions: 0,
-          averageResponseTime: 0,
-          lastSuccessTime: new Date(),
-          lastFailureTime: new Date(),
-          isHealthy: true,
-          healthScore: 100,
-          dailySuccessCount: 0,
-          dailyFailureCount: 0,
-          dailyTotalAmount: 0,
-          lastTransactionTime: new Date(),
-          weeklySuccessCount: 0,
-          weeklyFailureCount: 0,
-          monthlySuccessCount: 0,
-          monthlyFailureCount: 0,
-          // Volume tracking for limits
-          dailyTransactionCount: 0,
-          dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Default 20L
-          dailyTransactionLimit: vpa.maxDailyTransactions || 1000,
-          isVolumeLimitReached: false,
-          isTransactionLimitReached: false,
-          volumeLimitPercentage: 0,
-          transactionLimitPercentage: 0,
-        });
-      });
-
-      this.logger.info("Initialized VPA metrics from defaults");
     }
   }
 
@@ -1044,25 +1141,20 @@ export class EnhancedVPARoutingService {
     return this.enhancedRoundRobinStrategy(vpas);
   }
 
-  // Update usage metrics for a VPA
+  // Update usage metrics for a VPA (only for tracking VPA selection, not actual transactions)
   private async updateUsageMetrics(vpa: string) {
     const metrics = this.vpaMetrics.get(vpa);
     if (metrics) {
-      metrics.totalTransactions++;
+      // NOTE: Do NOT increment totalTransactions here
+      // totalTransactions should only be incremented when actual payment is attempted
+      // This method is called when VPA is selected for payment link generation
+
+      // Only update last used time for routing purposes
       metrics.lastTransactionTime = new Date();
       this.vpaMetrics.set(vpa, metrics);
 
-      // Cache metrics only if cache manager is available
-      if (this.cacheManager) {
-        try {
-          await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000); // 1 hour
-          this.logger.debug(`Cached VPA metrics for ${vpa}`);
-        } catch (error) {
-          this.logger.warn(
-            `Failed to cache VPA metrics for ${vpa}: ${error.message}`,
-          );
-        }
-      }
+      // Save metrics to cache
+      await this.saveMetricsToCache();
     }
   }
 
@@ -1094,14 +1186,8 @@ export class EnhancedVPARoutingService {
 
       this.vpaMetrics.set(vpa, metrics);
 
-      // Cache metrics only if cache manager is available
-      if (this.cacheManager) {
-        try {
-          await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000);
-        } catch (error) {
-          this.logger.warn(`Failed to cache VPA metrics: ${error.message}`);
-        }
-      }
+      // Save metrics to cache
+      await this.saveMetricsToCache();
 
       // Reset circuit breaker failures
       const circuitState = this.circuitBreakerState.get(vpa);
@@ -1137,14 +1223,8 @@ export class EnhancedVPARoutingService {
 
       this.vpaMetrics.set(vpa, metrics);
 
-      // Cache metrics only if cache manager is available
-      if (this.cacheManager) {
-        try {
-          await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000);
-        } catch (error) {
-          this.logger.warn(`Failed to cache VPA metrics: ${error.message}`);
-        }
-      }
+      // Save metrics to cache
+      await this.saveMetricsToCache();
 
       // Update circuit breaker
       const circuitState = this.circuitBreakerState.get(vpa) || {
@@ -1290,9 +1370,8 @@ export class EnhancedVPARoutingService {
       metrics.transactionLimitPercentage = 0;
     });
 
-    if (this.cacheManager) {
-      await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000);
-    }
+    // Save updated metrics to cache
+    await this.saveMetricsToCache();
 
     this.logger.info("Reset daily VPA metrics and volume limits");
   }
@@ -1304,9 +1383,8 @@ export class EnhancedVPARoutingService {
       metrics.weeklyFailureCount = 0;
     });
 
-    if (this.cacheManager) {
-      await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000);
-    }
+    // Save updated metrics to cache
+    await this.saveMetricsToCache();
 
     this.logger.info("Reset weekly VPA metrics");
   }
@@ -1318,9 +1396,8 @@ export class EnhancedVPARoutingService {
       metrics.monthlyFailureCount = 0;
     });
 
-    if (this.cacheManager) {
-      await this.cacheManager.set("vpa_metrics", this.vpaMetrics, 3600000);
-    }
+    // Save updated metrics to cache
+    await this.saveMetricsToCache();
 
     this.logger.info("Reset monthly VPA metrics");
   }
