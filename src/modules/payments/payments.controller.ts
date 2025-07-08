@@ -625,4 +625,139 @@ export class PaymentsController {
       };
     }
   }
+
+  @Public()
+  @ApiOperation({ summary: "Debug daily metrics issue" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/debug-daily")
+  async debugDailyMetrics() {
+    this.logger.info("Debug daily metrics endpoint called");
+
+    try {
+      // Get current stats
+      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
+
+      // Get current date info
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      // Check each VPA's daily metrics
+      const debugInfo =
+        stats.healthMetrics?.map((metric: any) => {
+          const lastTransactionDate = new Date(metric.lastTransactionTime);
+          const lastTransactionDay = new Date(
+            lastTransactionDate.getFullYear(),
+            lastTransactionDate.getMonth(),
+            lastTransactionDate.getDate(),
+          );
+
+          return {
+            vpa: metric.vpa,
+            dailySuccessCount: metric.dailySuccessCount,
+            dailyFailureCount: metric.dailyFailureCount,
+            dailyTotalAmount: metric.dailyTotalAmount,
+            lastTransactionTime: metric.lastTransactionTime,
+            lastTransactionDate: lastTransactionDate.toISOString(),
+            lastTransactionDay: lastTransactionDay.toISOString(),
+            today: today.toISOString(),
+            isSameDay: lastTransactionDay.getTime() === today.getTime(),
+            totalSuccessCount: metric.successCount,
+            totalFailureCount: metric.failureCount,
+            weeklySuccessCount: metric.weeklySuccessCount,
+            monthlySuccessCount: metric.monthlySuccessCount,
+          };
+        }) || [];
+
+      return {
+        message: "Daily metrics debug information",
+        timestamp: new Date().toISOString(),
+        currentDate: {
+          now: now.toISOString(),
+          today: today.toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        },
+        debugInfo,
+      };
+    } catch (error) {
+      this.logger.error(`Daily metrics debug failed: ${error.message}`);
+
+      return {
+        message: "Daily metrics debug failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Test daily metrics update" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post("vpa/test-daily-update")
+  async testDailyMetricsUpdate(
+    @Body()
+    body: {
+      vpa: string;
+      amount: number;
+      responseTime?: number;
+    },
+  ) {
+    this.logger.info("Test daily metrics update endpoint called", body);
+
+    try {
+      // Get stats before
+      const statsBefore = await enhancedVpaRoutingService.getEnhancedVPAStats();
+      const vpaBefore = statsBefore.healthMetrics?.find(
+        (m: any) => m.vpa === body.vpa,
+      );
+
+      // Record a success
+      await enhancedVpaRoutingService.recordSuccess(
+        body.vpa,
+        body.responseTime || 1000,
+        body.amount,
+      );
+
+      // Get stats after
+      const statsAfter = await enhancedVpaRoutingService.getEnhancedVPAStats();
+      const vpaAfter = statsAfter.healthMetrics?.find(
+        (m: any) => m.vpa === body.vpa,
+      );
+
+      return {
+        message: "Daily metrics test completed",
+        vpa: body.vpa,
+        before: {
+          dailySuccessCount: vpaBefore?.dailySuccessCount || 0,
+          dailyTotalAmount: vpaBefore?.dailyTotalAmount || 0,
+          totalSuccessCount: vpaBefore?.successCount || 0,
+        },
+        after: {
+          dailySuccessCount: vpaAfter?.dailySuccessCount || 0,
+          dailyTotalAmount: vpaAfter?.dailyTotalAmount || 0,
+          totalSuccessCount: vpaAfter?.successCount || 0,
+        },
+        difference: {
+          dailySuccessCount:
+            (vpaAfter?.dailySuccessCount || 0) -
+            (vpaBefore?.dailySuccessCount || 0),
+          dailyTotalAmount:
+            (vpaAfter?.dailyTotalAmount || 0) -
+            (vpaBefore?.dailyTotalAmount || 0),
+          totalSuccessCount:
+            (vpaAfter?.successCount || 0) - (vpaBefore?.successCount || 0),
+        },
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(`Daily metrics test failed: ${error.message}`);
+
+      return {
+        message: "Daily metrics test failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
 }
