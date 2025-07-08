@@ -1,8 +1,8 @@
 import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Inject } from "@nestjs/common";
-import { VPARoute } from "./enhanced-vpa-routing.util";
 import { CustomLogger } from "@/logger";
+import { VPARoute } from "@/interface/common.interface";
 
 export interface VPADynamicConfig {
   vpas: VPARoute[];
