@@ -240,6 +240,9 @@ export class EnhancedVPARoutingService {
       // First try to load from cache
       await this.initializeMetrics();
 
+      // Check if daily metrics need to be reset after loading from cache
+      await this.checkAndResetDailyMetricsIfNeeded();
+
       // Then load historical data if repository is available
       if (this.payInOrdersRepository) {
         await this.loadHistoricalMetrics();
@@ -257,13 +260,27 @@ export class EnhancedVPARoutingService {
   private async initializeMetrics() {
     try {
       if (this.cacheManager) {
-        const cachedMetrics = await this.cacheManager.get<any>("vpa_metrics");
+        const cachedData = await this.cacheManager.get<any>("vpa_metrics");
 
-        if (cachedMetrics && typeof cachedMetrics === "object") {
+        if (cachedData && typeof cachedData === "object") {
+          // Handle both old format (direct metrics object) and new format (with lastDailyResetDate)
+          let metricsObject: any;
+          let lastDailyResetDate: string | null = null;
+
+          if (cachedData.metrics) {
+            // New format with lastDailyResetDate
+            metricsObject = cachedData.metrics;
+            lastDailyResetDate = cachedData.lastDailyResetDate;
+          } else {
+            // Old format - direct metrics object
+            metricsObject = cachedData;
+            lastDailyResetDate = null; // Will be initialized in checkAndResetDailyMetricsIfNeeded
+          }
+
           // Convert plain object back to Map
           const metricsMap = new Map<string, VPAHealthMetrics>();
 
-          Object.entries(cachedMetrics).forEach(
+          Object.entries(metricsObject).forEach(
             ([vpa, metricsData]: [string, any]) => {
               // Convert date strings back to Date objects
               const metrics: VPAHealthMetrics = {
@@ -277,8 +294,9 @@ export class EnhancedVPARoutingService {
           );
 
           this.vpaMetrics = metricsMap;
+          this.lastDailyResetDate = lastDailyResetDate;
           this.logger.info(
-            `Loaded VPA metrics from cache: ${metricsMap.size} VPAs`,
+            `Loaded VPA metrics from cache: ${metricsMap.size} VPAs, lastDailyResetDate: ${this.lastDailyResetDate}`,
           );
 
           // Ensure all configured VPAs are present
@@ -359,6 +377,7 @@ export class EnhancedVPARoutingService {
         });
       });
 
+      this.lastDailyResetDate = this.getCurrentISTDate(); // Initialize lastDailyResetDate
       this.logger.info("Initialized VPA metrics from defaults");
     }
   }
@@ -380,10 +399,18 @@ export class EnhancedVPARoutingService {
         metricsObject[vpa] = metrics;
       });
 
-      // Save with longer TTL for metrics persistence (7 days instead of 24 hours)
-      await this.cacheManager.set("vpa_metrics", metricsObject, 604800000); // 7 days
+      // Save metrics and lastDailyResetDate together
+      const cacheData = {
+        metrics: metricsObject,
+        lastDailyResetDate: this.lastDailyResetDate,
+      };
 
-      this.logger.debug(`Saved ${this.vpaMetrics.size} VPA metrics to cache`);
+      // Save with longer TTL for metrics persistence (7 days instead of 24 hours)
+      await this.cacheManager.set("vpa_metrics", cacheData, 604800000); // 7 days
+
+      this.logger.debug(
+        `Saved ${this.vpaMetrics.size} VPA metrics to cache with lastDailyResetDate: ${this.lastDailyResetDate}`,
+      );
     } catch (error) {
       this.logger.error(`Failed to save metrics to cache: ${error.message}`);
     }
@@ -1490,13 +1517,27 @@ export class EnhancedVPARoutingService {
         return;
       }
 
-      const cachedMetrics = await this.cacheManager.get<any>("vpa_metrics");
+      const cachedData = await this.cacheManager.get<any>("vpa_metrics");
 
-      if (cachedMetrics && typeof cachedMetrics === "object") {
+      if (cachedData && typeof cachedData === "object") {
+        // Handle both old format (direct metrics object) and new format (with lastDailyResetDate)
+        let metricsObject: any;
+        let lastDailyResetDate: string | null = null;
+
+        if (cachedData.metrics) {
+          // New format with lastDailyResetDate
+          metricsObject = cachedData.metrics;
+          lastDailyResetDate = cachedData.lastDailyResetDate;
+        } else {
+          // Old format - direct metrics object
+          metricsObject = cachedData;
+          lastDailyResetDate = null; // Will be initialized in checkAndResetDailyMetricsIfNeeded
+        }
+
         // Convert plain object back to Map
         const metricsMap = new Map<string, VPAHealthMetrics>();
 
-        Object.entries(cachedMetrics).forEach(
+        Object.entries(metricsObject).forEach(
           ([vpa, metricsData]: [string, any]) => {
             // Convert date strings back to Date objects
             const metrics: VPAHealthMetrics = {
@@ -1510,8 +1551,9 @@ export class EnhancedVPARoutingService {
         );
 
         this.vpaMetrics = metricsMap;
+        this.lastDailyResetDate = lastDailyResetDate;
         this.logger.info(
-          `Force refreshed VPA metrics from cache: ${metricsMap.size} VPAs`,
+          `Force refreshed VPA metrics from cache: ${metricsMap.size} VPAs, lastDailyResetDate: ${this.lastDailyResetDate}`,
         );
 
         // Log current metrics for debugging

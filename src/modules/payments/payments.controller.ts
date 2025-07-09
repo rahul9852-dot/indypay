@@ -22,6 +22,9 @@ import {
   ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
+import * as dayjs from "dayjs";
+import * as utc from "dayjs/plugin/utc";
+import * as timezone from "dayjs/plugin/timezone";
 import { Response } from "express";
 import { PaymentsService } from "./payments.service";
 import {
@@ -58,6 +61,10 @@ import { CustomLogger } from "@/logger";
 import { appConfig } from "@/config/app.config";
 import { enhancedVpaRoutingService } from "@/utils/enhanced-vpa-routing.util";
 import { todayStartDate } from "@/utils/date.utils";
+
+// Extend dayjs with the required plugins
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -627,6 +634,13 @@ export class PaymentsController {
     }
   }
 
+  /**
+   * Get IST date from a Date object for consistent comparison
+   */
+  private getISTDateFromDate(date: Date): string {
+    return dayjs(date).tz("Asia/Kolkata").format("YYYY-MM-DD");
+  }
+
   @Public()
   @ApiOperation({ summary: "Debug daily metrics issue" })
   @UseGuards(ApiKeyGuard)
@@ -647,7 +661,16 @@ export class PaymentsController {
       const debugInfo =
         stats.healthMetrics?.map((metric: any) => {
           const lastTransactionDate = new Date(metric.lastTransactionTime);
-          const lastTransactionDay = todayStartDate(); // Use same method for consistency
+          // Calculate the day from the actual last transaction time
+          const lastTransactionDay = dayjs(lastTransactionDate)
+            .tz("Asia/Kolkata")
+            .startOf("day")
+            .toDate();
+
+          // Get IST date strings for comparison
+          const lastTransactionISTDate =
+            this.getISTDateFromDate(lastTransactionDate);
+          const todayISTDate = this.getISTDateFromDate(today);
 
           return {
             vpa: metric.vpa,
@@ -656,9 +679,13 @@ export class PaymentsController {
             dailyTotalAmount: metric.dailyTotalAmount,
             lastTransactionTime: metric.lastTransactionTime,
             lastTransactionDate: lastTransactionDate.toISOString(),
-            lastTransactionDay: lastTransactionDay.toISOString(),
-            today: today.toISOString(),
-            isSameDay: lastTransactionDay.getTime() === today.getTime(),
+            lastTransactionDay: dayjs(lastTransactionDay)
+              .tz("Asia/Kolkata")
+              .format(),
+            today: dayjs(today).tz("Asia/Kolkata").format(),
+            lastTransactionISTDate,
+            todayISTDate,
+            isSameDay: lastTransactionISTDate === todayISTDate,
             totalSuccessCount: metric.successCount,
             totalFailureCount: metric.failureCount,
             weeklySuccessCount: metric.weeklySuccessCount,
@@ -671,8 +698,9 @@ export class PaymentsController {
         timestamp: new Date().toISOString(),
         currentDate: {
           now: now.toISOString(),
-          today: today.toISOString(),
-          timezone: "Asia/Kolkata", // Use consistent timezone
+          today: dayjs(today).tz("Asia/Kolkata").format(), // Keep in IST timezone
+          todayIST: dayjs(today).tz("Asia/Kolkata").format("YYYY-MM-DD"),
+          timezone: "Asia/Kolkata",
         },
         debugInfo,
       };
@@ -681,6 +709,110 @@ export class PaymentsController {
 
       return {
         message: "Daily metrics debug failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Force reset daily metrics for testing" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post("vpa/force-reset-daily")
+  async forceResetDailyMetrics() {
+    this.logger.info("Force reset daily metrics endpoint called");
+
+    try {
+      await enhancedVpaRoutingService.resetDailyMetrics();
+
+      return {
+        message: "Daily metrics reset successfully",
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(`Force reset daily metrics failed: ${error.message}`);
+
+      return {
+        message: "Force reset daily metrics failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Test date calculations" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/test-dates")
+  async testDateCalculations() {
+    this.logger.info("Test date calculations endpoint called");
+
+    try {
+      const now = new Date();
+      const today = todayStartDate();
+      const currentISTDate = dayjs().tz("Asia/Kolkata").format("YYYY-MM-DD");
+      const todayISTDate = this.getISTDateFromDate(today);
+
+      return {
+        message: "Date calculation test",
+        now: now.toISOString(),
+        today: dayjs(today).tz("Asia/Kolkata").format(),
+        currentISTDate,
+        todayISTDate,
+        timezone: "Asia/Kolkata",
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(`Test date calculations failed: ${error.message}`);
+
+      return {
+        message: "Test date calculations failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: "Check daily reset status and force reset if needed",
+  })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/daily-reset-status")
+  async getDailyResetStatus() {
+    this.logger.info("Daily reset status endpoint called");
+
+    try {
+      const currentISTDate = dayjs().tz("Asia/Kolkata").format("YYYY-MM-DD");
+      const today = todayStartDate();
+
+      // Get current stats to check daily metrics
+      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
+      const hasNonZeroDailyMetrics = stats.healthMetrics?.some(
+        (metric: any) =>
+          metric.dailySuccessCount > 0 ||
+          metric.dailyFailureCount > 0 ||
+          metric.dailyTotalAmount > 0,
+      );
+
+      return {
+        message: "Daily reset status",
+        currentISTDate,
+        todayStartDate: today.toISOString(),
+        timezone: "Asia/Kolkata",
+        hasNonZeroDailyMetrics,
+        totalVPAs: stats.totalVPAs,
+        activeVPAs: stats.activeVPAs,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(`Daily reset status failed: ${error.message}`);
+
+      return {
+        message: "Daily reset status failed",
         error: error.message,
         timestamp: new Date().toISOString(),
       };
@@ -752,6 +884,49 @@ export class PaymentsController {
 
       return {
         message: "Daily metrics test failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Force refresh metrics and check daily reset" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post("vpa/force-refresh-metrics")
+  async forceRefreshMetrics() {
+    this.logger.info("Force refresh metrics endpoint called");
+
+    try {
+      // Force refresh metrics from cache
+      await enhancedVpaRoutingService.forceRefreshMetricsFromCache();
+
+      // Check and reset daily metrics if needed
+      await enhancedVpaRoutingService.refreshMetrics();
+
+      // Get updated stats
+      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
+
+      return {
+        message: "Metrics refreshed and daily reset checked",
+        timestamp: new Date().toISOString(),
+        totalVPAs: stats.totalVPAs,
+        activeVPAs: stats.activeVPAs,
+        healthMetrics: stats.healthMetrics?.map((metric: any) => ({
+          vpa: metric.vpa,
+          dailySuccessCount: metric.dailySuccessCount,
+          dailyFailureCount: metric.dailyFailureCount,
+          dailyTotalAmount: metric.dailyTotalAmount,
+          totalSuccessCount: metric.successCount,
+          totalFailureCount: metric.failureCount,
+        })),
+      };
+    } catch (error) {
+      this.logger.error(`Force refresh metrics failed: ${error.message}`);
+
+      return {
+        message: "Force refresh metrics failed",
         error: error.message,
         timestamp: new Date().toISOString(),
       };
