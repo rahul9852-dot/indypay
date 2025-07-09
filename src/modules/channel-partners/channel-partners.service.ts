@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -33,11 +34,13 @@ import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.
 import { getIsmartPayPgConfig } from "@/utils/pg-config.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
+import { PAYMENT_METHOD } from "@/enums/payment-method.enum";
 
 const { externalPaymentConfig } = appConfig();
 
 @Injectable()
 export class ChannelPartnersService {
+  private readonly logger = new Logger(ChannelPartnersService.name);
   constructor(
     @InjectRepository(UsersEntity)
     private readonly usersRepository: Repository<UsersEntity>,
@@ -199,6 +202,7 @@ export class ChannelPartnersService {
       sort = "id",
       order = "DESC",
     }: PaginationDto,
+    { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
     merchantId: string,
     cpId: string,
   ) {
@@ -211,6 +215,7 @@ export class ChannelPartnersService {
             role: USERS_ROLE.MERCHANT,
           },
           orderId: ILike(`%${search}%`),
+          createdAt: Between(new Date(startDate), new Date(endDate)),
         },
         relations: {
           user: true,
@@ -445,6 +450,243 @@ export class ChannelPartnersService {
         failedCount: failedSettlementCount,
       },
     };
+  }
+
+  async getBusinessTrendForCP(
+    cpId: string,
+    { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
+  ) {
+    if (new Date(startDate) > new Date(endDate)) {
+      throw new BadRequestException("Start date cannot be after end date");
+    }
+
+    try {
+      const startDateTime = new Date(startDate);
+      const endDateTime = new Date(endDate);
+
+      const queryBuilder = this.payInOrdersRepository
+        .createQueryBuilder("payInOrder")
+        .innerJoin("payInOrder.user", "user");
+
+      queryBuilder.where("user.channelPartnerId = :cpId", { cpId });
+
+      const upiQueryBuilder = this.payInOrdersRepository
+        .createQueryBuilder("payInOrder")
+        .innerJoin("payInOrder.user", "user");
+
+      upiQueryBuilder.where("user.channelPartnerId = :cpId", {
+        cpId,
+      });
+
+      const upiStats = await upiQueryBuilder
+        .andWhere("payInOrder.createdAt >= :startDate", {
+          startDate: startDateTime,
+        })
+        .andWhere("payInOrder.createdAt <= :endDate", { endDate: endDateTime })
+        .andWhere("payInOrder.paymentMethod = :paymentMethod", {
+          paymentMethod: PAYMENT_METHOD.UPI,
+        })
+        .select([
+          "COUNT(payInOrder.id) as totalCount",
+          `COUNT(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.id END) as successCount`,
+          `COUNT(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.id END) as failedCount`,
+          `COUNT(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.PENDING}' THEN payInOrder.id END) as pendingCount`,
+          `SUM(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.amount ELSE 0 END) as successAmount`,
+          `SUM(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.amount ELSE 0 END) as failedAmount`,
+          `SUM(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.PENDING}' THEN payInOrder.amount ELSE 0 END) as pendingAmount`,
+          `COUNT(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.id END) as todaySuccessCount`,
+          `COUNT(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE AND payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.id END) as todayFailedCount`,
+          `SUM(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.amount ELSE 0 END) as todayVolume`,
+          `COUNT(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE - INTERVAL '1 day' AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.id END) as yesterdaySuccessCount`,
+          `COUNT(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE - INTERVAL '1 day' AND payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.id END) as yesterdayFailedCount`,
+          `SUM(CASE WHEN DATE(payInOrder.createdAt) = CURRENT_DATE - INTERVAL '1 day' AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.amount ELSE 0 END) as yesterdayVolume`,
+          `COUNT(CASE WHEN payInOrder.createdAt >= CURRENT_DATE - INTERVAL '7 days' AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.id END) as last7DaysSuccessCount`,
+          `COUNT(CASE WHEN payInOrder.createdAt >= CURRENT_DATE - INTERVAL '7 days' AND payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.id END) as last7DaysFailedCount`,
+          `SUM(CASE WHEN payInOrder.createdAt >= CURRENT_DATE - INTERVAL '7 days' AND payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.amount ELSE 0 END) as last7DaysVolume`,
+        ])
+        .getRawOne();
+
+      const upiTotalCount = Number(upiStats.totalcount) || 0;
+      const upiSuccessCount = Number(upiStats.successcount) || 0;
+      const todayTotal =
+        (Number(upiStats.todaysuccesscount) || 0) +
+        (Number(upiStats.todayfailedcount) || 0);
+      const yesterdayTotal =
+        (Number(upiStats.yesterdaysuccesscount) || 0) +
+        (Number(upiStats.yesterdayfailedcount) || 0);
+      const last7DaysTotal =
+        (Number(upiStats.last7dayssuccesscount) || 0) +
+        (Number(upiStats.last7daysfailedcount) || 0);
+
+      const upiTrendStats = {
+        method: PAYMENT_METHOD.UPI,
+        totalcount: Number(upiStats.totalcount) || 0,
+        successcount: Number(upiStats.successcount) || 0,
+        failedcount: Number(upiStats.failedcount) || 0,
+        pendingcount: Number(upiStats.pendingcount) || 0,
+        successamount: Number(upiStats.successamount) || 0,
+        failedamount: Number(upiStats.failedamount) || 0,
+        pendingamount: Number(upiStats.pendingamount) || 0,
+        todaySuccessCount: Number(upiStats.todaysuccesscount) || 0,
+        todayFailedCount: Number(upiStats.todayfailedcount) || 0,
+        todayVolume: Number(upiStats.todayvolume) || 0,
+        yesterdaySuccessCount: Number(upiStats.yesterdaysuccesscount) || 0,
+        yesterdayFailedCount: Number(upiStats.yesterdayfailedcount) || 0,
+        yesterdayVolume: Number(upiStats.yesterdayvolume) || 0,
+        last7DaysSuccessCount: Number(upiStats.last7dayssuccesscount) || 0,
+        last7DaysFailedCount: Number(upiStats.last7daysfailedcount) || 0,
+        last7DaysVolume: Number(upiStats.last7daysvolume) || 0,
+        successRate:
+          upiTotalCount > 0
+            ? (Number(upiSuccessCount) / Number(upiTotalCount)) * 100
+            : 0,
+        todaySuccessRate:
+          todayTotal > 0
+            ? (Number(upiStats.todaysuccesscount) / todayTotal) * 100
+            : 0,
+        yesterdaySuccessRate:
+          yesterdayTotal > 0
+            ? (Number(upiStats.yesterdaysuccesscount) / yesterdayTotal) * 100
+            : 0,
+        last7DaysSuccessRate:
+          last7DaysTotal > 0
+            ? (Number(upiStats.last7dayssuccesscount) / last7DaysTotal) * 100
+            : 0,
+      };
+
+      const paymentMethodStats = [upiTrendStats];
+      const overallQueryBuilder = this.payInOrdersRepository
+        .createQueryBuilder("payInOrder")
+        .innerJoin("payInOrder.user", "user");
+
+      overallQueryBuilder.where("user.channelPartnerId = :cpId", {
+        cpId,
+      });
+
+      const overallStats = await overallQueryBuilder
+        .andWhere("payInOrder.createdAt >= :startDate", {
+          startDate: startDateTime,
+        })
+        .andWhere("payInOrder.createdAt <= :endDate", { endDate: endDateTime })
+        .select([
+          "SUM(payInOrder.amount) as totalAmount",
+          "COUNT(payInOrder.id) as totalCount",
+          `SUM(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.amount ELSE 0 END) as successAmount`,
+          `COUNT(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.id END) as successCount`,
+          `SUM(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.amount ELSE 0 END) as failedAmount`,
+          `COUNT(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.FAILED}' THEN payInOrder.id END) as failedCount`,
+          `SUM(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.PENDING}' THEN payInOrder.amount ELSE 0 END) as pendingAmount`,
+          `COUNT(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.PENDING}' THEN payInOrder.id END) as pendingCount`,
+        ])
+        .getRawOne();
+
+      const overallTotalCount = Number(overallStats.totalcount) || 0;
+      const overallSuccessCount = Number(overallStats.successcount) || 0;
+      const overallFailedCount = Number(overallStats.failedcount) || 0;
+      const overallPendingCount = Number(overallStats.pendingcount) || 0;
+
+      const overallRates = {
+        successRate:
+          overallTotalCount > 0
+            ? (overallSuccessCount / overallTotalCount) * 100
+            : 0,
+        conversionRate:
+          overallTotalCount > 0
+            ? (overallSuccessCount / overallTotalCount) * 100
+            : 0,
+        failureRate:
+          overallTotalCount > 0
+            ? (overallFailedCount / overallTotalCount) * 100
+            : 0,
+        pendingRate:
+          overallTotalCount > 0
+            ? (overallPendingCount / overallTotalCount) * 100
+            : 0,
+      };
+
+      const hourlyQueryBuilder = this.payInOrdersRepository
+        .createQueryBuilder("payInOrder")
+        .innerJoin("payInOrder.user", "user");
+
+      hourlyQueryBuilder.where("user.channelPartnerId = :cpId", {
+        cpId,
+      });
+
+      const hourlyStats = await hourlyQueryBuilder
+        .andWhere("payInOrder.createdAt >= :last24Hours", {
+          last24Hours: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        })
+        .andWhere("payInOrder.paymentMethod = :method", {
+          method: PAYMENT_METHOD.UPI,
+        })
+        .select([
+          "DATE_TRUNC('hour', payInOrder.createdAt) as hour",
+          "COUNT(payInOrder.id) as count",
+          `COUNT(CASE WHEN payInOrder.status = '${PAYMENT_STATUS.SUCCESS}' THEN payInOrder.id END) as successCount`,
+          `SUM(payInOrder.amount) as volume`,
+        ])
+        .groupBy("hour")
+        .orderBy("hour", "ASC")
+        .getRawMany();
+
+      const totalSuccessfulTransactions =
+        Number(overallStats.successcount) || 0;
+      const totalTransactions = Number(overallStats.totalcount) || 0;
+      const successRate =
+        totalTransactions > 0
+          ? (totalSuccessfulTransactions / totalTransactions) * 100
+          : 0;
+
+      const sortedStats = [...paymentMethodStats].sort(
+        (a, b) => (b.successRate || 0) - (a.successRate || 0),
+      );
+
+      const bestPerformer = sortedStats[0] || {
+        method: PAYMENT_METHOD.UPI,
+        successRate: 0,
+      };
+      const worstPerformer = sortedStats[sortedStats.length - 1] || {
+        method: PAYMENT_METHOD.UPI,
+        successRate: 0,
+      };
+
+      const response = {
+        summary: {
+          successfulTransactionsRate: Number(successRate) || 0,
+          numberOfSuccessfulTransactions:
+            Number(totalSuccessfulTransactions) || 0,
+          volumeOfTransactions: Number(overallStats.successamount) || 0,
+        },
+        insights: {
+          successRate: Number(successRate) || 0,
+          numberOfTransactions: Number(totalSuccessfulTransactions) || 0,
+          highestPaymentMethodSuccessRate: PAYMENT_METHOD.UPI,
+          lowestPaymentMethod: PAYMENT_METHOD.UPI,
+          totalSuccessGrossVolume: Number(overallStats.successamount) || 0,
+        },
+        tableData: [
+          {
+            paymentMethod: PAYMENT_METHOD.UPI,
+            successRatioToday: Number(upiTrendStats.todaySuccessRate) || 0,
+            successRatioYesterday:
+              Number(upiTrendStats.yesterdaySuccessRate) || 0,
+            averageSuccessRatio:
+              Number(upiTrendStats.last7DaysSuccessRate) || 0,
+            successToday: Number(upiTrendStats.todaySuccessCount) || 0,
+            successYesterday: Number(upiTrendStats.yesterdaySuccessCount) || 0,
+            averageVolume: Number(upiTrendStats.last7DaysVolume)
+              ? Number(upiTrendStats.last7DaysVolume) / 7
+              : 0,
+          },
+        ],
+      };
+
+      return response;
+    } catch (error) {
+      this.logger.error(`Error in getBusinessTrend: ${error.message}`);
+      this.logger.error(error.stack);
+      throw error;
+    }
   }
 
   async findAllSettlementsTransactionsCP(
