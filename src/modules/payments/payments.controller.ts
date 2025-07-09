@@ -57,6 +57,7 @@ import { ExternalPayinWebhookUtkarshDto } from "@/modules/payments/dto/external-
 import { CustomLogger } from "@/logger";
 import { appConfig } from "@/config/app.config";
 import { enhancedVpaRoutingService } from "@/utils/enhanced-vpa-routing.util";
+import { todayStartDate } from "@/utils/date.utils";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -638,19 +639,15 @@ export class PaymentsController {
       // Get current stats
       const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
 
-      // Get current date info
+      // Get current date info using existing date utilities
       const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const today = todayStartDate();
 
       // Check each VPA's daily metrics
       const debugInfo =
         stats.healthMetrics?.map((metric: any) => {
           const lastTransactionDate = new Date(metric.lastTransactionTime);
-          const lastTransactionDay = new Date(
-            lastTransactionDate.getFullYear(),
-            lastTransactionDate.getMonth(),
-            lastTransactionDate.getDate(),
-          );
+          const lastTransactionDay = todayStartDate(); // Use same method for consistency
 
           return {
             vpa: metric.vpa,
@@ -675,7 +672,7 @@ export class PaymentsController {
         currentDate: {
           now: now.toISOString(),
           today: today.toISOString(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone: "Asia/Kolkata", // Use consistent timezone
         },
         debugInfo,
       };

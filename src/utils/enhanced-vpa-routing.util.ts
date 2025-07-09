@@ -1,3 +1,6 @@
+import * as dayjs from "dayjs";
+import * as utc from "dayjs/plugin/utc";
+import * as timezone from "dayjs/plugin/timezone";
 import { Repository } from "typeorm";
 import { Cache } from "cache-manager";
 import { appConfig } from "@/config/app.config";
@@ -9,6 +12,11 @@ import {
   VPATransactionRecord,
 } from "@/interface/common.interface";
 import { VPARoute, VPARoutingResult } from "@/utils/vpa-routing.util";
+import { todayStartDate } from "@/utils/date.utils";
+
+// Extend dayjs with the required plugins
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const {
   utkarsh: { vpas, vpaRouting },
@@ -27,6 +35,7 @@ export class EnhancedVPARoutingService {
   private cacheManager: Cache | null = null;
   private payInOrdersRepository: Repository<PayInOrdersEntity> | null = null;
   private transactionRecords: Map<string, VPATransactionRecord> = new Map();
+  private lastDailyResetDate: string | null = null; // Track when daily reset was last performed
 
   constructor(
     cacheManager?: Cache,
@@ -147,7 +156,32 @@ export class EnhancedVPARoutingService {
   async refreshMetrics() {
     this.logger.info("Manually refreshing VPA metrics from cache and database");
     await this.loadCacheAndHistoricalData();
-    this.checkAndResetDailyMetricsIfNeeded();
+    await this.checkAndResetDailyMetricsIfNeeded();
+  }
+
+  /**
+   * Get current IST date in YYYY-MM-DD format for consistent date comparison
+   * Uses the existing date.utils.ts todayStartDate() method
+   */
+  private getCurrentISTDate(): string {
+    return dayjs(todayStartDate()).format("YYYY-MM-DD");
+  }
+
+  /**
+   * Get IST date from a Date object
+   */
+  private getISTDateFromDate(date: Date): string {
+    return dayjs(date).tz("Asia/Kolkata").format("YYYY-MM-DD");
+  }
+
+  /**
+   * Check if two dates are the same day in IST timezone
+   */
+  private isSameISTDay(date1: Date, date2: Date): boolean {
+    const istDate1 = this.getISTDateFromDate(date1);
+    const istDate2 = this.getISTDateFromDate(date2);
+
+    return istDate1 === istDate2;
   }
 
   /**
@@ -405,6 +439,8 @@ export class EnhancedVPARoutingService {
 
       let processedCount = 0;
 
+      this.logger.info(`Historical data: ${JSON.stringify(historicalData)}`);
+
       historicalData.forEach((transaction) => {
         // Extract VPA from payment intent (upi://pay?pa=VPA&...)
         const vpaMatch = transaction.intent?.match(/pa=([^&]+)/);
@@ -509,7 +545,7 @@ export class EnhancedVPARoutingService {
             lastSuccessTime: new Date(),
             lastFailureTime: new Date(),
             isHealthy: true,
-            healthScore: 10,
+            healthScore: 100,
             dailySuccessCount: 0,
             dailyFailureCount: 0,
             dailyTotalAmount: 0,
@@ -1404,56 +1440,26 @@ export class EnhancedVPARoutingService {
     // Save updated metrics to cache
     await this.saveMetricsToCache();
 
+    this.lastDailyResetDate = this.getCurrentISTDate();
     this.logger.info("Reset daily VPA metrics and volume limits");
   }
 
   /**
    * Check if daily metrics need to be reset (called on service initialization)
    */
-  private checkAndResetDailyMetricsIfNeeded() {
-    // Use IST timezone for date comparison
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-    const istNow = new Date(now.getTime() + istOffset);
-    const today = new Date(
-      istNow.getFullYear(),
-      istNow.getMonth(),
-      istNow.getDate(),
-    );
+  private async checkAndResetDailyMetricsIfNeeded() {
+    const currentISTDate = this.getCurrentISTDate();
 
-    // Check if we have any metrics with daily data from a previous day
-    let needsReset = false;
+    if (this.lastDailyResetDate === null) {
+      this.lastDailyResetDate = currentISTDate;
+      this.logger.info("Daily metrics reset date not set, initializing.");
 
-    this.vpaMetrics.forEach((metrics) => {
-      if (metrics.lastTransactionTime) {
-        const lastTransactionDate = new Date(metrics.lastTransactionTime);
-        // Convert last transaction to IST
-        const istLastTransaction = new Date(
-          lastTransactionDate.getTime() + istOffset,
-        );
-        const lastTransactionDay = new Date(
-          istLastTransaction.getFullYear(),
-          istLastTransaction.getMonth(),
-          istLastTransaction.getDate(),
-        );
+      return;
+    }
 
-        // If last transaction was on a different day, we need to reset daily metrics
-        if (lastTransactionDay.getTime() !== today.getTime()) {
-          needsReset = true;
-          this.logger.info(
-            `VPA ${metrics.vpa}: Last transaction day (${lastTransactionDay.toISOString()}) != Today (${today.toISOString()}) - will reset daily metrics`,
-          );
-        } else {
-          this.logger.info(
-            `VPA ${metrics.vpa}: Last transaction day (${lastTransactionDay.toISOString()}) == Today (${today.toISOString()}) - keeping daily metrics`,
-          );
-        }
-      }
-    });
-
-    if (needsReset) {
+    if (this.lastDailyResetDate !== currentISTDate) {
       this.logger.info(
-        "Detected daily metrics from previous day, resetting daily counters",
+        `Detected new day, resetting daily metrics from ${this.lastDailyResetDate} to ${currentISTDate}`,
       );
       this.vpaMetrics.forEach((metrics) => {
         metrics.dailySuccessCount = 0;
@@ -1465,6 +1471,7 @@ export class EnhancedVPARoutingService {
         metrics.volumeLimitPercentage = 0;
         metrics.transactionLimitPercentage = 0;
       });
+      this.lastDailyResetDate = currentISTDate;
     } else {
       this.logger.info("Daily metrics are from today, no reset needed");
     }
