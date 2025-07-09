@@ -10,6 +10,7 @@ import {
 } from "@/dtos/common.dto";
 import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
+import { AnalyticsService } from "@/modules/analytics/analytics.service";
 
 @ApiTags("Channel Partners")
 @Role(USERS_ROLE.CHANNEL_PARTNER)
@@ -17,6 +18,7 @@ import { UsersEntity } from "@/entities/user.entity";
 export class ChannelPartnersController {
   constructor(
     private readonly channelPartnersService: ChannelPartnersService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   @Get("merchants")
@@ -62,11 +64,13 @@ export class ChannelPartnersController {
   @ApiOperation({ summary: "Get all collections by merchant id" })
   async getAllCollectsByMerchantIdCP(
     @Param("userId") userId: string,
+    @Query() dateDto: DateDto,
     @Query() paginationDto: PaginationDto,
     @User() { id }: UsersEntity,
   ) {
     return this.channelPartnersService.getAllCollectsByMerchantIdCP(
       paginationDto,
+      dateDto,
       userId,
       id,
     );
@@ -76,6 +80,53 @@ export class ChannelPartnersController {
   @ApiOperation({ summary: "Get stats" })
   async getStatsForCP(@User() { id }: UsersEntity, @Query() query: DateDto) {
     return this.channelPartnersService.getStatsForCP(id, query);
+  }
+
+  @Get("business-trend")
+  @ApiOperation({ summary: "Get channel partner's business trend analytics" })
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  async getCPBusinessTrend(
+    @User() { id }: UsersEntity,
+    @Query() dateDto: DateDto,
+  ) {
+    return {
+      data: await this.channelPartnersService.getBusinessTrendForCP(
+        id,
+        dateDto,
+      ),
+    };
+  }
+
+  @Get("conversion-rate")
+  @ApiOperation({
+    summary: "Get conversion rate analytics for Channel Partner",
+  })
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  async getCPConversionRate(
+    @User() { id }: UsersEntity,
+    @Query() dateDto: DateDto,
+  ) {
+    return this.analyticsService.getAdminConversionRate(dateDto, id);
+  }
+
+  @Get("failure")
+  @ApiOperation({ summary: "Get failure analytics for channel partner" })
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  async getCPFailureAnalytics(
+    @User() { id }: UsersEntity,
+    @Query() dateDto: DateDto,
+  ) {
+    return this.analyticsService.getAdminFailureAnalytics(dateDto, id);
+  }
+
+  @Get("success")
+  @ApiOperation({ summary: "Get success analytics for channel partner" })
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  async getCPSuccessAnalytics(
+    @User() { id }: UsersEntity,
+    @Query() dateDto: DateDto,
+  ) {
+    return this.analyticsService.getAdminSuccessAnalytics(dateDto, id);
   }
 
   @Get("settlements")

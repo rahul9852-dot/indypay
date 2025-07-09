@@ -26,6 +26,18 @@ export class PayoutController {
     return this.payoutService.getAllPayoutsGroupedByUser(query);
   }
 
+  @ApiOperation({
+    summary: "Get all payouts grouped by user - Channel Partner",
+  })
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  @Get("/cp")
+  async getAllPayoutsGroupedByUserCP(
+    @Query() query: PaginationWithoutSortAndOrderDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.payoutService.getAllPayoutsGroupedByUser(query, user.id);
+  }
+
   @ApiOperation({ summary: "Get all payouts by user id - Admin" })
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @Get("/admin/:userId")
@@ -34,6 +46,17 @@ export class PayoutController {
     @Query() query: PaginationWithDateAndStatusDto,
   ) {
     return this.payoutService.getAllPayoutsMerchant(query, userId);
+  }
+
+  @ApiOperation({ summary: "Get all payouts by user id - Channel Partner" })
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  @Get("/cp/:userId")
+  async getAllPayoutsByUserIdCP(
+    @Param("userId") userId: string,
+    @Query() query: PaginationWithDateAndStatusDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.payoutService.getAllPayoutsMerchant(query, userId, user.id);
   }
 
   @ApiOperation({ summary: "Get all payouts - Merchant" })

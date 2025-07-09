@@ -30,6 +30,16 @@ export class WalletsController {
     return this.walletsService.getWalletList(paginationDto);
   }
 
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  @ApiOperation({ summary: "Get Wallet Txn - Channel Partner" })
+  @Get("/cp/wallet-list")
+  getWalletListCP(
+    @User() user: UsersEntity,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    return this.walletsService.getWalletList(paginationDto, user.id);
+  }
+
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @ApiOperation({ summary: "Get Wallet Txn of a user - Admin" })
   @Get("/admin/wallet-list/:userId")
@@ -38,6 +48,21 @@ export class WalletsController {
     @Query() paginationDto: PaginationDto,
   ) {
     return this.walletsService.getWalletListByUserId(userId, paginationDto);
+  }
+
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  @ApiOperation({ summary: "Get Wallet Txn of a user - Channel Partner" })
+  @Get("/cp/wallet-list/:userId")
+  getWalletListByUserIdCP(
+    @Param("userId") userId: string,
+    @Query() paginationDto: PaginationDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.walletsService.getWalletListByUserId(
+      userId,
+      paginationDto,
+      user.id,
+    );
   }
 
   @Role(USERS_ROLE.MERCHANT)

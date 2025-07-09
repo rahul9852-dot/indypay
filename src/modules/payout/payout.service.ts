@@ -10,6 +10,7 @@ import {
 import axios from "axios";
 import {
   BadRequestException,
+  ForbiddenException,
   HttpStatus,
   Injectable,
   NotFoundException,
@@ -67,12 +68,15 @@ export class PayoutService {
     private readonly thirdPartyAuthService: ThirdPartyAuthService,
   ) {}
 
-  async getAllPayoutsGroupedByUser({
-    page = 1,
-    limit = 10,
+  async getAllPayoutsGroupedByUser(
+    {
+      page = 1,
+      limit = 10,
 
-    search = "",
-  }: PaginationWithoutSortAndOrderDto) {
+      search = "",
+    }: PaginationWithoutSortAndOrderDto,
+    cpId?: string,
+  ) {
     const query = this.userRepository
       .createQueryBuilder("user")
       .where(
@@ -92,7 +96,13 @@ export class PayoutService {
           ACCOUNT_STATUS.TEST_DELETED,
           ACCOUNT_STATUS.DELETED,
         ],
-      })
+      });
+
+    if (cpId) {
+      query.andWhere("user.channelPartnerId = :cpId", { cpId });
+    }
+
+    query
       .leftJoin("user.payOutOrders", "payout")
       .select([
         "user.id",
@@ -229,6 +239,7 @@ export class PayoutService {
       status,
     }: PaginationWithDateAndStatusDto,
     userId: string,
+    cpId?: string,
   ) {
     const whereQuery:
       | FindOptionsWhere<PayOutOrdersEntity>
@@ -256,7 +267,16 @@ export class PayoutService {
       where: {
         id: userId,
       },
+      relations: { channelPartner: true },
     });
+
+    if (
+      cpId &&
+      ![USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role) &&
+      user.channelPartnerId !== cpId
+    ) {
+      throw new ForbiddenException("Unauthorized access to payouts");
+    }
 
     const query = [];
 

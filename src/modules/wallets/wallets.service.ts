@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -33,17 +34,16 @@ export class WalletsService {
     private readonly usersRepository: Repository<UsersEntity>,
   ) {}
 
-  async getWalletList({
-    limit = 10,
-    page = 1,
-    sort = "id",
-    order = "DESC",
-  }: PaginationDto) {
+  async getWalletList(
+    { limit = 10, page = 1, sort = "id", order = "DESC" }: PaginationDto,
+    cpId?: string,
+  ) {
     const [wallets, totalItems] = await this.usersRepository.findAndCount({
       where: {
         role: USERS_ROLE.MERCHANT,
         accountStatus: ACCOUNT_STATUS.ACTIVE,
         onboardingStatus: ONBOARDING_STATUS.KYC_VERIFIED,
+        ...(cpId && { channelPartnerId: cpId }),
       },
       select: {
         id: true,
@@ -106,7 +106,19 @@ export class WalletsService {
       order = "DESC",
       search = "",
     }: PaginationDto,
+    cpId?: string,
   ) {
+    if (cpId) {
+      const user = await this.usersRepository.findOne({
+        where: { id: userId, channelPartnerId: cpId },
+      });
+
+      if (!user) {
+        throw new ForbiddenException(
+          "You are not authorized to access this user's data.",
+        );
+      }
+    }
     const walletQueryBuilder = this.walletRepository
       .createQueryBuilder("wallet")
       .leftJoin("wallet.user", "user")
