@@ -154,9 +154,18 @@ export class EnhancedVPARoutingService {
    * Manually trigger cache and historical data loading
    */
   async refreshMetrics() {
-    this.logger.info("Manually refreshing VPA metrics from cache and database");
-    await this.loadCacheAndHistoricalData();
-    await this.checkAndResetDailyMetricsIfNeeded();
+    this.logger.info("Manually refreshing VPA metrics from database");
+
+    // Update all metrics from database for all active VPAs
+    const activeVPAs = this.getActiveVPAs();
+    for (const vpa of activeVPAs) {
+      await this.updateAllMetricsFromDatabase(vpa.vpa);
+    }
+
+    // Save updated metrics to cache
+    await this.saveMetricsToCache();
+
+    this.logger.info("VPA metrics refreshed from database");
   }
 
   /**
@@ -1297,9 +1306,9 @@ export class EnhancedVPARoutingService {
       (metrics) => configuredVpaSet.has(metrics.vpa),
     );
 
-    // Update daily metrics from database for all VPAs
+    // Update all metrics from database for all VPAs (comprehensive calculation)
     for (const vpa of activeVPAs) {
-      await this.updateDailyMetricsFromDatabase(vpa.vpa);
+      await this.updateAllMetricsFromDatabase(vpa.vpa);
     }
 
     // Get updated metrics after database calculation
@@ -1401,20 +1410,20 @@ export class EnhancedVPARoutingService {
    */
   async resetDailyMetrics() {
     this.logger.info(
-      "Daily metrics reset called - using database calculation instead",
+      "Daily metrics reset called - using comprehensive database calculation instead",
     );
 
-    // Update daily metrics from database for all VPAs
+    // Update all metrics from database for all VPAs
     const activeVPAs = this.getActiveVPAs();
     for (const vpa of activeVPAs) {
-      await this.updateDailyMetricsFromDatabase(vpa.vpa);
+      await this.updateAllMetricsFromDatabase(vpa.vpa);
     }
 
     // Save updated metrics to cache
     await this.saveMetricsToCache();
 
     this.lastDailyResetDate = this.getCurrentISTDate();
-    this.logger.info("Updated daily VPA metrics from database");
+    this.logger.info("Updated comprehensive VPA metrics from database");
   }
 
   /**
@@ -1436,10 +1445,10 @@ export class EnhancedVPARoutingService {
         `Detected new day, updating daily metrics from database from ${this.lastDailyResetDate} to ${currentISTDate}`,
       );
 
-      // Update daily metrics from database for all VPAs
+      // Update all metrics from database for all VPAs
       const activeVPAs = this.getActiveVPAs();
       for (const vpa of activeVPAs) {
-        await this.updateDailyMetricsFromDatabase(vpa.vpa);
+        await this.updateAllMetricsFromDatabase(vpa.vpa);
       }
 
       this.lastDailyResetDate = currentISTDate;
@@ -1523,6 +1532,227 @@ export class EnhancedVPARoutingService {
   }
 
   /**
+   * Calculate comprehensive metrics directly from database for a specific VPA
+   * This ensures accuracy by always getting real-time data from database
+   */
+  private async calculateAllMetricsFromDatabase(vpa: string): Promise<{
+    totalTransactions: number;
+    successCount: number;
+    failureCount: number;
+    averageResponseTime: number;
+    lastSuccessTime: Date;
+    lastFailureTime: Date;
+    lastTransactionTime: Date;
+    dailySuccessCount: number;
+    dailyFailureCount: number;
+    dailyTotalAmount: number;
+    dailyTransactionCount: number;
+    weeklySuccessCount: number;
+    weeklyFailureCount: number;
+    monthlySuccessCount: number;
+    monthlyFailureCount: number;
+  }> {
+    if (!this.payInOrdersRepository) {
+      this.logger.warn(
+        "PayInOrders repository not available for metrics calculation",
+      );
+
+      return {
+        totalTransactions: 0,
+        successCount: 0,
+        failureCount: 0,
+        averageResponseTime: 0,
+        lastSuccessTime: new Date(),
+        lastFailureTime: new Date(),
+        lastTransactionTime: new Date(),
+        dailySuccessCount: 0,
+        dailyFailureCount: 0,
+        dailyTotalAmount: 0,
+        dailyTransactionCount: 0,
+        weeklySuccessCount: 0,
+        weeklyFailureCount: 0,
+        monthlySuccessCount: 0,
+        monthlyFailureCount: 0,
+      };
+    }
+
+    try {
+      const today = todayStartDate();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Calculate week start (7 days ago)
+      const weekStart = new Date(today);
+      weekStart.setDate(weekStart.getDate() - 7);
+
+      // Calculate month start (30 days ago)
+      const monthStart = new Date(today);
+      monthStart.setDate(monthStart.getDate() - 30);
+
+      // Query for all transactions for this specific VPA
+      const allTransactions = await this.payInOrdersRepository
+        .createQueryBuilder("payin")
+        .select([
+          "payin.status",
+          "payin.amount",
+          "payin.createdAt",
+          "payin.successAt",
+          "payin.failureAt",
+        ])
+        .where("payin.intent LIKE :vpaPattern", {
+          vpaPattern: `%pa=${vpa}%`,
+        })
+        .orderBy("payin.createdAt", "DESC")
+        .getMany();
+
+      // Calculate all metrics
+      let totalTransactions = 0;
+      let successCount = 0;
+      let failureCount = 0;
+      let totalResponseTime = 0;
+      let responseTimeCount = 0;
+      let lastSuccessTime = new Date(0);
+      let lastFailureTime = new Date(0);
+      let lastTransactionTime = new Date(0);
+
+      // Daily metrics
+      let dailySuccessCount = 0;
+      let dailyFailureCount = 0;
+      let dailyTotalAmount = 0;
+      let dailyTransactionCount = 0;
+
+      // Weekly metrics
+      let weeklySuccessCount = 0;
+      let weeklyFailureCount = 0;
+
+      // Monthly metrics
+      let monthlySuccessCount = 0;
+      let monthlyFailureCount = 0;
+
+      allTransactions.forEach((transaction) => {
+        const transactionDate = new Date(transaction.createdAt);
+        totalTransactions++;
+
+        // Update last transaction time
+        if (transactionDate > lastTransactionTime) {
+          lastTransactionTime = transactionDate;
+        }
+
+        if (transaction.status === PAYMENT_STATUS.SUCCESS) {
+          successCount++;
+
+          // Update last success time
+          if (transactionDate > lastSuccessTime) {
+            lastSuccessTime = transactionDate;
+          }
+
+          // Calculate response time if successAt is available
+          if (transaction.successAt) {
+            const responseTime =
+              new Date(transaction.successAt).getTime() -
+              transactionDate.getTime();
+            if (responseTime > 0) {
+              totalResponseTime += responseTime;
+              responseTimeCount++;
+            }
+          }
+
+          // Daily metrics
+          if (transactionDate >= today && transactionDate < tomorrow) {
+            dailySuccessCount++;
+            dailyTotalAmount += Number(transaction.amount) || 0; // Ensure it's a number
+          }
+
+          // Weekly metrics
+          if (transactionDate >= weekStart) {
+            weeklySuccessCount++;
+          }
+
+          // Monthly metrics
+          if (transactionDate >= monthStart) {
+            monthlySuccessCount++;
+          }
+        } else if (transaction.status === PAYMENT_STATUS.FAILED) {
+          failureCount++;
+
+          // Update last failure time
+          if (transactionDate > lastFailureTime) {
+            lastFailureTime = transactionDate;
+          }
+
+          // Daily metrics
+          if (transactionDate >= today && transactionDate < tomorrow) {
+            dailyFailureCount++;
+          }
+
+          // Weekly metrics
+          if (transactionDate >= weekStart) {
+            weeklyFailureCount++;
+          }
+
+          // Monthly metrics
+          if (transactionDate >= monthStart) {
+            monthlyFailureCount++;
+          }
+        }
+
+        // Daily transaction count (all transactions today)
+        if (transactionDate >= today && transactionDate < tomorrow) {
+          dailyTransactionCount++;
+        }
+      });
+
+      // Calculate average response time
+      const averageResponseTime =
+        responseTimeCount > 0 ? totalResponseTime / responseTimeCount : 0;
+
+      this.logger.debug(
+        `Calculated comprehensive metrics for VPA ${vpa}: Total=${totalTransactions}, Success=${successCount}, Failure=${failureCount}, Daily=${dailySuccessCount}/${dailyFailureCount}, Weekly=${weeklySuccessCount}/${weeklyFailureCount}, Monthly=${monthlySuccessCount}/${monthlyFailureCount}`,
+      );
+
+      return {
+        totalTransactions,
+        successCount,
+        failureCount,
+        averageResponseTime,
+        lastSuccessTime,
+        lastFailureTime,
+        lastTransactionTime,
+        dailySuccessCount,
+        dailyFailureCount,
+        dailyTotalAmount,
+        dailyTransactionCount,
+        weeklySuccessCount,
+        weeklyFailureCount,
+        monthlySuccessCount,
+        monthlyFailureCount,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to calculate comprehensive metrics for VPA ${vpa}: ${error.message}`,
+      );
+
+      return {
+        totalTransactions: 0,
+        successCount: 0,
+        failureCount: 0,
+        averageResponseTime: 0,
+        lastSuccessTime: new Date(),
+        lastFailureTime: new Date(),
+        lastTransactionTime: new Date(),
+        dailySuccessCount: 0,
+        dailyFailureCount: 0,
+        dailyTotalAmount: 0,
+        dailyTransactionCount: 0,
+        weeklySuccessCount: 0,
+        weeklyFailureCount: 0,
+        monthlySuccessCount: 0,
+        monthlyFailureCount: 0,
+      };
+    }
+  }
+
+  /**
    * Calculate daily metrics directly from database for a specific VPA
    * This ensures accuracy by always getting real-time data
    */
@@ -1532,80 +1762,20 @@ export class EnhancedVPARoutingService {
     dailyTotalAmount: number;
     dailyTransactionCount: number;
   }> {
-    if (!this.payInOrdersRepository) {
-      this.logger.warn(
-        "PayInOrders repository not available for daily metrics calculation",
-      );
+    const allMetrics = await this.calculateAllMetricsFromDatabase(vpa);
 
-      return {
-        dailySuccessCount: 0,
-        dailyFailureCount: 0,
-        dailyTotalAmount: 0,
-        dailyTransactionCount: 0,
-      };
-    }
-
-    try {
-      const today = todayStartDate();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      // Query for today's transactions for this specific VPA
-      const todayTransactions = await this.payInOrdersRepository
-        .createQueryBuilder("payin")
-        .select(["payin.status", "payin.amount", "payin.createdAt"])
-        .where("payin.createdAt >= :startDate", { startDate: today })
-        .andWhere("payin.createdAt < :endDate", { endDate: tomorrow })
-        .andWhere("payin.intent LIKE :vpaPattern", {
-          vpaPattern: `%pa=${vpa}%`,
-        })
-        .getMany();
-
-      let dailySuccessCount = 0;
-      let dailyFailureCount = 0;
-      let dailyTotalAmount = 0;
-      let dailyTransactionCount = 0;
-
-      todayTransactions.forEach((transaction) => {
-        dailyTransactionCount++;
-
-        if (transaction.status === PAYMENT_STATUS.SUCCESS) {
-          dailySuccessCount++;
-          dailyTotalAmount += transaction.amount || 0;
-        } else if (transaction.status === PAYMENT_STATUS.FAILED) {
-          dailyFailureCount++;
-        }
-        // Pending transactions only count toward transaction count, not success/failure
-      });
-
-      this.logger.debug(
-        `Calculated daily metrics for VPA ${vpa}: ${dailySuccessCount} success, ${dailyFailureCount} failed, ${dailyTotalAmount} amount, ${dailyTransactionCount} total transactions`,
-      );
-
-      return {
-        dailySuccessCount,
-        dailyFailureCount,
-        dailyTotalAmount,
-        dailyTransactionCount,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Failed to calculate daily metrics for VPA ${vpa}: ${error.message}`,
-      );
-
-      return {
-        dailySuccessCount: 0,
-        dailyFailureCount: 0,
-        dailyTotalAmount: 0,
-        dailyTransactionCount: 0,
-      };
-    }
+    return {
+      dailySuccessCount: allMetrics.dailySuccessCount,
+      dailyFailureCount: allMetrics.dailyFailureCount,
+      dailyTotalAmount: allMetrics.dailyTotalAmount,
+      dailyTransactionCount: allMetrics.dailyTransactionCount,
+    };
   }
 
   /**
-   * Update daily metrics for a VPA from database
+   * Update all metrics for a VPA from database (comprehensive update)
    */
-  private async updateDailyMetricsFromDatabase(vpa: string): Promise<void> {
+  private async updateAllMetricsFromDatabase(vpa: string): Promise<void> {
     const metrics = this.vpaMetrics.get(vpa);
     if (!metrics) {
       this.logger.warn(`No metrics found for VPA ${vpa}`);
@@ -1613,13 +1783,34 @@ export class EnhancedVPARoutingService {
       return;
     }
 
-    const dailyMetrics = await this.calculateDailyMetricsFromDatabase(vpa);
+    const allMetrics = await this.calculateAllMetricsFromDatabase(vpa);
 
-    // Update the metrics with real-time data
-    metrics.dailySuccessCount = dailyMetrics.dailySuccessCount;
-    metrics.dailyFailureCount = dailyMetrics.dailyFailureCount;
-    metrics.dailyTotalAmount = dailyMetrics.dailyTotalAmount;
-    metrics.dailyTransactionCount = dailyMetrics.dailyTransactionCount;
+    // Update all metrics with real-time database data
+    metrics.totalTransactions = allMetrics.totalTransactions;
+    metrics.successCount = allMetrics.successCount;
+    metrics.failureCount = allMetrics.failureCount;
+    metrics.averageResponseTime = allMetrics.averageResponseTime;
+    metrics.lastSuccessTime = allMetrics.lastSuccessTime;
+    metrics.lastFailureTime = allMetrics.lastFailureTime;
+    metrics.lastTransactionTime = allMetrics.lastTransactionTime;
+
+    // Daily metrics
+    metrics.dailySuccessCount = allMetrics.dailySuccessCount;
+    metrics.dailyFailureCount = allMetrics.dailyFailureCount;
+    metrics.dailyTotalAmount = allMetrics.dailyTotalAmount;
+    metrics.dailyTransactionCount = allMetrics.dailyTransactionCount;
+
+    // Weekly metrics
+    metrics.weeklySuccessCount = allMetrics.weeklySuccessCount;
+    metrics.weeklyFailureCount = allMetrics.weeklyFailureCount;
+
+    // Monthly metrics
+    metrics.monthlySuccessCount = allMetrics.monthlySuccessCount;
+    metrics.monthlyFailureCount = allMetrics.monthlyFailureCount;
+
+    // Recalculate health score based on real database data
+    metrics.healthScore = this.calculateHealthScore(metrics);
+    metrics.isHealthy = metrics.healthScore > 50;
 
     // Recalculate percentages
     metrics.volumeLimitPercentage =
@@ -1638,8 +1829,15 @@ export class EnhancedVPARoutingService {
     this.vpaMetrics.set(vpa, metrics);
 
     this.logger.info(
-      `Updated daily metrics for VPA ${vpa} from database: ${dailyMetrics.dailySuccessCount} success, ${dailyMetrics.dailyFailureCount} failed, ${dailyMetrics.dailyTotalAmount} amount`,
+      `Updated comprehensive metrics for VPA ${vpa} from database: Total=${allMetrics.totalTransactions}, Success=${allMetrics.successCount}, Failure=${allMetrics.failureCount}, HealthScore=${metrics.healthScore.toFixed(2)}, Daily=${allMetrics.dailySuccessCount}/${allMetrics.dailyFailureCount}, Weekly=${allMetrics.weeklySuccessCount}/${allMetrics.weeklyFailureCount}, Monthly=${allMetrics.monthlySuccessCount}/${allMetrics.monthlyFailureCount}`,
     );
+  }
+
+  /**
+   * Update daily metrics for a VPA from database (for backward compatibility)
+   */
+  private async updateDailyMetricsFromDatabase(vpa: string): Promise<void> {
+    await this.updateAllMetricsFromDatabase(vpa);
   }
 }
 
