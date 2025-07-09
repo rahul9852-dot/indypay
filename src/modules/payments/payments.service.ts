@@ -789,6 +789,16 @@ export class PaymentsService {
         );
       }
 
+      // Extract VPA from payment URL if available
+      let vpa = null;
+      if (externalPaymentResponse?.data?.paymentUrl) {
+        const vpaMatch =
+          externalPaymentResponse.data.paymentUrl.match(/pa=([^&]+)/);
+        if (vpaMatch) {
+          vpa = vpaMatch[1];
+        }
+      }
+
       // 6. save external payment
       await queryRunner.manager.save(
         this.payInOrdersRepository.create({
@@ -796,6 +806,7 @@ export class PaymentsService {
           ...(externalPaymentResponse?.data?.paymentUrl && {
             intent: externalPaymentResponse?.data?.paymentUrl,
           }),
+          vpa,
           txnRefId: externalPaymentResponse.data.txnRefId,
         }),
       );
@@ -3280,6 +3291,16 @@ export class PaymentsService {
         orderId,
         userId: user.id,
       });
+
+      // Extract VPA from payment link if available
+      let vpa = null;
+      if (paymentLink) {
+        const vpaMatch = paymentLink.match(/pa=([^&]+)/);
+        if (vpaMatch) {
+          vpa = vpaMatch[1];
+        }
+      }
+
       // 6. save external payment
       await queryRunner.manager.save(
         this.payInOrdersRepository.create({
@@ -3287,6 +3308,7 @@ export class PaymentsService {
           ...(paymentLink && {
             intent: paymentLink,
           }),
+          vpa,
         }),
       );
 

@@ -449,11 +449,11 @@ export class EnhancedVPARoutingService {
       const threeDaysAgo = new Date();
       threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-      // Highly optimized query with minimal data fetch
+      // Highly optimized query with minimal data fetch using VPA column
       const historicalData = await this.payInOrdersRepository
         .createQueryBuilder("payin")
         .select([
-          "payin.intent",
+          "payin.vpa",
           "payin.amount",
           "payin.status",
           "payin.createdAt",
@@ -461,8 +461,7 @@ export class EnhancedVPARoutingService {
           "payin.failureAt",
         ])
         .where("payin.createdAt >= :date", { date: threeDaysAgo })
-        .andWhere("payin.intent IS NOT NULL")
-        .andWhere("payin.intent LIKE '%pa=%'") // Pre-filter for VPA transactions
+        .andWhere("payin.vpa IS NOT NULL") // Use VPA column for much faster queries
         .orderBy("payin.createdAt", "DESC")
         .limit(5000) // Reduced limit for better performance
         .getMany();
@@ -485,11 +484,10 @@ export class EnhancedVPARoutingService {
       this.logger.info(`Historical data: ${JSON.stringify(historicalData)}`);
 
       historicalData.forEach((transaction) => {
-        // Extract VPA from payment intent (upi://pay?pa=VPA&...)
-        const vpaMatch = transaction.intent?.match(/pa=([^&]+)/);
-        if (!vpaMatch) return;
+        // Use VPA directly from the dedicated column
+        const {vpa} = transaction;
+        if (!vpa) return;
 
-        const vpa = vpaMatch[1];
         processedCount++;
         const stats = vpaStats.get(vpa) || {
           successCount: 0,
@@ -743,6 +741,7 @@ export class EnhancedVPARoutingService {
               where: { orderId },
               select: [
                 "intent",
+                "vpa",
                 "amount",
                 "status",
                 "createdAt",
@@ -751,10 +750,20 @@ export class EnhancedVPARoutingService {
               ],
             });
 
-            if (payinOrder && payinOrder.intent) {
-              const vpaMatch = payinOrder.intent.match(/pa=([^&]+)/);
-              if (vpaMatch) {
-                const vpa = vpaMatch[1];
+            if (payinOrder) {
+              // Use the dedicated VPA column if available, otherwise extract from intent
+              let {vpa} = payinOrder;
+              if (!vpa && payinOrder.intent) {
+                const vpaMatch = payinOrder.intent.match(/pa=([^&]+)/);
+                if (vpaMatch) {
+                  vpa = vpaMatch[1];
+
+                  // Update the VPA column for future queries
+                  await this.payInOrdersRepository.update({ orderId }, { vpa });
+                }
+              }
+
+              if (vpa) {
                 this.logger.info(
                   `Found VPA ${vpa} from database for orderId: ${orderId}`,
                 );
@@ -1589,7 +1598,7 @@ export class EnhancedVPARoutingService {
       const monthStart = new Date(today);
       monthStart.setDate(monthStart.getDate() - 30);
 
-      // Query for all transactions for this specific VPA
+      // Query for all transactions for this specific VPA using the dedicated VPA column
       const allTransactions = await this.payInOrdersRepository
         .createQueryBuilder("payin")
         .select([
@@ -1599,9 +1608,7 @@ export class EnhancedVPARoutingService {
           "payin.successAt",
           "payin.failureAt",
         ])
-        .where("payin.intent LIKE :vpaPattern", {
-          vpaPattern: `%pa=${vpa}%`,
-        })
+        .where("payin.vpa = :vpa", { vpa })
         .orderBy("payin.createdAt", "DESC")
         .getMany();
 
