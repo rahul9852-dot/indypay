@@ -932,4 +932,56 @@ export class PaymentsController {
       };
     }
   }
+
+  @Public()
+  @ApiOperation({ summary: "Debug daily reset logic" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("vpa/debug-daily-reset")
+  async debugDailyReset() {
+    this.logger.info("Debug daily reset endpoint called");
+
+    try {
+      const currentISTDate = dayjs().tz("Asia/Kolkata").format("YYYY-MM-DD");
+      const today = todayStartDate();
+
+      // Get current stats
+      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
+
+      // Check if any VPAs have non-zero daily metrics
+      const vpasWithNonZeroDaily =
+        stats.healthMetrics?.filter(
+          (metric: any) =>
+            metric.dailySuccessCount > 0 ||
+            metric.dailyFailureCount > 0 ||
+            metric.dailyTotalAmount > 0,
+        ) || [];
+
+      return {
+        message: "Daily reset debug information",
+        currentISTDate,
+        todayStartDate: today.toISOString(),
+        timezone: "Asia/Kolkata",
+        lastDailyResetDate: enhancedVpaRoutingService.getLastDailyResetDate(),
+        totalVPAs: stats.totalVPAs,
+        activeVPAs: stats.activeVPAs,
+        vpasWithNonZeroDaily: vpasWithNonZeroDaily.map((metric: any) => ({
+          vpa: metric.vpa,
+          dailySuccessCount: metric.dailySuccessCount,
+          dailyFailureCount: metric.dailyFailureCount,
+          dailyTotalAmount: metric.dailyTotalAmount,
+          lastTransactionTime: metric.lastTransactionTime,
+        })),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(`Debug daily reset failed: ${error.message}`);
+
+      return {
+        message: "Debug daily reset failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
 }

@@ -168,6 +168,13 @@ export class EnhancedVPARoutingService {
   }
 
   /**
+   * Get last daily reset date for debugging
+   */
+  getLastDailyResetDate(): string | null {
+    return this.lastDailyResetDate;
+  }
+
+  /**
    * Get IST date from a Date object
    */
   private getISTDateFromDate(date: Date): string {
@@ -1247,6 +1254,9 @@ export class EnhancedVPARoutingService {
 
   // Record success for a VPA with real data
   async recordSuccess(vpa: string, responseTime: number, amount = 0) {
+    // Check if daily metrics need to be reset before updating
+    await this.checkAndResetDailyMetricsIfNeeded();
+
     const metrics = this.vpaMetrics.get(vpa);
     if (metrics) {
       metrics.successCount++;
@@ -1291,6 +1301,9 @@ export class EnhancedVPARoutingService {
 
   // Record failure for a VPA with real data
   async recordFailure(vpa: string, amount = 0) {
+    // Check if daily metrics need to be reset before updating
+    await this.checkAndResetDailyMetricsIfNeeded();
+
     const metrics = this.vpaMetrics.get(vpa);
     if (metrics) {
       metrics.failureCount++;
@@ -1499,6 +1512,10 @@ export class EnhancedVPARoutingService {
         metrics.transactionLimitPercentage = 0;
       });
       this.lastDailyResetDate = currentISTDate;
+
+      // Save updated metrics to cache after reset
+      await this.saveMetricsToCache();
+      this.logger.info("Daily metrics reset and saved to cache");
     } else {
       this.logger.info("Daily metrics are from today, no reset needed");
     }
