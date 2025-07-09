@@ -183,48 +183,7 @@ export class PaymentsService {
    * Get VPA routing statistics
    */
   async getVPAStats() {
-    // Debug data availability first
-    await enhancedVpaRoutingService.debugDataAvailability();
-
     return await enhancedVpaRoutingService.getEnhancedVPAStats();
-  }
-
-  /**
-   * Debug VPA service data availability
-   */
-  async debugVPAService() {
-    this.logger.info("Debug VPA service called");
-
-    return await enhancedVpaRoutingService.debugDataAvailability();
-  }
-
-  async debugVPAHealthScores() {
-    this.logger.info("Debug VPA health scores called");
-
-    const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
-
-    // Return only the health metrics for debugging
-    return {
-      message: "VPA Health Scores Debug",
-      healthMetrics:
-        stats.healthMetrics?.map((metric: any) => ({
-          vpa: metric.vpa,
-          healthScore: metric.healthScore,
-          isHealthy: metric.isHealthy,
-          successCount: metric.successCount,
-          failureCount: metric.failureCount,
-          totalTransactions: metric.totalTransactions,
-          successRate:
-            metric.totalTransactions > 0
-              ? (
-                  (metric.successCount / metric.totalTransactions) *
-                  100
-                ).toFixed(2) + "%"
-              : "0%",
-          averageResponseTime:
-            metric.averageResponseTime?.toFixed(2) + "ms" || "0ms",
-        })) || [],
-    };
   }
 
   /**
