@@ -22,7 +22,7 @@ export class ItemController {
   constructor(private readonly itemService: ItemService) {}
 
   @ApiOperation({ summary: "Create item" })
-  @Role(USERS_ROLE.MERCHANT)
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @Post("create")
   async createItem(
     @Body() createItemDto: CreateItemDto,
