@@ -14,6 +14,7 @@ import { UserAddressEntity } from "@/entities/user-address.entity";
 import { SNSService } from "@/modules/aws/sns.service";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
+import { WalletEntity } from "@/entities/wallet.entity";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
       UserAddressEntity,
       ApiCredentialsEntity,
       UserLoginIpsEntity,
+      WalletEntity,
     ]),
     AuthModule,
   ],
