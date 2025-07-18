@@ -118,7 +118,7 @@ export class UsersController {
     summary: "Get Address - Merchant",
   })
   @Get("address")
-  @Role(USERS_ROLE.MERCHANT)
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.VIEW_ONLY_ADMIN)
   async getAddress(@User() { id }: UsersEntity) {
     return this.usersService.getAddress(id);
   }

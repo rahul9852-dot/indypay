@@ -22,7 +22,7 @@ export class InvoiceController {
   constructor(private readonly invoiceService: InvoiceCustomerService) {}
 
   @ApiOperation({ summary: "Create invoice (Merchant Only)" })
-  @Role(USERS_ROLE.MERCHANT)
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.VIEW_ONLY_ADMIN)
   @Post("/draft")
   async saveToDraftInvoiceForMerchant(
     @Body() createInvoiceDto: CreateInvoiceDto,
@@ -32,14 +32,24 @@ export class InvoiceController {
   }
 
   @ApiOperation({ summary: "Get single invoice" })
-  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Role(
+    USERS_ROLE.MERCHANT,
+    USERS_ROLE.ADMIN,
+    USERS_ROLE.OWNER,
+    USERS_ROLE.VIEW_ONLY_ADMIN,
+  )
   @Get(":invoiceId")
   async getSingleInvoiceForMerchant(@Param("invoiceId") invoiceId: string) {
     return this.invoiceService.getInvoiceById(invoiceId);
   }
 
   @ApiOperation({ summary: "Get all invoices" })
-  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Role(
+    USERS_ROLE.MERCHANT,
+    USERS_ROLE.ADMIN,
+    USERS_ROLE.OWNER,
+    USERS_ROLE.VIEW_ONLY_ADMIN,
+  )
   @Get()
   async getInvoicesOfMerchant(
     @Query() paginationInvoiceDto: PaginationInvoiceDto,
@@ -62,7 +72,7 @@ export class InvoiceController {
   }
 
   @ApiOperation({ summary: "Finalize and send invoice (Merchant Only)" })
-  @Role(USERS_ROLE.MERCHANT)
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.VIEW_ONLY_ADMIN)
   @Post("/finalize")
   async finalizeAndSendInvoiceForMerchant(
     @Body() createInvoiceDto: CreateInvoiceDto,

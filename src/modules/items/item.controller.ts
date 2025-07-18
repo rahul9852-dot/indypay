@@ -22,7 +22,12 @@ export class ItemController {
   constructor(private readonly itemService: ItemService) {}
 
   @ApiOperation({ summary: "Create item" })
-  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Role(
+    USERS_ROLE.MERCHANT,
+    USERS_ROLE.ADMIN,
+    USERS_ROLE.OWNER,
+    USERS_ROLE.VIEW_ONLY_ADMIN,
+  )
   @Post("create")
   async createItem(
     @Body() createItemDto: CreateItemDto,
@@ -32,7 +37,12 @@ export class ItemController {
   }
 
   @ApiOperation({ summary: "Get all items for a merchant" })
-  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Role(
+    USERS_ROLE.MERCHANT,
+    USERS_ROLE.ADMIN,
+    USERS_ROLE.OWNER,
+    USERS_ROLE.VIEW_ONLY_ADMIN,
+  )
   @Get()
   async getItemsOfMerchant(
     @Query() paginationWithDateDto: PaginationWithDateDto,
@@ -45,7 +55,12 @@ export class ItemController {
   }
 
   @ApiOperation({ summary: "Get item by ID" })
-  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Role(
+    USERS_ROLE.MERCHANT,
+    USERS_ROLE.ADMIN,
+    USERS_ROLE.OWNER,
+    USERS_ROLE.VIEW_ONLY_ADMIN,
+  )
   @Get(":itemId")
   async getItemById(
     @Param("itemId") itemId: string,
