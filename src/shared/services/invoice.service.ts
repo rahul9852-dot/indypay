@@ -387,7 +387,7 @@ export class InvoiceService {
           </tr>
           <tr>
             <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
-            <td>&#8377;{{amount}}</td>
+            <td>₹{{amount}}</td>
           </tr>
         </tfoot>
       </table>
