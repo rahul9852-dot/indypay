@@ -50,6 +50,7 @@ import { UserAddressEntity } from "@/entities/user-address.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
+import { WalletEntity } from "@/entities/wallet.entity";
 
 @Injectable()
 export class UsersService {
@@ -68,6 +69,8 @@ export class UsersService {
     private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
     @InjectRepository(UserLoginIpsEntity)
     private readonly userLoginIpsRepository: Repository<UserLoginIpsEntity>,
+    @InjectRepository(WalletEntity)
+    private readonly walletRepository: Repository<WalletEntity>,
 
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
@@ -174,14 +177,32 @@ export class UsersService {
   }: ChangeOnboardingStatusDto) {
     const dbUser = await this.usersRepository.findOne({
       where: { id: userId },
+      relations: {
+        wallet: true,
+      },
     });
     if (!dbUser) {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
-    const user = this.usersRepository.create({
-      onboardingStatus,
-    });
-    await this.usersRepository.update({ id: userId }, user);
+
+    if (onboardingStatus === ONBOARDING_STATUS.KYC_VERIFIED && !dbUser.wallet) {
+      const wallet = await this.walletRepository.findOne({
+        where: {
+          userId,
+        },
+      });
+
+      await this.usersRepository.update(
+        { id: userId },
+        {
+          onboardingStatus,
+          wallet,
+        },
+      );
+    } else {
+      await this.usersRepository.update({ id: userId }, { onboardingStatus });
+    }
+
     await this.cacheManager.del(REDIS_KEYS.USER_KEY(userId));
 
     return new MessageResponseDto("Onboarding status updated successfully");
