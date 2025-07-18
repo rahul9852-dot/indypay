@@ -16,9 +16,10 @@ export class InvoiceService {
 <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="UTF-8">
         <style>
     body {
-        font-family: 'Arial', sans-serif;
+        font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
         margin: 0;
         padding: 0;
         background-color: white;
@@ -149,7 +150,7 @@ export class InvoiceService {
             <div class="details-grid">
                 <div class="detail-item">
                     <div class="detail-label">Amount</div>
-                    <div class="detail-value">₹{{amount}}</div>
+                    <div class="detail-value">&#8377;{{amount}}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Transfer Mode</div>
@@ -196,11 +197,12 @@ export class InvoiceService {
   private readonly customerInvoiceTemplate = `<!DOCTYPE html>
     <html>
       <head>
+        <meta charset="UTF-8">
         <title>Invoice for {{customer.name}}</title>
         <style>
 
       body {
-        font-family: 'Montserrat', sans-serif;
+        font-family: 'Montserrat', 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
         color: #333;
       }
 
@@ -342,7 +344,7 @@ export class InvoiceService {
       <div class="invoice-details">
         <div class="invoice-details-row">
           <div class="section-title">Status</div>
-          <p>{{status}}</p>
+          <p>SUCCESS</p>
         </div>
 
         <div class="invoice-details-row">
@@ -377,7 +379,7 @@ export class InvoiceService {
         <tfoot>
           <tr>
             <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
-            <td>₹{{amount}}</td>
+            <td>&#8377;{{amount}}</td>
           </tr>
         </tfoot>
       </table>
@@ -471,7 +473,11 @@ export class InvoiceService {
 
       const browser = await puppeteer.launch({
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--font-render-hinting=none",
+        ],
       });
 
       const page = await browser.newPage();
@@ -567,7 +573,11 @@ export class InvoiceService {
 
       const browser = await puppeteer.launch({
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--font-render-hinting=none",
+        ],
       });
 
       const page = await browser.newPage();
