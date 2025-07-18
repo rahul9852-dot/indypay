@@ -545,6 +545,11 @@ export class InvoiceCustomerService {
     const invoicePdfBuffer =
       await this.invoiceService.generateInvoiceToCustomer({
         amount: invoice.totalAmount,
+        subTotal: invoice.items.reduce(
+          (acc, item) => acc + item.item.price * item.quantity,
+          0,
+        ),
+        gst: 18,
         invoiceNumber: invoice.invoiceNumber,
         userName: user.fullName,
         customerNotes: invoice.customerNotes,

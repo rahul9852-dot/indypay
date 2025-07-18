@@ -378,6 +378,14 @@ export class InvoiceService {
 
         <tfoot>
           <tr>
+            <td colspan="4" style="text-align: right;"><strong>Sub Total:</strong></td>
+            <td>&#8377;{{subTotal}}</td>
+          </tr>
+          <tr>
+            <td colspan="4" style="text-align: right;"><strong>GST:</strong></td>
+            <td>{{gst}}%</td>
+          </tr>
+          <tr>
             <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
             <td>&#8377;{{amount}}</td>
           </tr>
@@ -511,6 +519,8 @@ export class InvoiceService {
 
   async generateInvoiceToCustomer(data: {
     amount: number;
+    subTotal: number;
+    gst: number;
     invoiceNumber: string;
     userName: string;
     status: string;
