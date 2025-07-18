@@ -379,7 +379,7 @@ export class InvoiceService {
         <tfoot>
           <tr>
             <td colspan="4" style="text-align: right;"><strong>Sub Total:</strong></td>
-            <td>&#8377;{{subTotal}}</td>
+            <td>₹{{subTotal}}</td>
           </tr>
           <tr>
             <td colspan="4" style="text-align: right;"><strong>GST:</strong></td>
