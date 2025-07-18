@@ -391,7 +391,7 @@ export class InvoiceService {
                   <tfoot>
             <tr>
               <td colspan="4" style="text-align: right;"><strong>Sub Total:</strong></td>
-              <td>{{{rupeeEntity subTotal}}}</td>
+              <td>Rs. {{subTotal}}</td>
             </tr>
             <tr>
               <td colspan="4" style="text-align: right;"><strong>GST:</strong></td>
@@ -399,7 +399,7 @@ export class InvoiceService {
             </tr>
             <tr>
               <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
-              <td>{{{rupeeEntity amount}}}</td>
+              <td>Rs.{{amount}}</td>
             </tr>
           </tfoot>
       </table>
