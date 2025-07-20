@@ -9,9 +9,10 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import {
   VPAHealthMetrics,
+  VPARoute,
+  VPARoutingResult,
   VPATransactionRecord,
 } from "@/interface/common.interface";
-import { VPARoute, VPARoutingResult } from "@/utils/vpa-routing.util";
 import { todayStartDate } from "@/utils/date.utils";
 
 // Extend dayjs with the required plugins

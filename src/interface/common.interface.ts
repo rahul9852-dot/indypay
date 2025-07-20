@@ -90,3 +90,23 @@ export interface VPATransactionRecord {
   completedAt?: Date;
   responseTime?: number;
 }
+export interface VPARoute {
+  vpa: string;
+  priority: number;
+  maxDailyTransactions?: number;
+  maxDailyAmount?: number;
+  isActive: boolean;
+  description?: string;
+}
+
+export interface VPARoutingResult {
+  selectedVpa: string;
+  strategy: string;
+  reason: string;
+  metadata?: {
+    healthScore?: number;
+    currentLoad?: number;
+    lastUsed?: Date;
+    successRate?: number;
+  };
+}
