@@ -25,9 +25,9 @@ export const generatePaymentLinkUtil = async (
       metadata: routingResult.metadata,
     });
 
-    const expiry = new Date(Date.now() + 60 * 1000); // 1 minute expiry
-
-    const paymentStr = `&pa=${selectedVpa}&am=${amount}&tr=${orderId}&tn=Payment_for_${orderId}&cu=INR&exp=${expiry.getTime()}`;
+    const name = "PAYBOLTTECHNOLOGIES";
+    const expiry = new Date(Date.now() + 60 * 1000); // 15 minutes expiry
+    const paymentStr = `&pa=${vpa}&pn=${name}&am=${amount}&tr=${orderId}&tn=Paymentfor${orderId}&cu=INR&exp=${expiry.getTime()}`;
 
     return `upi://pay?${paymentStr}`;
   } catch (error) {
@@ -38,7 +38,8 @@ export const generatePaymentLinkUtil = async (
 
     // Fallback to default VPA
     const fallbackVpa = vpa || "default@paybolt";
-    const paymentStr = `&pa=${fallbackVpa}&am=${amount}&tr=${orderId}&tn=Payment_for_${orderId}&cu=INR&exp=${new Date(Date.now() + 60 * 1000).getTime()}`;
+    const name = "PAYBOLTTECHNOLOGIES";
+    const paymentStr = `&pa=${fallbackVpa}&pn=${name}&am=${amount}&tr=${orderId}&tn=Paymentfor${orderId}&cu=INR&exp=${new Date(Date.now() + 60 * 1000).getTime()}`;
 
     return `upi://pay?${paymentStr}`;
   }
