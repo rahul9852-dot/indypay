@@ -3290,14 +3290,15 @@ export class PaymentsService {
         amount,
         orderId,
         userId: user.id,
+        vpa,
       });
 
       // Extract VPA from payment link if available
-      let vpa = null;
+      let generatedVpa = null;
       if (paymentLink) {
         const vpaMatch = paymentLink.match(/pa=([^&]+)/);
         if (vpaMatch) {
-          vpa = vpaMatch[1];
+          generatedVpa = vpaMatch[1];
         }
       }
 
@@ -3308,7 +3309,7 @@ export class PaymentsService {
           ...(paymentLink && {
             intent: paymentLink,
           }),
-          vpa,
+          vpa: generatedVpa,
         }),
       );
 
