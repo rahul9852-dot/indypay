@@ -151,53 +151,17 @@ export class EnhancedVPARoutingService {
   }
 
   /**
-   * Manually trigger cache and historical data loading
-   */
-  async refreshMetrics() {
-    this.logger.info("Manually refreshing VPA metrics from database");
-
-    // Update all metrics from database for all active VPAs
-    const activeVPAs = this.getActiveVPAs();
-    for (const vpa of activeVPAs) {
-      await this.updateAllMetricsFromDatabase(vpa.vpa);
-    }
-
-    // Save updated metrics to cache
-    await this.saveMetricsToCache();
-
-    this.logger.info("VPA metrics refreshed from database");
-  }
-
-  /**
    * Get current IST date in YYYY-MM-DD format for consistent date comparison
    * Uses the existing date.utils.ts todayStartDate() method
    */
   private getCurrentISTDate(): string {
     return dayjs(todayStartDate()).format("YYYY-MM-DD");
   }
-
-  /**
-   * Get last daily reset date for debugging
-   */
-  getLastDailyResetDate(): string | null {
-    return this.lastDailyResetDate;
-  }
-
   /**
    * Get IST date from a Date object
    */
   private getISTDateFromDate(date: Date): string {
     return dayjs(date).tz("Asia/Kolkata").format("YYYY-MM-DD");
-  }
-
-  /**
-   * Check if two dates are the same day in IST timezone
-   */
-  private isSameISTDay(date1: Date, date2: Date): boolean {
-    const istDate1 = this.getISTDateFromDate(date1);
-    const istDate2 = this.getISTDateFromDate(date2);
-
-    return istDate1 === istDate2;
   }
 
   /**
@@ -246,156 +210,6 @@ export class EnhancedVPARoutingService {
 
     // Check if daily metrics need to be reset
     this.checkAndResetDailyMetricsIfNeeded();
-  }
-
-  /**
-   * Load cache and historical data asynchronously
-   */
-  private async loadCacheAndHistoricalData() {
-    try {
-      // First try to load from cache
-      await this.initializeMetrics();
-
-      // Check if daily metrics need to be reset after loading from cache
-      await this.checkAndResetDailyMetricsIfNeeded();
-
-      // Then load historical data if repository is available
-      if (this.payInOrdersRepository) {
-        await this.loadHistoricalMetrics();
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Failed to load cache/historical data: ${error.message}`,
-      );
-    }
-  }
-
-  /**
-   * Load metrics from cache with proper serialization handling
-   */
-  private async initializeMetrics() {
-    try {
-      if (this.cacheManager) {
-        const cachedData = await this.cacheManager.get<any>("vpa_metrics");
-
-        if (cachedData && typeof cachedData === "object") {
-          // Handle both old format (direct metrics object) and new format (with lastDailyResetDate)
-          let metricsObject: any;
-          let lastDailyResetDate: string | null = null;
-
-          if (cachedData.metrics) {
-            // New format with lastDailyResetDate
-            metricsObject = cachedData.metrics;
-            lastDailyResetDate = cachedData.lastDailyResetDate;
-          } else {
-            // Old format - direct metrics object
-            metricsObject = cachedData;
-            lastDailyResetDate = null; // Will be initialized in checkAndResetDailyMetricsIfNeeded
-          }
-
-          // Convert plain object back to Map
-          const metricsMap = new Map<string, VPAHealthMetrics>();
-
-          Object.entries(metricsObject).forEach(
-            ([vpa, metricsData]: [string, any]) => {
-              // Convert date strings back to Date objects
-              const metrics: VPAHealthMetrics = {
-                ...metricsData,
-                lastSuccessTime: new Date(metricsData.lastSuccessTime),
-                lastFailureTime: new Date(metricsData.lastFailureTime),
-                lastTransactionTime: new Date(metricsData.lastTransactionTime),
-              };
-              metricsMap.set(vpa, metrics);
-            },
-          );
-
-          this.vpaMetrics = metricsMap;
-          this.lastDailyResetDate = lastDailyResetDate;
-          this.logger.info(
-            `Loaded VPA metrics from cache: ${metricsMap.size} VPAs, lastDailyResetDate: ${this.lastDailyResetDate}`,
-          );
-
-          // Ensure all configured VPAs are present
-          vpas?.forEach((vpa) => {
-            if (!this.vpaMetrics.has(vpa.vpa)) {
-              this.logger.info(`Adding missing VPA to metrics: ${vpa.vpa}`);
-              this.vpaMetrics.set(vpa.vpa, {
-                vpa: vpa.vpa,
-                successCount: 0,
-                failureCount: 0,
-                totalTransactions: 0,
-                averageResponseTime: 0,
-                lastSuccessTime: new Date(),
-                lastFailureTime: new Date(),
-                isHealthy: true,
-                healthScore: 100,
-                dailySuccessCount: 0,
-                dailyFailureCount: 0,
-                dailyTotalAmount: 0,
-                lastTransactionTime: new Date(),
-                weeklySuccessCount: 0,
-                weeklyFailureCount: 0,
-                monthlySuccessCount: 0,
-                monthlyFailureCount: 0,
-                // Volume tracking for limits
-                dailyTransactionCount: 0,
-                dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Use environment config or default to 20L
-                dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Use environment config or default to 5000
-                isVolumeLimitReached: false,
-                isTransactionLimitReached: false,
-                volumeLimitPercentage: 0,
-                transactionLimitPercentage: 0,
-              });
-            }
-          });
-
-          return;
-        } else {
-          this.logger.info("No cached metrics found, initializing defaults");
-        }
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Failed to load metrics from cache: ${error.message}, using defaults`,
-      );
-    }
-
-    // Only initialize if metrics are empty
-    if (this.vpaMetrics.size === 0) {
-      // Initialize with real data if available
-      vpas?.forEach((vpa) => {
-        this.vpaMetrics.set(vpa.vpa, {
-          vpa: vpa.vpa,
-          successCount: 0,
-          failureCount: 0,
-          totalTransactions: 0,
-          averageResponseTime: 0,
-          lastSuccessTime: new Date(),
-          lastFailureTime: new Date(),
-          isHealthy: true,
-          healthScore: 100,
-          dailySuccessCount: 0,
-          dailyFailureCount: 0,
-          dailyTotalAmount: 0,
-          lastTransactionTime: new Date(),
-          weeklySuccessCount: 0,
-          weeklyFailureCount: 0,
-          monthlySuccessCount: 0,
-          monthlyFailureCount: 0,
-          // Volume tracking for limits
-          dailyTransactionCount: 0,
-          dailyVolumeLimit: vpa.maxDailyAmount || 2000000, // Use environment config or default to 20L
-          dailyTransactionLimit: vpa.maxDailyTransactions || 5000, // Use environment config or default to 5000
-          isVolumeLimitReached: false,
-          isTransactionLimitReached: false,
-          volumeLimitPercentage: 0,
-          transactionLimitPercentage: 0,
-        });
-      });
-
-      this.lastDailyResetDate = this.getCurrentISTDate(); // Initialize lastDailyResetDate
-      this.logger.info("Initialized VPA metrics from defaults");
-    }
   }
 
   /**
@@ -485,7 +299,7 @@ export class EnhancedVPARoutingService {
 
       historicalData.forEach((transaction) => {
         // Use VPA directly from the dedicated column
-        const {vpa} = transaction;
+        const { vpa } = transaction;
         if (!vpa) return;
 
         processedCount++;
@@ -752,7 +566,7 @@ export class EnhancedVPARoutingService {
 
             if (payinOrder) {
               // Use the dedicated VPA column if available, otherwise extract from intent
-              let {vpa} = payinOrder;
+              let { vpa } = payinOrder;
               if (!vpa && payinOrder.intent) {
                 const vpaMatch = payinOrder.intent.match(/pa=([^&]+)/);
                 if (vpaMatch) {
@@ -1473,74 +1287,6 @@ export class EnhancedVPARoutingService {
   }
 
   /**
-   * Force refresh metrics from cache (useful for debugging)
-   */
-  async forceRefreshMetricsFromCache() {
-    try {
-      this.logger.info("Force refreshing metrics from cache...");
-
-      if (!this.cacheManager) {
-        this.logger.warn("Cache manager not available");
-
-        return;
-      }
-
-      const cachedData = await this.cacheManager.get<any>("vpa_metrics");
-
-      if (cachedData && typeof cachedData === "object") {
-        // Handle both old format (direct metrics object) and new format (with lastDailyResetDate)
-        let metricsObject: any;
-        let lastDailyResetDate: string | null = null;
-
-        if (cachedData.metrics) {
-          // New format with lastDailyResetDate
-          metricsObject = cachedData.metrics;
-          lastDailyResetDate = cachedData.lastDailyResetDate;
-        } else {
-          // Old format - direct metrics object
-          metricsObject = cachedData;
-          lastDailyResetDate = null; // Will be initialized in checkAndResetDailyMetricsIfNeeded
-        }
-
-        // Convert plain object back to Map
-        const metricsMap = new Map<string, VPAHealthMetrics>();
-
-        Object.entries(metricsObject).forEach(
-          ([vpa, metricsData]: [string, any]) => {
-            // Convert date strings back to Date objects
-            const metrics: VPAHealthMetrics = {
-              ...metricsData,
-              lastSuccessTime: new Date(metricsData.lastSuccessTime),
-              lastFailureTime: new Date(metricsData.lastFailureTime),
-              lastTransactionTime: new Date(metricsData.lastTransactionTime),
-            };
-            metricsMap.set(vpa, metrics);
-          },
-        );
-
-        this.vpaMetrics = metricsMap;
-        this.lastDailyResetDate = lastDailyResetDate;
-        this.logger.info(
-          `Force refreshed VPA metrics from cache: ${metricsMap.size} VPAs, lastDailyResetDate: ${this.lastDailyResetDate}`,
-        );
-
-        // Log current metrics for debugging
-        this.vpaMetrics.forEach((metrics, vpa) => {
-          this.logger.info(
-            `VPA ${vpa}: ${metrics.totalTransactions} transactions, ${metrics.successCount} success, ${metrics.failureCount} failures, healthScore=${metrics.healthScore.toFixed(2)}`,
-          );
-        });
-      } else {
-        this.logger.warn("No cached metrics found");
-      }
-    } catch (error) {
-      this.logger.error(
-        `Failed to force refresh metrics from cache: ${error.message}`,
-      );
-    }
-  }
-
-  /**
    * Calculate comprehensive metrics directly from database for a specific VPA
    * This ensures accuracy by always getting real-time data from database
    */
@@ -1838,13 +1584,6 @@ export class EnhancedVPARoutingService {
     this.logger.info(
       `Updated comprehensive metrics for VPA ${vpa} from database: Total=${allMetrics.totalTransactions}, Success=${allMetrics.successCount}, Failure=${allMetrics.failureCount}, HealthScore=${metrics.healthScore.toFixed(2)}, Daily=${allMetrics.dailySuccessCount}/${allMetrics.dailyFailureCount}, Weekly=${allMetrics.weeklySuccessCount}/${allMetrics.weeklyFailureCount}, Monthly=${allMetrics.monthlySuccessCount}/${allMetrics.monthlyFailureCount}`,
     );
-  }
-
-  /**
-   * Update daily metrics for a VPA from database (for backward compatibility)
-   */
-  private async updateDailyMetricsFromDatabase(vpa: string): Promise<void> {
-    await this.updateAllMetricsFromDatabase(vpa);
   }
 }
 
