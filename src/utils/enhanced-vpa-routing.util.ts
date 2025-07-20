@@ -151,6 +151,24 @@ export class EnhancedVPARoutingService {
   }
 
   /**
+   * Manually trigger cache and historical data loading
+   */
+  async refreshMetrics() {
+    this.logger.info("Manually refreshing VPA metrics from database");
+
+    // Update all metrics from database for all active VPAs
+    const activeVPAs = this.getActiveVPAs();
+    for (const vpa of activeVPAs) {
+      await this.updateAllMetricsFromDatabase(vpa.vpa);
+    }
+
+    // Save updated metrics to cache
+    await this.saveMetricsToCache();
+
+    this.logger.info("VPA metrics refreshed from database");
+  }
+
+  /**
    * Get current IST date in YYYY-MM-DD format for consistent date comparison
    * Uses the existing date.utils.ts todayStartDate() method
    */
