@@ -3229,6 +3229,16 @@ export class PaymentsService {
         );
       }
 
+      if (status === payinOrder.status) {
+        // this.logger.info(
+        //   `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+        // );
+        return {
+          message: "Status updated successfully.",
+          timestamp: new Date().toISOString(),
+        };
+      }
+
       // Jumping Start
 
       let successCount =
