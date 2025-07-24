@@ -3307,11 +3307,10 @@ export class PaymentsService {
             gstAmount,
             netPayableAmount,
             txnRefId: txnId,
-            utr: custRef,
             ...(isAmountMismatch && {
               status: PAYMENT_STATUS.MISMATCH,
             }),
-            ...(isMisspelled && { utr: custRef }),
+            ...(!isMisspelled && { utr: custRef }),
             isMisspelled,
           });
         } else {
@@ -3320,7 +3319,7 @@ export class PaymentsService {
             status,
             amount,
             txnRefId: txnId,
-            ...(isMisspelled && { utr: custRef }),
+            ...(!isMisspelled && { utr: custRef }),
             isMisspelled,
             ...(status === PAYMENT_STATUS.SUCCESS && {
               successAt: new Date(),
