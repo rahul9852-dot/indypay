@@ -15,6 +15,7 @@ import { SNSService } from "@/modules/aws/sns.service";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { WalletEntity } from "@/entities/wallet.entity";
+import { SESService } from "@/modules/aws/ses.service";
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { WalletEntity } from "@/entities/wallet.entity";
     ]),
     AuthModule,
   ],
-  providers: [UsersService, BcryptService, JwtService, SNSService],
+  providers: [UsersService, BcryptService, JwtService, SNSService, SESService],
   controllers: [UsersController],
   exports: [UsersService],
 })
