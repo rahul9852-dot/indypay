@@ -157,14 +157,14 @@ export class KycService {
       }),
     );
 
-    const savedUser = await this.userRepository.save(
-      this.userRepository.create({
-        id: userId,
-        onboardingStatus: ONBOARDING_STATUS.KYC_PENDING,
-        kyc,
-        businessDetails,
-      }),
-    );
+    businessDetails.user = user;
+    await this.userBusinessRepository.save(businessDetails);
+
+    user.businessDetails = businessDetails;
+    user.kyc = kyc;
+    user.onboardingStatus = ONBOARDING_STATUS.KYC_PENDING;
+
+    const savedUser = await this.userRepository.save(user);
 
     const payload: IAccessTokenPayload = {
       id: savedUser.id,
