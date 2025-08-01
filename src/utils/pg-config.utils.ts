@@ -28,6 +28,15 @@ export const getEritechPgConfig = ({ token, merchantId }) => {
   };
 };
 
+export const getDiaspayConfig = ({ token }) => {
+  return {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  };
+};
+
 export const getUtkarshPgConfig = ({ mid, terminalId }) => {
   return {
     headers: {

@@ -65,6 +65,7 @@ import {
   getUlidId,
 } from "@/utils/helperFunctions.utils";
 import {
+  DIASPAY,
   ERTITECH,
   FALKPAY,
   ISMART_PAY,
@@ -87,12 +88,14 @@ import {
   IExternalPayoutStatusResponseFlakPay,
   IExternalEritecPayoutFundResponse,
   IExternalPayinStatusResponseUtkarsh,
+  IExternalDiasPayFundResponse,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
 import { ID_TYPE, USERS_ROLE } from "@/enums";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import {
+  getDiaspayConfig,
   getEritechPgConfig,
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
@@ -732,6 +735,90 @@ export class PaymentsService {
 
       // Add to processing queue
       await this.payoutQueue.add("process-payouts", {
+        payoutOrders,
+        userId: user.id,
+        batchId,
+      });
+
+      await queryRunner.commitTransaction();
+
+      this.logger.info(
+        `PAYOUT CREATED: ${LoggerPlaceHolder.Json}`,
+        createPayoutDto,
+      );
+
+      return {
+        message: "Payout process initiated",
+        batchId,
+        payoutOrders: payoutOrders.map((payout) => ({
+          orderId: payout.orderId,
+          payoutId: payout.payoutId,
+          amount: payout.amount,
+          status: payout.status,
+          accountNumber: payout.bankAccountNumber,
+          bankName: payout.bankName,
+          ifscCode: payout.bankIfsc,
+        })),
+        summary: {
+          total: payoutDataArr.length,
+          status: "PROCESSING",
+        },
+      };
+    } catch (err) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Error initiating payouts`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createPayoutDiasPay(
+    createPayoutDto: CreatePayoutDto,
+    user: UsersEntity,
+  ) {
+    const { data: payoutDataArr } = createPayoutDto;
+
+    if (payoutDataArr.length > 1000) {
+      throw new BadRequestException("Maximum 1000 payouts allowed");
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const totalAmount = payoutDataArr.reduce((acc, curr) => {
+        if (curr.amount <= 0) {
+          throw new BadRequestException("Amount should be greater than 0");
+        }
+        const commissionResult = calculateDynamicCommission({
+          amount: +curr.amount,
+          userCommissionRate: user.commissionInPercentagePayout,
+          userGstRate: user.gstInPercentagePayout,
+        });
+
+        return acc + commissionResult.netPayableAmount;
+      }, 0);
+
+      // Check and update wallet balance
+      await this.validateAndUpdateWallet(queryRunner, user, totalAmount);
+
+      // Create batch job identifier
+      const batchId = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
+
+      // Create payout orders in DB
+      const payoutOrders = await this.createPayoutOrders(
+        queryRunner,
+        payoutDataArr,
+        user,
+        batchId,
+      );
+
+      // Add to processing queue
+      await this.payoutQueue.add("process-payouts-dias-pay", {
         payoutOrders,
         userId: user.id,
         batchId,
@@ -1542,6 +1629,69 @@ export class PaymentsService {
     };
   }
 
+  // dias pay status check
+  async checkPayOutStatusTransactionDiasPay(
+    { orderId }: PayoutStatusDto,
+    user: UsersEntity,
+  ) {
+    const payoutOrder = await this.payOutOrdersRepository.findOne({
+      where: { orderId },
+    });
+
+    if (!payoutOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payout order not found"),
+      );
+    }
+
+    if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
+      return {
+        orderId: payoutOrder.orderId,
+        status: payoutOrder.status,
+        transferId: payoutOrder.transferId,
+      };
+    }
+
+    // call api
+    const axiosServiceDiasPay = new AxiosService(
+      DIASPAY.BASE_URL,
+      getDiaspayConfig({
+        token: externalPaymentConfig.diaspay.token,
+      }),
+    );
+
+    const diasPayResponse =
+      await axiosServiceDiasPay.postRequest<IExternalDiasPayFundResponse>(
+        DIASPAY.PAYOUT.QUERY,
+        {
+          order_id: orderId,
+        },
+      );
+
+    this.logger.info(
+      `Dias Pay Response: ${LoggerPlaceHolder.Json}`,
+      diasPayResponse,
+    );
+
+    // update payout order
+    const status = convertExternalPaymentStatusToInternal(
+      diasPayResponse.status.toUpperCase(),
+    );
+
+    await this.payOutOrdersRepository.save(
+      this.payOutOrdersRepository.create({
+        ...payoutOrder,
+        status,
+        transferId: diasPayResponse.UTR,
+      }),
+    );
+
+    return {
+      orderId: payoutOrder.orderId,
+      status,
+      transferId: diasPayResponse.UTR,
+    };
+  }
   // flakpay status check
   async checkPayOutStatusTransactionFlakPay({ orderId }: PayoutStatusDto) {
     const payoutOrder = await this.payOutOrdersRepository.findOne({
