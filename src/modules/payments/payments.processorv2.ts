@@ -79,6 +79,11 @@ export class PayoutProcessor {
               remarks: order.orderId,
             };
 
+            const formData = new URLSearchParams();
+            Object.entries(diasPayPayload).forEach(([key, value]) => {
+              formData.append(key, value.toString());
+            });
+
             this.logger.info(
               `Dias Pay Payload: ${LoggerPlaceHolder.Json}`,
               diasPayPayload,
@@ -87,7 +92,7 @@ export class PayoutProcessor {
             const responseDiaspay =
               await axiosDiasPay.postRequest<IExternalDiasPayFundResponse>(
                 DIASPAY.PAYOUT.FUND_TRANSFER,
-                diasPayPayload,
+                formData,
               );
 
             if (responseDiaspay.status === PAYMENT_STATUS.FAILED) {
