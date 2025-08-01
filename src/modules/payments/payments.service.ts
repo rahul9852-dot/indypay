@@ -107,9 +107,6 @@ import customerUniqueGenerate from "@/utils/customer-unique.utils";
 import { CheckoutEntity } from "@/entities/checkout.entity";
 import { generatePaymentLinkUtil } from "@/utils/payment-link.util";
 import { UtkarshCryptoService } from "@/utils/utkarsh-enc-decr.utils";
-import { enhancedVpaRoutingService } from "@/utils/enhanced-vpa-routing.util";
-import { vpaMonitoringService } from "@/utils/vpa-monitoring.util";
-import { vpaConfigManager } from "@/utils/vpa-config-manager.util";
 
 const {
   beBaseUrl,
@@ -142,34 +139,7 @@ export class PaymentsService {
     private readonly dataSource: DataSource,
     private readonly thirdPartyAuthService: ThirdPartyAuthService,
     private readonly encryptionAlgoService: CryptoService,
-  ) {
-    // Initialize enhanced VPA routing service with dependencies
-    this.initializeVPAService();
-  }
-
-  /**
-   * Initialize VPA service with proper dependencies
-   */
-  private async initializeVPAService() {
-    try {
-      // Set cache manager
-      enhancedVpaRoutingService.setCacheManager(this.cacheManager);
-
-      // Set repository
-      enhancedVpaRoutingService.setPayInOrdersRepository(
-        this.payInOrdersRepository,
-      );
-
-      // Refresh metrics to load historical data
-      await enhancedVpaRoutingService.refreshMetrics();
-
-      this.logger.info(
-        "VPA service initialized successfully with all dependencies",
-      );
-    } catch (error) {
-      this.logger.error(`Failed to initialize VPA service: ${error.message}`);
-    }
-  }
+  ) {}
   public randomStr(len: number, arr: string) {
     let ans = "";
     for (let i = 0; i < len; i++) {
@@ -177,126 +147,6 @@ export class PaymentsService {
     }
 
     return ans;
-  }
-
-  /**
-   * Get VPA routing statistics
-   */
-  async getVPAStats() {
-    return await enhancedVpaRoutingService.getEnhancedVPAStats();
-  }
-
-  /**
-   * Get VPA volume limits status
-   */
-  async getVPAVolumeLimits() {
-    this.logger.info("Getting VPA volume limits status...");
-
-    try {
-      const stats = await enhancedVpaRoutingService.getEnhancedVPAStats();
-
-      // Extract volume limit information
-      const volumeLimits =
-        stats.healthMetrics?.map((metric: any) => ({
-          vpa: metric.vpa,
-          dailyTransactionCount: metric.dailyTransactionCount,
-          dailyTotalAmount: metric.dailyTotalAmount,
-          dailyVolumeLimit: metric.dailyVolumeLimit,
-          dailyTransactionLimit: metric.dailyTransactionLimit,
-          volumeLimitPercentage: metric.volumeLimitPercentage,
-          transactionLimitPercentage: metric.transactionLimitPercentage,
-          isVolumeLimitReached: metric.isVolumeLimitReached,
-          isTransactionLimitReached: metric.isTransactionLimitReached,
-          status:
-            metric.isVolumeLimitReached || metric.isTransactionLimitReached
-              ? "LIMIT_REACHED"
-              : "AVAILABLE",
-        })) || [];
-
-      const summary = {
-        totalVPAs: volumeLimits.length,
-        availableVPAs: volumeLimits.filter((v: any) => v.status === "AVAILABLE")
-          .length,
-        limitReachedVPAs: volumeLimits.filter(
-          (v: any) => v.status === "LIMIT_REACHED",
-        ).length,
-        approachingLimitVPAs: volumeLimits.filter(
-          (v: any) =>
-            v.volumeLimitPercentage >= 80 || v.transactionLimitPercentage >= 80,
-        ).length,
-      };
-
-      return {
-        message: "VPA volume limits status retrieved",
-        timestamp: new Date().toISOString(),
-        summary,
-        volumeLimits,
-      };
-    } catch (error) {
-      this.logger.error(`Failed to get VPA volume limits: ${error.message}`);
-
-      return {
-        message: "Failed to get VPA volume limits",
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      };
-    }
-  }
-
-  /**
-   * Get active VPAs
-   */
-  getActiveVPAs() {
-    return enhancedVpaRoutingService.getActiveVPAs();
-  }
-
-  /**
-   * Get VPA monitoring status
-   */
-  async getVPAMonitoringStatus() {
-    return vpaMonitoringService.getStatus();
-  }
-
-  /**
-   * Get VPA alerts
-   */
-  async getVPAlerts() {
-    return await vpaMonitoringService.getActiveAlerts();
-  }
-
-  /**
-   * Get VPA configuration
-   */
-  async getVPAConfig() {
-    return vpaConfigManager.getConfig();
-  }
-
-  /**
-   * Add new VPA
-   */
-  async addVPA(vpaConfig: any) {
-    return await vpaConfigManager.addVPA(vpaConfig);
-  }
-
-  /**
-   * Update VPA
-   */
-  async updateVPA(vpa: string, updates: any) {
-    return await vpaConfigManager.updateVPA(vpa, updates);
-  }
-
-  /**
-   * Remove VPA
-   */
-  async removeVPA(vpa: string) {
-    return await vpaConfigManager.removeVPA(vpa);
-  }
-
-  /**
-   * Update routing strategy
-   */
-  async updateRoutingStrategy(strategy: string, config?: any) {
-    return await vpaConfigManager.updateRoutingStrategy(strategy, config);
   }
 
   async checkout(checkoutDto: CheckoutDto) {
@@ -789,16 +639,6 @@ export class PaymentsService {
         );
       }
 
-      // Extract VPA from payment URL if available
-      let vpa = null;
-      if (externalPaymentResponse?.data?.paymentUrl) {
-        const vpaMatch =
-          externalPaymentResponse.data.paymentUrl.match(/pa=([^&]+)/);
-        if (vpaMatch) {
-          vpa = vpaMatch[1];
-        }
-      }
-
       // 6. save external payment
       await queryRunner.manager.save(
         this.payInOrdersRepository.create({
@@ -806,7 +646,6 @@ export class PaymentsService {
           ...(externalPaymentResponse?.data?.paymentUrl && {
             intent: externalPaymentResponse?.data?.paymentUrl,
           }),
-          vpa,
           txnRefId: externalPaymentResponse.data.txnRefId,
         }),
       );
@@ -3292,22 +3131,11 @@ export class PaymentsService {
       // 4. save transaction
       await queryRunner.manager.save(transaction);
 
-      const paymentLink = await generatePaymentLinkUtil({
+      const paymentLink = generatePaymentLinkUtil({
         amount,
         orderId,
-        userId: user.id,
         vpa,
       });
-
-      // Extract VPA from payment link if available
-      let generatedVpa = null;
-      if (paymentLink) {
-        const vpaMatch = paymentLink.match(/pa=([^&]+)/);
-        if (vpaMatch) {
-          generatedVpa = vpaMatch[1];
-        }
-      }
-
       // 6. save external payment
       await queryRunner.manager.save(
         this.payInOrdersRepository.create({
@@ -3315,7 +3143,6 @@ export class PaymentsService {
           ...(paymentLink && {
             intent: paymentLink,
           }),
-          vpa: generatedVpa,
         }),
       );
 
@@ -3532,33 +3359,6 @@ export class PaymentsService {
         }
 
         await queryRunner.commitTransaction();
-
-        // Process VPA routing metrics after successful transaction update
-        try {
-          const responseTime =
-            status === PAYMENT_STATUS.SUCCESS && payinOrderRaw.successAt
-              ? payinOrderRaw.successAt.getTime() -
-                payinOrder.createdAt.getTime()
-              : status === PAYMENT_STATUS.FAILED && payinOrderRaw.failureAt
-                ? payinOrderRaw.failureAt.getTime() -
-                  payinOrder.createdAt.getTime()
-                : undefined;
-
-          await enhancedVpaRoutingService.processPaymentWebhook(
-            refId, // orderId
-            status,
-            responseTime,
-          );
-
-          this.logger.info(
-            `VPA routing metrics processed for orderId: ${refId}, status: ${status}, responseTime: ${responseTime}ms`,
-          );
-        } catch (vpaError) {
-          this.logger.error(
-            `Failed to process VPA routing metrics for orderId: ${refId}: ${vpaError.message}`,
-          );
-          // Don't throw error - VPA metrics are not critical for payment processing
-        }
 
         if (user?.payInWebhookUrl) {
           const webhookPayload = {

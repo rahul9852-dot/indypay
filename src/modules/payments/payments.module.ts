@@ -3,12 +3,10 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
 import { CacheModule } from "@nestjs/cache-manager";
-import { redisStore } from "cache-manager-redis-yet";
 
 import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
 import { PayoutProcessor } from "./payments.processor";
-import { appConfig } from "@/config/app.config";
 import { SESService } from "@/modules/aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
@@ -53,13 +51,7 @@ import { CryptoService } from "@/utils/encryption-algo.utils";
     BullModule.registerQueue({
       name: "payouts",
     }),
-    CacheModule.register({
-      store: redisStore,
-      host: appConfig().redisConfig.redisHostUrl,
-      port: appConfig().redisConfig.redisPort,
-      ttl: 3600000, // 1 hour default TTL
-      isGlobal: true,
-    }),
+    CacheModule.register(),
     ThirdPartyAuthModule,
   ],
   providers: [
