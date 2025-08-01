@@ -194,53 +194,15 @@ export class PayoutProcessor {
 
             const { amount, orderId, payoutId } = order;
 
-            // this.logger.info(
-            //   `Payout failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-            //   order,
-            // );
-
-            // if (user?.payOutWebhookUrl) {
-            //   const payload = {
-            //     orderId,
-            //     status: PAYMENT_STATUS.FAILED,
-            //     amount,
-            //     txnRefId: null,
-            //     payoutId,
-            //     utr: null,
-            //   };
-            //   // this.logger.error(
-            //   //   `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
-            //   //   payload,
-            //   // );
-
-            //   axios
-            //     .post(user.payOutWebhookUrl, payload)
-            //     .then(({ data }) => {
-            //       this.logger.info(
-            //         `Payout webhook sent successfully - ${order.orderId} - ${user.payOutWebhookUrl} - RES: ${JSON.stringify(data)}`,
-            //       );
-            //     })
-            //     .catch((error) => {
-            //       this.logger.error(
-            //         `Payout webhook failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-            //         error,
-            //       );
-            //     });
-            // }
-
             if (user?.payOutWebhookUrl) {
               const payload = {
                 orderId,
-                status: error.status,
+                status: PAYMENT_STATUS.FAILED,
                 amount,
                 txnRefId: null,
                 payoutId,
                 utr: null,
               };
-              // this.logger.error(
-              //   `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
-              //   payload,
-              // );
 
               axios
                 .post(user.payOutWebhookUrl, payload)
