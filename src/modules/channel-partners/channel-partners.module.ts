@@ -6,6 +6,7 @@ import { UsersEntity } from "@/entities/user.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
+import { AnalyticsService } from "@/modules/analytics/analytics.service";
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
       SettlementsEntity,
     ]),
   ],
-  providers: [ChannelPartnersService],
+  providers: [ChannelPartnersService, AnalyticsService],
   controllers: [ChannelPartnersController],
 })
 export class ChannelPartnersModule {}

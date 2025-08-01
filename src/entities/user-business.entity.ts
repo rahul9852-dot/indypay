@@ -16,6 +16,7 @@ import {
   TURNOVER_TYPE,
 } from "@/enums";
 import { BUSINESS_INDUSTRIES } from "@/constants/business-industries.constant";
+import { DirectorInfoDto } from "@/modules/kyc/dto/kyc.dto";
 
 @Entity("user_business_details")
 export class UserBusinessDetailsEntity {
@@ -42,6 +43,27 @@ export class UserBusinessDetailsEntity {
 
   @Column({ enum: BUSINESS_INDUSTRIES })
   businessIndustry: string;
+
+  @Column({ nullable: true })
+  companyPanNumber: string;
+
+  @Column({ nullable: true })
+  gstin: string;
+
+  @Column({ nullable: true })
+  websiteUrl: string;
+
+  @Column("jsonb", { nullable: true })
+  directors: DirectorInfoDto[];
+
+  @Column({ nullable: true })
+  moa: string;
+
+  @Column({ nullable: true })
+  aoa: string;
+
+  @Column({ nullable: true })
+  coi: string;
 
   // Relations
   @OneToOne(() => UsersEntity, ({ businessDetails }) => businessDetails, {

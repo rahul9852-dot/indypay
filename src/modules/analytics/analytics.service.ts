@@ -22,12 +22,16 @@ export class AnalyticsService {
   private async getAnalyticsMetrics(
     dateRange: { startDate: Date; endDate: Date },
     userId?: string,
+    cpId?: string,
   ) {
     const baseQuery = this.payInOrdersRepository
       .createQueryBuilder("payInOrder")
       .where("payInOrder.createdAt BETWEEN :startDate AND :endDate", dateRange);
 
-    if (userId) {
+    if (cpId) {
+      baseQuery.innerJoin("payInOrder.user", "user");
+      baseQuery.andWhere("user.channelPartnerId = :cpId", { cpId });
+    } else if (userId) {
       baseQuery.andWhere("payInOrder.userId = :userId", { userId });
     }
 
@@ -348,82 +352,64 @@ export class AnalyticsService {
     }
   }
 
-  async getAdminConversionRate({
-    startDate = todayStartDate(),
-    endDate = todayEndDate(),
-  }: DateDto) {
+  async getAdminConversionRate(
+    { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
+    cpId?: string,
+  ) {
     if (new Date(startDate) > new Date(endDate)) {
       throw new BadRequestException("Start date cannot be after end date");
     }
 
+    const startDateTime = new Date(startDate);
+    const endDateTime = new Date(endDate);
+
+    const getPayInQueryBuilder = () => {
+      const qb = this.payInOrdersRepository
+        .createQueryBuilder("payInOrder")
+        .where("payInOrder.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: startDateTime,
+          endDate: endDateTime,
+        });
+
+      if (cpId) {
+        qb.innerJoin("payInOrder.user", "user").andWhere(
+          "user.channelPartnerId = :cpId",
+          { cpId },
+        );
+      }
+
+      return qb;
+    };
+
     const payInStats = await Promise.all([
-      this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
+      getPayInQueryBuilder()
         .select("SUM(payInOrder.amount)", "total")
-        .where("payInOrder.createdAt BETWEEN :startDate AND :endDate", {
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
+        .getRawOne(), // total amount
+      getPayInQueryBuilder().getCount(), // total count
+      getPayInQueryBuilder()
+        .andWhere("payInOrder.status = :status", {
+          status: PAYMENT_STATUS.SUCCESS,
         })
-        .getRawOne(),
-
-      this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
-        .where("payInOrder.createdAt BETWEEN :startDate AND :endDate", {
-          startDate: new Date(startDate),
-          endDate: new Date(endDate),
+        .select("SUM(payInOrder.amount)", "total")
+        .getRawOne(), // success amount
+      getPayInQueryBuilder()
+        .andWhere("payInOrder.status = :status", {
+          status: PAYMENT_STATUS.SUCCESS,
         })
-        .getCount(),
-
-      this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
+        .getCount(), // success count
+      getPayInQueryBuilder()
+        .andWhere("payInOrder.status = :status", {
+          status: PAYMENT_STATUS.FAILED,
+        })
         .select("SUM(payInOrder.amount)", "total")
-        .where(
-          "payInOrder.createdAt BETWEEN :startDate AND :endDate AND payInOrder.status = :status",
-          {
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            status: PAYMENT_STATUS.SUCCESS,
-          },
-        )
-        .getRawOne(),
-
-      this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
-        .where(
-          "payInOrder.createdAt BETWEEN :startDate AND :endDate AND payInOrder.status = :status",
-          {
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            status: PAYMENT_STATUS.SUCCESS,
-          },
-        )
-        .getCount(),
-
-      this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
-        .select("SUM(payInOrder.amount)", "total")
-        .where(
-          "payInOrder.createdAt BETWEEN :startDate AND :endDate AND payInOrder.status = :status",
-          {
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            status: PAYMENT_STATUS.FAILED,
-          },
-        )
-        .getRawOne(),
-
-      this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
-        .where(
-          "payInOrder.createdAt BETWEEN :startDate AND :endDate AND payInOrder.status = :status",
-          {
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            status: PAYMENT_STATUS.FAILED,
-          },
-        )
-        .getCount(),
+        .getRawOne(), // failed amount
+      getPayInQueryBuilder()
+        .andWhere("payInOrder.status = :status", {
+          status: PAYMENT_STATUS.FAILED,
+        })
+        .getCount(), // failed count
     ]);
+
     const [
       initiatedPayinAmountRaw,
       initiatedPayinCount,
@@ -641,48 +627,51 @@ export class AnalyticsService {
       .getRawMany();
   }
 
-  async getAdminFailureAnalytics({
-    startDate = todayStartDate(),
-    endDate = todayEndDate(),
-  }: DateDto) {
+  async getAdminFailureAnalytics(
+    { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
+    cpId?: string,
+  ) {
     if (new Date(startDate) > new Date(endDate)) {
       throw new BadRequestException("Start date cannot be after end date");
     }
 
+    const startDateTime = new Date(startDate);
+    const endDateTime = new Date(endDate);
+
+    const getPayInQueryBuilder = () => {
+      const qb = this.payInOrdersRepository
+        .createQueryBuilder("payInOrder")
+        .where("payInOrder.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: startDateTime,
+          endDate: endDateTime,
+        });
+
+      if (cpId) {
+        qb.innerJoin("payInOrder.user", "user").andWhere(
+          "user.channelPartnerId = :cpId",
+          { cpId },
+        );
+      }
+
+      return qb;
+    };
+
     const failedAnalytics = await Promise.all([
-      this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
-        .where(
-          "payInOrder.createdAt BETWEEN :startDate AND :endDate AND payInOrder.status = :status",
-          {
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            status: PAYMENT_STATUS.PENDING,
-          },
-        )
+      getPayInQueryBuilder()
+        .andWhere("payInOrder.status = :status", {
+          status: PAYMENT_STATUS.PENDING,
+        })
         .getCount(),
-      this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
-        .where(
-          "payInOrder.createdAt BETWEEN :startDate AND :endDate AND payInOrder.status = :status",
-          {
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            status: PAYMENT_STATUS.FAILED,
-          },
-        )
+      getPayInQueryBuilder()
+        .andWhere("payInOrder.status = :status", {
+          status: PAYMENT_STATUS.FAILED,
+        })
         .getCount(),
-      this.payInOrdersRepository
-        .createQueryBuilder("payInOrder")
+      getPayInQueryBuilder()
+        .andWhere("payInOrder.status = :status", {
+          status: PAYMENT_STATUS.FAILED,
+        })
         .select("SUM(payInOrder.amount)", "total")
-        .where(
-          "payInOrder.createdAt BETWEEN :startDate AND :endDate AND payInOrder.status = :status",
-          {
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            status: PAYMENT_STATUS.FAILED,
-          },
-        )
         .getRawOne(),
     ]);
 
@@ -760,10 +749,10 @@ export class AnalyticsService {
     };
   }
 
-  async getAdminSuccessAnalytics({
-    startDate = todayStartDate(),
-    endDate = todayEndDate(),
-  }: DateDto) {
+  async getAdminSuccessAnalytics(
+    { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
+    cpId?: string,
+  ) {
     if (new Date(startDate) > new Date(endDate)) {
       throw new BadRequestException("Start date cannot be after end date");
     }
@@ -773,7 +762,7 @@ export class AnalyticsService {
       endDate: new Date(endDate),
     };
 
-    const metrics = await this.getAnalyticsMetrics(dateRange);
+    const metrics = await this.getAnalyticsMetrics(dateRange, undefined, cpId);
 
     return {
       successAnalytics: {

@@ -34,3 +34,15 @@ export class WalletListDto {
   @IsNotEmpty()
   mobile: string;
 }
+
+export class RefundWalletDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  userId: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+}

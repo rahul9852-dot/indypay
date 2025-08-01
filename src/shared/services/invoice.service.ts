@@ -16,9 +16,10 @@ export class InvoiceService {
 <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="UTF-8">
         <style>
     body {
-        font-family: 'Arial', sans-serif;
+        font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif;
         margin: 0;
         padding: 0;
         background-color: white;
@@ -149,7 +150,7 @@ export class InvoiceService {
             <div class="details-grid">
                 <div class="detail-item">
                     <div class="detail-label">Amount</div>
-                    <div class="detail-value">₹{{amount}}</div>
+                    <div class="detail-value">{{{rupeeEntity amount}}}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Transfer Mode</div>
@@ -196,11 +197,12 @@ export class InvoiceService {
   private readonly customerInvoiceTemplate = `<!DOCTYPE html>
     <html>
       <head>
+        <meta charset="UTF-8">
         <title>Invoice for {{customer.name}}</title>
         <style>
 
       body {
-        font-family: 'Montserrat', sans-serif;
+        font-family: 'Arial Unicode MS', 'Arial', 'Helvetica', 'DejaVu Sans', 'Noto Sans', sans-serif;
         color: #333;
       }
 
@@ -315,6 +317,18 @@ export class InvoiceService {
       .footer p {
         margin: 5px 0;
       }
+      
+      /* Ensure rupee symbol renders properly */
+      .rupee-symbol {
+        font-family: 'Arial Unicode MS', 'Arial', 'Helvetica', sans-serif;
+        font-weight: normal;
+      }
+      
+      /* Fallback for rupee symbol */
+      .rupee-fallback::before {
+        content: "₹";
+        font-family: 'Arial Unicode MS', 'Arial', 'Helvetica', sans-serif;
+      }
     </style>
       </head>
       <body>
@@ -342,7 +356,7 @@ export class InvoiceService {
       <div class="invoice-details">
         <div class="invoice-details-row">
           <div class="section-title">Status</div>
-          <p>{{status}}</p>
+          <p>SUCCESS</p>
         </div>
 
         <div class="invoice-details-row">
@@ -374,12 +388,20 @@ export class InvoiceService {
           {{/each}}
         </tbody>
 
-        <tfoot>
-          <tr>
-            <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
-            <td>₹{{amount}}</td>
-          </tr>
-        </tfoot>
+                  <tfoot>
+            <tr>
+              <td colspan="4" style="text-align: right;"><strong>Sub Total:</strong></td>
+              <td>Rs. {{subTotal}}</td>
+            </tr>
+            <tr>
+              <td colspan="4" style="text-align: right;"><strong>GST:</strong></td>
+              <td>{{gst}}%</td>
+            </tr>
+            <tr>
+              <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
+              <td>Rs.{{amount}}</td>
+            </tr>
+          </tfoot>
       </table>
 
 
@@ -471,7 +493,11 @@ export class InvoiceService {
 
       const browser = await puppeteer.launch({
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--font-render-hinting=none",
+        ],
       });
 
       const page = await browser.newPage();
@@ -479,9 +505,12 @@ export class InvoiceService {
       await page.setDefaultTimeout(this.TIMEOUT);
 
       await page.setContent(html, {
-        waitUntil: ["domcontentloaded"],
+        waitUntil: ["domcontentloaded", "networkidle0"],
         timeout: this.TIMEOUT,
       });
+
+      // Wait a bit more for fonts to load
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const pdfBuffer = await page.pdf({
         format: "A4",
@@ -505,6 +534,8 @@ export class InvoiceService {
 
   async generateInvoiceToCustomer(data: {
     amount: number;
+    subTotal: number;
+    gst: number;
     invoiceNumber: string;
     userName: string;
     status: string;
@@ -567,7 +598,11 @@ export class InvoiceService {
 
       const browser = await puppeteer.launch({
         headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--font-render-hinting=none",
+        ],
       });
 
       const page = await browser.newPage();
@@ -575,9 +610,12 @@ export class InvoiceService {
       await page.setDefaultTimeout(this.TIMEOUT);
 
       await page.setContent(html, {
-        waitUntil: ["domcontentloaded"],
+        waitUntil: ["domcontentloaded", "networkidle0"],
         timeout: this.TIMEOUT,
       });
+
+      // Wait a bit more for fonts to load
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const pdfBuffer = await page.pdf({
         format: "A4",
@@ -606,4 +644,13 @@ handlebars.registerHelper("add", function (value1, value2) {
 
 handlebars.registerHelper("formatNumber", function (value) {
   return value.toFixed(2);
+});
+
+handlebars.registerHelper("rupee", function (value) {
+  // Try multiple representations of the rupee symbol
+  return `₹${value}`;
+});
+
+handlebars.registerHelper("rupeeEntity", function (value) {
+  return `&#8377;${value}`;
 });

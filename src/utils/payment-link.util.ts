@@ -25,22 +25,13 @@ export const generatePaymentLinkUtil = async (
       metadata: routingResult.metadata,
     });
 
-    const name = "PAYBOLTTECHNOLOGIES";
-    const expiry = new Date(Date.now() + 60 * 1000); // 15 minutes expiry
-    const paymentStr = `&pa=${vpa}&pn=${name}&am=${amount}&tr=${orderId}&tn=Paymentfor${orderId}&cu=INR&exp=${expiry.getTime()}`;
-
-    return `upi://pay?${paymentStr}`;
-  } catch (error) {
-    logger.error(`VPA Selection Failed: ${LoggerPlaceHolder.Json}`, {
-      error: error.message,
-      payload,
-    });
-
     // Fallback to default VPA
     const fallbackVpa = vpa || "default@paybolt";
     const name = "PAYBOLTTECHNOLOGIES";
     const paymentStr = `&pa=${fallbackVpa}&pn=${name}&am=${amount}&tr=${orderId}&tn=Paymentfor${orderId}&cu=INR&exp=${new Date(Date.now() + 60 * 1000).getTime()}`;
 
     return `upi://pay?${paymentStr}`;
+  } catch (err) {
+    throw new Error(err);
   }
 };

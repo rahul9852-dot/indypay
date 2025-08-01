@@ -4,6 +4,7 @@ import {
   ValidateNested,
   IsObject,
   IsNotEmpty,
+  IsOptional,
   IsEmail,
   IsPositive,
 } from "class-validator";
@@ -37,24 +38,38 @@ export class DocumentsDto {
   @ApiProperty()
   @ValidateNested()
   @Type(() => DocumentDto)
-  panCard: DocumentDto;
-
-  @ApiProperty()
-  @ValidateNested()
-  @Type(() => DocumentDto)
-  aadharNumber: DocumentDto;
-
-  @ApiProperty()
-  @ValidateNested()
-  @Type(() => DocumentDto)
   bankStatement: DocumentDto;
 
   @ApiProperty()
   @ValidateNested()
   @Type(() => DocumentDto)
   addressProof: DocumentDto;
-}
 
+  @ApiProperty()
+  @ValidateNested()
+  @Type(() => DocumentDto)
+  companyPan: DocumentDto;
+
+  @ApiProperty()
+  @ValidateNested()
+  @Type(() => DocumentDto)
+  companyCheque: DocumentDto;
+
+  @ApiProperty()
+  @ValidateNested()
+  @Type(() => DocumentDto)
+  moa: DocumentDto;
+
+  @ApiProperty()
+  @ValidateNested()
+  @Type(() => DocumentDto)
+  aoa: DocumentDto;
+
+  @ApiProperty()
+  @ValidateNested()
+  @Type(() => DocumentDto)
+  coi: DocumentDto;
+}
 export class PersonalInfoDto {
   @ApiProperty()
   @IsString()
@@ -100,6 +115,43 @@ export class BusinessStructureDto {
   turnover: number;
 }
 
+export class DirectorInfoDto {
+  @ApiProperty()
+  @IsString()
+  name: string;
+
+  @ApiProperty()
+  @IsString()
+  din: string;
+
+  @ApiProperty()
+  @IsString()
+  pan: string;
+
+  @ApiProperty()
+  @IsString()
+  aadharNumber: string;
+
+  @ApiProperty({ type: DocumentDto })
+  @IsOptional()
+  panCardDoc?: DocumentDto;
+
+  @ApiProperty({ type: DocumentDto })
+  @IsOptional()
+  aadharCardDoc?: DocumentDto;
+}
+
+export class KybInfoDto {
+  @ApiProperty({ type: [DirectorInfoDto] })
+  @ValidateNested({ each: true })
+  @Type(() => DirectorInfoDto)
+  directors: DirectorInfoDto[];
+
+  @ApiProperty()
+  @IsOptional()
+  @IsString()
+  websiteUrl: string;
+}
 export class KycSubmissionDto {
   @ApiProperty()
   @ValidateNested()
@@ -112,6 +164,12 @@ export class KycSubmissionDto {
   @Type(() => BusinessStructureDto)
   @IsObject()
   businessStructure: BusinessStructureDto;
+
+  @ApiProperty()
+  @ValidateNested()
+  @Type(() => KybInfoDto)
+  @IsObject()
+  kybInfo: KybInfoDto;
 
   @ApiProperty()
   @ValidateNested()

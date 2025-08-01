@@ -545,6 +545,11 @@ export class InvoiceCustomerService {
     const invoicePdfBuffer =
       await this.invoiceService.generateInvoiceToCustomer({
         amount: invoice.totalAmount,
+        subTotal: invoice.items.reduce(
+          (acc, item) => acc + item.item.price * item.quantity,
+          0,
+        ),
+        gst: 18,
         invoiceNumber: invoice.invoiceNumber,
         userName: user.fullName,
         customerNotes: invoice.customerNotes,
@@ -577,7 +582,7 @@ export class InvoiceCustomerService {
             <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
               <h2 style="color: #4CAF50;">Invoice #${invoice.id}</h2>
               <p>Dear ${invoice.customer.name},</p>
-              <p>You have received an invoice from <strong>${user.fullName}</strong> for a total amount of <strong>$${(+invoice.totalAmount).toFixed(
+              <p>You have received an invoice from <strong>${user.fullName}</strong> for a total amount of <strong>₹${(+invoice.totalAmount).toFixed(
                 2,
               )}</strong>.</p>
               <p>Please find your invoice attached.</p>

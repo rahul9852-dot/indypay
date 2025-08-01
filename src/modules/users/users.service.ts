@@ -50,6 +50,9 @@ import { UserAddressEntity } from "@/entities/user-address.entity";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
+import { WalletEntity } from "@/entities/wallet.entity";
+import { SESService } from "@/modules/aws/ses.service";
+import { SNSService } from "@/modules/aws/sns.service";
 
 @Injectable()
 export class UsersService {
@@ -68,11 +71,15 @@ export class UsersService {
     private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
     @InjectRepository(UserLoginIpsEntity)
     private readonly userLoginIpsRepository: Repository<UserLoginIpsEntity>,
+    @InjectRepository(WalletEntity)
+    private readonly walletRepository: Repository<WalletEntity>,
 
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
     private readonly authService: AuthService,
     private readonly bcryptService: BcryptService,
+    private readonly sesService: SESService,
+    private readonly snsService: SNSService,
   ) {}
 
   async getUserIps(
@@ -174,17 +181,65 @@ export class UsersService {
   }: ChangeOnboardingStatusDto) {
     const dbUser = await this.usersRepository.findOne({
       where: { id: userId },
+      relations: {
+        wallet: true,
+      },
     });
     if (!dbUser) {
       throw new NotFoundException(new MessageResponseDto("User not found"));
     }
-    const user = this.usersRepository.create({
-      onboardingStatus,
-    });
-    await this.usersRepository.update({ id: userId }, user);
+
+    if (onboardingStatus === ONBOARDING_STATUS.KYC_VERIFIED && !dbUser.wallet) {
+      const wallet = await this.walletRepository.findOne({
+        where: {
+          userId,
+        },
+      });
+
+      await this.usersRepository.update(
+        { id: userId },
+        {
+          onboardingStatus,
+          wallet,
+        },
+      );
+    } else {
+      await this.usersRepository.update({ id: userId }, { onboardingStatus });
+    }
+
+    if (onboardingStatus === ONBOARDING_STATUS.KYC_VERIFIED) {
+      await this.sendKycVerificationNotification(dbUser.email, dbUser.mobile);
+    }
+
     await this.cacheManager.del(REDIS_KEYS.USER_KEY(userId));
 
     return new MessageResponseDto("Onboarding status updated successfully");
+  }
+
+  async sendKycVerificationNotification(email: string, phoneNumber: string) {
+    const emailSubject = "KYC Verification Successful";
+    const subject = `KYC Verification Successful`;
+    const emailBody = `
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f9f9f9;">
+        <div style="max-width: 600px; margin: 20px auto; padding: 20px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+          <div style="text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #4CAF50;">
+            PayBolt
+          </div>
+          <h2 style="color: #333; text-align: center;">Dear User,</h2>
+          <p style="text-align: center;">We are pleased to inform you that your KYC has been successfully verified. Welcome onboard!</p>
+          <p style="text-align: center;">Thank you for choosing us. We look forward to serving you.</p>
+          <p style="text-align: center; margin-top: 30px; color: #777;">Regards,<br>PayBolt Support</p>
+        </div>
+      </body>
+    </html>
+`;
+
+    const smsMessage = "KYC successfully verified, welcome onboard!";
+
+    await this.sesService.sendEmail(emailSubject, emailBody, email);
+
+    await this.snsService.sendSMS(phoneNumber, smsMessage);
   }
 
   async getBusinessDetails(user: UsersEntity) {

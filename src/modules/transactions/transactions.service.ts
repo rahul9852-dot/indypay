@@ -433,10 +433,17 @@ export class TransactionsService {
         this.payOutOrdersRepository.sum("amount", {
           createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
+        this.payOutOrdersRepository.sum("amountBeforeDeduction", {
+          createdAt: Between(new Date(startDate), new Date(endDate)),
+        }),
         this.payOutOrdersRepository.count({
           where: { createdAt: Between(new Date(startDate), new Date(endDate)) },
         }),
         this.payOutOrdersRepository.sum("amount", {
+          status: PAYMENT_STATUS.SUCCESS,
+          createdAt: Between(new Date(startDate), new Date(endDate)),
+        }),
+        this.payOutOrdersRepository.sum("amountBeforeDeduction", {
           status: PAYMENT_STATUS.SUCCESS,
           createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
@@ -447,6 +454,10 @@ export class TransactionsService {
           },
         }),
         this.payOutOrdersRepository.sum("amount", {
+          status: PAYMENT_STATUS.FAILED,
+          createdAt: Between(new Date(startDate), new Date(endDate)),
+        }),
+        this.payOutOrdersRepository.sum("amountBeforeDeduction", {
           status: PAYMENT_STATUS.FAILED,
           createdAt: Between(new Date(startDate), new Date(endDate)),
         }),
@@ -479,10 +490,13 @@ export class TransactionsService {
 
     const [
       initiatedPayoutAmount,
+      initiatedPayoutAmountWithCharges,
       initiatedPayoutCount,
       successPayoutAmount,
+      successPayoutAmountWithCharges,
       successPayoutCount,
       failedPayoutAmount,
+      failedPayoutAmountWithCharges,
       failedPayoutCount,
     ] = payoutStats;
 
@@ -497,10 +511,13 @@ export class TransactionsService {
       },
       payout: {
         totalAmount: initiatedPayoutAmount,
+        totalAmountWithCharges: initiatedPayoutAmountWithCharges,
         totalCount: initiatedPayoutCount,
         successAmount: successPayoutAmount,
+        successAmountWithCharges: successPayoutAmountWithCharges,
         successCount: successPayoutCount,
         failedAmount: failedPayoutAmount,
+        failedAmountWithCharges: failedPayoutAmountWithCharges,
         failedCount: failedPayoutCount,
       },
       settlement: {
@@ -612,6 +629,12 @@ export class TransactionsService {
       },
     );
 
+    const initiatedPayoutAmountWithCharges =
+      await this.payOutOrdersRepository.sum("amountBeforeDeduction", {
+        user: { id: userId },
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      });
+
     const initiatedPayoutCount = await this.payOutOrdersRepository.count({
       where: {
         user: { id: userId },
@@ -628,6 +651,13 @@ export class TransactionsService {
       },
     );
 
+    const successPayoutAmountWithCharges =
+      await this.payOutOrdersRepository.sum("amountBeforeDeduction", {
+        user: { id: userId },
+        status: PAYMENT_STATUS.SUCCESS,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      });
+
     const successPayoutCount = await this.payOutOrdersRepository.count({
       where: {
         user: { id: userId },
@@ -641,6 +671,15 @@ export class TransactionsService {
       status: PAYMENT_STATUS.FAILED,
       createdAt: Between(new Date(startDate), new Date(endDate)),
     });
+
+    const failedPayoutAmountWithCharges = await this.payOutOrdersRepository.sum(
+      "amountBeforeDeduction",
+      {
+        user: { id: userId },
+        status: PAYMENT_STATUS.FAILED,
+        createdAt: Between(new Date(startDate), new Date(endDate)),
+      },
+    );
 
     const failedPayoutCount = await this.payOutOrdersRepository.count({
       where: {
@@ -661,10 +700,13 @@ export class TransactionsService {
       },
       payout: {
         totalAmount: initiatedPayoutAmount,
+        totalAmountWithCharges: initiatedPayoutAmountWithCharges,
         totalCount: initiatedPayoutCount,
         successAmount: successPayoutAmount,
+        successAmountWithCharges: successPayoutAmountWithCharges,
         successCount: successPayoutCount,
         failedAmount: failedPayoutAmount,
+        failedAmountWithCharges: failedPayoutAmountWithCharges,
         failedCount: failedPayoutCount,
       },
       settlement: {

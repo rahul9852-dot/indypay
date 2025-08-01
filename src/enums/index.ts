@@ -20,6 +20,7 @@ export enum USERS_ROLE {
   OPS = 4,
   ADMIN = 5,
   OWNER = 6,
+  VIEW_ONLY_ADMIN = 7,
 }
 
 export enum KYC_STATUS {
