@@ -115,4 +115,31 @@ export class AxiosService {
       this.errorFormatter(error);
     }
   }
+
+  // async postFormData<T>(
+  //   url: string,
+  //   data: Record<string, any>,
+  //   config?: AxiosRequestConfig,
+  // ): Promise<T> {
+  //   try {
+  //     this.logger.debug(`postFormData - url: ${this.baseUrl}/${url}`);
+
+  //     // Convert object to URLSearchParams for form data
+  //     const formData = new URLSearchParams();
+  //     Object.entries(data).forEach(([key, value]) => {
+  //       formData.append(key, value.toString());
+  //     });
+
+  //     const res = await this.axiosInstance.post<T>(url, formData, {
+  //       headers: {
+  //         "Content-Type": "application/x-www-form-urlencoded",
+  //       },
+  //       ...config,
+  //     });
+
+  //     return res.data;
+  //   } catch (error: any) {
+  //     this.errorFormatter(error);
+  //   }
+  // }
 }

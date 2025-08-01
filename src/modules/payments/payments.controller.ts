@@ -118,6 +118,33 @@ export class PaymentsController {
   }
 
   @Public()
+  @ApiOperation({ summary: "Create pay-out transaction for dias pay" })
+  @UseGuards(ApiKeyGuard)
+  @Post("payout/create/dias-pay")
+  async createPayoutDiasPay(
+    @Body() createPayoutDto: CreatePayoutDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutDiasPay(createPayoutDto, user);
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: "Check status of pay-out transaction",
+  })
+  @HttpCode(HttpStatus.OK)
+  @Post("payout/status/dias-pay")
+  async checkStatusTransactionPayoutDiasPay(
+    @Body() payoutStatusDto: PayoutStatusDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.checkPayOutStatusTransactionDiasPay(
+      payoutStatusDto,
+      user,
+    );
+  }
+
+  @Public()
   @ApiOperation({ summary: "Create pay-out transaction Bulk" })
   @UseGuards(ApiKeyGuard)
   @Post("payout/create")
