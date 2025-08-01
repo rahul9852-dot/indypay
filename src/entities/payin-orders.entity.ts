@@ -57,6 +57,9 @@ export class PayInOrdersEntity {
   intent: string;
 
   @Column({ nullable: true })
+  vpa: string;
+
+  @Column({ nullable: true })
   paymentLink: string;
 
   @Column({ nullable: true })
