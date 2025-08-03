@@ -3417,7 +3417,7 @@ export class PaymentsService {
         await this.cacheManager.set(
           REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
           successCount,
-          1000 * 60 * 60 * 24 * 365, // 365 days
+          1000 * 60 * 60 * 24 * 20, // 20 days
         );
 
         if (status === payinOrder.status) {
