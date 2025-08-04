@@ -16,10 +16,6 @@ export const webhookBodyParser = (
   });
 
   req.on("end", () => {
-    logger.info("Raw webhook data:", data);
-    logger.info("Content-Type:", req.headers["content-type"]);
-    logger.info("Content-Length:", req.headers["content-length"]);
-
     // Add raw body to request
     (req as any).rawBody = data;
 

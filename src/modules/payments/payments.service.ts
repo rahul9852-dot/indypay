@@ -3370,7 +3370,7 @@ export class PaymentsService {
 
       this.logger.info(
         `PAYIN - Webhook called - Payin order: ${LoggerPlaceHolder.Json}`,
-        payinOrder,
+        payinOrder.id,
       );
 
       if (!payinOrder) {
