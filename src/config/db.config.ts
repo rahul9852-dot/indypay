@@ -16,7 +16,7 @@ export const dbConfig: TypeOrmModuleOptions = {
   database: name,
   entities: [__dirname + "/../**/*.entity{.ts,.js}"],
   synchronize: false,
-  poolSize: 50,
+  poolSize: 100,
   maxQueryExecutionTime: 1000,
   extra: {
     max: 50,
