@@ -52,6 +52,12 @@ export class WalletEntity {
   @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
+  @Column({
+    type: "integer",
+    default: 0,
+  })
+  version: number;
+
   @BeforeInsert()
   beforeInsertHook() {
     this.id = getUlidId(ID_TYPE.WALLET);

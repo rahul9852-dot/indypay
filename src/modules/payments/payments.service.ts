@@ -3333,24 +3333,83 @@ export class PaymentsService {
     }
   }
 
+  // immediate fix by version check
   private async safeUpdateWalletBalance(
     queryRunner: QueryRunner,
     userId: string,
     updateFn: (wallet: WalletEntity) => void,
   ): Promise<WalletEntity> {
-    const wallet = await queryRunner.manager
-      .createQueryBuilder(WalletEntity, "wallet")
-      .setLock("pessimistic_write")
-      .where("wallet.userId = :userId", { userId })
-      .getOne();
+    const maxRetries = 3;
 
-    if (!wallet) {
-      throw new NotFoundException(`Wallet not found for user: ${userId}`);
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Get wallet without lock
+      const wallet = await queryRunner.manager
+        .createQueryBuilder(WalletEntity, "wallet")
+        .where("wallet.userId = :userId", { userId })
+        .getOne();
+
+      if (!wallet) {
+        throw new NotFoundException(`Wallet not found for user: ${userId}`);
+      }
+
+      const originalVersion = wallet.version;
+      updateFn(wallet);
+      wallet.version = originalVersion + 1;
+
+      try {
+        // Update with version check
+        const result = await queryRunner.manager
+          .createQueryBuilder()
+          .update(WalletEntity)
+          .set({
+            totalCollections: wallet.totalCollections,
+            availablePayoutBalance: wallet.availablePayoutBalance,
+            version: wallet.version,
+            updatedAt: new Date(),
+          })
+          .where("userId = :userId AND version = :version", {
+            userId,
+            version: originalVersion,
+          })
+          .execute();
+
+        if (result.affected === 0) {
+          // Version conflict, retry
+          if (attempt === maxRetries - 1) {
+            throw new Error("Wallet update conflict after max retries");
+          }
+          await new Promise((resolve) =>
+            setTimeout(resolve, 50 * (attempt + 1)),
+          ); // Exponential backoff
+          continue;
+        }
+
+        return wallet;
+      } catch (error) {
+        if (attempt === maxRetries - 1) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      }
     }
-    updateFn(wallet);
-
-    return await queryRunner.manager.save(wallet);
   }
+
+  // private async safeUpdateWalletBalance(
+  //   queryRunner: QueryRunner,
+  //   userId: string,
+  //   updateFn: (wallet: WalletEntity) => void,
+  // ): Promise<WalletEntity> {
+  //   const wallet = await queryRunner.manager
+  //     .createQueryBuilder(WalletEntity, "wallet")
+  //     .setLock("pessimistic_write")
+  //     .where("wallet.userId = :userId", { userId })
+  //     .getOne();
+
+  //   if (!wallet) {
+  //     throw new NotFoundException(`Wallet not found for user: ${userId}`);
+  //   }
+  //   updateFn(wallet);
+
+  //   return await queryRunner.manager.save(wallet);
+  // }
 
   async externalWebhookPayinUtkarsh(
     externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
