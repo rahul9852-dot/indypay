@@ -3486,7 +3486,6 @@ export class PaymentsService {
       try {
         // FIXED: Use direct updated intstead of create+save
         const updateData: any = {
-          id: payinOrder.id,
           status,
           txnRefId: txnId,
           ...(!isMisspelled && { utr: custRef }),
