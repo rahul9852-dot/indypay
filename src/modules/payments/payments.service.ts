@@ -3255,7 +3255,14 @@ export class PaymentsService {
         commissionInPercentage: user.commissionInPercentagePayin,
         gstInPercentage: user.gstInPercentagePayin,
       });
-      // 1. create pay-in order
+
+      const paymentLink = generatePaymentLinkUtil({
+        amount,
+        orderId,
+        vpa,
+      });
+
+      // FIXED: Create payin order with all fields at once
       const payinOrder = this.payInOrdersRepository.create({
         user,
         amount,
@@ -3266,45 +3273,23 @@ export class PaymentsService {
         gstAmount,
         netPayableAmount,
         orderId,
+        ...(paymentLink && {
+          intent: paymentLink,
+        }),
       });
 
-      // 2. save pay-in order
+      // FIXED: Single save operation
       const savedPayinOrder = await queryRunner.manager.save(payinOrder);
 
-      // 3. create transaction
+      // FIXED: Create transaction with direct save
       const transaction = this.transactionsRepository.create({
         user,
         payInOrder: savedPayinOrder,
         transactionType: PAYMENT_TYPE.PAYIN,
       });
 
-      // 4. save transaction
+      // FIXED: Single save for transaction
       await queryRunner.manager.save(transaction);
-
-      const paymentLink = generatePaymentLinkUtil({
-        amount,
-        orderId,
-        vpa,
-      });
-      // 6. save external payment
-      await queryRunner.manager.save(
-        this.payInOrdersRepository.create({
-          ...savedPayinOrder,
-          ...(paymentLink && {
-            intent: paymentLink,
-          }),
-        }),
-      );
-
-      // if (!externalPaymentResponse?.data?.paymentUrl?.trim()) {
-      //   throw new BadRequestException(
-      //     new MessageResponseDto("Something went wrong"),
-      //   );
-      // }
-
-      // this.logger.info(
-      //   `PAYIN - createTransaction - Created transaction successfully`,
-      // );
 
       // Commit transaction
       await queryRunner.commitTransaction();
@@ -3499,7 +3484,15 @@ export class PaymentsService {
       await queryRunner.startTransaction();
 
       try {
-        let payinOrderRaw;
+        // FIXED: Use direct updated intstead of create+save
+        const updateData: any = {
+          id: payinOrder.id,
+          status,
+          txnRefId: txnId,
+          ...(!isMisspelled && { utr: custRef }),
+          isMisspelled,
+          updatedAt: new Date(),
+        };
         if (isAmountMismatch) {
           const { commissionAmount, gstAmount, netPayableAmount } =
             getCommissions({
@@ -3508,39 +3501,25 @@ export class PaymentsService {
               gstInPercentage: user.gstInPercentagePayin,
             });
 
-          payinOrderRaw = this.payInOrdersRepository.create({
-            id: payinOrder.id,
-            status,
-            amount,
-            commissionAmount,
-            gstAmount,
-            netPayableAmount,
-            txnRefId: txnId,
-            ...(isAmountMismatch && {
-              status: PAYMENT_STATUS.MISMATCH,
-            }),
-            ...(!isMisspelled && { utr: custRef }),
-            isMisspelled,
-          });
+          updateData.amount = amount;
+          updateData.commissionAmount = commissionAmount;
+          updateData.gstAmount = gstAmount;
+          updateData.netPayableAmount = netPayableAmount;
+          updateData.status = PAYMENT_STATUS.MISMATCH;
         } else {
-          payinOrderRaw = this.payInOrdersRepository.create({
-            id: payinOrder.id,
-            status,
-            amount,
-            txnRefId: txnId,
-            ...(!isMisspelled && { utr: custRef }),
-            isMisspelled,
-            ...(status === PAYMENT_STATUS.SUCCESS && {
-              successAt: new Date(),
-            }),
-            ...(status === PAYMENT_STATUS.FAILED && {
-              failureAt: new Date(),
-            }),
-          });
+          if (status === PAYMENT_STATUS.SUCCESS) {
+            updateData.successAt = new Date();
+          } else if (status === PAYMENT_STATUS.FAILED) {
+            updateData.failureAt = new Date();
+          }
         }
 
-        await this.payInOrdersRepository.save(payinOrderRaw);
-
+        // FIXED: Direct update - no dead tuples
+        await queryRunner.manager.update(
+          PayInOrdersEntity,
+          { id: payinOrder.id },
+          updateData,
+        );
         // update wallet
         if (status === PAYMENT_STATUS.SUCCESS) {
           await this.cacheManager.del(
@@ -3610,6 +3589,7 @@ export class PaymentsService {
         };
       } catch (err: any) {
         await queryRunner.rollbackTransaction();
+        throw err;
       } finally {
         await queryRunner.release();
       }
