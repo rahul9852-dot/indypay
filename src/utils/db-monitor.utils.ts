@@ -175,4 +175,87 @@ export class DatabaseMonitorService {
       throw error;
     }
   }
+
+  /**
+   * Monitor slow wallet update queries
+   */
+  async getSlowWalletQueries() {
+    try {
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+
+      const slowQueries = await queryRunner.query(`
+        SELECT 
+          pid,
+          usename,
+          application_name,
+          state,
+          query_start,
+          now() - query_start as duration,
+          query
+        FROM pg_stat_activity 
+        WHERE state = 'active'
+        AND query LIKE '%wallets%'
+        AND query LIKE '%UPDATE%'
+        AND now() - query_start > interval '1 second'
+        ORDER BY query_start
+      `);
+
+      await queryRunner.release();
+
+      if (slowQueries.length > 0) {
+        this.logger.warn(
+          `Found ${slowQueries.length} slow wallet update queries: ${JSON.stringify(
+            {
+              queries: slowQueries.map((q) => ({
+                pid: q.pid,
+                duration: q.duration,
+                state: q.state,
+                query: q.query?.substring(0, 200) + "...",
+              })),
+            },
+          )}`,
+        );
+      }
+
+      return slowQueries;
+    } catch (error) {
+      this.logger.error("Failed to get slow wallet queries:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check wallet table index usage
+   */
+  async getWalletIndexStats() {
+    try {
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+
+      const indexStats = await queryRunner.query(`
+        SELECT 
+          schemaname,
+          tablename,
+          indexname,
+          idx_scan,
+          idx_tup_read,
+          idx_tup_fetch
+        FROM pg_stat_user_indexes 
+        WHERE tablename = 'wallets'
+        ORDER BY idx_scan DESC
+      `);
+
+      await queryRunner.release();
+
+      this.logger.info(`Wallet table index statistics:`, {
+        indexStats,
+      });
+
+      return indexStats;
+    } catch (error) {
+      this.logger.error("Failed to get wallet index stats:", error);
+      throw error;
+    }
+  }
 }

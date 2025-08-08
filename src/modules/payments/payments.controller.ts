@@ -420,10 +420,18 @@ export class PaymentsController {
   @Role(USERS_ROLE.ADMIN)
   async getDatabaseHealth() {
     try {
-      const [poolStatus, longRunning, walletLocks] = await Promise.all([
+      const [
+        poolStatus,
+        longRunning,
+        walletLocks,
+        slowWalletQueries,
+        indexStats,
+      ] = await Promise.all([
         this.databaseMonitorService.getConnectionPoolStatus(),
         this.databaseMonitorService.getLongRunningTransactions(1), // 1 minute threshold
         this.databaseMonitorService.getWalletLockStats(),
+        this.databaseMonitorService.getSlowWalletQueries(),
+        this.databaseMonitorService.getWalletIndexStats(),
       ]);
 
       return {
@@ -432,11 +440,14 @@ export class PaymentsController {
         poolStatus,
         longRunningTransactions: longRunning.length,
         walletLocks: walletLocks.length,
+        slowWalletQueries: slowWalletQueries.length,
+        indexStats,
         alerts: {
           highConnections: poolStatus.poolStats.active_connections > 40,
           longRunningQueries: poolStatus.timeoutStats.long_running_queries > 0,
           walletLockContention:
             walletLocks.filter((l) => !l.granted).length > 0,
+          slowWalletUpdates: slowWalletQueries.length > 0,
         },
       };
     } catch (error) {

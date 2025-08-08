@@ -184,19 +184,35 @@ export class AddWalletOptimisticLockIndex1754332826574
   name = "AddWalletOptimisticLockIndex1754332826574";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Add composite index for optimistic locking
+    // Add composite index for optimistic locking - CRITICAL for performance
     await queryRunner.query(
-      `CREATE INDEX "IDX_wallets_userId_version" ON "wallets" ("userId", "version")`,
+      `CREATE INDEX CONCURRENTLY "IDX_wallets_userId_version" ON "wallets" ("userId", "version")`,
     );
 
     // Add index on updatedAt for better query performance
     await queryRunner.query(
-      `CREATE INDEX "IDX_wallets_updatedAt" ON "wallets" ("updatedAt")`,
+      `CREATE INDEX CONCURRENTLY "IDX_wallets_updatedAt" ON "wallets" ("updatedAt")`,
+    );
+
+    // Add index on userId alone for faster lookups
+    await queryRunner.query(
+      `CREATE INDEX CONCURRENTLY "IDX_wallets_userId" ON "wallets" ("userId")`,
+    );
+
+    // Add covering index for the specific update query
+    await queryRunner.query(
+      `CREATE INDEX CONCURRENTLY "IDX_wallets_userId_version_covering" ON "wallets" ("userId", "version") INCLUDE ("totalCollections", "availablePayoutBalance", "updatedAt")`,
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "IDX_wallets_userId_version"`);
-    await queryRunner.query(`DROP INDEX "IDX_wallets_updatedAt"`);
+    await queryRunner.query(
+      `DROP INDEX CONCURRENTLY "IDX_wallets_userId_version"`,
+    );
+    await queryRunner.query(`DROP INDEX CONCURRENTLY "IDX_wallets_updatedAt"`);
+    await queryRunner.query(`DROP INDEX CONCURRENTLY "IDX_wallets_userId"`);
+    await queryRunner.query(
+      `DROP INDEX CONCURRENTLY "IDX_wallets_userId_version_covering"`,
+    );
   }
 }
