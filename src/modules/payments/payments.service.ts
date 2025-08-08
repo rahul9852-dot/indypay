@@ -1387,9 +1387,9 @@ export class PaymentsService {
     user: UsersEntity,
     totalAmount: number,
   ) {
+    // current wallet to check balance
     let userWallet = await queryRunner.manager
       .createQueryBuilder(WalletEntity, "wallet")
-      .setLock("pessimistic_write")
       .leftJoinAndSelect("wallet.user", "user")
       .where("user.id = :userId", { userId: user.id })
       .getOne();
@@ -1427,8 +1427,14 @@ export class PaymentsService {
       },
     );
 
-    userWallet.availablePayoutBalance = newBalance;
-    const updatedWallet = await queryRunner.manager.save(userWallet);
+    // with optimistic locking
+    const updatedWallet = await this.safeUpdateWalletBalance(
+      queryRunner,
+      user.id,
+      (wallet) => {
+        wallet.availablePayoutBalance = newBalance;
+      },
+    );
 
     this.logger.info(
       `PAYOUT - validateAndUpdateWallet - Wallet updated successfully: ${LoggerPlaceHolder.Json}`,
@@ -1813,29 +1819,41 @@ export class PaymentsService {
 
     // update wallet
     if (status === PAYMENT_STATUS.SUCCESS) {
-      const wallet = await this.walletRepository.findOne({
-        where: { user: { id: user.id } },
-        relations: ["user"],
-      });
-
       await this.cacheManager.del(
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const walletRaw = this.walletRepository.create({
-        ...(wallet?.id && { id: wallet.id }),
-        totalCollections:
-          (wallet.totalCollections ? +wallet.totalCollections : 0) +
-          +payinOrder.amount,
-        user,
-      });
+      // Use standardized wallet update with optimistic locking
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
 
-      await this.walletRepository.save(walletRaw);
+      try {
+        const updatedWallet = await this.safeUpdateWalletBalance(
+          queryRunner,
+          user.id,
+          (wallet) => {
+            wallet.totalCollections =
+              (wallet.totalCollections ? +wallet.totalCollections : 0) +
+              +payinOrder.amount;
+          },
+        );
 
-      this.logger.info(
-        `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
-        walletRaw,
-      );
+        await queryRunner.commitTransaction();
+
+        this.logger.info(
+          `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+          {
+            walletId: updatedWallet.id,
+            newTotalCollections: updatedWallet.totalCollections,
+          },
+        );
+      } catch (error) {
+        await queryRunner.rollbackTransaction();
+        throw error;
+      } finally {
+        await queryRunner.release();
+      }
     }
 
     if (user?.payInWebhookUrl) {
@@ -1963,29 +1981,41 @@ export class PaymentsService {
 
     // update wallet
     if (status === PAYMENT_STATUS.SUCCESS) {
-      const wallet = await this.walletRepository.findOne({
-        where: { user: { id: user.id } },
-        relations: ["user"],
-      });
-
       await this.cacheManager.del(
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const walletRaw = this.walletRepository.create({
-        ...(wallet?.id && { id: wallet.id }),
-        totalCollections:
-          (wallet.totalCollections ? +wallet.totalCollections : 0) +
-          +payinOrder.amount,
-        user,
-      });
+      // Use standardized wallet update with optimistic locking
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
 
-      await this.walletRepository.save(walletRaw);
+      try {
+        const updatedWallet = await this.safeUpdateWalletBalance(
+          queryRunner,
+          user.id,
+          (wallet) => {
+            wallet.totalCollections =
+              (wallet.totalCollections ? +wallet.totalCollections : 0) +
+              +payinOrder.amount;
+          },
+        );
 
-      // this.logger.info(
-      //   `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
-      //   walletRaw,
-      // );
+        await queryRunner.commitTransaction();
+
+        this.logger.info(
+          `PAYIN WEBHOOK - FlakPay wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+          {
+            walletId: updatedWallet.id,
+            newTotalCollections: updatedWallet.totalCollections,
+          },
+        );
+      } catch (error) {
+        await queryRunner.rollbackTransaction();
+        throw error;
+      } finally {
+        await queryRunner.release();
+      }
     }
 
     if (user?.payInWebhookUrl) {
@@ -3324,24 +3354,40 @@ export class PaymentsService {
     userId: string,
     updateFn: (wallet: WalletEntity) => void,
   ): Promise<WalletEntity> {
-    const maxRetries = 3;
+    const maxRetries = 5;
+    const baseDelay = 100; // 100ms base delay
+    const operationTimeout = 8000; // 8 seconds max for wallet update
+
+    const startTime = Date.now();
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      // Get wallet without lock
-      const wallet = await queryRunner.manager
-        .createQueryBuilder(WalletEntity, "wallet")
-        .where("wallet.userId = :userId", { userId })
-        .getOne();
-
-      if (!wallet) {
-        throw new NotFoundException(`Wallet not found for user: ${userId}`);
-      }
-
-      const originalVersion = wallet.version;
-      updateFn(wallet);
-      wallet.version = originalVersion + 1;
-
       try {
+        // Check if we've exceeded the operation timeout
+        if (Date.now() - startTime > operationTimeout) {
+          throw new Error(
+            `Wallet update timeout after ${operationTimeout}ms for user: ${userId}`,
+          );
+        }
+
+        // Get wallet with current version
+        const wallet = await queryRunner.manager
+          .createQueryBuilder(WalletEntity, "wallet")
+          .where("wallet.userId = :userId", { userId })
+          .getOne();
+
+        if (!wallet) {
+          throw new NotFoundException(`Wallet not found for user: ${userId}`);
+        }
+
+        const originalVersion = wallet.version;
+
+        // Apply the update function
+        updateFn(wallet);
+
+        // Increment version for optimistic locking
+        wallet.version = originalVersion + 1;
+        wallet.updatedAt = new Date();
+
         // Update with version check
         const result = await queryRunner.manager
           .createQueryBuilder()
@@ -3350,7 +3396,7 @@ export class PaymentsService {
             totalCollections: wallet.totalCollections,
             availablePayoutBalance: wallet.availablePayoutBalance,
             version: wallet.version,
-            updatedAt: new Date(),
+            updatedAt: wallet.updatedAt,
           })
           .where("userId = :userId AND version = :version", {
             userId,
@@ -3359,22 +3405,45 @@ export class PaymentsService {
           .execute();
 
         if (result.affected === 0) {
-          // Version conflict, retry
+          // Version conflict, retry with exponential backoff
           if (attempt === maxRetries - 1) {
-            throw new Error("Wallet update conflict after max retries");
+            throw new Error(
+              `Wallet update conflict after ${maxRetries} retries for user: ${userId}`,
+            );
           }
-          await new Promise((resolve) =>
-            setTimeout(resolve, 50 * (attempt + 1)),
-          ); // Exponential backoff
+
+          const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff
+          await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
 
+        this.logger.info(
+          `Wallet updated successfully for user ${userId} on attempt ${attempt + 1}`,
+          {
+            userId,
+            attempt: attempt + 1,
+            newVersion: wallet.version,
+            totalCollections: wallet.totalCollections,
+            availablePayoutBalance: wallet.availablePayoutBalance,
+          },
+        );
+
         return wallet;
       } catch (error) {
-        if (attempt === maxRetries - 1) throw error;
-        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+        if (attempt === maxRetries - 1) {
+          this.logger.error(
+            `Failed to update wallet for user ${userId} after ${maxRetries} attempts`,
+            error,
+          );
+          throw error;
+        }
+
+        const delay = baseDelay * Math.pow(2, attempt);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
+
+    throw new Error(`Unexpected error in wallet update for user: ${userId}`);
   }
 
   // private async safeUpdateWalletBalance(

@@ -53,6 +53,7 @@ import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { ExternalPayinWebhookUtkarshDto } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
+import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -66,6 +67,7 @@ export class PaymentsController {
     private readonly paymentsService: PaymentsService,
     private readonly payoutService: PayoutService,
     private readonly encryptionAlgoService: CryptoService,
+    private readonly databaseMonitorService: DatabaseMonitorService,
   ) {}
 
   @Public()
@@ -413,4 +415,36 @@ export class PaymentsController {
   // ) {
   //   return this.paymentsService.checkPaymentStatus(orderId, req);
   // }
+
+  @Get("health/database")
+  @Role(USERS_ROLE.ADMIN)
+  async getDatabaseHealth() {
+    try {
+      const [poolStatus, longRunning, walletLocks] = await Promise.all([
+        this.databaseMonitorService.getConnectionPoolStatus(),
+        this.databaseMonitorService.getLongRunningTransactions(1), // 1 minute threshold
+        this.databaseMonitorService.getWalletLockStats(),
+      ]);
+
+      return {
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        poolStatus,
+        longRunningTransactions: longRunning.length,
+        walletLocks: walletLocks.length,
+        alerts: {
+          highConnections: poolStatus.poolStats.active_connections > 40,
+          longRunningQueries: poolStatus.timeoutStats.long_running_queries > 0,
+          walletLockContention:
+            walletLocks.filter((l) => !l.granted).length > 0,
+        },
+      };
+    } catch (error) {
+      return {
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        error: error.message,
+      };
+    }
+  }
 }

@@ -177,3 +177,26 @@ export class AddedVersionColumn1754332826573 implements MigrationInterface {
     }
   }
 }
+
+export class AddWalletOptimisticLockIndex1754332826574
+  implements MigrationInterface
+{
+  name = "AddWalletOptimisticLockIndex1754332826574";
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add composite index for optimistic locking
+    await queryRunner.query(
+      `CREATE INDEX "IDX_wallets_userId_version" ON "wallets" ("userId", "version")`,
+    );
+
+    // Add index on updatedAt for better query performance
+    await queryRunner.query(
+      `CREATE INDEX "IDX_wallets_updatedAt" ON "wallets" ("updatedAt")`,
+    );
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX "IDX_wallets_userId_version"`);
+    await queryRunner.query(`DROP INDEX "IDX_wallets_updatedAt"`);
+  }
+}
