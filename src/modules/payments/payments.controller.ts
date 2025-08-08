@@ -420,19 +420,59 @@ export class PaymentsController {
   @Role(USERS_ROLE.ADMIN)
   async getDatabaseHealth() {
     try {
-      const [
-        poolStatus,
-        longRunning,
-        walletLocks,
-        slowWalletQueries,
-        indexStats,
-      ] = await Promise.all([
-        this.databaseMonitorService.getConnectionPoolStatus(),
-        this.databaseMonitorService.getLongRunningTransactions(1), // 1 minute threshold
-        this.databaseMonitorService.getWalletLockStats(),
-        this.databaseMonitorService.getSlowWalletQueries(),
-        this.databaseMonitorService.getWalletIndexStats(),
-      ]);
+      // Get basic pool status first
+      const poolStatus =
+        await this.databaseMonitorService.getConnectionPoolStatus();
+
+      // Get additional stats with error handling
+      let longRunning = [];
+      let walletLocks = [];
+      let slowWalletQueries = [];
+      let indexStats = [];
+
+      try {
+        longRunning =
+          await this.databaseMonitorService.getLongRunningTransactions(1);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to get long running transactions: ${error.message}`,
+        );
+      }
+
+      try {
+        walletLocks = await this.databaseMonitorService.getWalletLockStats();
+      } catch (error) {
+        this.logger.warn(`Failed to get wallet lock stats: ${error.message}`);
+      }
+
+      try {
+        slowWalletQueries =
+          await this.databaseMonitorService.getSlowWalletQueries();
+      } catch (error) {
+        this.logger.warn(`Failed to get slow wallet queries: ${error.message}`);
+      }
+
+      try {
+        indexStats = await this.databaseMonitorService.getWalletIndexStats();
+      } catch (error) {
+        this.logger.warn(`Failed to get wallet index stats: ${error.message}`);
+      }
+
+      // Get TPS and index information
+      let walletTPS = null;
+      let walletIndexes = null;
+
+      try {
+        walletTPS = await this.databaseMonitorService.getWalletUpdateTPS();
+      } catch (error) {
+        this.logger.warn(`Failed to get wallet TPS: ${error.message}`);
+      }
+
+      try {
+        walletIndexes = await this.databaseMonitorService.checkWalletIndexes();
+      } catch (error) {
+        this.logger.warn(`Failed to check wallet indexes: ${error.message}`);
+      }
 
       return {
         status: "healthy",
@@ -442,17 +482,55 @@ export class PaymentsController {
         walletLocks: walletLocks.length,
         slowWalletQueries: slowWalletQueries.length,
         indexStats,
+        walletTPS,
+        walletIndexes,
         alerts: {
-          highConnections: poolStatus.poolStats.active_connections > 40,
-          longRunningQueries: poolStatus.timeoutStats.long_running_queries > 0,
+          highConnections: poolStatus.poolStats.active_connections > 15, // Adjusted for new max of 20
+          longRunningQueries: poolStatus.timeoutStats?.long_running_queries > 0,
           walletLockContention:
             walletLocks.filter((l) => !l.granted).length > 0,
           slowWalletUpdates: slowWalletQueries.length > 0,
         },
       };
     } catch (error) {
+      this.logger.error("Database health check failed:", error);
+
       return {
         status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        error: error.message,
+      };
+    }
+  }
+
+  @Get("monitor/tps")
+  @Role(USERS_ROLE.ADMIN)
+  async getWalletTPS() {
+    try {
+      const [walletTPS, walletIndexes] = await Promise.all([
+        this.databaseMonitorService.getWalletUpdateTPS(),
+        this.databaseMonitorService.checkWalletIndexes(),
+      ]);
+
+      return {
+        status: "success",
+        timestamp: new Date().toISOString(),
+        walletTPS,
+        walletIndexes,
+        performance: {
+          hasOptimizedIndexes: walletIndexes?.hasUserIdVersionIndex || false,
+          currentTPS: parseFloat(walletTPS?.stats?.tps || 0).toFixed(2),
+          avgDuration: parseFloat(
+            walletTPS?.stats?.avg_duration_seconds || 0,
+          ).toFixed(3),
+          slowUpdates: walletTPS?.slowUpdates?.length || 0,
+        },
+      };
+    } catch (error) {
+      this.logger.error("TPS monitoring failed:", error);
+
+      return {
+        status: "error",
         timestamp: new Date().toISOString(),
         error: error.message,
       };

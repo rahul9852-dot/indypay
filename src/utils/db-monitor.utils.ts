@@ -8,15 +8,10 @@ export class DatabaseMonitorService {
 
   constructor(private readonly dataSource: DataSource) {}
 
-  /**
-   * Monitor database connection pool status with timeout tracking
-   */
   async getConnectionPoolStatus() {
     try {
       const queryRunner = this.dataSource.createQueryRunner();
       await queryRunner.connect();
-
-      // Get PostgreSQL connection pool statistics
       const poolStats = await queryRunner.query(`
         SELECT 
           count(*) as total_connections,
@@ -74,7 +69,7 @@ export class DatabaseMonitorService {
         poolStats: poolStats[0],
         timeoutStats: timeoutStats[0],
         activeLocks: lockInfo.length,
-        locks: lockInfo.slice(0, 10), // Log first 10 locks
+        locks: lockInfo.slice(0, 10),
       });
 
       return {
@@ -88,10 +83,6 @@ export class DatabaseMonitorService {
       throw error;
     }
   }
-
-  /**
-   * Get long-running transactions
-   */
   async getLongRunningTransactions(thresholdMinutes = 5) {
     try {
       const queryRunner = this.dataSource.createQueryRunner();
@@ -224,10 +215,6 @@ export class DatabaseMonitorService {
       throw error;
     }
   }
-
-  /**
-   * Check wallet table index usage
-   */
   async getWalletIndexStats() {
     try {
       const queryRunner = this.dataSource.createQueryRunner();
@@ -236,13 +223,13 @@ export class DatabaseMonitorService {
       const indexStats = await queryRunner.query(`
         SELECT 
           schemaname,
-          tablename,
-          indexname,
+          relname as tablename,
+          indexrelname as indexname,
           idx_scan,
           idx_tup_read,
           idx_tup_fetch
         FROM pg_stat_user_indexes 
-        WHERE tablename = 'wallets'
+        WHERE relname = 'wallets'
         ORDER BY idx_scan DESC
       `);
 
@@ -255,6 +242,112 @@ export class DatabaseMonitorService {
       return indexStats;
     } catch (error) {
       this.logger.error("Failed to get wallet index stats:", error);
+      throw error;
+    }
+  }
+
+  async getWalletUpdateTPS() {
+    try {
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+
+      // Get wallet update statistics from the last hour
+      const walletUpdateStats = await queryRunner.query(`
+        SELECT 
+          COUNT(*) as total_updates,
+          COUNT(*) / 3600.0 as tps,
+          AVG(EXTRACT(EPOCH FROM (now() - query_start))) as avg_duration_seconds,
+          MAX(EXTRACT(EPOCH FROM (now() - query_start))) as max_duration_seconds,
+          MIN(EXTRACT(EPOCH FROM (now() - query_start))) as min_duration_seconds
+        FROM pg_stat_activity 
+        WHERE state = 'active'
+        AND query LIKE '%UPDATE%wallets%'
+        AND query_start > now() - interval '1 hour'
+      `);
+
+      // Get current slow wallet updates
+      const slowWalletUpdates = await queryRunner.query(`
+        SELECT 
+          pid,
+          usename,
+          application_name,
+          state,
+          query_start,
+          EXTRACT(EPOCH FROM (now() - query_start)) as duration_seconds,
+          query
+        FROM pg_stat_activity 
+        WHERE state = 'active'
+        AND query LIKE '%UPDATE%wallets%'
+        AND query_start < now() - interval '1 second'
+        ORDER BY query_start
+      `);
+
+      await queryRunner.release();
+
+      const stats = walletUpdateStats[0] || {
+        total_updates: 0,
+        tps: 0,
+        avg_duration_seconds: 0,
+        max_duration_seconds: 0,
+        min_duration_seconds: 0,
+      };
+
+      this.logger.info(`Wallet update TPS statistics:`, {
+        totalUpdates: stats.total_updates,
+        tps: parseFloat(stats.tps || 0).toFixed(2),
+        avgDurationSeconds: parseFloat(stats.avg_duration_seconds || 0).toFixed(
+          3,
+        ),
+        maxDurationSeconds: parseFloat(stats.max_duration_seconds || 0).toFixed(
+          3,
+        ),
+        slowUpdates: slowWalletUpdates.length,
+      });
+
+      return {
+        stats,
+        slowUpdates: slowWalletUpdates,
+      };
+    } catch (error) {
+      this.logger.error("Failed to get wallet update TPS:", error);
+      throw error;
+    }
+  }
+  async checkWalletIndexes() {
+    try {
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+
+      const indexes = await queryRunner.query(`
+        SELECT 
+          indexname,
+          indexdef
+        FROM pg_indexes 
+        WHERE tablename = 'wallets'
+        ORDER BY indexname
+      `);
+
+      // Check if the critical index exists
+      const hasUserIdVersionIndex = indexes.some(
+        (idx) =>
+          idx.indexname.includes("userId") && idx.indexname.includes("version"),
+      );
+
+      await queryRunner.release();
+
+      this.logger.info(`Wallet indexes check:`, {
+        totalIndexes: indexes.length,
+        hasUserIdVersionIndex,
+        indexes: indexes.map((idx) => idx.indexname),
+      });
+
+      return {
+        totalIndexes: indexes.length,
+        hasUserIdVersionIndex,
+        indexes: indexes.map((idx) => idx.indexname),
+      };
+    } catch (error) {
+      this.logger.error("Failed to check wallet indexes:", error);
       throw error;
     }
   }
