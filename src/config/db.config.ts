@@ -18,13 +18,16 @@ export const dbConfig: TypeOrmModuleOptions = {
   synchronize: false,
   maxQueryExecutionTime: 1000,
   extra: {
-    max: 50,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 10_000,
-    // Optimize for concurrent operations
-    statement_timeout: 30000, // 30 seconds
-    lock_timeout: 10000, // 10 seconds
-    idle_in_transaction_session_timeout: 30000, // 30 seconds
+    max: 20, // Reduced from 50 to 20 for better performance
+    min: 5, // Minimum connections to maintain
+    connectionTimeoutMillis: 3000, // 3 seconds max
+    idleTimeoutMillis: 30000, // 30 seconds max
+    // Optimize for concurrent operations with aggressive timeouts
+    statement_timeout: 10000, // 10 seconds max
+    lock_timeout: 3000, //  3 seconds max
+    idle_in_transaction_session_timeout: 5000, // 5 seconds max
+    acquireTimeoutMillis: 5000, // 5 seconds to acquire connection
+    reapIntervalMillis: 1000, // Check for idle connections every 1 second
   },
   logging: !isProduction,
   ...((isProduction || isStaging) && {
