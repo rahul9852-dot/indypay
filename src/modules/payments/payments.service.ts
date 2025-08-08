@@ -3388,7 +3388,7 @@ export class PaymentsService {
         wallet.version = originalVersion + 1;
         wallet.updatedAt = new Date();
 
-        // Update with version check
+        // Update with version check - optimized for index usage
         const result = await queryRunner.manager
           .createQueryBuilder()
           .update(WalletEntity)
