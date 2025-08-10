@@ -485,7 +485,7 @@ export class PaymentsController {
         walletTPS,
         walletIndexes,
         alerts: {
-          highConnections: poolStatus.poolStats.active_connections > 15, // Adjusted for new max of 20
+          highConnections: poolStatus.poolStats.active_connections > 8, // 🚨 Adjusted for new max of 10
           longRunningQueries: poolStatus.timeoutStats?.long_running_queries > 0,
           walletLockContention:
             walletLocks.filter((l) => !l.granted).length > 0,
