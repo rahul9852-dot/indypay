@@ -3263,6 +3263,12 @@ export class PaymentsService {
   ) {
     const { amount, email, mobile, name, orderId } = createPayinTransactionDto;
 
+    if (amount < 100 || amount > 3000) {
+      throw new BadRequestException(
+        "Amount must be greater than 100 and less than 3000",
+      );
+    }
+
     const existingPayinOrder = await this.payInOrdersRepository.exists({
       where: { orderId },
     });
