@@ -3430,7 +3430,8 @@ export class PaymentsService {
             }
 
             const delay = baseDelay * Math.pow(2, attempt);
-            await new Promise((resolve) => setTimeout(resolve, delay));
+            const jitter = Math.floor(Math.random() * delay * 0.5);
+            await new Promise((resolve) => setTimeout(resolve, delay + jitter));
             continue;
           }
 
@@ -3456,7 +3457,8 @@ export class PaymentsService {
           }
 
           const delay = baseDelay * Math.pow(2, attempt);
-          await new Promise((resolve) => setTimeout(resolve, delay));
+          const jitter = Math.floor(Math.random() * delay * 0.5);
+          await new Promise((resolve) => setTimeout(resolve, delay + jitter));
         }
       }
 
