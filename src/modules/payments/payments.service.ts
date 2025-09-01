@@ -3535,7 +3535,10 @@ export class PaymentsService {
           1000 * 60 * 60 * 24 * 20, // 20 days
         );
 
-        if (status === payinOrder.status) {
+        if (
+          status === payinOrder.status &&
+          payinOrder.isMisspelled === isMisspelled
+        ) {
           this.logger.info(
             `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
           );
