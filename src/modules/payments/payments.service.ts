@@ -3360,23 +3360,51 @@ export class PaymentsService {
     userId: string,
     updateFn: (wallet: WalletEntity) => void,
   ): Promise<WalletEntity> {
-    const maxRetries = 3; // 🚨 Reduced from 5 to 3
-    const baseDelay = 50; // 🚨 Reduced from 100ms to 50ms
-    const operationTimeout = 3000; // 🚨 Reduced from 8s to 3s
+    const maxRetries = 3;
+    const baseDelay = 100;
+    const operationTimeout = 5000;
+    const lockTimeout = 5000;
+    const lockTtl = 10000;
 
     const startTime = Date.now();
-
-    // 🚨 CRITICAL: Use Redis-based locking to prevent concurrent updates on same wallet
     const lockKey = `wallet_update:${userId}`;
-    const existingLock = await this.cacheManager.get(lockKey);
+    let lockAcquired = false;
 
-    if (existingLock) {
-      throw new Error(`Wallet update lock already held for user: ${userId}`);
-    }
+    // ✅ FIXED: Wait for lock instead of failing immediately
+    const acquireLock = async (): Promise<boolean> => {
+      const lockStartTime = Date.now();
 
-    await this.cacheManager.set(lockKey, "locked", 5000); // 5 second lock
+      while (Date.now() - lockStartTime < lockTimeout) {
+        const existingLock = await this.cacheManager.get(lockKey);
+
+        if (!existingLock) {
+          // Try to acquire lock
+          await this.cacheManager.set(lockKey, "locked", lockTtl);
+          // Double-check we got the lock (race condition safety)
+          const checkLock = await this.cacheManager.get(lockKey);
+          if (checkLock) {
+            return true;
+          }
+        }
+        // Wait before checking again
+        await new Promise((resolve) =>
+          setTimeout(resolve, 50 + Math.random() * 50),
+        );
+      }
+
+      return false; // Couldn't acquire lock within timeout
+    };
 
     try {
+      // Wait for lock acquisition
+      lockAcquired = await acquireLock();
+
+      if (!lockAcquired) {
+        throw new Error(
+          `Could not acquire wallet lock for user ${userId} within ${lockTimeout}ms`,
+        );
+      }
+
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
           // Check if we've exceeded the operation timeout
@@ -3464,8 +3492,10 @@ export class PaymentsService {
 
       throw new Error(`Unexpected error in wallet update for user: ${userId}`);
     } finally {
-      // 🚨 CRITICAL: Always release the lock
-      await this.cacheManager.del(lockKey);
+      // ✅ Always release lock if we acquired it
+      if (lockAcquired) {
+        await this.cacheManager.del(lockKey);
+      }
     }
   }
 
