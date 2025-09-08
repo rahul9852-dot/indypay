@@ -20,10 +20,10 @@ export const dbConfig: TypeOrmModuleOptions = {
   extra: {
     max: 10,
     min: 2,
-    connectionTimeoutMillis: 2000,
-    idleTimeoutMillis: 15000,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
     // Optimize for concurrent operations with aggressive timeouts
-    statement_timeout: 5000,
+    statement_timeout: 10000,
     lock_timeout: 1000,
     idle_in_transaction_session_timeout: 2000,
     acquireTimeoutMillis: 3000,
