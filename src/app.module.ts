@@ -33,6 +33,7 @@ import { SsoModule } from "@/modules/sso/sso.module";
 import { ChannelPartnersModule } from "@/modules/channel-partners/channel-partners.module";
 import { AnalyticsModule } from "@/modules/analytics/analytics.module";
 import { DisabledEndpointInterceptor } from "@/interceptors/disabled-endpoint.interceptor";
+import { CacheMonitorModule } from "@/shared/cache-monitor/cache-monitor.module";
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { DisabledEndpointInterceptor } from "@/interceptors/disabled-endpoint.in
     ItemModule,
     ReportsModule,
     AnalyticsModule,
+    CacheMonitorModule,
   ],
   controllers: [AppController],
   providers: [

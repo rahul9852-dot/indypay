@@ -11,4 +11,9 @@ export const REDIS_KEYS = {
   FORGET_PASSWORD_KEY: (mobile: string) => `forget_pwd_to_${mobile}`,
   PAYMENT_STATUS: (orderId: string) => `payment_status_${orderId}`,
   SUCCESS_COUNT: (userId: string) => `pin_success_count:${userId}`,
+  // Stats caching keys
+  STATS_MERCHANT: (userId: string, startDate: string, endDate: string) =>
+    `stats:merchant:${userId}:${startDate}:${endDate}`,
+  STATS_ADMIN: (startDate: string, endDate: string) =>
+    `stats:admin:${startDate}:${endDate}`,
 };

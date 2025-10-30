@@ -4,11 +4,15 @@ export class KybDoc1753555321852 implements MigrationInterface {
   name = "KybDoc1753555321852";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "public"."IDX_payin_orders_vpa"`);
     await queryRunner.query(
-      `DROP INDEX "public"."IDX_payin_orders_vpa_created_at"`,
+      `DROP INDEX IF EXISTS "public"."IDX_payin_orders_vpa"`,
     );
-    await queryRunner.query(`ALTER TABLE "payin_orders" DROP COLUMN "vpa"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "public"."IDX_payin_orders_vpa_created_at"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "payin_orders" DROP COLUMN IF EXISTS "vpa"`,
+    );
     await queryRunner.query(
       `ALTER TABLE "user_business_details" ADD "companyPanNumber" character varying`,
     );
