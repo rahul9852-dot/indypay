@@ -1,7 +1,7 @@
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { WalletsService } from "./wallets.service";
-import { WalletTopUpDto } from "./dto/wallet.dto";
+import { RefundWalletDto, WalletTopUpDto } from "./dto/wallet.dto";
 import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -30,6 +30,16 @@ export class WalletsController {
     return this.walletsService.getWalletList(paginationDto);
   }
 
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  @ApiOperation({ summary: "Get Wallet Txn - Channel Partner" })
+  @Get("/cp/wallet-list")
+  getWalletListCP(
+    @User() user: UsersEntity,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    return this.walletsService.getWalletList(paginationDto, user.id);
+  }
+
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
   @ApiOperation({ summary: "Get Wallet Txn of a user - Admin" })
   @Get("/admin/wallet-list/:userId")
@@ -38,6 +48,21 @@ export class WalletsController {
     @Query() paginationDto: PaginationDto,
   ) {
     return this.walletsService.getWalletListByUserId(userId, paginationDto);
+  }
+
+  @Role(USERS_ROLE.CHANNEL_PARTNER)
+  @ApiOperation({ summary: "Get Wallet Txn of a user - Channel Partner" })
+  @Get("/cp/wallet-list/:userId")
+  getWalletListByUserIdCP(
+    @Param("userId") userId: string,
+    @Query() paginationDto: PaginationDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.walletsService.getWalletListByUserId(
+      userId,
+      paginationDto,
+      user.id,
+    );
   }
 
   @Role(USERS_ROLE.MERCHANT)
@@ -78,5 +103,15 @@ export class WalletsController {
     @Body() { amount, userId: merchantUserId }: WalletTopUpDto,
   ) {
     return this.walletsService.topUpWallet(merchantUserId, user, amount);
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Refund user - Admin" })
+  @Post("refund")
+  refundWallet(
+    @User() user: UsersEntity,
+    @Body() { userId: merchantUserId, amount }: RefundWalletDto,
+  ) {
+    return this.walletsService.refundWallet(merchantUserId, user, amount);
   }
 }

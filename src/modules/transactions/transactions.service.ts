@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException } from "@nestjs/common";
+import {
+  Injectable,
+  InternalServerErrorException,
+  Inject,
+  Logger,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Response } from "express";
 import {
@@ -10,6 +15,8 @@ import {
   MoreThanOrEqual,
   Repository,
 } from "typeorm";
+import { Cache } from "cache-manager";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { DownloadCsvDto } from "./download-csv.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
@@ -21,9 +28,14 @@ import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
+import { CacheMonitorService } from "@/shared/cache-monitor/cache-monitor.service";
+import { CacheTTLCalculator } from "@/utils/cache-ttl.utils";
+import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 
 @Injectable()
 export class TransactionsService {
+  private readonly logger = new Logger(TransactionsService.name);
+
   constructor(
     @InjectRepository(TransactionsEntity)
     private readonly transactionsRepository: Repository<TransactionsEntity>,
@@ -35,6 +47,11 @@ export class TransactionsService {
 
     @InjectRepository(SettlementsEntity)
     private readonly settlementsRepository: Repository<SettlementsEntity>,
+
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
+
+    private readonly cacheMonitor: CacheMonitorService,
   ) {}
 
   selectQuery: FindOptionsSelect<TransactionsEntity> = {
@@ -367,314 +384,358 @@ export class TransactionsService {
     startDate = todayStartDate(),
     endDate = todayEndDate(),
   }: DateDto) {
-    const [payinStats, settlementStats, payoutStats] = await Promise.all([
-      // PayIn Stats
-      Promise.all([
-        this.payInOrdersRepository.sum("amount", {
-          createdAt: Between(new Date(startDate), new Date(endDate)),
-        }),
-        this.payInOrdersRepository.count({
-          where: { createdAt: Between(new Date(startDate), new Date(endDate)) },
-        }),
-        this.payInOrdersRepository.sum("amount", {
+    // Generate cache key with normalized date strings
+    const startDateStr = new Date(startDate).toISOString().split("T")[0];
+    const endDateStr = new Date(endDate).toISOString().split("T")[0];
+    const cacheKey = REDIS_KEYS.STATS_ADMIN(startDateStr, endDateStr);
+
+    // Try to get from cache
+    const cachedData = await this.cacheManager.get(cacheKey);
+    if (cachedData) {
+      this.cacheMonitor.recordHit(cacheKey);
+      this.logger.debug(
+        `📦 Cache HIT for admin stats: (${startDateStr} to ${endDateStr})`,
+      );
+
+      return cachedData;
+    }
+
+    // Cache miss - fetch from database
+    this.cacheMonitor.recordMiss(cacheKey);
+    this.logger.debug(
+      `💾 Cache MISS for admin stats: (${startDateStr} to ${endDateStr}) - Fetching from DB...`,
+    );
+
+    // Fetch all data in parallel
+    const [
+      payinSuccessAmount,
+      payinSuccessCount,
+      settlementSuccessAmount,
+      settlementSuccessCount,
+      payoutSuccessAmount,
+      payoutSuccessCount,
+      recentTransactions,
+      topMerchantsRaw,
+    ] = await Promise.all([
+      // PayIn success stats
+      this.payInOrdersRepository
+        .createQueryBuilder("payin")
+        .select("SUM(payin.amount)", "sum")
+        .where("payin.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payin.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getRawOne()
+        .then((result) => parseFloat(result?.sum) || 0),
+      this.payInOrdersRepository
+        .createQueryBuilder("payin")
+        .where("payin.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payin.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getCount(),
+
+      // Settlement success stats
+      this.settlementsRepository
+        .createQueryBuilder("settlement")
+        .select("SUM(settlement.amountAfterDeduction)", "sum")
+        .where("settlement.status = :status", {
           status: PAYMENT_STATUS.SUCCESS,
-          createdAt: Between(new Date(startDate), new Date(endDate)),
-        }),
-        this.payInOrdersRepository.count({
-          where: {
-            status: PAYMENT_STATUS.SUCCESS,
-            createdAt: Between(new Date(startDate), new Date(endDate)),
-          },
-        }),
-        this.payInOrdersRepository.sum("amount", {
-          status: PAYMENT_STATUS.FAILED,
-          createdAt: Between(new Date(startDate), new Date(endDate)),
-        }),
-        this.payInOrdersRepository.count({
-          where: {
-            status: PAYMENT_STATUS.FAILED,
-            createdAt: Between(new Date(startDate), new Date(endDate)),
-          },
-        }),
-      ]),
-      // Settlement Stats
-      Promise.all([
-        this.settlementsRepository.sum("amountAfterDeduction", {
-          createdAt: Between(new Date(startDate), new Date(endDate)),
-        }),
-        this.settlementsRepository.count({
-          where: {
-            createdAt: Between(new Date(startDate), new Date(endDate)),
-          },
-        }),
-        this.settlementsRepository.sum("amountAfterDeduction", {
+        })
+        .andWhere("settlement.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getRawOne()
+        .then((result) => parseFloat(result?.sum) || 0),
+      this.settlementsRepository
+        .createQueryBuilder("settlement")
+        .where("settlement.status = :status", {
           status: PAYMENT_STATUS.SUCCESS,
-          createdAt: Between(new Date(startDate), new Date(endDate)),
-        }),
-        this.settlementsRepository.count({
-          where: {
-            status: PAYMENT_STATUS.SUCCESS,
-            createdAt: Between(new Date(startDate), new Date(endDate)),
-          },
-        }),
-        this.settlementsRepository.sum("amountAfterDeduction", {
-          status: PAYMENT_STATUS.FAILED,
-          createdAt: Between(new Date(startDate), new Date(endDate)),
-        }),
-        this.settlementsRepository.count({
-          where: {
-            status: PAYMENT_STATUS.FAILED,
-            createdAt: Between(new Date(startDate), new Date(endDate)),
-          },
-        }),
-      ]),
-      // Payout Stats
-      Promise.all([
-        this.payOutOrdersRepository.sum("amount", {
-          createdAt: Between(new Date(startDate), new Date(endDate)),
-        }),
-        this.payOutOrdersRepository.count({
-          where: { createdAt: Between(new Date(startDate), new Date(endDate)) },
-        }),
-        this.payOutOrdersRepository.sum("amount", {
-          status: PAYMENT_STATUS.SUCCESS,
-          createdAt: Between(new Date(startDate), new Date(endDate)),
-        }),
-        this.payOutOrdersRepository.count({
-          where: {
-            status: PAYMENT_STATUS.SUCCESS,
-            createdAt: Between(new Date(startDate), new Date(endDate)),
-          },
-        }),
-        this.payOutOrdersRepository.sum("amount", {
-          status: PAYMENT_STATUS.FAILED,
-          createdAt: Between(new Date(startDate), new Date(endDate)),
-        }),
-        this.payOutOrdersRepository.count({
-          where: {
-            status: PAYMENT_STATUS.FAILED,
-            createdAt: Between(new Date(startDate), new Date(endDate)),
-          },
-        }),
-      ]),
+        })
+        .andWhere("settlement.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getCount(),
+
+      // Payout success stats
+      this.payOutOrdersRepository
+        .createQueryBuilder("payout")
+        .select("SUM(payout.amount)", "sum")
+        .where("payout.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payout.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getRawOne()
+        .then((result) => parseFloat(result?.sum) || 0),
+      this.payOutOrdersRepository
+        .createQueryBuilder("payout")
+        .where("payout.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payout.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getCount(),
+
+      // Recent 5 transactions (PayIn only)
+      this.payInOrdersRepository
+        .createQueryBuilder("payin")
+        .select([
+          "payin.orderId",
+          "payin.amount",
+          "payin.paymentMethod",
+          "payin.status",
+          "payin.createdAt",
+          "user.id",
+          "user.fullName",
+          "user.email",
+        ])
+        .innerJoin("payin.user", "user")
+        .where("payin.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payin.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .orderBy("payin.createdAt", "DESC")
+        .limit(5)
+        .getMany(),
+
+      // Top 5 merchants by transaction amount
+      this.payInOrdersRepository
+        .createQueryBuilder("payin")
+        .select("payin.userId", "userId")
+        .addSelect("user.fullName", "merchantName")
+        .addSelect("user.email", "merchantEmail")
+        .addSelect("SUM(payin.amount)", "totalAmount")
+        .addSelect("COUNT(payin.id)", "transactionCount")
+        .innerJoin("payin.user", "user")
+        .where("payin.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payin.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .groupBy("payin.userId")
+        .addGroupBy("user.fullName")
+        .addGroupBy("user.email")
+        .orderBy("SUM(payin.amount)", "DESC")
+        .limit(5)
+        .getRawMany(),
     ]);
 
-    const [
-      initiatedPayinAmount,
-      initiatedPayinCount,
-      successPayinAmount,
-      successPayinCount,
-      failedPayinAmount,
-      failedPayinCount,
-    ] = payinStats;
-
-    const [
-      initiatedSettlementAmount,
-      initiatedSettlementCount,
-      successSettlementAmount,
-      successSettlementCount,
-      failedSettlementAmount,
-      failedSettlementCount,
-    ] = settlementStats;
-
-    const [
-      initiatedPayoutAmount,
-      initiatedPayoutCount,
-      successPayoutAmount,
-      successPayoutCount,
-      failedPayoutAmount,
-      failedPayoutCount,
-    ] = payoutStats;
-
-    return {
+    const result = {
       payin: {
-        totalAmount: initiatedPayinAmount,
-        totalCount: initiatedPayinCount,
-        successAmount: successPayinAmount,
-        successCount: successPayinCount,
-        failedAmount: failedPayinAmount,
-        failedCount: failedPayinCount,
+        successAmount: payinSuccessAmount || 0,
+        successCount: payinSuccessCount || 0,
       },
       payout: {
-        totalAmount: initiatedPayoutAmount,
-        totalCount: initiatedPayoutCount,
-        successAmount: successPayoutAmount,
-        successCount: successPayoutCount,
-        failedAmount: failedPayoutAmount,
-        failedCount: failedPayoutCount,
+        successAmount: payoutSuccessAmount || 0,
+        successCount: payoutSuccessCount || 0,
       },
       settlement: {
-        totalAmount: initiatedSettlementAmount,
-        totalCount: initiatedSettlementCount,
-        successAmount: successSettlementAmount,
-        successCount: successSettlementCount,
-        failedAmount: failedSettlementAmount,
-        failedCount: failedSettlementCount,
+        successAmount: settlementSuccessAmount || 0,
+        successCount: settlementSuccessCount || 0,
       },
+      recentTransactions: recentTransactions.map((txn) => ({
+        date: txn.createdAt,
+        transactionId: txn.orderId,
+        method: txn.paymentMethod,
+        amount: txn.amount,
+        status: txn.status,
+      })),
+      topMerchants: topMerchantsRaw.map((merchant) => ({
+        merchantName: merchant.merchantName,
+        merchantEmail: merchant.merchantEmail,
+        totalAmount: parseFloat(merchant.totalAmount) || 0,
+        transactionCount: parseInt(merchant.transactionCount) || 0,
+      })),
     };
+
+    // Calculate smart TTL based on date range
+    const ttl = CacheTTLCalculator.calculateTTL(
+      new Date(startDate),
+      new Date(endDate),
+    );
+
+    // Store in cache with smart TTL
+    await this.cacheManager.set(cacheKey, result, ttl);
+    this.cacheMonitor.recordSet(cacheKey, ttl);
+    this.logger.debug(
+      `✅ Cached admin stats with TTL: ${CacheTTLCalculator.getTTLDescription(ttl)}`,
+    );
+
+    return result;
   }
 
   async getStatsForMerchant(
     userId: string,
     { startDate = todayStartDate(), endDate = todayEndDate() }: DateDto,
   ) {
-    const totalAmount = await this.payInOrdersRepository.sum("amount", {
-      user: { id: userId },
-      createdAt: Between(new Date(startDate), new Date(endDate)),
-    });
-    const totalCount = await this.payInOrdersRepository.count({
-      where: {
-        user: { id: userId },
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
-
-    const successAmount = await this.payInOrdersRepository.sum("amount", {
-      user: { id: userId },
-      status: PAYMENT_STATUS.SUCCESS,
-      createdAt: Between(new Date(startDate), new Date(endDate)),
-    });
-    const successCount = await this.payInOrdersRepository.count({
-      where: {
-        user: { id: userId },
-        status: PAYMENT_STATUS.SUCCESS,
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
-
-    const failedAmount = await this.payInOrdersRepository.sum("amount", {
-      user: { id: userId },
-      status: PAYMENT_STATUS.FAILED,
-      createdAt: Between(new Date(startDate), new Date(endDate)),
-    });
-    const failedCount = await this.payInOrdersRepository.count({
-      where: {
-        user: { id: userId },
-        status: PAYMENT_STATUS.FAILED,
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
-
-    const initiatedSettlementAmount = await this.settlementsRepository.sum(
-      "amountAfterDeduction",
-      {
-        user: { id: userId },
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
+    // Generate cache key with normalized date strings
+    const startDateStr = new Date(startDate).toISOString().split("T")[0];
+    const endDateStr = new Date(endDate).toISOString().split("T")[0];
+    const cacheKey = REDIS_KEYS.STATS_MERCHANT(
+      userId,
+      startDateStr,
+      endDateStr,
     );
 
-    const initiatedSettlementCount = await this.settlementsRepository.count({
-      where: {
-        user: { id: userId },
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
+    // Try to get from cache
+    const cachedData = await this.cacheManager.get(cacheKey);
+    if (cachedData) {
+      this.cacheMonitor.recordHit(cacheKey);
+      this.logger.debug(
+        `📦 Cache HIT for merchant stats: ${userId} (${startDateStr} to ${endDateStr})`,
+      );
 
-    const successSettlementAmount = await this.settlementsRepository.sum(
-      "amountAfterDeduction",
-      {
-        user: { id: userId },
-        status: PAYMENT_STATUS.SUCCESS,
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
+      return cachedData;
+    }
+
+    // Cache miss - fetch from database
+    this.cacheMonitor.recordMiss(cacheKey);
+    this.logger.debug(
+      `💾 Cache MISS for merchant stats: ${userId} (${startDateStr} to ${endDateStr}) - Fetching from DB...`,
     );
 
-    const successSettlementCount = await this.settlementsRepository.count({
-      where: {
-        user: { id: userId },
-        status: PAYMENT_STATUS.SUCCESS,
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
+    // Fetch all data in parallel
+    const [
+      payinSuccessAmount,
+      payinSuccessCount,
+      settlementSuccessAmount,
+      settlementSuccessCount,
+      payoutSuccessAmount,
+      payoutSuccessCount,
+      recentTransactions,
+    ] = await Promise.all([
+      // PayIn success stats
+      this.payInOrdersRepository
+        .createQueryBuilder("payin")
+        .select("SUM(payin.amount)", "sum")
+        .where("payin.userId = :userId", { userId })
+        .andWhere("payin.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payin.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getRawOne()
+        .then((result) => parseFloat(result?.sum) || 0),
+      this.payInOrdersRepository
+        .createQueryBuilder("payin")
+        .where("payin.userId = :userId", { userId })
+        .andWhere("payin.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payin.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getCount(),
 
-    const failedSettlementAmount = await this.settlementsRepository.sum(
-      "amountAfterDeduction",
-      {
-        user: { id: userId },
-        status: PAYMENT_STATUS.FAILED,
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    );
+      // Settlement success stats
+      this.settlementsRepository
+        .createQueryBuilder("settlement")
+        .select("SUM(settlement.amountAfterDeduction)", "sum")
+        .where("settlement.userId = :userId", { userId })
+        .andWhere("settlement.status = :status", {
+          status: PAYMENT_STATUS.SUCCESS,
+        })
+        .andWhere("settlement.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getRawOne()
+        .then((result) => parseFloat(result?.sum) || 0),
+      this.settlementsRepository
+        .createQueryBuilder("settlement")
+        .where("settlement.userId = :userId", { userId })
+        .andWhere("settlement.status = :status", {
+          status: PAYMENT_STATUS.SUCCESS,
+        })
+        .andWhere("settlement.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getCount(),
 
-    const failedSettlementCount = await this.settlementsRepository.count({
-      where: {
-        user: { id: userId },
-        status: PAYMENT_STATUS.FAILED,
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
+      // Payout success stats
+      this.payOutOrdersRepository
+        .createQueryBuilder("payout")
+        .select("SUM(payout.amount)", "sum")
+        .where("payout.userId = :userId", { userId })
+        .andWhere("payout.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payout.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getRawOne()
+        .then((result) => parseFloat(result?.sum) || 0),
+      this.payOutOrdersRepository
+        .createQueryBuilder("payout")
+        .where("payout.userId = :userId", { userId })
+        .andWhere("payout.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payout.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .getCount(),
 
-    const initiatedPayoutAmount = await this.payOutOrdersRepository.sum(
-      "amount",
-      {
-        user: { id: userId },
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    );
+      // Recent 5 transactions (PayIn only)
+      this.payInOrdersRepository
+        .createQueryBuilder("payin")
+        .select([
+          "payin.orderId",
+          "payin.amount",
+          "payin.paymentMethod",
+          "payin.status",
+          "payin.createdAt",
+        ])
+        .where("payin.userId = :userId", { userId })
+        .andWhere("payin.status = :status", { status: PAYMENT_STATUS.SUCCESS })
+        .andWhere("payin.createdAt BETWEEN :startDate AND :endDate", {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        })
+        .orderBy("payin.createdAt", "DESC")
+        .limit(5)
+        .getMany(),
+    ]);
 
-    const initiatedPayoutCount = await this.payOutOrdersRepository.count({
-      where: {
-        user: { id: userId },
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
-
-    const successPayoutAmount = await this.payOutOrdersRepository.sum(
-      "amount",
-      {
-        user: { id: userId },
-        status: PAYMENT_STATUS.SUCCESS,
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    );
-
-    const successPayoutCount = await this.payOutOrdersRepository.count({
-      where: {
-        user: { id: userId },
-        status: PAYMENT_STATUS.SUCCESS,
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
-
-    const failedPayoutAmount = await this.payOutOrdersRepository.sum("amount", {
-      user: { id: userId },
-      status: PAYMENT_STATUS.FAILED,
-      createdAt: Between(new Date(startDate), new Date(endDate)),
-    });
-
-    const failedPayoutCount = await this.payOutOrdersRepository.count({
-      where: {
-        user: { id: userId },
-        status: PAYMENT_STATUS.FAILED,
-        createdAt: Between(new Date(startDate), new Date(endDate)),
-      },
-    });
-
-    return {
+    const result = {
       payin: {
-        totalAmount,
-        totalCount,
-        successAmount,
-        successCount,
-        failedAmount,
-        failedCount,
+        successAmount: payinSuccessAmount || 0,
+        successCount: payinSuccessCount || 0,
       },
       payout: {
-        totalAmount: initiatedPayoutAmount,
-        totalCount: initiatedPayoutCount,
-        successAmount: successPayoutAmount,
-        successCount: successPayoutCount,
-        failedAmount: failedPayoutAmount,
-        failedCount: failedPayoutCount,
+        successAmount: payoutSuccessAmount || 0,
+        successCount: payoutSuccessCount || 0,
       },
       settlement: {
-        totalAmount: initiatedSettlementAmount,
-        totalCount: initiatedSettlementCount,
-        successAmount: successSettlementAmount,
-        successCount: successSettlementCount,
-        failedAmount: failedSettlementAmount,
-        failedCount: failedSettlementCount,
+        successAmount: settlementSuccessAmount || 0,
+        successCount: settlementSuccessCount || 0,
       },
+      recentTransactions: recentTransactions.map((txn) => ({
+        date: txn.createdAt,
+        transactionId: txn.orderId,
+        method: txn.paymentMethod,
+        amount: txn.amount,
+        status: txn.status,
+      })),
     };
+
+    // Calculate smart TTL based on date range
+    const ttl = CacheTTLCalculator.calculateTTL(
+      new Date(startDate),
+      new Date(endDate),
+    );
+
+    // Store in cache with smart TTL
+    await this.cacheManager.set(cacheKey, result, ttl);
+    this.cacheMonitor.recordSet(cacheKey, ttl);
+    this.logger.debug(
+      `✅ Cached merchant stats with TTL: ${CacheTTLCalculator.getTTLDescription(ttl)}`,
+    );
+
+    return result;
   }
 }

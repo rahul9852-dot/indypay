@@ -12,6 +12,17 @@ export class DocumentUploadDto {
 
   @ApiProperty()
   @IsString()
-  @IsIn(["panCard", "aadharNumber", "bankStatement", "addressProof"])
+  @IsIn([
+    "panCard",
+    "aadharNumber",
+    "bankStatement",
+    "addressProof",
+    "companyPan",
+    "companyCheque",
+    "moa",
+    "aoa",
+    "coi",
+    "gstinCertificate",
+  ])
   documentType: string;
 }

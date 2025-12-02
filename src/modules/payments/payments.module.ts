@@ -29,6 +29,7 @@ import { CheckoutEntity } from "@/entities/checkout.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth.module";
 import { CryptoService } from "@/utils/encryption-algo.utils";
+import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { CryptoService } from "@/utils/encryption-algo.utils";
     PayoutProcessor,
     PayoutService,
     CryptoService,
+    DatabaseMonitorService,
   ],
   controllers: [PaymentsController],
   exports: [PaymentsService],

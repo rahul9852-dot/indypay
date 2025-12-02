@@ -1,8 +1,15 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { ILike, In, Repository } from "typeorm";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { Response } from "express";
+import { Cache } from "cache-manager";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { KycSubmissionDto } from "./dto/kyc.dto";
 import { DocumentUploadDto } from "./dto/document-upload.dto";
 import { UsersEntity } from "@/entities/user.entity";
@@ -20,6 +27,9 @@ import { appConfig } from "@/config/app.config";
 import { getOnboardingStatus } from "@/utils/helperFunctions.utils";
 import { PaginationDto } from "@/dtos/common.dto";
 import { getPagination } from "@/utils/pagination.utils";
+import { REDIS_KEYS } from "@/constants/redis-cache.constant";
+import { SESService } from "@/modules/aws/ses.service";
+import { SNSService } from "@/modules/aws/sns.service";
 
 const {
   jwtConfig: {
@@ -43,6 +53,9 @@ export class KycService {
     private readonly userKycRepository: Repository<UserKycEntity>,
     private readonly jwtService: JwtService,
     private readonly s3Service: S3Service,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly sesService: SESService,
+    private readonly snsService: SNSService,
   ) {}
 
   async getKycStatus(user: IAccessTokenPayload) {
@@ -79,41 +92,47 @@ export class KycService {
     }
 
     if (user.onboardingStatus === ONBOARDING_STATUS.KYC_VERIFIED) {
-      throw new Error("User has already completed kyc");
+      throw new Error("User has already completed KYC");
     }
 
-    const { personalInfo, businessStructure, documents } = kycData;
+    const { personalInfo, businessStructure, kybInfo, documents } = kycData;
 
-    const aadharId = this.userMediaRepository.create({
-      documentType: documents.aadharNumber.docType,
-      documentUrl: documents.aadharNumber.url,
-      documentName: documents.aadharNumber.name,
-    });
+    if (!documents || Object.keys(documents).length === 0) {
+      throw new BadRequestException("No documents submitted.");
+    }
 
-    const panId = this.userMediaRepository.create({
-      documentType: documents.panCard.docType,
-      documentUrl: documents.panCard.url,
-      documentName: documents.panCard.name,
-    });
+    if (!kybInfo.directors || kybInfo.directors.length === 0) {
+      throw new BadRequestException("At least one director is required.");
+    }
 
-    const addressProofId = this.userMediaRepository.create({
-      documentType: documents.addressProof.docType,
-      documentUrl: documents.addressProof.url,
-      documentName: documents.addressProof.name,
-    });
+    const validDocumentTypes = [
+      "panCard",
+      "aadharNumber",
+      "bankStatement",
+      "addressProof",
+      "companyPan",
+      "companyCheque",
+      "moa",
+      "aoa",
+      "coi",
+      "gstinCertificate",
+    ];
 
-    const bankStatementId = this.userMediaRepository.create({
-      documentType: documents.bankStatement.docType,
-      documentUrl: documents.bankStatement.url,
-      documentName: documents.bankStatement.name,
-    });
+    const kycDocMedia = Object.entries(documents)
+      .filter(([key]) => {
+        return validDocumentTypes.includes(key) || key.startsWith("director");
+      })
+      .map(([key, doc]) => {
+        if (!doc?.url || !doc?.docType || !doc?.name) {
+          throw new BadRequestException(`Invalid document format for ${key}`);
+        }
 
-    const kycDocMedia = await Promise.all([
-      panId,
-      aadharId,
-      addressProofId,
-      bankStatementId,
-    ]);
+        return this.userMediaRepository.create({
+          documentType: doc.docType,
+          documentUrl: doc.url,
+          documentName: doc.name,
+        });
+      });
 
     const kyc = await this.userKycRepository.save(
       this.userKycRepository.create({
@@ -130,17 +149,22 @@ export class KycService {
         designation: personalInfo.designation,
         registerBusinessNumber: businessStructure.registeredBusinessNumber,
         businessPan: personalInfo.personalPanNumber,
+        websiteUrl: kybInfo.websiteUrl,
+        directors: kybInfo.directors,
+        moa: documents?.moa?.url,
+        aoa: documents?.aoa?.url,
+        coi: documents?.coi?.url,
       }),
     );
 
-    const savedUser = await this.userRepository.save(
-      this.userRepository.create({
-        id: userId,
-        onboardingStatus: ONBOARDING_STATUS.KYC_PENDING,
-        kyc,
-        businessDetails,
-      }),
-    );
+    businessDetails.user = user;
+    await this.userBusinessRepository.save(businessDetails);
+
+    user.businessDetails = businessDetails;
+    user.kyc = kyc;
+    user.onboardingStatus = ONBOARDING_STATUS.KYC_PENDING;
+
+    const savedUser = await this.userRepository.save(user);
 
     const payload: IAccessTokenPayload = {
       id: savedUser.id,
@@ -152,10 +176,40 @@ export class KycService {
     const accessToken = this.generateAccessToken(payload);
     const refreshToken = this.generateRefreshToken(payload);
 
+    await this.cacheManager.del(REDIS_KEYS.USER_KEY(user.id));
+    user.onboardingStatus = ONBOARDING_STATUS.KYC_PENDING;
+    await this.userRepository.save(user);
+
+    await this.sendKycSubmissionNotification(user.email, user.mobile);
+
     return res
       .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
       .cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions)
       .json({ message: "KYC submitted successfully" });
+  }
+
+  async sendKycSubmissionNotification(email: string, phoneNumber: string) {
+    const emailSubject = "KYC Submission Successful";
+    const emailBody = `
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f9f9f9;">
+        <div style="max-width: 600px; margin: 20px auto; padding: 20px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+          <div style="text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #4CAF50;">
+            PayBolt
+          </div>
+          <h2 style="color: #333; text-align: center;">Dear User,</h2>
+          <p style="text-align: center;">Your KYC documents have been successfully submitted. Verification is pending!</p>
+          <p style="text-align: center;">Thank you for your patience.</p>
+          <p style="text-align: center; margin-top: 30px; color: #777;">Regards,<br>PayBolt Support</p>
+        </div>
+      </body>
+    </html>
+`;
+
+    const smsMessage = "KYC successfully submitted, verification pending!";
+    await this.sesService.sendEmail(emailSubject, emailBody, email);
+
+    await this.snsService.sendSMS(phoneNumber, smsMessage);
   }
 
   generateAccessToken(payload: Record<string, any>, options?: JwtSignOptions) {

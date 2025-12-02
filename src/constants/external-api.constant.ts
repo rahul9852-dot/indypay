@@ -76,3 +76,14 @@ export const PAYBOLT = {
     LIVE: "api/v1/payments/payin/create",
   },
 };
+
+export const DIASPAY = {
+  BASE_URL: "https://apiv2.diaspay.in",
+  PAYIN: {
+    LIVE: "api/initiatePayout",
+  },
+  PAYOUT: {
+    FUND_TRANSFER: "api/initiatePayout",
+    QUERY: "api/getPayoutStatus",
+  },
+};

@@ -52,6 +52,11 @@ export class ThirdPartyAuthService {
             email,
             password,
           },
+          {
+            headers: {
+              merchantId: externalPaymentConfig.ertech.merchantId,
+            },
+          },
         );
       if (
         response &&

@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "dashboard-api",
       script: "./dist/src/main.js",
-      instances: "max", // Matches your 8-core CPU
+      instances: 4, // Matches your 8-core CPU
       exec_mode: "cluster",
       max_memory_restart: "500M", // Restart if process exceeds 500MB
       load_balancing: {

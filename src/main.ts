@@ -17,9 +17,14 @@ import { appConfig } from "@/config/app.config";
 import { loadSwaggerConfigs } from "@/config/swagger.config";
 import { helmetConfigs } from "@/config/helmet.config";
 import { HttpExceptionsFilter } from "@/filters/http-exceptions.filter";
+// import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner";
 
 const { port, isProduction, allowedOrigins } = appConfig();
 
+// (PostgresQueryRunner.prototype as any).getCurrentSchema = async function () {
+//   const result = await this.query(`SELECT current_schema()`);
+//   return result[0]["current_schema"];
+// };
 async function bootstrap() {
   const logger = new CustomLogger();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);

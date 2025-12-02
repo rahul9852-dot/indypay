@@ -14,6 +14,7 @@ import { ID_TYPE } from "@/enums";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 
 @Entity("wallets")
+@Index(["userId", "version"]) // Composite index for optimistic locking
 export class WalletEntity {
   @PrimaryColumn()
   id: string;
@@ -51,6 +52,12 @@ export class WalletEntity {
 
   @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
+
+  @Column({
+    type: "integer",
+    default: 0,
+  })
+  version: number;
 
   @BeforeInsert()
   beforeInsertHook() {

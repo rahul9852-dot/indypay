@@ -16,12 +16,18 @@ export const dbConfig: TypeOrmModuleOptions = {
   database: name,
   entities: [__dirname + "/../**/*.entity{.ts,.js}"],
   synchronize: false,
-  poolSize: 50,
   maxQueryExecutionTime: 1000,
   extra: {
-    max: 50,
+    max: 10,
+    min: 2,
     connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30000,
+    // Optimize for concurrent operations with aggressive timeouts
+    statement_timeout: 10000,
+    lock_timeout: 1000,
+    idle_in_transaction_session_timeout: 2000,
+    acquireTimeoutMillis: 3000,
+    reapIntervalMillis: 500, // Check for idle connections every 500ms
   },
   logging: !isProduction,
   ...((isProduction || isStaging) && {

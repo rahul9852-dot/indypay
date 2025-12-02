@@ -332,6 +332,20 @@ export interface IExternalEritecPayoutFundResponse {
   exception: string;
 }
 
+export interface IExternalDiasPayFundResponse {
+  status: string;
+  UTR: string;
+  request_data: {
+    payee_name: string;
+    payee_account_no: string;
+    payee_ifsc: string;
+    transfer_amount: string;
+    remarks: string;
+    user_uuid: string;
+  };
+  order_id: string;
+}
+
 export interface IExternalEritecPayoutFundResponseDecrypted {
   orderId: string;
   merchantId: string;

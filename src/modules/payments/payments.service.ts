@@ -66,6 +66,7 @@ import {
   getUlidId,
 } from "@/utils/helperFunctions.utils";
 import {
+  DIASPAY,
   ERTITECH,
   FALKPAY,
   ISMART_PAY,
@@ -91,12 +92,14 @@ import {
   IExternalPayinStatusResponseUtkarsh,
   IExternalPayinPaymentRequestPayboltPayin,
   IExternalPayinPaymentResponsePayboltPayin,
+  IExternalDiasPayFundResponse,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
 import { ID_TYPE, USERS_ROLE } from "@/enums";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import {
+  getDiaspayConfig,
   getEritechPgConfig,
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
@@ -778,6 +781,90 @@ export class PaymentsService {
     }
   }
 
+  async createPayoutDiasPay(
+    createPayoutDto: CreatePayoutDto,
+    user: UsersEntity,
+  ) {
+    const { data: payoutDataArr } = createPayoutDto;
+
+    if (payoutDataArr.length > 1000) {
+      throw new BadRequestException("Maximum 1000 payouts allowed");
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const totalAmount = payoutDataArr.reduce((acc, curr) => {
+        if (curr.amount <= 0) {
+          throw new BadRequestException("Amount should be greater than 0");
+        }
+        const commissionResult = calculateDynamicCommission({
+          amount: +curr.amount,
+          userCommissionRate: user.commissionInPercentagePayout,
+          userGstRate: user.gstInPercentagePayout,
+        });
+
+        return acc + commissionResult.netPayableAmount;
+      }, 0);
+
+      // Check and update wallet balance
+      await this.validateAndUpdateWallet(queryRunner, user, totalAmount);
+
+      // Create batch job identifier
+      const batchId = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
+
+      // Create payout orders in DB
+      const payoutOrders = await this.createPayoutOrders(
+        queryRunner,
+        payoutDataArr,
+        user,
+        batchId,
+      );
+
+      // Add to processing queue
+      await this.payoutQueue.add("process-payouts-dias-pay", {
+        payoutOrders,
+        userId: user.id,
+        batchId,
+      });
+
+      await queryRunner.commitTransaction();
+
+      this.logger.info(
+        `PAYOUT CREATED: ${LoggerPlaceHolder.Json}`,
+        createPayoutDto,
+      );
+
+      return {
+        message: "Payout process initiated",
+        batchId,
+        payoutOrders: payoutOrders.map((payout) => ({
+          orderId: payout.orderId,
+          payoutId: payout.payoutId,
+          amount: payout.amount,
+          status: payout.status,
+          accountNumber: payout.bankAccountNumber,
+          bankName: payout.bankName,
+          ifscCode: payout.bankIfsc,
+        })),
+        summary: {
+          total: payoutDataArr.length,
+          status: "PROCESSING",
+        },
+      };
+    } catch (err) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Error initiating payouts`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async createPayoutFlakPaySingle(
     singlePayoutDto: SinglePayoutDto,
     user: UsersEntity,
@@ -1305,9 +1392,9 @@ export class PaymentsService {
     user: UsersEntity,
     totalAmount: number,
   ) {
+    // current wallet to check balance
     let userWallet = await queryRunner.manager
       .createQueryBuilder(WalletEntity, "wallet")
-      .setLock("pessimistic_write")
       .leftJoinAndSelect("wallet.user", "user")
       .where("user.id = :userId", { userId: user.id })
       .getOne();
@@ -1345,8 +1432,14 @@ export class PaymentsService {
       },
     );
 
-    userWallet.availablePayoutBalance = newBalance;
-    const updatedWallet = await queryRunner.manager.save(userWallet);
+    // with optimistic locking
+    const updatedWallet = await this.safeUpdateWalletBalance(
+      queryRunner,
+      user.id,
+      (wallet) => {
+        wallet.availablePayoutBalance = newBalance;
+      },
+    );
 
     this.logger.info(
       `PAYOUT - validateAndUpdateWallet - Wallet updated successfully: ${LoggerPlaceHolder.Json}`,
@@ -1435,7 +1528,13 @@ export class PaymentsService {
       );
     }
 
-    if (payinOrder.status !== PAYMENT_STATUS.SUCCESS) {
+    // Only skip API call if status is already SUCCESS and we have a txnRefId
+    // This prevents unnecessary API calls for completed transactions
+    if (payinOrder.status === PAYMENT_STATUS.SUCCESS && payinOrder.txnRefId) {
+      this.logger.info(
+        `Transaction already completed: ${orderId}, returning cached status`,
+      );
+
       return {
         orderId: payinOrder.orderId,
         status: payinOrder.status,
@@ -1541,6 +1640,69 @@ export class PaymentsService {
     };
   }
 
+  // dias pay status check
+  async checkPayOutStatusTransactionDiasPay(
+    { orderId }: PayoutStatusDto,
+    user: UsersEntity,
+  ) {
+    const payoutOrder = await this.payOutOrdersRepository.findOne({
+      where: { orderId },
+    });
+
+    if (!payoutOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payout order not found"),
+      );
+    }
+
+    if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
+      return {
+        orderId: payoutOrder.orderId,
+        status: payoutOrder.status,
+        transferId: payoutOrder.transferId,
+      };
+    }
+
+    // call api
+    const axiosServiceDiasPay = new AxiosService(
+      DIASPAY.BASE_URL,
+      getDiaspayConfig({
+        token: externalPaymentConfig.diaspay.token,
+      }),
+    );
+
+    const diasPayResponse =
+      await axiosServiceDiasPay.postRequest<IExternalDiasPayFundResponse>(
+        DIASPAY.PAYOUT.QUERY,
+        {
+          order_id: orderId,
+        },
+      );
+
+    this.logger.info(
+      `Dias Pay Response: ${LoggerPlaceHolder.Json}`,
+      diasPayResponse,
+    );
+
+    // update payout order
+    const status = convertExternalPaymentStatusToInternal(
+      diasPayResponse.status.toUpperCase(),
+    );
+
+    await this.payOutOrdersRepository.save(
+      this.payOutOrdersRepository.create({
+        ...payoutOrder,
+        status,
+        transferId: diasPayResponse.UTR,
+      }),
+    );
+
+    return {
+      orderId: payoutOrder.orderId,
+      status,
+      transferId: diasPayResponse.UTR,
+    };
+  }
   // flakpay status check
   async checkPayOutStatusTransactionFlakPay({ orderId }: PayoutStatusDto) {
     const payoutOrder = await this.payOutOrdersRepository.findOne({
@@ -1662,29 +1824,41 @@ export class PaymentsService {
 
     // update wallet
     if (status === PAYMENT_STATUS.SUCCESS) {
-      const wallet = await this.walletRepository.findOne({
-        where: { user: { id: user.id } },
-        relations: ["user"],
-      });
-
       await this.cacheManager.del(
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const walletRaw = this.walletRepository.create({
-        ...(wallet?.id && { id: wallet.id }),
-        totalCollections:
-          (wallet.totalCollections ? +wallet.totalCollections : 0) +
-          +payinOrder.amount,
-        user,
-      });
+      // Use standardized wallet update with optimistic locking
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
 
-      await this.walletRepository.save(walletRaw);
+      try {
+        const updatedWallet = await this.safeUpdateWalletBalance(
+          queryRunner,
+          user.id,
+          (wallet) => {
+            wallet.totalCollections =
+              (wallet.totalCollections ? +wallet.totalCollections : 0) +
+              +payinOrder.amount;
+          },
+        );
 
-      this.logger.info(
-        `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
-        walletRaw,
-      );
+        await queryRunner.commitTransaction();
+
+        this.logger.info(
+          `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+          {
+            walletId: updatedWallet.id,
+            newTotalCollections: updatedWallet.totalCollections,
+          },
+        );
+      } catch (error) {
+        await queryRunner.rollbackTransaction();
+        throw error;
+      } finally {
+        await queryRunner.release();
+      }
     }
 
     if (user?.payInWebhookUrl) {
@@ -1748,9 +1922,9 @@ export class PaymentsService {
     }
 
     if (status === payinOrder.status) {
-      // this.logger.info(
-      //   `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
-      // );
+      this.logger.info(
+        `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+      );
 
       return {
         message: "Status updated successfully.",
@@ -1812,29 +1986,41 @@ export class PaymentsService {
 
     // update wallet
     if (status === PAYMENT_STATUS.SUCCESS) {
-      const wallet = await this.walletRepository.findOne({
-        where: { user: { id: user.id } },
-        relations: ["user"],
-      });
-
       await this.cacheManager.del(
         REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
       );
 
-      const walletRaw = this.walletRepository.create({
-        ...(wallet?.id && { id: wallet.id }),
-        totalCollections:
-          (wallet.totalCollections ? +wallet.totalCollections : 0) +
-          +payinOrder.amount,
-        user,
-      });
+      // Use standardized wallet update with optimistic locking
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
 
-      await this.walletRepository.save(walletRaw);
+      try {
+        const updatedWallet = await this.safeUpdateWalletBalance(
+          queryRunner,
+          user.id,
+          (wallet) => {
+            wallet.totalCollections =
+              (wallet.totalCollections ? +wallet.totalCollections : 0) +
+              +payinOrder.amount;
+          },
+        );
 
-      // this.logger.info(
-      //   `PAYIN WEBHOOK - externalWebhookUpdateStatusPayin - wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
-      //   walletRaw,
-      // );
+        await queryRunner.commitTransaction();
+
+        this.logger.info(
+          `PAYIN WEBHOOK - FlakPay wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+          {
+            walletId: updatedWallet.id,
+            newTotalCollections: updatedWallet.totalCollections,
+          },
+        );
+      } catch (error) {
+        await queryRunner.rollbackTransaction();
+        throw error;
+      } finally {
+        await queryRunner.release();
+      }
     }
 
     if (user?.payInWebhookUrl) {
@@ -3082,6 +3268,12 @@ export class PaymentsService {
   ) {
     const { amount, email, mobile, name, orderId } = createPayinTransactionDto;
 
+    if (amount < 100 || amount > 3000) {
+      throw new BadRequestException(
+        "Amount must be greater than 100 and less than 3000",
+      );
+    }
+
     const existingPayinOrder = await this.payInOrdersRepository.exists({
       where: { orderId },
     });
@@ -3104,7 +3296,14 @@ export class PaymentsService {
         commissionInPercentage: user.commissionInPercentagePayin,
         gstInPercentage: user.gstInPercentagePayin,
       });
-      // 1. create pay-in order
+
+      const paymentLink = generatePaymentLinkUtil({
+        amount,
+        orderId,
+        vpa,
+      });
+
+      // FIXED: Create payin order with all fields at once
       const payinOrder = this.payInOrdersRepository.create({
         user,
         amount,
@@ -3115,45 +3314,23 @@ export class PaymentsService {
         gstAmount,
         netPayableAmount,
         orderId,
+        ...(paymentLink && {
+          intent: paymentLink,
+        }),
       });
 
-      // 2. save pay-in order
+      // FIXED: Single save operation
       const savedPayinOrder = await queryRunner.manager.save(payinOrder);
 
-      // 3. create transaction
+      // FIXED: Create transaction with direct save
       const transaction = this.transactionsRepository.create({
         user,
         payInOrder: savedPayinOrder,
         transactionType: PAYMENT_TYPE.PAYIN,
       });
 
-      // 4. save transaction
+      // FIXED: Single save for transaction
       await queryRunner.manager.save(transaction);
-
-      const paymentLink = generatePaymentLinkUtil({
-        amount,
-        orderId,
-        vpa,
-      });
-      // 6. save external payment
-      await queryRunner.manager.save(
-        this.payInOrdersRepository.create({
-          ...savedPayinOrder,
-          ...(paymentLink && {
-            intent: paymentLink,
-          }),
-        }),
-      );
-
-      // if (!externalPaymentResponse?.data?.paymentUrl?.trim()) {
-      //   throw new BadRequestException(
-      //     new MessageResponseDto("Something went wrong"),
-      //   );
-      // }
-
-      // this.logger.info(
-      //   `PAYIN - createTransaction - Created transaction successfully`,
-      // );
 
       // Commit transaction
       await queryRunner.commitTransaction();
@@ -3182,24 +3359,149 @@ export class PaymentsService {
     }
   }
 
+  // immediate fix by version check
   private async safeUpdateWalletBalance(
     queryRunner: QueryRunner,
     userId: string,
     updateFn: (wallet: WalletEntity) => void,
   ): Promise<WalletEntity> {
-    const wallet = await queryRunner.manager
-      .createQueryBuilder(WalletEntity, "wallet")
-      .setLock("pessimistic_write")
-      .leftJoinAndSelect("wallet.user", "user")
-      .where("user.id = :userId", { userId })
-      .getOne();
+    const maxRetries = 3;
+    const baseDelay = 100;
+    const operationTimeout = 5000;
+    const lockTimeout = 5000;
+    const lockTtl = 10000;
 
-    if (!wallet) {
-      throw new NotFoundException(`Wallet not found for user: ${userId}`);
+    const startTime = Date.now();
+    const lockKey = `wallet_update:${userId}`;
+    let lockAcquired = false;
+
+    // ✅ FIXED: Wait for lock instead of failing immediately
+    const acquireLock = async (): Promise<boolean> => {
+      const lockStartTime = Date.now();
+
+      while (Date.now() - lockStartTime < lockTimeout) {
+        const existingLock = await this.cacheManager.get(lockKey);
+
+        if (!existingLock) {
+          // Try to acquire lock
+          await this.cacheManager.set(lockKey, "locked", lockTtl);
+          // Double-check we got the lock (race condition safety)
+          const checkLock = await this.cacheManager.get(lockKey);
+          if (checkLock) {
+            return true;
+          }
+        }
+        // Wait before checking again
+        await new Promise((resolve) =>
+          setTimeout(resolve, 50 + Math.random() * 50),
+        );
+      }
+
+      return false; // Couldn't acquire lock within timeout
+    };
+
+    try {
+      // Wait for lock acquisition
+      lockAcquired = await acquireLock();
+
+      if (!lockAcquired) {
+        throw new Error(
+          `Could not acquire wallet lock for user ${userId} within ${lockTimeout}ms`,
+        );
+      }
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          // Check if we've exceeded the operation timeout
+          if (Date.now() - startTime > operationTimeout) {
+            throw new Error(
+              `Wallet update timeout after ${operationTimeout}ms for user: ${userId}`,
+            );
+          }
+
+          // Get wallet with current version
+          const wallet = await queryRunner.manager
+            .createQueryBuilder(WalletEntity, "wallet")
+            .where("wallet.userId = :userId", { userId })
+            .getOne();
+
+          if (!wallet) {
+            throw new NotFoundException(`Wallet not found for user: ${userId}`);
+          }
+
+          const originalVersion = wallet.version;
+
+          // Apply the update function
+          updateFn(wallet);
+
+          // Increment version for optimistic locking
+          wallet.version = originalVersion + 1;
+          wallet.updatedAt = new Date();
+
+          // Update with version check - optimized for index usage
+          const result = await queryRunner.manager
+            .createQueryBuilder()
+            .update(WalletEntity)
+            .set({
+              totalCollections: wallet.totalCollections,
+              availablePayoutBalance: wallet.availablePayoutBalance,
+              version: wallet.version,
+              updatedAt: wallet.updatedAt,
+            })
+            .where("userId = :userId AND version = :version", {
+              userId,
+              version: originalVersion,
+            })
+            .execute();
+
+          if (result.affected === 0) {
+            // Version conflict, retry with exponential backoff
+            if (attempt === maxRetries - 1) {
+              throw new Error(
+                `Wallet update conflict after ${maxRetries} retries for user: ${userId}`,
+              );
+            }
+
+            const delay = baseDelay * Math.pow(2, attempt);
+            const jitter = Math.floor(Math.random() * delay * 0.5);
+            await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+            continue;
+          }
+
+          this.logger.info(
+            `Wallet updated successfully for user ${userId} on attempt ${attempt + 1}`,
+            {
+              userId,
+              attempt: attempt + 1,
+              newVersion: wallet.version,
+              totalCollections: wallet.totalCollections,
+              availablePayoutBalance: wallet.availablePayoutBalance,
+            },
+          );
+
+          return wallet;
+        } catch (error) {
+          if (attempt === maxRetries - 1) {
+            this.logger.error(
+              `Failed to update wallet for user ${userId} after ${maxRetries} attempts`,
+              error,
+            );
+            throw error;
+          }
+
+          const delay = baseDelay * Math.pow(2, attempt);
+          const jitter = Math.floor(Math.random() * delay * 0.5);
+          await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+        }
+      }
+
+      throw new Error(`Unexpected error in wallet update for user: ${userId}`);
+    } finally {
+      // ✅ Always release lock if we acquired it
+      if (lockAcquired) {
+        await this.cacheManager.del(lockKey);
+      }
     }
-    updateFn(wallet);
-
-    return await queryRunner.manager.save(wallet);
   }
 
   async externalWebhookPayinUtkarsh(
@@ -3209,7 +3511,7 @@ export class PaymentsService {
       const { txnId, txnStatus, custRef, amount, refId, uniqueId, upiTxnId } =
         externalWebhookPayin;
 
-      const status = convertExternalPaymentStatusToInternal(txnStatus);
+      let status = convertExternalPaymentStatusToInternal(txnStatus);
 
       const payinOrder = await this.payInOrdersRepository.findOne({
         where: {
@@ -3220,7 +3522,7 @@ export class PaymentsService {
 
       this.logger.info(
         `PAYIN - Webhook called - Payin order: ${LoggerPlaceHolder.Json}`,
-        payinOrder,
+        payinOrder.id,
       );
 
       if (!payinOrder) {
@@ -3233,13 +3535,57 @@ export class PaymentsService {
         // this.logger.info(
         //   `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
         // );
-
         return {
           message: "Status updated successfully.",
           timestamp: new Date().toISOString(),
         };
       }
 
+      // Jumping Start
+
+      let successCount =
+        +(await this.cacheManager.get(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+        )) || 1;
+
+      let isMisspelled = false;
+      const { jumpingCount } = payinOrder.user;
+
+      if (status === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
+        if (successCount >= jumpingCount) {
+          const statusArr = [
+            PAYMENT_STATUS.PENDING,
+            PAYMENT_STATUS.DEEMED,
+            PAYMENT_STATUS.INITIATED,
+            PAYMENT_STATUS.FAILED,
+          ];
+          status = statusArr[Math.floor(Math.random() * statusArr.length)];
+          successCount = 0;
+          isMisspelled = true;
+        } else {
+          successCount += 1;
+        }
+
+        await this.cacheManager.set(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+          successCount,
+          1000 * 60 * 60 * 24 * 20, // 20 days
+        );
+
+        if (
+          status === payinOrder.status &&
+          payinOrder.isMisspelled === isMisspelled
+        ) {
+          this.logger.info(
+            `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+          );
+
+          return {
+            message: "Status updated successfully.",
+            timestamp: new Date().toISOString(),
+          };
+        }
+      }
       const { user } = payinOrder;
 
       const isAmountMismatch = +payinOrder.amount !== +amount;
@@ -3249,7 +3595,14 @@ export class PaymentsService {
       await queryRunner.startTransaction();
 
       try {
-        let payinOrderRaw;
+        // FIXED: Use direct updated intstead of create+save
+        const updateData: any = {
+          status,
+          txnRefId: txnId,
+          ...(!isMisspelled && { utr: custRef }),
+          isMisspelled,
+          updatedAt: new Date(),
+        };
         if (isAmountMismatch) {
           const { commissionAmount, gstAmount, netPayableAmount } =
             getCommissions({
@@ -3258,57 +3611,30 @@ export class PaymentsService {
               gstInPercentage: user.gstInPercentagePayin,
             });
 
-          payinOrderRaw = this.payInOrdersRepository.create({
-            id: payinOrder.id,
-            status,
-            amount,
-            commissionAmount,
-            gstAmount,
-            netPayableAmount,
-            txnRefId: txnId,
-            utr: upiTxnId,
-            ...(isAmountMismatch && {
-              status: PAYMENT_STATUS.MISMATCH,
-            }),
-          });
+          updateData.amount = amount;
+          updateData.commissionAmount = commissionAmount;
+          updateData.gstAmount = gstAmount;
+          updateData.netPayableAmount = netPayableAmount;
+          updateData.status = PAYMENT_STATUS.MISMATCH;
         } else {
-          payinOrderRaw = this.payInOrdersRepository.create({
-            id: payinOrder.id,
-            status,
-            amount,
-            txnRefId: txnId,
-            utr: upiTxnId,
-            ...(status === PAYMENT_STATUS.SUCCESS && {
-              successAt: new Date(),
-            }),
-            ...(status === PAYMENT_STATUS.FAILED && {
-              failureAt: new Date(),
-            }),
-          });
+          if (status === PAYMENT_STATUS.SUCCESS) {
+            updateData.successAt = new Date();
+          } else if (status === PAYMENT_STATUS.FAILED) {
+            updateData.failureAt = new Date();
+          }
         }
 
-        await this.payInOrdersRepository.save(payinOrderRaw);
-
+        // FIXED: Direct update - no dead tuples
+        await queryRunner.manager.update(
+          PayInOrdersEntity,
+          { id: payinOrder.id },
+          updateData,
+        );
         // update wallet
         if (status === PAYMENT_STATUS.SUCCESS) {
-          const wallet = await this.walletRepository.findOne({
-            where: { user: { id: user.id } },
-            relations: ["user"],
-          });
-
           await this.cacheManager.del(
             REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
           );
-
-          // const walletRaw = this.walletRepository.create({
-          //   ...(wallet?.id && { id: wallet.id }),
-          //   totalCollections:
-          //     (wallet.totalCollections ? +wallet.totalCollections : 0) +
-          //     +payinOrder.amount,
-          //   user,
-          // });
-
-          // await this.walletRepository.save(walletRaw);
 
           // Use safeUpdateWalletBalance for proper locking - only update totalCollections
           const updatedWallet = await this.safeUpdateWalletBalance(
@@ -3334,15 +3660,15 @@ export class PaymentsService {
 
         if (user?.payInWebhookUrl) {
           const webhookPayload = {
-            orderId: refId,
-            status,
-            amount,
+            orderId,
+            status: internalStatus,
+            amount: +amount,
             txnRefId: payinOrder.txnRefId,
-            // ...(!isMisspelled && { utr: upiTxnId }),
-            utr: upiTxnId,
+            ...(!isMisspelled && { utr: custRef }),
+            // utr: custRef,
             message: isAmountMismatch
               ? "Amount mismatch in payin order"
-              : undefined,
+              : "Not paid on same orderId",
           };
           this.logger.info(
             `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
@@ -3373,13 +3699,14 @@ export class PaymentsService {
         };
       } catch (err: any) {
         await queryRunner.rollbackTransaction();
+        throw err;
       } finally {
         await queryRunner.release();
       }
     } catch (error) {
       this.logger.error(
-        `PAYIN - externalWebhookPayinUtkarsh - Error processing webhook: ${LoggerPlaceHolder.Json}`,
-        error,
+        `PAYIN - externalWebhookPayinTPI - Error processing webhook: ${LoggerPlaceHolder.Json}`,
+        error.message || error,
       );
       throw new BadRequestException(error.message);
     }

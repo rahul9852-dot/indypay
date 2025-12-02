@@ -53,6 +53,7 @@ import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { ExternalPayinWebhookUtkarshDto } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
+import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -66,6 +67,7 @@ export class PaymentsController {
     private readonly paymentsService: PaymentsService,
     private readonly payoutService: PayoutService,
     private readonly encryptionAlgoService: CryptoService,
+    private readonly databaseMonitorService: DatabaseMonitorService,
   ) {}
 
   @Public()
@@ -110,6 +112,33 @@ export class PaymentsController {
   ) {
     return this.paymentsService.checkPayInStatusTransaction(
       payinStatusDto,
+      user,
+    );
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Create pay-out transaction for dias pay" })
+  @UseGuards(ApiKeyGuard)
+  @Post("payout/create/dias-pay")
+  async createPayoutDiasPay(
+    @Body() createPayoutDto: CreatePayoutDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutDiasPay(createPayoutDto, user);
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: "Check status of pay-out transaction",
+  })
+  @HttpCode(HttpStatus.OK)
+  @Post("payout/status/dias-pay")
+  async checkStatusTransactionPayoutDiasPay(
+    @Body() payoutStatusDto: PayoutStatusDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.checkPayOutStatusTransactionDiasPay(
+      payoutStatusDto,
       user,
     );
   }
@@ -383,4 +412,125 @@ export class PaymentsController {
   // ) {
   //   return this.paymentsService.checkPaymentStatus(orderId, req);
   // }
+
+  @Get("health/database")
+  @Role(USERS_ROLE.ADMIN)
+  async getDatabaseHealth() {
+    try {
+      // Get basic pool status first
+      const poolStatus =
+        await this.databaseMonitorService.getConnectionPoolStatus();
+
+      // Get additional stats with error handling
+      let longRunning = [];
+      let walletLocks = [];
+      let slowWalletQueries = [];
+      let indexStats = [];
+
+      try {
+        longRunning =
+          await this.databaseMonitorService.getLongRunningTransactions(1);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to get long running transactions: ${error.message}`,
+        );
+      }
+
+      try {
+        walletLocks = await this.databaseMonitorService.getWalletLockStats();
+      } catch (error) {
+        this.logger.warn(`Failed to get wallet lock stats: ${error.message}`);
+      }
+
+      try {
+        slowWalletQueries =
+          await this.databaseMonitorService.getSlowWalletQueries();
+      } catch (error) {
+        this.logger.warn(`Failed to get slow wallet queries: ${error.message}`);
+      }
+
+      try {
+        indexStats = await this.databaseMonitorService.getWalletIndexStats();
+      } catch (error) {
+        this.logger.warn(`Failed to get wallet index stats: ${error.message}`);
+      }
+
+      // Get TPS and index information
+      let walletTPS = null;
+      let walletIndexes = null;
+
+      try {
+        walletTPS = await this.databaseMonitorService.getWalletUpdateTPS();
+      } catch (error) {
+        this.logger.warn(`Failed to get wallet TPS: ${error.message}`);
+      }
+
+      try {
+        walletIndexes = await this.databaseMonitorService.checkWalletIndexes();
+      } catch (error) {
+        this.logger.warn(`Failed to check wallet indexes: ${error.message}`);
+      }
+
+      return {
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        poolStatus,
+        longRunningTransactions: longRunning.length,
+        walletLocks: walletLocks.length,
+        slowWalletQueries: slowWalletQueries.length,
+        indexStats,
+        walletTPS,
+        walletIndexes,
+        alerts: {
+          highConnections: poolStatus.poolStats.active_connections > 8, // 🚨 Adjusted for new max of 10
+          longRunningQueries: poolStatus.timeoutStats?.long_running_queries > 0,
+          walletLockContention:
+            walletLocks.filter((l) => !l.granted).length > 0,
+          slowWalletUpdates: slowWalletQueries.length > 0,
+        },
+      };
+    } catch (error) {
+      this.logger.error("Database health check failed:", error);
+
+      return {
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        error: error.message,
+      };
+    }
+  }
+
+  @Get("monitor/tps")
+  @Role(USERS_ROLE.ADMIN)
+  async getWalletTPS() {
+    try {
+      const [walletTPS, walletIndexes] = await Promise.all([
+        this.databaseMonitorService.getWalletUpdateTPS(),
+        this.databaseMonitorService.checkWalletIndexes(),
+      ]);
+
+      return {
+        status: "success",
+        timestamp: new Date().toISOString(),
+        walletTPS,
+        walletIndexes,
+        performance: {
+          hasOptimizedIndexes: walletIndexes?.hasUserIdVersionIndex || false,
+          currentTPS: parseFloat(walletTPS?.stats?.tps || 0).toFixed(2),
+          avgDuration: parseFloat(
+            walletTPS?.stats?.avg_duration_seconds || 0,
+          ).toFixed(3),
+          slowUpdates: walletTPS?.slowUpdates?.length || 0,
+        },
+      };
+    } catch (error) {
+      this.logger.error("TPS monitoring failed:", error);
+
+      return {
+        status: "error",
+        timestamp: new Date().toISOString(),
+        error: error.message,
+      };
+    }
+  }
 }
