@@ -4092,7 +4092,7 @@ export class PaymentsService {
         );
       }
 
-      paymentLink = tpiResponse.data?.qrString;
+      paymentLink = tpiResponse.data?.qr_string;
       txnRefId = tpiResponse.data?.ref_id;
     } catch (err: any) {
       this.logger.error(

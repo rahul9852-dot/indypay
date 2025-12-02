@@ -51,9 +51,7 @@ import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
-import {
-  ExternalPayinWebhookTPIDto,
-} from "@/modules/payments/dto/external-webhook-payin.dto";
+import { ExternalPayinWebhookTPIDto } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 

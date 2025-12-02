@@ -431,7 +431,7 @@ export interface IExternalPayinPaymentResponseTPI {
   status: string;
   data: {
     vpa: string;
-    qrString: string;
+    qr_string: string;
     ref_id: string;
   };
 }
