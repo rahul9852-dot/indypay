@@ -3660,8 +3660,8 @@ export class PaymentsService {
 
         if (user?.payInWebhookUrl) {
           const webhookPayload = {
-            orderId,
-            status: internalStatus,
+            orderId: payinOrder.orderId,
+            status,
             amount: +amount,
             txnRefId: payinOrder.txnRefId,
             ...(!isMisspelled && { utr: custRef }),
