@@ -236,3 +236,32 @@ export class ExternalPayinWebhookPayboltDto {
   @IsOptional()
   txnRefId?: string;
 }
+
+export class ExternalPayinWebhookTPIDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  status: string;
+
+  @ApiProperty()
+  // @IsNumber()
+  // @IsPositive()
+  @IsString()
+  @IsNotEmpty()
+  amount: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  qr_code_id: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  payment_id: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  bank_ref_no: string;
+}

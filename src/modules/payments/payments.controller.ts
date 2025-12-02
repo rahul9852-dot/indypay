@@ -51,7 +51,9 @@ import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
-import { ExternalPayinWebhookUtkarshDto } from "@/modules/payments/dto/external-webhook-payin.dto";
+import {
+  ExternalPayinWebhookTPIDto,
+} from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 
@@ -79,7 +81,7 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createPayboltPayin(createTransactionDto, user);
+    return this.paymentsService.createJioPayin(createTransactionDto, user);
   }
 
   // @Public()
@@ -217,11 +219,9 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
   async externalWebhookPayin(
-    @Body() externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
+    @Body() externalWebhookPayin: ExternalPayinWebhookTPIDto,
   ) {
-    return this.paymentsService.externalWebhookPayinUtkarsh(
-      externalWebhookPayin,
-    );
+    return this.paymentsService.externalWebhookPayinJio(externalWebhookPayin);
   }
 
   @Public()

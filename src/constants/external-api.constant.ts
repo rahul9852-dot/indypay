@@ -87,3 +87,10 @@ export const DIASPAY = {
     QUERY: "api/getPayoutStatus",
   },
 };
+
+export const TPI = {
+  BASE_URL: "https://banking.mytpipay.com/api",
+  PAYIN: {
+    LIVE: "/addmoney/v11/create-order",
+  },
+};

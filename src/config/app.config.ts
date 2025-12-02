@@ -139,4 +139,10 @@ export const appConfig = registerAs("appConfig", () => ({
     clientSecret: getOsEnv("PAYBOLT_CLIENT_SECRET"),
     webhookIps: getOsEnv("PAYBOLT_WEBHOOK_IPS").split(","),
   },
+  tpipay: {
+    apiToken: getOsEnv("TPI_API_TOKEN"),
+    callbackUrl: getOsEnv("TPI_CALLBACK_URL"),
+    webhookIps: getOsEnv("TPI_WEBHOOK_IPS").split(","),
+    redirectUrl: getOsEnv("TPI_REDIRECT_URL"),
+  },
 }));

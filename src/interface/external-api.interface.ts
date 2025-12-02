@@ -415,3 +415,23 @@ export interface IExternalPayinPaymentResponsePayboltPayin {
     intent: string;
   };
 }
+
+export interface IExternalPayinPaymentRequestTPIPay {
+  amount: number;
+  client_id: string;
+  api_token: string;
+  callback_url: string;
+  customer_name: string;
+  customer_mobile: string;
+  customer_email: string;
+  redirect_url: string;
+}
+
+export interface IExternalPayinPaymentResponseTPI {
+  status: string;
+  data: {
+    vpa: string;
+    qrString: string;
+    ref_id: string;
+  };
+}
