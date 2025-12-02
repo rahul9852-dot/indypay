@@ -3433,7 +3433,7 @@ export class PaymentsService {
           payload,
         );
 
-      if (!payboltResponse) {
+      if (!payboltResponse || !payboltResponse.intent) {
         this.logger.error(
           `PAYIN - createTransaction - Paybolt API failed`,
           payboltResponse,
@@ -3443,7 +3443,11 @@ export class PaymentsService {
         );
       }
 
-      paymentLink = payboltResponse?.intent;
+      paymentLink = payboltResponse.intent;
+      this.logger.info(
+        `PAYIN - createTransaction - Paybolt API response: ${LoggerPlaceHolder.Json}`,
+        payboltResponse,
+      );
     } catch (err: any) {
       this.logger.error(
         `PAYIN - createTransaction - Error calling TPI API`,
