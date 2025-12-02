@@ -396,6 +396,8 @@ export interface IExternalPayinPaymentRequestPayboltPayin {
 }
 
 export interface IExternalPayinPaymentResponsePayboltPayin {
-  orderId: string;
-  intent: string;
+  data: {
+    orderId: string;
+    intent: string;
+  };
 }

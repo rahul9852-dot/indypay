@@ -3433,7 +3433,12 @@ export class PaymentsService {
           payload,
         );
 
-      if (!payboltResponse || !payboltResponse.intent) {
+      this.logger.info(
+        `PAYIN - createTransaction - Paybolt API response: ${LoggerPlaceHolder.Json}`,
+        JSON.stringify(payboltResponse),
+      );
+
+      if (!payboltResponse || !payboltResponse.data.intent) {
         this.logger.error(
           `PAYIN - createTransaction - Paybolt API failed`,
           payboltResponse,
@@ -3443,7 +3448,11 @@ export class PaymentsService {
         );
       }
 
-      paymentLink = payboltResponse.intent;
+      paymentLink = payboltResponse.data.intent;
+      this.logger.info(
+        `PAYIN - createTransaction - Payment link: ${LoggerPlaceHolder.Json}`,
+        paymentLink,
+      );
       this.logger.info(
         `PAYIN - createTransaction - Paybolt API response: ${LoggerPlaceHolder.Json}`,
         payboltResponse,
