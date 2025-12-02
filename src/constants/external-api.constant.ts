@@ -73,6 +73,6 @@ export const UTKARSH = {
 export const PAYBOLT = {
   BASE_URL: "https://api.paybolt.money",
   PAYIN: {
-    LIVE: "api/v1/payin/create",
+    LIVE: "api/v1/payments/payin/create",
   },
 };
