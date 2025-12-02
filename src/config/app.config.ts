@@ -130,4 +130,9 @@ export const appConfig = registerAs("appConfig", () => ({
     utkarshAuthIV: getOsEnv("UTKARSH_AUTH_IV"),
     utkarshAuthKey: getOsEnv("UTKARSH_AUTH_KEY"),
   },
+  payboltCreds: {
+    clientId: getOsEnv("PAYBOLT_CLIENT_ID"),
+    clientSecret: getOsEnv("PAYBOLT_CLIENT_SECRET"),
+    webhookIps: getOsEnv("PAYBOLT_WEBHOOK_IPS").split(","),
+  },
 }));

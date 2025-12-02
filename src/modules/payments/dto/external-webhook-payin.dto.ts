@@ -209,3 +209,30 @@ export class ExternalPayinWebhookUtkarshDto {
   @IsOptional()
   upiTxnId?: string;
 }
+
+export class ExternalPayinWebhookPayboltDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  orderId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  status: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  utr?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  txnRefId?: string;
+}

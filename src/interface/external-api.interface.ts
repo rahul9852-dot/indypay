@@ -386,3 +386,16 @@ export interface IExternalPayinStatusResponseUtkarsh {
   data: string;
   message: string;
 }
+
+export interface IExternalPayinPaymentRequestPayboltPayin {
+  amount: number;
+  email: string;
+  mobile: string;
+  name: string;
+  orderId: string;
+}
+
+export interface IExternalPayinPaymentResponsePayboltPayin {
+  orderId: string;
+  intent: string;
+}

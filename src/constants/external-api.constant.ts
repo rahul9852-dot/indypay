@@ -69,3 +69,10 @@ export const UTKARSH = {
     STATUS_CHECK: "/payment/getStaticQrRequery",
   },
 };
+
+export const PAYBOLT = {
+  BASE_URL: "https://api.paybolt.money",
+  PAYIN: {
+    LIVE: "api/v1/payin/create",
+  },
+};

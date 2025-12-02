@@ -77,10 +77,7 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createUtkarshPaymentLink(
-      createTransactionDto,
-      user,
-    );
+    return this.paymentsService.createPayboltPayin(createTransactionDto, user);
   }
 
   // @Public()
@@ -99,7 +96,6 @@ export class PaymentsController {
   //     user,
   //   );
   // }
-  // test commit
 
   @Public()
   @ApiOperation({
