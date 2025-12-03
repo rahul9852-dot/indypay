@@ -4152,20 +4152,11 @@ export class PaymentsService {
     externalWebhookPayin: ExternalPayinWebhookTPIDto,
   ) {
     try {
-      this.logger.info(
-        `PAYIN - External webhook called - Payin order: ${LoggerPlaceHolder.Json}`,
-        externalWebhookPayin,
-      );
       const { status, amount, qr_code_id, payment_id, bank_ref_no } =
         externalWebhookPayin;
 
       let internalStatus = convertExternalPaymentStatusToInternal(
         status.toUpperCase(),
-      );
-
-      this.logger.info(
-        `PAYIN - External webhook called - Payin order: ${LoggerPlaceHolder.Json}`,
-        { qr_code_id, qr_code_id_string: qr_code_id.toString() },
       );
 
       const payinOrder = await this.payInOrdersRepository.findOne({
