@@ -14,6 +14,7 @@ const {
   externalPaymentConfig: { flakPay, ismart, paynpro, ertech },
   utkarsh: { webhookIps: utkarshWebhookIps },
   payboltCreds: { webhookIps: payboltWebhookIps },
+  tpipay: { webhookIps: tpiWebhookIps },
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -37,6 +38,7 @@ export class WebhookGuard implements CanActivate {
       ...ertech.webhookIps,
       ...utkarshWebhookIps,
       ...payboltWebhookIps,
+      ...tpiWebhookIps,
     ];
 
     if (!webhookIps.includes(requestIp)) {
