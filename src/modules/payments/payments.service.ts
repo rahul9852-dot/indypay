@@ -4245,7 +4245,7 @@ export class PaymentsService {
         // FIXED: Use direct updated intstead of create+save
         const updateData: any = {
           status: internalStatus,
-          txnRefId: qr_code_id.toString(),
+          txnRefId: qr_code_id,
           ...(!isMisspelled && { utr: bank_ref_no }),
           isMisspelled,
           updatedAt: new Date(),

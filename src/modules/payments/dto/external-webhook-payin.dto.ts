@@ -248,17 +248,17 @@ export class ExternalPayinWebhookTPIDto {
   // @IsPositive()
   @IsNumber()
   @IsNotEmpty()
-  amount: string;
+  amount: number;
 
   @ApiProperty()
   @IsNumber()
   @IsNotEmpty()
-  qr_code_id: string;
+  qr_code_id: number;
 
   @ApiProperty()
   @IsNumber()
   @IsNotEmpty()
-  payment_id: string;
+  payment_id: number;
 
   @ApiProperty()
   @IsString()
