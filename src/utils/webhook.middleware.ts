@@ -20,7 +20,8 @@ export const webhookBodyParser = (
     (req as any).rawBody = data;
 
     try {
-      req.body = JSON.parse(data);
+      // req.body = JSON.parse(data);
+      req.body = Object.fromEntries(new URLSearchParams(data));
       logger.info("Webhook body parsed successfully");
     } catch (e) {
       logger.error(
