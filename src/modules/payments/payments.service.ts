@@ -1413,7 +1413,7 @@ export class PaymentsService {
 
     const currentBalance = +userWallet.availablePayoutBalance;
     const newBalance = currentBalance - totalAmount;
-    const MINIMUM_BALANCE = 10000;
+    const MINIMUM_BALANCE = 50;
 
     if (newBalance < 0) {
       throw new BadRequestException(
