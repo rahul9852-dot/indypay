@@ -151,7 +151,7 @@ export class PaymentsController {
     @Body() createPayoutDto: CreatePayoutDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createPayoutFlakPayBulk(createPayoutDto, user);
+    return this.paymentsService.createPayoutTPIBulk(createPayoutDto, user);
   }
 
   // @Public()

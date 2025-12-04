@@ -435,3 +435,10 @@ export interface IExternalPayinPaymentResponseTPI {
     ref_id: string;
   };
 }
+
+export interface IExternalTpiPayoutFundResponse {
+  status: string;
+  message: string;
+  utr: string;
+  payid: string;
+}

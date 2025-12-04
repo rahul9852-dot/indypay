@@ -144,5 +144,6 @@ export const appConfig = registerAs("appConfig", () => ({
     callbackUrl: getOsEnv("TPI_CALLBACK_URL"),
     webhookIps: getOsEnv("TPI_WEBHOOK_IPS").split(","),
     redirectUrl: getOsEnv("TPI_REDIRECT_URL"),
+    userEmail: getOsEnv("TPI_USER_EMAIL"),
   },
 }));

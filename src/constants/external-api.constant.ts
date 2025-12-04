@@ -93,4 +93,7 @@ export const TPI = {
   PAYIN: {
     LIVE: "/addmoney/v11/create-order",
   },
+  PAYOUT: {
+    LIVE: "/payout/v2/transfer-now",
+  },
 };
