@@ -1403,6 +1403,7 @@ export class PaymentsService {
       .createQueryBuilder(WalletEntity, "wallet")
       .leftJoinAndSelect("wallet.user", "user")
       .where("user.id = :userId", { userId: user.id })
+      .setLock("pessimistic_write")
       .getOne();
 
     if (!userWallet) {
