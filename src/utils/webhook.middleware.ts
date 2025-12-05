@@ -61,4 +61,7 @@ export const webhookBodyParser = (
   // });
 };
 
-export const WEBHOOK_ROUTES = ["/api/v1/payments/payin/webhook"];
+export const WEBHOOK_ROUTES = [
+  "/api/v1/payments/payin/webhook",
+  "/api/v1/payments/v2/payin/webhook",
+];
