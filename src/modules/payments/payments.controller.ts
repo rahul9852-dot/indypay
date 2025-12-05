@@ -245,7 +245,7 @@ export class PaymentsController {
   @UseGuards(WebhookGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
-  @Post("/v2/payin/webhook")
+  @Post("v2/payin/webhook")
   async externalWebhookPayinV2(
     @Body() externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
   ) {
