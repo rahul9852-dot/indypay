@@ -77,6 +77,7 @@ import {
   TPI,
 } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
+// import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
 import {
   calculateOriginalAmountFromNetPayable,
   calculatePayoutOriginalAmountFromNetPayable,
@@ -140,6 +141,8 @@ export class PaymentsService {
     private readonly payOutOrdersRepository: Repository<PayOutOrdersEntity>,
     @InjectRepository(WalletEntity)
     private readonly walletRepository: Repository<WalletEntity>,
+    // @InjectRepository(PayinWalletEntity)
+    // private readonly PayinWalletRepository: Repository<PayinWalletEntity>,
     @InjectRepository(SettlementsEntity)
     private readonly settlementRepository: Repository<SettlementsEntity>,
     @InjectRepository(ApiCredentialsEntity)
@@ -3654,11 +3657,22 @@ export class PaymentsService {
             },
           );
 
+          // const updatedWallet2 = await this.safeUpdatePayinWalletBalance(
+          //   queryRunner,
+          //   user.id,
+          //   (wallet) => {
+          //     wallet.totalBalance =
+          //       (wallet.totalBalance ? +wallet.totalBalance : 0) +
+          //       +payinOrder.netPayableAmount;
+          //   },
+          // );
+
           this.logger.info(
             `PAYIN WEBHOOK - Wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
             {
               walletId: updatedWallet.id,
               newTotalCollections: updatedWallet.totalCollections,
+              // payinwallet: updatedWallet2.totalBalance,
             },
           );
         }

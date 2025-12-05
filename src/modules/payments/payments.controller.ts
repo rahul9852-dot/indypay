@@ -51,7 +51,10 @@ import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
-import { ExternalPayinWebhookTPIDto } from "@/modules/payments/dto/external-webhook-payin.dto";
+import {
+  ExternalPayinWebhookTPIDto,
+  ExternalPayinWebhookUtkarshDto,
+} from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 
@@ -80,6 +83,21 @@ export class PaymentsController {
     @User() user: UsersEntity,
   ) {
     return this.paymentsService.createJioPayin(createTransactionDto, user);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Create pay-in transaction" })
+  @UseGuards(ApiKeyGuard)
+  @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })
+  @Post("/v2/payin/create")
+  async createPayInTransactionV2(
+    @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createUtkarshPaymentLink(
+      createTransactionDto,
+      user,
+    );
   }
 
   // @Public()
@@ -220,6 +238,20 @@ export class PaymentsController {
     @Body() externalWebhookPayin: ExternalPayinWebhookTPIDto,
   ) {
     return this.paymentsService.externalWebhookPayinJio(externalWebhookPayin);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "External webhook for pay-in" })
+  @UseGuards(WebhookGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("/v2/payin/webhook")
+  async externalWebhookPayinV2(
+    @Body() externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
+  ) {
+    return this.paymentsService.externalWebhookPayinUtkarsh(
+      externalWebhookPayin,
+    );
   }
 
   @Public()
