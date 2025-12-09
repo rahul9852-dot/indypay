@@ -332,18 +332,23 @@ export interface IExternalEritecPayoutFundResponse {
   exception: string;
 }
 
-export interface IExternalDiasPayFundResponse {
+export interface IExternalKDSPayoutResponse {
+  statuscode: string;
   status: string;
-  UTR: string;
-  request_data: {
-    payee_name: string;
-    payee_account_no: string;
-    payee_ifsc: string;
-    transfer_amount: string;
-    remarks: string;
-    user_uuid: string;
+  message: string;
+  data: {
+    txnStatus: number;
+    amount: number;
+    txnStatusDesc: string;
+    bank_ref_no: string;
+    fee: number;
+    senderName: string;
+    externalTxnId: string;
+    balance: number;
+    payeeName: string;
+    payeeAccount: number;
+    payeeIfsc: string;
   };
-  order_id: string;
 }
 
 export interface IExternalEritecPayoutFundResponseDecrypted {

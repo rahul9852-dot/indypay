@@ -82,6 +82,10 @@ export const appConfig = registerAs("appConfig", () => ({
       },
       webhookIps: getOsEnv("PAYNPRO_PAYMENT_WEBHOOK_IPS").split(","),
     },
+    kdsPayout: {
+      kdsClientId: getOsEnv("KDS_CLIENT_ID"),
+      kdsClientSecret: getOsEnv("KDS_CLIENT_SECRET"),
+    },
   },
   transactionConfig: {
     commissionInPercentagePayIn:

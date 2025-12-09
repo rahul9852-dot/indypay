@@ -67,7 +67,6 @@ import {
   getUlidId,
 } from "@/utils/helperFunctions.utils";
 import {
-  DIASPAY,
   ERTITECH,
   FALKPAY,
   ISMART_PAY,
@@ -95,7 +94,7 @@ import {
   IExternalPayinStatusResponseUtkarsh,
   IExternalPayinPaymentRequestPayboltPayin,
   IExternalPayinPaymentResponsePayboltPayin,
-  IExternalDiasPayFundResponse,
+  // IExternalDiasPayFundResponse,
   IExternalPayinPaymentRequestTPIPay,
   IExternalPayinPaymentResponseTPI,
 } from "@/interface/external-api.interface";
@@ -104,7 +103,6 @@ import { getPagination } from "@/utils/pagination.utils";
 import { ID_TYPE, USERS_ROLE } from "@/enums";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import {
-  getDiaspayConfig,
   getEritechPgConfig,
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
@@ -832,7 +830,7 @@ export class PaymentsService {
       );
 
       // Add to processing queue
-      await this.payoutQueue.add("process-payouts-dias-pay", {
+      await this.payoutQueue.add("process-payouts-kds-payout", {
         payoutOrders,
         userId: user.id,
         batchId,
@@ -1651,68 +1649,68 @@ export class PaymentsService {
   }
 
   // dias pay status check
-  async checkPayOutStatusTransactionDiasPay(
-    { orderId }: PayoutStatusDto,
-    user: UsersEntity,
-  ) {
-    const payoutOrder = await this.payOutOrdersRepository.findOne({
-      where: { orderId },
-    });
+  // async checkPayOutStatusTransactionDiasPay(
+  //   { orderId }: PayoutStatusDto,
+  //   user: UsersEntity,
+  // ) {
+  //   const payoutOrder = await this.payOutOrdersRepository.findOne({
+  //     where: { orderId },
+  //   });
 
-    if (!payoutOrder) {
-      throw new NotFoundException(
-        new MessageResponseDto("Payout order not found"),
-      );
-    }
+  //   if (!payoutOrder) {
+  //     throw new NotFoundException(
+  //       new MessageResponseDto("Payout order not found"),
+  //     );
+  //   }
 
-    if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
-      return {
-        orderId: payoutOrder.orderId,
-        status: payoutOrder.status,
-        transferId: payoutOrder.transferId,
-      };
-    }
+  //   if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
+  //     return {
+  //       orderId: payoutOrder.orderId,
+  //       status: payoutOrder.status,
+  //       transferId: payoutOrder.transferId,
+  //     };
+  //   }
 
-    // call api
-    const axiosServiceDiasPay = new AxiosService(
-      DIASPAY.BASE_URL,
-      getDiaspayConfig({
-        token: externalPaymentConfig.diaspay.token,
-      }),
-    );
+  //   // call api
+  //   const axiosServiceDiasPay = new AxiosService(
+  //     DIASPAY.BASE_URL,
+  //     getDiaspayConfig({
+  //       token: externalPaymentConfig.diaspay.token,
+  //     }),
+  //   );
 
-    const diasPayResponse =
-      await axiosServiceDiasPay.postRequest<IExternalDiasPayFundResponse>(
-        DIASPAY.PAYOUT.QUERY,
-        {
-          order_id: orderId,
-        },
-      );
+  //   const diasPayResponse =
+  //     await axiosServiceDiasPay.postRequest<IExternalDiasPayFundResponse>(
+  //       DIASPAY.PAYOUT.QUERY,
+  //       {
+  //         order_id: orderId,
+  //       },
+  //     );
 
-    this.logger.info(
-      `Dias Pay Response: ${LoggerPlaceHolder.Json}`,
-      diasPayResponse,
-    );
+  //   this.logger.info(
+  //     `Dias Pay Response: ${LoggerPlaceHolder.Json}`,
+  //     diasPayResponse,
+  //   );
 
-    // update payout order
-    const status = convertExternalPaymentStatusToInternal(
-      diasPayResponse.status.toUpperCase(),
-    );
+  //   // update payout order
+  //   const status = convertExternalPaymentStatusToInternal(
+  //     diasPayResponse.status.toUpperCase(),
+  //   );
 
-    await this.payOutOrdersRepository.save(
-      this.payOutOrdersRepository.create({
-        ...payoutOrder,
-        status,
-        transferId: diasPayResponse.UTR,
-      }),
-    );
+  //   await this.payOutOrdersRepository.save(
+  //     this.payOutOrdersRepository.create({
+  //       ...payoutOrder,
+  //       status,
+  //       transferId: diasPayResponse.UTR,
+  //     }),
+  //   );
 
-    return {
-      orderId: payoutOrder.orderId,
-      status,
-      transferId: diasPayResponse.UTR,
-    };
-  }
+  //   return {
+  //     orderId: payoutOrder.orderId,
+  //     status,
+  //     transferId: diasPayResponse.UTR,
+  //   };
+  // }
   // flakpay status check
   async checkPayOutStatusTransactionFlakPay({ orderId }: PayoutStatusDto) {
     const payoutOrder = await this.payOutOrdersRepository.findOne({
@@ -4460,6 +4458,138 @@ export class PaymentsService {
   }
 
   async externalWebhookPayoutTpi(
+    webhookData: any,
+  ): Promise<PayoutWebhookResponseDto> {
+    this.logger.info(
+      `Tpi Webhook Data: ${LoggerPlaceHolder.Json}`,
+      webhookData,
+    );
+
+    const {
+      status: status_code,
+      payid: payid,
+      // transferId: custUniqRef,
+      // amount,
+      utr,
+    } = webhookData;
+
+    const status = convertExternalPaymentStatusToInternal(
+      status_code.toUpperCase(),
+    );
+    const payOutOrder = await this.payOutOrdersRepository.findOne({
+      where: {
+        transferId: payid,
+      },
+      relations: ["user"],
+    });
+
+    this.logger.info(`PAYOUT WEBHOOK - For OrderId: ${payid} :`, payOutOrder);
+
+    if (!payOutOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payout order not found"),
+      );
+    }
+
+    if (payOutOrder.status === status) {
+      // this.logger.info(
+      //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
+      // );
+      return {
+        message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${payid}`,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    if (status === PAYMENT_STATUS.SUCCESS) {
+      const payOutOrderRaw = this.payOutOrdersRepository.create({
+        id: payOutOrder.id,
+        status,
+        successAt: new Date(),
+        transferId: payid,
+        utr,
+      });
+
+      this.logger.info(
+        `PAYOUT - TPI Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
+        payOutOrderRaw,
+      );
+
+      await this.payOutOrdersRepository.save(payOutOrderRaw);
+    }
+
+    if (status === PAYMENT_STATUS.FAILED) {
+      const payOutOrderRaw = this.payOutOrdersRepository.create({
+        id: payOutOrder.id,
+        status,
+        failureAt: new Date(),
+        transferId: payid,
+        utr,
+      });
+
+      await this.payOutOrdersRepository.save(payOutOrderRaw);
+
+      const wallet = await this.walletRepository.findOne({
+        where: {
+          user: {
+            id: payOutOrder.user.id,
+          },
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (wallet) {
+        await this.walletRepository.save(
+          this.walletRepository.create({
+            id: wallet.id,
+            availablePayoutBalance:
+              +wallet.availablePayoutBalance +
+              +payOutOrder.amountBeforeDeduction,
+          }),
+        );
+      }
+    }
+
+    // send webhook
+    if (payOutOrder.user?.payOutWebhookUrl) {
+      const webhookPayload = {
+        orderId: payid,
+        status,
+        amount: payOutOrder.amount,
+        txnRefId: payid,
+        payoutId: payOutOrder.payoutId,
+        utr,
+      };
+
+      this.logger.info(
+        `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+        webhookPayload,
+      );
+
+      axios
+        .post(payOutOrder.user.payOutWebhookUrl, webhookPayload)
+        .then(({ data }) => {
+          this.logger.info(
+            `PAYOUT - User webhook - (${payOutOrder.user.payOutWebhookUrl}) - ${payOutOrder.payoutId} - Webhook sent successfully: ${JSON.stringify(data)}`,
+          );
+        })
+        .catch((err) => {
+          this.logger.error(
+            `PAYOUT - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+            err,
+          );
+        });
+    }
+
+    return {
+      message: "Payout status updated successfully.",
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  async externalWebhookPayoutKDS(
     webhookData: any,
   ): Promise<PayoutWebhookResponseDto> {
     this.logger.info(

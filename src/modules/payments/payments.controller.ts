@@ -145,21 +145,21 @@ export class PaymentsController {
     return this.paymentsService.createPayoutDiasPay(createPayoutDto, user);
   }
 
-  @Public()
-  @ApiOperation({
-    summary: "Check status of pay-out transaction",
-  })
-  @HttpCode(HttpStatus.OK)
-  @Post("payout/status/dias-pay")
-  async checkStatusTransactionPayoutDiasPay(
-    @Body() payoutStatusDto: PayoutStatusDto,
-    @User() user: UsersEntity,
-  ) {
-    return this.paymentsService.checkPayOutStatusTransactionDiasPay(
-      payoutStatusDto,
-      user,
-    );
-  }
+  // @Public()
+  // @ApiOperation({
+  //   summary: "Check status of pay-out transaction",
+  // })
+  // @HttpCode(HttpStatus.OK)
+  // @Post("payout/status/dias-pay")
+  // async checkStatusTransactionPayoutDiasPay(
+  //   @Body() payoutStatusDto: PayoutStatusDto,
+  //   @User() user: UsersEntity,
+  // ) {
+  //   return this.paymentsService.checkPayOutStatusTransactionDiasPay(
+  //     payoutStatusDto,
+  //     user,
+  //   );
+  // }
 
   @Public()
   @ApiOperation({ summary: "Create pay-out transaction Bulk" })

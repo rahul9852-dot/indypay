@@ -4,9 +4,9 @@ import axios from "axios";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
-import { DIASPAY } from "@/constants/external-api.constant";
+import { KDSPAYOUT } from "@/constants/external-api.constant";
 import { AxiosService } from "@/shared/axios/axios.service";
-import { IExternalDiasPayFundResponse } from "@/interface/external-api.interface";
+import { IExternalKDSPayoutResponse } from "@/interface/external-api.interface";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
@@ -14,13 +14,15 @@ import { WalletEntity } from "@/entities/wallet.entity";
 import { UsersService } from "@/modules/users/users.service";
 import { appConfig } from "@/config/app.config";
 import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
-import { getDiaspayConfig } from "@/utils/pg-config.utils";
+import { getKDSConfig } from "@/utils/pg-config.utils";
 
 const {
-  externalPaymentConfig: { diaspay: diasPayCred },
+  externalPaymentConfig: {
+    kdsPayout: { kdsClientId, kdsClientSecret },
+  },
 } = appConfig();
 
-@Processor("payouts-dias-pay")
+@Processor("payouts-kds-payout")
 export class PayoutProcessor {
   private readonly logger = new CustomLogger(PayoutProcessor.name);
   constructor(
@@ -32,7 +34,7 @@ export class PayoutProcessor {
     private readonly thirdPartyAuthService: ThirdPartyAuthService,
   ) {}
 
-  @Process("process-payouts-dias-pay")
+  @Process("process-payouts-kds-payout")
   async handlePayoutsDiasPay(
     job: Job<{
       payoutOrders: PayOutOrdersEntity[];
@@ -46,10 +48,11 @@ export class PayoutProcessor {
 
     // external API
 
-    const axiosDiasPay = new AxiosService(
-      DIASPAY.BASE_URL,
-      getDiaspayConfig({
-        token: diasPayCred.token,
+    const axiosKDSPayout = new AxiosService(
+      KDSPAYOUT.BASE_URL,
+      getKDSConfig({
+        clientId: kdsClientId,
+        clientSecret: kdsClientSecret,
       }),
     );
     const user = await this.usersService.findOne(userId);
@@ -70,51 +73,59 @@ export class PayoutProcessor {
               setTimeout(resolve, DELAY_BETWEEN_REQUESTS),
             );
 
-            const diasPayPayload = {
-              user_uuid: diasPayCred.uuid,
-              payee_name: order.name,
-              payee_account_no: order.bankAccountNumber,
-              payee_ifsc: order.bankIfsc,
-              transfer_amount: order.amount,
-              remarks: order.orderId,
+            const AccountType = "CURRENT";
+            const KDSPayoutPayload = {
+              externalTxnId: order.orderId,
+              type: "Fund-transfer",
+              mode: "IMPS",
+              payeeName: order.name,
+              payeeAccount: order.bankAccountNumber,
+              payeeIfsc: order.bankIfsc,
+              amount: order.amount,
+              sender_name: "RFP",
+              latlong: "20.342639620957844, 85.81222573798418",
+              payeeAcType: ["SAVINGS", "CURRENT"].includes(AccountType)
+                ? AccountType
+                : "SAVINGS",
+              payeeBankName: order.bankName,
             };
 
-            const formData = new URLSearchParams();
-            Object.entries(diasPayPayload).forEach(([key, value]) => {
-              formData.append(key, value.toString());
-            });
+            // const formData = new URLSearchParams();
+            // Object.entries(diasPayPayload).forEach(([key, value]) => {
+            //   formData.append(key, value.toString());
+            // });
 
             this.logger.info(
-              `Dias Pay Payload: ${LoggerPlaceHolder.Json}`,
-              diasPayPayload,
+              `kds Payout Payload: ${LoggerPlaceHolder.Json}`,
+              KDSPayoutPayload,
             );
 
-            const responseDiaspay =
-              await axiosDiasPay.postRequest<IExternalDiasPayFundResponse>(
-                DIASPAY.PAYOUT.FUND_TRANSFER,
-                formData,
+            const responseKDSPayout =
+              await axiosKDSPayout.postRequest<IExternalKDSPayoutResponse>(
+                KDSPAYOUT.PAYOUT.LIVE,
+                KDSPAYOUT,
               );
 
-            if (responseDiaspay.status === PAYMENT_STATUS.FAILED) {
+            if (responseKDSPayout.status === PAYMENT_STATUS.FAILED) {
               throw {
-                status: responseDiaspay.status,
+                status: responseKDSPayout.status,
                 message: "Error from third party Payout integration",
               };
             }
 
             const status = convertExternalPaymentStatusToInternal(
-              responseDiaspay.status.toUpperCase(),
+              responseKDSPayout.status.toUpperCase(),
             );
 
             this.logger.info(
-              `Dias Pay Converted Status: ${LoggerPlaceHolder.Json}`,
+              `KDS Payout Converted Status: ${LoggerPlaceHolder.Json}`,
               status,
             );
 
             await this.payOutOrdersRepository.save(
               this.payOutOrdersRepository.create({
                 id: order.id,
-                transferId: responseDiaspay.order_id,
+                transferId: responseKDSPayout.data.externalTxnId,
                 ...(status === PAYMENT_STATUS.SUCCESS && {
                   status,
                   successAt: new Date(),
@@ -127,7 +138,7 @@ export class PayoutProcessor {
                   status,
                 ) && { status }),
 
-                utr: responseDiaspay.UTR,
+                utr: responseKDSPayout.data.bank_ref_no,
               }),
             );
 
@@ -158,9 +169,9 @@ export class PayoutProcessor {
                 orderId: order.orderId,
                 status,
                 amount: order.amount,
-                txnRefId: responseDiaspay.order_id,
+                txnRefId: responseKDSPayout.data.externalTxnId,
                 payoutId: order.payoutId,
-                utr: responseDiaspay.UTR,
+                utr: responseKDSPayout.data.bank_ref_no,
               };
 
               this.logger.info(

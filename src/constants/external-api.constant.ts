@@ -97,3 +97,10 @@ export const TPI = {
     LIVE: "/payout/v2/transfer-now",
   },
 };
+
+export const KDSPAYOUT = {
+  BASE_URL: "https://partner.kdstechs.com/api",
+  PAYOUT: {
+    LIVE: "/payout/initiate",
+  },
+};

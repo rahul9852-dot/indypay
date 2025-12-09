@@ -46,3 +46,13 @@ export const getUtkarshPgConfig = ({ mid, terminalId }) => {
     },
   };
 };
+
+export const getKDSConfig = ({ clientId, clientSecret }) => {
+  return {
+    headers: {
+      "Content-Type": "application/json",
+      "Client-ID": clientId,
+      "Client-Secret": clientSecret,
+    },
+  };
+};
