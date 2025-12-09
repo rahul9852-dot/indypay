@@ -85,6 +85,7 @@ export const appConfig = registerAs("appConfig", () => ({
     kdsPayout: {
       kdsClientId: getOsEnv("KDS_CLIENT_ID"),
       kdsClientSecret: getOsEnv("KDS_CLIENT_SECRET"),
+      kdsIp: getOsEnv("KDS_IP").split(","),
     },
   },
   transactionConfig: {
