@@ -11,11 +11,10 @@ import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 // import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 const {
-  externalPaymentConfig: { flakPay, ismart, paynpro, ertech },
+  externalPaymentConfig: { flakPay, ismart, paynpro, ertech, kdsPayout },
   utkarsh: { webhookIps: utkarshWebhookIps },
   payboltCreds: { webhookIps: payboltWebhookIps },
   tpipay: { webhookIps: tpiWebhookIps },
-  kdsPayout: { kdsIp: kdsWebhookIps },
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -40,7 +39,7 @@ export class WebhookGuard implements CanActivate {
       ...utkarshWebhookIps,
       ...payboltWebhookIps,
       ...tpiWebhookIps,
-      ...kdsWebhookIps,
+      ...kdsPayout.kdsIp,
     ];
 
     if (!webhookIps.includes(requestIp)) {
