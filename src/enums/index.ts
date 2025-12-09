@@ -88,6 +88,7 @@ export enum ID_TYPE {
   ORDER = "ord",
   OTP = "otp",
   PAYIN_KEY = "pin",
+  PAYIN_WALLET = "pinwl",
   PAYOUT_BATCH_KEY = "pbatch",
   PAYOUT_KEY = "pout",
   PG_CONFIG = "conf",

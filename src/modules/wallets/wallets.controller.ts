@@ -114,4 +114,24 @@ export class WalletsController {
   ) {
     return this.walletsService.refundWallet(merchantUserId, user, amount);
   }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Refund user - Admin" })
+  @Post("payin-wallet/recharge")
+  rechargePayinWallet(
+    @User() user: UsersEntity,
+    @Body() { userId: merchantUserId, amount }: RefundWalletDto,
+  ) {
+    return this.walletsService.rechargePayinWallet(
+      merchantUserId,
+      user,
+      amount,
+    );
+  }
+
+  @Get("payin-wallet")
+  @ApiOperation({ summary: "Get Wallet" })
+  getPayinWallet(@User() user: UsersEntity) {
+    return this.walletsService.getPayinWallet(user.id);
+  }
 }

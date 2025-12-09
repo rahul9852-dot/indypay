@@ -77,7 +77,7 @@ import {
   TPI,
 } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
-// import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
+import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
 import {
   calculateOriginalAmountFromNetPayable,
   calculatePayoutOriginalAmountFromNetPayable,
@@ -141,8 +141,8 @@ export class PaymentsService {
     private readonly payOutOrdersRepository: Repository<PayOutOrdersEntity>,
     @InjectRepository(WalletEntity)
     private readonly walletRepository: Repository<WalletEntity>,
-    // @InjectRepository(PayinWalletEntity)
-    // private readonly PayinWalletRepository: Repository<PayinWalletEntity>,
+    @InjectRepository(PayinWalletEntity)
+    private readonly PayinWalletRepository: Repository<PayinWalletEntity>,
     @InjectRepository(SettlementsEntity)
     private readonly settlementRepository: Repository<SettlementsEntity>,
     @InjectRepository(ApiCredentialsEntity)
@@ -3514,6 +3514,150 @@ export class PaymentsService {
     }
   }
 
+  private async safeUpdatePayinWalletBalance(
+    queryRunner: QueryRunner,
+    userId: string,
+    updateFn: (payinWallet: PayinWalletEntity) => void,
+  ): Promise<PayinWalletEntity> {
+    const maxRetries = 3;
+    const baseDelay = 100;
+    const operationTimeout = 5000;
+    const lockTimeout = 5000;
+    const lockTtl = 10000;
+
+    const startTime = Date.now();
+    const lockKey = `payin_wallet_update:${userId}`;
+    let lockAcquired = false;
+
+    // ✅ FIXED: Wait for lock instead of failing immediately
+    const acquireLock = async (): Promise<boolean> => {
+      const lockStartTime = Date.now();
+
+      while (Date.now() - lockStartTime < lockTimeout) {
+        const existingLock = await this.cacheManager.get(lockKey);
+
+        if (!existingLock) {
+          // Try to acquire lock
+          await this.cacheManager.set(lockKey, "locked", lockTtl);
+          // Double-check we got the lock (race condition safety)
+          const checkLock = await this.cacheManager.get(lockKey);
+          if (checkLock) {
+            return true;
+          }
+        }
+        // Wait before checking again
+        await new Promise((resolve) =>
+          setTimeout(resolve, 50 + Math.random() * 50),
+        );
+      }
+
+      return false; // Couldn't acquire lock within timeout
+    };
+
+    try {
+      // Wait for lock acquisition
+      lockAcquired = await acquireLock();
+
+      if (!lockAcquired) {
+        throw new Error(
+          `Could not acquire payin wallet lock for user ${userId} within ${lockTimeout}ms`,
+        );
+      }
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          // Check if we've exceeded the operation timeout
+          if (Date.now() - startTime > operationTimeout) {
+            throw new Error(
+              `Payin wallet update timeout after ${operationTimeout}ms for user: ${userId}`,
+            );
+          }
+
+          // Get wallet with current version
+          const payinWallet = await queryRunner.manager
+            .createQueryBuilder(PayinWalletEntity, "payinWallet")
+            .where("payinWallet.userId = :userId", { userId })
+            .getOne();
+
+          if (!payinWallet) {
+            throw new NotFoundException(`Wallet not found for user: ${userId}`);
+          }
+
+          const originalVersion = payinWallet.version;
+
+          // Apply the update function
+          updateFn(payinWallet);
+
+          // Increment version for optimistic locking
+          payinWallet.version = originalVersion + 1;
+          payinWallet.updatedAt = new Date();
+
+          // Update with version check - optimized for index usage
+          const result = await queryRunner.manager
+            .createQueryBuilder()
+            .update(PayinWalletEntity)
+            .set({
+              totalPayinBalance: payinWallet.totalPayinBalance,
+              version: payinWallet.version,
+              updatedAt: payinWallet.updatedAt,
+            })
+            .where("userId = :userId AND version = :version", {
+              userId,
+              version: originalVersion,
+            })
+            .execute();
+
+          if (result.affected === 0) {
+            // Version conflict, retry with exponential backoff
+            if (attempt === maxRetries - 1) {
+              throw new Error(
+                `Payin wallet update conflict after ${maxRetries} retries for user: ${userId}`,
+              );
+            }
+
+            const delay = baseDelay * Math.pow(2, attempt);
+            const jitter = Math.floor(Math.random() * delay * 0.5);
+            await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+            continue;
+          }
+
+          this.logger.info(
+            `Wallet updated successfully for user ${userId} on attempt ${attempt + 1}`,
+            {
+              userId,
+              attempt: attempt + 1,
+              newVersion: payinWallet.version,
+              totalPayinBalance: payinWallet.totalPayinBalance,
+            },
+          );
+
+          return payinWallet;
+        } catch (error) {
+          if (attempt === maxRetries - 1) {
+            this.logger.error(
+              `Failed to update payin wallet for user ${userId} after ${maxRetries} attempts`,
+              error,
+            );
+            throw error;
+          }
+
+          const delay = baseDelay * Math.pow(2, attempt);
+          const jitter = Math.floor(Math.random() * delay * 0.5);
+          await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+        }
+      }
+
+      throw new Error(
+        `Unexpected error in payin wallet update for user: ${userId}`,
+      );
+    } finally {
+      // ✅ Always release lock if we acquired it
+      if (lockAcquired) {
+        await this.cacheManager.del(lockKey);
+      }
+    }
+  }
+
   async externalWebhookPayinUtkarsh(
     externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
   ) {
@@ -3657,22 +3801,22 @@ export class PaymentsService {
             },
           );
 
-          // const updatedWallet2 = await this.safeUpdatePayinWalletBalance(
-          //   queryRunner,
-          //   user.id,
-          //   (wallet) => {
-          //     wallet.totalBalance =
-          //       (wallet.totalBalance ? +wallet.totalBalance : 0) +
-          //       +payinOrder.netPayableAmount;
-          //   },
-          // );
+          const updatedWallet2 = await this.safeUpdatePayinWalletBalance(
+            queryRunner,
+            user.id,
+            (wallet) => {
+              wallet.totalPayinBalance =
+                (wallet.totalPayinBalance ? +wallet.totalPayinBalance : 0) -
+                (+payinOrder.amount - +payinOrder.netPayableAmount);
+            },
+          );
 
           this.logger.info(
             `PAYIN WEBHOOK - Wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
             {
               walletId: updatedWallet.id,
               newTotalCollections: updatedWallet.totalCollections,
-              // payinwallet: updatedWallet2.totalBalance,
+              payinwallet: updatedWallet2.totalPayinBalance,
             },
           );
         }

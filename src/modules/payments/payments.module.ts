@@ -30,6 +30,7 @@ import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth.module";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
+import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
       UserWhitelistIpsEntity,
       UserAddressEntity,
       WalletEntity,
+      PayinWalletEntity,
       SettlementsEntity,
       ApiCredentialsEntity,
       UserLoginIpsEntity,

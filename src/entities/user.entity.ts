@@ -26,6 +26,7 @@ import { WalletEntity } from "./wallet.entity";
 import { WalletTopupEntity } from "./wallet-topup.entity";
 import { CustomerEntity } from "./invoice-customer.entity";
 import { ApiCredentialsEntity } from "./api-credentials.entity";
+import { PayinWalletEntity } from "./payin-wallet.entity";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import {
   ONBOARDING_STATUS,
@@ -36,7 +37,6 @@ import {
 import { InvoiceEntity } from "@/entities/invoice.entity";
 import { ItemEntity } from "@/entities/item.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
-// import { PayinWalletEntity } from "./payin-wallet.entity";
 
 @Entity("users")
 export class UsersEntity {
@@ -75,8 +75,8 @@ export class UsersEntity {
   @Column({ default: false })
   isPayoutDisabledFromDashboard: boolean;
 
-  // @Column({ default: false })
-  // isPayinWalletFromDashboard: boolean;
+  @Column({ default: false })
+  isPayinWalletFromDashboard: boolean;
 
   @Column({ nullable: true, length: 255 })
   image?: string;
@@ -186,11 +186,11 @@ export class UsersEntity {
   })
   wallet: WalletEntity;
 
-  // @JoinColumn()
-  // @OneToOne(() => PayinWalletEntity, ({ user }) => user, {
-  //   cascade: true,
-  // })
-  // payinWallet: PayinWalletEntity;
+  @JoinColumn()
+  @OneToOne(() => PayinWalletEntity, ({ user }) => user, {
+    cascade: true,
+  })
+  payinWallet: PayinWalletEntity;
 
   @JoinColumn()
   @OneToOne(() => ApiCredentialsEntity, ({ user }) => user, {
