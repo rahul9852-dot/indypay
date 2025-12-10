@@ -23,8 +23,8 @@ const {
 } = appConfig();
 
 @Processor("payouts-kds-payout")
-export class PayoutProcessor {
-  private readonly logger = new CustomLogger(PayoutProcessor.name);
+export class PayoutProcessorDiasPay {
+  private readonly logger = new CustomLogger(PayoutProcessorDiasPay.name);
   constructor(
     @InjectRepository(PayOutOrdersEntity)
     private readonly payOutOrdersRepository: Repository<PayOutOrdersEntity>,

@@ -7,6 +7,7 @@ import { CacheModule } from "@nestjs/cache-manager";
 import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
 import { PayoutProcessor } from "./payments.processor";
+import { PayoutProcessorDiasPay } from "./payments.processorv2";
 import { SESService } from "@/modules/aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
@@ -66,6 +67,7 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
     SNSService,
     SESService,
     PayoutProcessor,
+    PayoutProcessorDiasPay,
     PayoutService,
     CryptoService,
     DatabaseMonitorService,
