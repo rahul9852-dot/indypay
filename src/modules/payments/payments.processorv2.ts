@@ -76,7 +76,7 @@ export class PayoutProcessorDiasPay {
             const AccountType = "CURRENT";
             const KDSPayoutPayload = {
               externalTxnId: order.orderId,
-              type: "Fund-transfer",
+              type: "fund-transfer",
               mode: "IMPS",
               payeeName: order.name,
               payeeAccount: order.bankAccountNumber,
