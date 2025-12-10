@@ -148,6 +148,7 @@ export class PaymentsService {
     private readonly checkoutRepository: Repository<CheckoutEntity>,
     @InjectQueue("payouts") private payoutQueue: Queue,
     @InjectQueue("tpipay-payouts") private payoutQueueTPI: Queue,
+    @InjectQueue("payouts-kds-payout") private payoutQueueKDS: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
     private readonly dataSource: DataSource,
@@ -826,7 +827,7 @@ export class PaymentsService {
       );
 
       // Add to processing queue
-      await this.payoutQueue.add("process-payouts-kds-payout", {
+      await this.payoutQueueKDS.add("process-payouts-kds-payout", {
         payoutOrders,
         userId: user.id,
         batchId,
