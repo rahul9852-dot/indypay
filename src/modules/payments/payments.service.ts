@@ -35,7 +35,6 @@ import {
 import {
   ExternalPayOutWebhookFlakPayDto,
   ExternalPayoutWebhookIsmartDto,
-  PayoutWebhookResponseDto,
 } from "./dto/external-webhook-payout.dto";
 import {
   ExternalPayinWebhookFlakPayDto,
@@ -788,10 +787,7 @@ export class PaymentsService {
     }
   }
 
-  async createPayoutDiasPay(
-    createPayoutDto: CreatePayoutDto,
-    user: UsersEntity,
-  ) {
+  async createPayoutKDS(createPayoutDto: CreatePayoutDto, user: UsersEntity) {
     const { data: payoutDataArr } = createPayoutDto;
 
     if (payoutDataArr.length > 1000) {
@@ -2261,10 +2257,9 @@ export class PaymentsService {
         //   `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
         // );
 
-        return {
-          message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
-          timestamp: new Date().toISOString(),
-        };
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+        );
       }
 
       if (status === PAYMENT_STATUS.SUCCESS) {
@@ -2322,10 +2317,7 @@ export class PaymentsService {
         await this.walletRepository.save(walletRaw);
       }
 
-      return {
-        message: "Transaction status updated successfully.",
-        timestamp: new Date().toISOString(),
-      };
+      return new MessageResponseDto("Transaction status updated successfully.");
     } else {
       const payOutOrder = await this.payOutOrdersRepository.findOne({
         where: {
@@ -2349,10 +2341,9 @@ export class PaymentsService {
         // this.logger.info(
         //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
         // );
-        return {
-          message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
-          timestamp: new Date().toISOString(),
-        };
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+        );
       }
 
       if (status === PAYMENT_STATUS.SUCCESS) {
@@ -2437,7 +2428,7 @@ export class PaymentsService {
 
   async externalWebhookPayoutEritech(
     rawWebhookData: any,
-  ): Promise<PayoutWebhookResponseDto> {
+  ): Promise<MessageResponseDto> {
     this.logger.info(
       `Raw Eritech Webhook Data: ${LoggerPlaceHolder.Json}`,
       rawWebhookData,
@@ -2493,10 +2484,9 @@ export class PaymentsService {
         //   `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
         // );
 
-        return {
-          message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
-          timestamp: new Date().toISOString(),
-        };
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+        );
       }
 
       if (status === PAYMENT_STATUS.SUCCESS) {
@@ -2554,10 +2544,7 @@ export class PaymentsService {
         await this.walletRepository.save(walletRaw);
       }
 
-      return {
-        message: "Transaction status updated successfully.",
-        timestamp: new Date().toISOString(),
-      };
+      return new MessageResponseDto("Transaction status updated successfully.");
     } else {
       const payOutOrder = await this.payOutOrdersRepository.findOne({
         where: {
@@ -2581,10 +2568,9 @@ export class PaymentsService {
         // this.logger.info(
         //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
         // );
-        return {
-          message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
-          timestamp: new Date().toISOString(),
-        };
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${order_id}`,
+        );
       }
 
       if (status === PAYMENT_STATUS.SUCCESS) {
@@ -2665,10 +2651,7 @@ export class PaymentsService {
           });
       }
 
-      return {
-        message: "Payout status updated successfully.",
-        timestamp: new Date().toISOString(),
-      };
+      return new MessageResponseDto("Payout status updated successfully.");
     }
   }
 
@@ -4459,7 +4442,7 @@ export class PaymentsService {
 
   async externalWebhookPayoutTpi(
     webhookData: any,
-  ): Promise<PayoutWebhookResponseDto> {
+  ): Promise<MessageResponseDto> {
     this.logger.info(
       `Tpi Webhook Data: ${LoggerPlaceHolder.Json}`,
       webhookData,
@@ -4495,10 +4478,9 @@ export class PaymentsService {
       // this.logger.info(
       //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
       // );
-      return {
-        message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${payid}`,
-        timestamp: new Date().toISOString(),
-      };
+      return new MessageResponseDto(
+        `Duplicate Webhook for PAYOUT/SETTLEMENT : ${payid}`,
+      );
     }
 
     if (status === PAYMENT_STATUS.SUCCESS) {
@@ -4583,39 +4565,33 @@ export class PaymentsService {
         });
     }
 
-    return {
-      message: "Payout status updated successfully.",
-      timestamp: new Date().toISOString(),
-    };
+    return new MessageResponseDto("Payout status updated successfully.");
   }
 
   async externalWebhookPayoutKDS(
     webhookData: any,
-  ): Promise<PayoutWebhookResponseDto> {
+  ): Promise<MessageResponseDto> {
     this.logger.info(
-      `Tpi Webhook Data: ${LoggerPlaceHolder.Json}`,
+      `KDS Webhook Data: ${LoggerPlaceHolder.Json}`,
       webhookData,
     );
 
-    const {
-      status: status_code,
-      payid: payid,
-      // transferId: custUniqRef,
-      // amount,
-      utr,
-    } = webhookData;
+    const { requestId, status: status_code, apiTxnId, utr } = webhookData;
 
     const status = convertExternalPaymentStatusToInternal(
       status_code.toUpperCase(),
     );
     const payOutOrder = await this.payOutOrdersRepository.findOne({
       where: {
-        transferId: payid,
+        transferId: requestId,
       },
       relations: ["user"],
     });
 
-    this.logger.info(`PAYOUT WEBHOOK - For OrderId: ${payid} :`, payOutOrder);
+    this.logger.info(
+      `PAYOUT WEBHOOK - For OrderId: ${requestId} :`,
+      payOutOrder,
+    );
 
     if (!payOutOrder) {
       throw new NotFoundException(
@@ -4624,13 +4600,9 @@ export class PaymentsService {
     }
 
     if (payOutOrder.status === status) {
-      // this.logger.info(
-      //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
-      // );
-      return {
-        message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${payid}`,
-        timestamp: new Date().toISOString(),
-      };
+      return new MessageResponseDto(
+        `Duplicate Webhook for PAYOUT/SETTLEMENT : ${requestId}`,
+      );
     }
 
     if (status === PAYMENT_STATUS.SUCCESS) {
@@ -4638,12 +4610,12 @@ export class PaymentsService {
         id: payOutOrder.id,
         status,
         successAt: new Date(),
-        transferId: payid,
+        transferId: requestId,
         utr,
       });
 
       this.logger.info(
-        `PAYOUT - TPI Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
+        `PAYOUT - KDS Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
         payOutOrderRaw,
       );
 
@@ -4655,7 +4627,7 @@ export class PaymentsService {
         id: payOutOrder.id,
         status,
         failureAt: new Date(),
-        transferId: payid,
+        transferId: requestId,
         utr,
       });
 
@@ -4687,12 +4659,13 @@ export class PaymentsService {
     // send webhook
     if (payOutOrder.user?.payOutWebhookUrl) {
       const webhookPayload = {
-        orderId: payid,
+        orderId: requestId,
         status,
         amount: payOutOrder.amount,
-        txnRefId: payid,
+        txnRefId: requestId,
         payoutId: payOutOrder.payoutId,
         utr,
+        apiTxnId,
       };
 
       this.logger.info(
@@ -4715,9 +4688,6 @@ export class PaymentsService {
         });
     }
 
-    return {
-      message: "Payout status updated successfully.",
-      timestamp: new Date().toISOString(),
-    };
+    return new MessageResponseDto("Payout status updated successfully.");
   }
 }

@@ -142,7 +142,7 @@ export class PaymentsController {
     @Body() createPayoutDto: CreatePayoutDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createPayoutDiasPay(createPayoutDto, user);
+    return this.paymentsService.createPayoutKDS(createPayoutDto, user);
   }
 
   // @Public()
@@ -264,6 +264,16 @@ export class PaymentsController {
     return this.paymentsService.externalWebhookPayoutEritech(
       externalWebhookPayout,
     );
+  }
+
+  @Public()
+  @ApiOperation({ summary: "External webhook for KDS pay-out" })
+  @UseGuards(WebhookGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payout/webhook/kds")
+  async externalWebhookPayoutKDS(@Body() externalWebhookPayout: any) {
+    return this.paymentsService.externalWebhookPayoutKDS(externalWebhookPayout);
   }
 
   @ApiOperation({ summary: "Get all collection list" })
