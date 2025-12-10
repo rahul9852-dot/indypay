@@ -79,7 +79,7 @@ export class PayoutProcessorDiasPay {
               type: "fund-transfer",
               mode: "IMPS",
               payeeName: order.name,
-              payeeAccount: order.bankAccountNumber,
+              payeeAccount: +order.bankAccountNumber,
               payeeIfsc: order.bankIfsc,
               amount: order.amount,
               sender_name: "RFP",
