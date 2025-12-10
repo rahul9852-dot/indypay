@@ -106,6 +106,11 @@ export class PayoutProcessorDiasPay {
                 KDSPAYOUT,
               );
 
+            this.logger.info(
+              `KDS Payout Response: ${LoggerPlaceHolder.Json}`,
+              responseKDSPayout,
+            );
+
             if (responseKDSPayout.status === PAYMENT_STATUS.FAILED) {
               throw {
                 status: responseKDSPayout.status,
