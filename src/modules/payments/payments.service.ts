@@ -4577,10 +4577,10 @@ export class PaymentsService {
       webhookData,
     );
 
-    const { requestId, status: status_code, apiTxnId, utr } = webhookData;
+    const { requestId, status, apiTxnId, utr } = webhookData;
 
-    const status = convertExternalPaymentStatusToInternal(
-      status_code.toUpperCase(),
+    const internalStatus = convertExternalPaymentStatusToInternal(
+      status.toUpperCase(),
     );
     const payOutOrder = await this.payOutOrdersRepository.findOne({
       where: {
@@ -4600,16 +4600,16 @@ export class PaymentsService {
       );
     }
 
-    if (payOutOrder.status === status) {
+    if (payOutOrder.status === internalStatus) {
       return new MessageResponseDto(
         `Duplicate Webhook for PAYOUT/SETTLEMENT : ${requestId}`,
       );
     }
 
-    if (status === PAYMENT_STATUS.SUCCESS) {
+    if (internalStatus === PAYMENT_STATUS.SUCCESS) {
       const payOutOrderRaw = this.payOutOrdersRepository.create({
         id: payOutOrder.id,
-        status,
+        status: internalStatus,
         successAt: new Date(),
         transferId: requestId,
         utr,
@@ -4623,10 +4623,10 @@ export class PaymentsService {
       await this.payOutOrdersRepository.save(payOutOrderRaw);
     }
 
-    if (status === PAYMENT_STATUS.FAILED) {
+    if (internalStatus === PAYMENT_STATUS.FAILED) {
       const payOutOrderRaw = this.payOutOrdersRepository.create({
         id: payOutOrder.id,
-        status,
+        status: internalStatus,
         failureAt: new Date(),
         transferId: requestId,
         utr,
@@ -4661,7 +4661,7 @@ export class PaymentsService {
     if (payOutOrder.user?.payOutWebhookUrl) {
       const webhookPayload = {
         orderId: requestId,
-        status,
+        status: internalStatus,
         amount: payOutOrder.amount,
         txnRefId: requestId,
         payoutId: payOutOrder.payoutId,
