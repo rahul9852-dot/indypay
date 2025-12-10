@@ -103,7 +103,7 @@ export class PayoutProcessorDiasPay {
             const responseKDSPayout =
               await axiosKDSPayout.postRequest<IExternalKDSPayoutResponse>(
                 KDSPAYOUT.PAYOUT.LIVE,
-                KDSPAYOUT,
+                KDSPayoutPayload,
               );
 
             this.logger.info(
