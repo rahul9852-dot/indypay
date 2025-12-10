@@ -49,7 +49,11 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
       UserLoginIpsEntity,
       CheckoutEntity,
     ]),
-    BullModule.registerQueue({ name: "payouts" }, { name: "tpipay-payouts" }),
+    BullModule.registerQueue(
+      { name: "payouts" },
+      { name: "tpipay-payouts" },
+      { name: "payouts-kds-payout" },
+    ),
     CacheModule.register(),
     ThirdPartyAuthModule,
   ],
