@@ -4833,7 +4833,7 @@ export class PaymentsService {
       });
 
       this.logger.info(
-        `PAYOUT - KDS Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
+        `PAYOUT - Buckbox Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
         payOutOrderRaw,
       );
 

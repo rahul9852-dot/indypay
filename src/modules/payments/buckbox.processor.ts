@@ -6,9 +6,7 @@ import { Repository } from "typeorm";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { BUCKBOX } from "@/constants/external-api.constant";
 import { AxiosService } from "@/shared/axios/axios.service";
-import {
-  IExternalBuckboxPayoutFundResponse,
-} from "@/interface/external-api.interface";
+import { IExternalBuckboxPayoutFundResponse } from "@/interface/external-api.interface";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
@@ -68,15 +66,6 @@ export class PayoutProcessorBuckBox {
             );
 
             const buckboxPayload = {
-              // email: user.email,
-              // api_token: apiToken,
-              // beneficiary_name: order.name,
-              // ifsc_code: order.bankIfsc,
-              // account_number: order.bankAccountNumber,
-              // amount: order.amount,
-              // mobile_number: order.beneficiaryMobile,
-              // channel_id: "2",
-              // client_id: order.orderId,
               product_id: "RU4HJHIE",
               external_order_id: order.orderId,
               amount: +order.amount,
