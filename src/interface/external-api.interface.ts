@@ -447,3 +447,15 @@ export interface IExternalTpiPayoutFundResponse {
   utr: string;
   payid: string;
 }
+
+export interface IExternalBuckboxPayoutFundResponse {
+  code: number;
+  key: string;
+  detail: {};
+  data: {
+    msg: string;
+    external_order_id: string;
+    transaction_id: string;
+    status: string;
+  };
+}

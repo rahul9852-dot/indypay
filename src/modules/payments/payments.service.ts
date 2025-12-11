@@ -4794,22 +4794,20 @@ export class PaymentsService {
       webhookData,
     );
 
-    return new MessageResponseDto("Webhook received successfully.");
-
-    const { requestId, status, apiTxnId, utr } = webhookData;
+    const { id, payment_status, utr_number, external_order_id } = webhookData;
 
     const internalStatus = convertExternalPaymentStatusToInternal(
-      status.toUpperCase(),
+      payment_status.toUpperCase(),
     );
     const payOutOrder = await this.payOutOrdersRepository.findOne({
       where: {
-        transferId: requestId,
+        transferId: external_order_id,
       },
       relations: ["user"],
     });
 
     this.logger.info(
-      `PAYOUT WEBHOOK - For OrderId: ${requestId} :`,
+      `PAYOUT WEBHOOK - For OrderId: ${external_order_id} :`,
       payOutOrder,
     );
 
@@ -4821,7 +4819,7 @@ export class PaymentsService {
 
     if (payOutOrder.status === internalStatus) {
       return new MessageResponseDto(
-        `Duplicate Webhook for PAYOUT/SETTLEMENT : ${requestId}`,
+        `Duplicate Webhook for PAYOUT/SETTLEMENT : ${external_order_id}`,
       );
     }
 
@@ -4830,8 +4828,8 @@ export class PaymentsService {
         id: payOutOrder.id,
         status: internalStatus,
         successAt: new Date(),
-        transferId: requestId,
-        utr,
+        transferId: id,
+        utr: utr_number,
       });
 
       this.logger.info(
@@ -4847,8 +4845,8 @@ export class PaymentsService {
         id: payOutOrder.id,
         status: internalStatus,
         failureAt: new Date(),
-        transferId: requestId,
-        utr,
+        transferId: id,
+        utr: utr_number,
       });
 
       await this.payOutOrdersRepository.save(payOutOrderRaw);
@@ -4879,13 +4877,12 @@ export class PaymentsService {
     // send webhook
     if (payOutOrder.user?.payOutWebhookUrl) {
       const webhookPayload = {
-        orderId: requestId,
+        orderId: external_order_id,
         status: internalStatus,
         amount: payOutOrder.amount,
-        txnRefId: requestId,
+        txnRefId: id,
         payoutId: payOutOrder.payoutId,
-        utr,
-        apiTxnId,
+        utr: utr_number,
       };
 
       this.logger.info(

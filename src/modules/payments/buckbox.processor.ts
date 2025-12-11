@@ -6,7 +6,9 @@ import { Repository } from "typeorm";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { BUCKBOX } from "@/constants/external-api.constant";
 import { AxiosService } from "@/shared/axios/axios.service";
-import { IExternalTpiPayoutFundResponse } from "@/interface/external-api.interface";
+import {
+  IExternalBuckboxPayoutFundResponse,
+} from "@/interface/external-api.interface";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
@@ -66,36 +68,48 @@ export class PayoutProcessorBuckBox {
             );
 
             const buckboxPayload = {
-              email: user.email,
-              api_token: apiToken,
-              beneficiary_name: order.name,
-              ifsc_code: order.bankIfsc,
-              account_number: order.bankAccountNumber,
-              amount: order.amount,
-              mobile_number: order.beneficiaryMobile,
-              channel_id: "2",
-              client_id: order.orderId,
+              // email: user.email,
+              // api_token: apiToken,
+              // beneficiary_name: order.name,
+              // ifsc_code: order.bankIfsc,
+              // account_number: order.bankAccountNumber,
+              // amount: order.amount,
+              // mobile_number: order.beneficiaryMobile,
+              // channel_id: "2",
+              // client_id: order.orderId,
+              product_id: "RU4HJHIE",
+              external_order_id: order.orderId,
+              amount: +order.amount,
+              payment_mode: "IMPS",
+              bene_name: order.name,
+              bene_account_number: order.bankAccountNumber,
+              bene_mobile: order.beneficiaryMobile,
+              bene_ifsc: order.bankIfsc,
+              purpose: order.purpose,
+              bank_name: order.bankName,
+              branch_name: "Mumbai",
+              bene_address: "Mumbai",
             };
 
-            const responseTpi =
-              await axiosServiceBuckBox.postRequest<IExternalTpiPayoutFundResponse>(
+            const responseBuckBox =
+              await axiosServiceBuckBox.postRequest<IExternalBuckboxPayoutFundResponse>(
                 BUCKBOX.PAYOUT.LIVE,
                 buckboxPayload,
               );
 
             const status = convertExternalPaymentStatusToInternal(
-              responseTpi.status.toUpperCase(),
+              responseBuckBox.data.status,
             );
 
             this.logger.info(
-              `Tpi Converted Status: ${LoggerPlaceHolder.Json}`,
-              responseTpi,
+              `Buckbox Converted Status: ${LoggerPlaceHolder.Json}`,
+              responseBuckBox,
             );
 
             await this.payOutOrdersRepository.save(
               this.payOutOrdersRepository.create({
                 id: order.id,
-                transferId: responseTpi.payid,
+                transferId: responseBuckBox.data.transaction_id,
                 ...(status === PAYMENT_STATUS.SUCCESS && {
                   status,
                   successAt: new Date(),
@@ -108,14 +122,14 @@ export class PayoutProcessorBuckBox {
                   status,
                 ) && { status }),
 
-                utr: responseTpi.utr,
+                // utr: responseBuckBox.data.utr,
               }),
             );
 
             if (status === PAYMENT_STATUS.FAILED) {
               throw {
                 status: PAYMENT_STATUS.FAILED,
-                message: responseTpi.message || "Payout failed",
+                message: responseBuckBox.data.msg || "Payout failed",
               };
             }
 
@@ -132,9 +146,9 @@ export class PayoutProcessorBuckBox {
                 orderId: order.orderId,
                 status,
                 amount: order.amount,
-                txnRefId: responseTpi.payid,
+                txnRefId: responseBuckBox.data.transaction_id,
                 payoutId: order.payoutId,
-                utr: responseTpi.utr,
+                // utr: respo.utr,
               };
 
               this.logger.info(
