@@ -10,7 +10,12 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
-import { webhookBodyParser, WEBHOOK_ROUTES } from "./utils/webhook.middleware";
+import {
+  webhookBodyParserUtkarsh,
+  WEBHOOK_ROUTES_UTK,
+  webhookBodyParserJio,
+  WEBHOOK_ROUTES_JIO,
+} from "./utils/webhook.middleware";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { appConfig } from "@/config/app.config";
@@ -33,8 +38,12 @@ async function bootstrap() {
   // Add cookie parser
   app.use(cookieParser());
 
-  WEBHOOK_ROUTES.forEach((route) => {
-    app.use(route, webhookBodyParser);
+  WEBHOOK_ROUTES_UTK.forEach((route) => {
+    app.use(route, webhookBodyParserUtkarsh);
+  });
+
+  WEBHOOK_ROUTES_JIO.forEach((route) => {
+    app.use(route, webhookBodyParserJio);
   });
 
   // Apply standard body parsing globally
