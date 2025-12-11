@@ -4790,9 +4790,11 @@ export class PaymentsService {
     webhookData: any,
   ): Promise<MessageResponseDto> {
     this.logger.info(
-      `KDS Webhook Data: ${LoggerPlaceHolder.Json}`,
+      `Buckbox Webhook Data: ${LoggerPlaceHolder.Json}`,
       webhookData,
     );
+
+    return new MessageResponseDto("Webhook received successfully.");
 
     const { requestId, status, apiTxnId, utr } = webhookData;
 

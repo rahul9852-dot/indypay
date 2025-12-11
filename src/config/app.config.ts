@@ -90,6 +90,7 @@ export const appConfig = registerAs("appConfig", () => ({
     buckbox: {
       apiToken: getOsEnv("BUCKBOX_API_TOKEN"),
       apiKey: getOsEnv("BUCKBOX_API_KEY"),
+      webhookIps: getOsEnv("BUCKBOX_WEBHOOK_IPS").split(","),
     },
   },
   transactionConfig: {

@@ -11,7 +11,14 @@ import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 // import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 const {
-  externalPaymentConfig: { flakPay, ismart, paynpro, ertech, kdsPayout },
+  externalPaymentConfig: {
+    flakPay,
+    ismart,
+    paynpro,
+    ertech,
+    kdsPayout,
+    buckbox,
+  },
   utkarsh: { webhookIps: utkarshWebhookIps },
   payboltCreds: { webhookIps: payboltWebhookIps },
   tpipay: { webhookIps: tpiWebhookIps },
@@ -40,6 +47,7 @@ export class WebhookGuard implements CanActivate {
       ...payboltWebhookIps,
       ...tpiWebhookIps,
       ...kdsPayout.kdsIp,
+      ...buckbox.webhookIps,
     ];
 
     if (!webhookIps.includes(requestIp)) {
