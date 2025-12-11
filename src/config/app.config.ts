@@ -87,6 +87,11 @@ export const appConfig = registerAs("appConfig", () => ({
       kdsClientSecret: getOsEnv("KDS_CLIENT_SECRET"),
       kdsIp: getOsEnv("KDS_IP").split(","),
     },
+    buckbox: {
+      apiToken: getOsEnv("BUCKBOX_API_TOKEN"),
+      apiKey: getOsEnv("BUCKBOX_API_KEY"),
+      webhookIps: getOsEnv("BUCKBOX_WEBHOOK_IPS").split(","),
+    },
   },
   transactionConfig: {
     commissionInPercentagePayIn:

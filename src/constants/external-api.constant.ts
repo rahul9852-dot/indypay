@@ -104,3 +104,10 @@ export const KDSPAYOUT = {
     LIVE: "/payout/initiate",
   },
 };
+
+export const BUCKBOX = {
+  BASE_URL: "https://admin.bustto.com",
+  PAYOUT: {
+    LIVE: "/api/merchant/external/reward-distributions/",
+  },
+};
