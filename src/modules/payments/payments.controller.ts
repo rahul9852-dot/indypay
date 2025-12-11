@@ -172,6 +172,17 @@ export class PaymentsController {
     return this.paymentsService.createPayoutTPIBulk(createPayoutDto, user);
   }
 
+  @Public()
+  @ApiOperation({ summary: "Create pay-out transaction Bulk" })
+  @UseGuards(ApiKeyGuard)
+  @Post("v2/payout/create")
+  async createPayoutBuckBox(
+    @Body() createPayoutDto: CreatePayoutDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutBuckBox(createPayoutDto, user);
+  }
+
   // @Public()
   // @ApiOperation({ summary: "Create pay-out transaction" })
   // @UseGuards(ApiKeyGuard)
@@ -274,6 +285,18 @@ export class PaymentsController {
   @Post("payout/webhook/kds")
   async externalWebhookPayoutKDS(@Body() externalWebhookPayout: any) {
     return this.paymentsService.externalWebhookPayoutKDS(externalWebhookPayout);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "External webhook for BuckBox pay-out" })
+  @UseGuards(WebhookGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("v2/payout/webhook")
+  async externalWebhookPayoutBuckBox(@Body() externalWebhookPayout: any) {
+    return this.paymentsService.externalWebhookPayoutBuckBox(
+      externalWebhookPayout,
+    );
   }
 
   @ApiOperation({ summary: "Get all collection list" })

@@ -208,6 +208,11 @@ export class ExternalPayinWebhookUtkarshDto {
   @IsString()
   @IsOptional()
   upiTxnId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  payerVpa?: string;
 }
 
 export class ExternalPayinWebhookPayboltDto {

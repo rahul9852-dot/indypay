@@ -3500,8 +3500,16 @@ export class PaymentsService {
     externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
   ) {
     try {
-      const { txnId, txnStatus, custRef, amount, refId, uniqueId, upiTxnId } =
-        externalWebhookPayin;
+      const {
+        txnId,
+        txnStatus,
+        custRef,
+        amount,
+        refId,
+        uniqueId,
+        upiTxnId,
+        payerVpa,
+      } = externalWebhookPayin;
 
       let status = convertExternalPaymentStatusToInternal(txnStatus);
 
@@ -3668,6 +3676,7 @@ export class PaymentsService {
             amount: +amount,
             txnRefId: payinOrder.txnRefId,
             ...(!isMisspelled && { utr: custRef }),
+            payerVpa,
             // utr: custRef,
             message: isAmountMismatch
               ? "Amount mismatch in payin order"
@@ -4570,6 +4579,213 @@ export class PaymentsService {
   }
 
   async externalWebhookPayoutKDS(
+    webhookData: any,
+  ): Promise<MessageResponseDto> {
+    this.logger.info(
+      `KDS Webhook Data: ${LoggerPlaceHolder.Json}`,
+      webhookData,
+    );
+
+    const { requestId, status, apiTxnId, utr } = webhookData;
+
+    const internalStatus = convertExternalPaymentStatusToInternal(
+      status.toUpperCase(),
+    );
+    const payOutOrder = await this.payOutOrdersRepository.findOne({
+      where: {
+        transferId: requestId,
+      },
+      relations: ["user"],
+    });
+
+    this.logger.info(
+      `PAYOUT WEBHOOK - For OrderId: ${requestId} :`,
+      payOutOrder,
+    );
+
+    if (!payOutOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payout order not found"),
+      );
+    }
+
+    if (payOutOrder.status === internalStatus) {
+      return new MessageResponseDto(
+        `Duplicate Webhook for PAYOUT/SETTLEMENT : ${requestId}`,
+      );
+    }
+
+    if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+      const payOutOrderRaw = this.payOutOrdersRepository.create({
+        id: payOutOrder.id,
+        status: internalStatus,
+        successAt: new Date(),
+        transferId: requestId,
+        utr,
+      });
+
+      this.logger.info(
+        `PAYOUT - KDS Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
+        payOutOrderRaw,
+      );
+
+      await this.payOutOrdersRepository.save(payOutOrderRaw);
+    }
+
+    if (internalStatus === PAYMENT_STATUS.FAILED) {
+      const payOutOrderRaw = this.payOutOrdersRepository.create({
+        id: payOutOrder.id,
+        status: internalStatus,
+        failureAt: new Date(),
+        transferId: requestId,
+        utr,
+      });
+
+      await this.payOutOrdersRepository.save(payOutOrderRaw);
+
+      const wallet = await this.walletRepository.findOne({
+        where: {
+          user: {
+            id: payOutOrder.user.id,
+          },
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (wallet) {
+        await this.walletRepository.save(
+          this.walletRepository.create({
+            id: wallet.id,
+            availablePayoutBalance:
+              +wallet.availablePayoutBalance +
+              +payOutOrder.amountBeforeDeduction,
+          }),
+        );
+      }
+    }
+
+    // send webhook
+    if (payOutOrder.user?.payOutWebhookUrl) {
+      const webhookPayload = {
+        orderId: requestId,
+        status: internalStatus,
+        amount: payOutOrder.amount,
+        txnRefId: requestId,
+        payoutId: payOutOrder.payoutId,
+        utr,
+        apiTxnId,
+      };
+
+      this.logger.info(
+        `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+        webhookPayload,
+      );
+
+      axios
+        .post(payOutOrder.user.payOutWebhookUrl, webhookPayload)
+        .then(({ data }) => {
+          this.logger.info(
+            `PAYOUT - User webhook - (${payOutOrder.user.payOutWebhookUrl}) - ${payOutOrder.payoutId} - Webhook sent successfully: ${JSON.stringify(data)}`,
+          );
+        })
+        .catch((err) => {
+          this.logger.error(
+            `PAYOUT - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+            err,
+          );
+        });
+    }
+
+    return new MessageResponseDto("Payout status updated successfully.");
+  }
+
+  async createPayoutBuckBox(
+    createPayoutDto: CreatePayoutDto,
+    user: UsersEntity,
+  ) {
+    const { data: payoutDataArr } = createPayoutDto;
+
+    if (payoutDataArr.length > 1000) {
+      throw new BadRequestException("Maximum 1000 payouts allowed");
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const totalAmount = payoutDataArr.reduce((acc, curr) => {
+        if (curr.amount <= 0) {
+          throw new BadRequestException("Amount should be greater than 0");
+        }
+        const commissionResult = calculateDynamicCommission({
+          amount: +curr.amount,
+          userCommissionRate: user.commissionInPercentagePayout,
+          userGstRate: user.gstInPercentagePayout,
+        });
+
+        return acc + commissionResult.netPayableAmount;
+      }, 0);
+
+      // Check and update wallet balance
+      await this.validateAndUpdateWallet(queryRunner, user, totalAmount);
+
+      // Create batch job identifier
+      const batchId = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
+
+      // Create payout orders in DB
+      const payoutOrders = await this.createPayoutOrders(
+        queryRunner,
+        payoutDataArr,
+        user,
+        batchId,
+      );
+
+      // Add to processing queue
+      await this.payoutQueueTPI.add("process-tpipay-payouts", {
+        payoutOrders,
+        userId: user.id,
+        batchId,
+      });
+
+      await queryRunner.commitTransaction();
+
+      this.logger.info(
+        `PAYOUT CREATED: ${LoggerPlaceHolder.Json}`,
+        createPayoutDto,
+      );
+
+      return {
+        message: "Payout process initiated",
+        batchId,
+        payoutOrders: payoutOrders.map((payout) => ({
+          orderId: payout.orderId,
+          payoutId: payout.payoutId,
+          amount: payout.amount,
+          status: payout.status,
+          accountNumber: payout.bankAccountNumber,
+          bankName: payout.bankName,
+          ifscCode: payout.bankIfsc,
+        })),
+        summary: {
+          total: payoutDataArr.length,
+          status: "PROCESSING",
+        },
+      };
+    } catch (err) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Error initiating payouts`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async externalWebhookPayoutBuckBox(
     webhookData: any,
   ): Promise<MessageResponseDto> {
     this.logger.info(
