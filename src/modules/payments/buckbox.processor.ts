@@ -44,7 +44,7 @@ export class PayoutProcessorBuckBox {
     const DELAY_BETWEEN_REQUESTS = 1000; // 1 second
     // external API
 
-    const axiosServiceBuckBox = new AxiosService(BUCKBOX.PAYOUT.LIVE, {
+    const axiosServiceBuckBox = new AxiosService(BUCKBOX.BASE_URL, {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiToken}`,
