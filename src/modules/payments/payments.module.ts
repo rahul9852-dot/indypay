@@ -8,6 +8,7 @@ import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
 import { PayoutProcessor } from "./payments.processor";
 import { PayoutProcessorDiasPay } from "./payments.processorv2";
+import { PayoutProcessorBuckBox } from "./buckbox.processor";
 import { SESService } from "@/modules/aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
@@ -54,6 +55,7 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
       { name: "payouts" },
       { name: "tpipay-payouts" },
       { name: "payouts-kds-payout" },
+      { name: "buckbox-payouts" },
     ),
     CacheModule.register(),
     ThirdPartyAuthModule,
@@ -68,6 +70,7 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
     SESService,
     PayoutProcessor,
     PayoutProcessorDiasPay,
+    PayoutProcessorBuckBox,
     PayoutService,
     CryptoService,
     DatabaseMonitorService,
