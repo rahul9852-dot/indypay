@@ -4801,7 +4801,7 @@ export class PaymentsService {
     );
     const payOutOrder = await this.payOutOrdersRepository.findOne({
       where: {
-        transferId: external_order_id,
+        orderId: external_order_id,
       },
       relations: ["user"],
     });
