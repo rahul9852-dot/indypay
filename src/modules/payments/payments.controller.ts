@@ -142,7 +142,8 @@ export class PaymentsController {
     @Body() createPayoutDto: CreatePayoutDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createPayoutKDS(createPayoutDto, user);
+    // return this.paymentsService.createPayoutKDS(createPayoutDto, user);
+    return this.paymentsService.createPayoutBuckBox(createPayoutDto, user);
   }
 
   // @Public()
