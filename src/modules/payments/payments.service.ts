@@ -4410,8 +4410,7 @@ export class PaymentsService {
       // and cause session expiry errors
       checkoutFormData = {
         merchantId: extractValue("merchantId") || "MERMERa7845c4",
-        callbackUrl:
-          "https://rupeeflow.co/api/v1/payments/payin/geopay/webhook",
+        callbackUrl: extractValue("callbackUrl"),
         merchantTxnId: geoPayMerchantTxnId || orderId,
         merchantTxnAmount: extractValue("merchantTxnAmount") || String(amount),
         cctype: extractValue("cctype") || "HDFCAUCC",
