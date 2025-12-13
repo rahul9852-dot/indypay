@@ -310,7 +310,7 @@ export class PaymentsController {
 
   @Public()
   @ApiOperation({ summary: "GeoPay Checkout - Returns checkout page" })
-  @UseGuards(ApiKeyGuard)
+  // @UseGuards(ApiKeyGuard)
   @Post("payin/geopay/checkout")
   @Render("geopay-checkout")
   async geoPayCheckout(
