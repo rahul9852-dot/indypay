@@ -4350,6 +4350,8 @@ export class PaymentsService {
         },
       );
 
+      this.logger.info(`PAYIN - createGeoPayCheckout - Calling GeoPay API...`);
+
       const geoPayResponse = await axiosServiceGeoPay.postRequest<any>(
         GEOPAY.PAYIN.LIVE,
         payload,
@@ -4358,6 +4360,17 @@ export class PaymentsService {
       this.logger.info(
         `GeoPay Checkout - Raw API Response Type: ${typeof geoPayResponse}, Length: ${typeof geoPayResponse === "string" ? geoPayResponse.length : "N/A"}`,
       );
+
+      // Log first 500 characters of response for debugging
+      if (typeof geoPayResponse === "string") {
+        this.logger.info(
+          `GeoPay Checkout - Response Preview: ${geoPayResponse.substring(0, 500)}`,
+        );
+      } else {
+        this.logger.info(
+          `GeoPay Checkout - Response Data: ${JSON.stringify(geoPayResponse)}`,
+        );
+      }
 
       // GeoPay API returns HTML with a form, not JSON
       // AxiosService returns res.data directly, so geoPayResponse is the HTML string
@@ -4432,35 +4445,71 @@ export class PaymentsService {
       // Log detailed error information for debugging GeoPay API issues
       const errorDetails: any = {
         message: err.message,
+        errorName: err.name,
         requestEndpoint: `${GEOPAY.BASE_URL}${GEOPAY.PAYIN.LIVE}`,
         requestPayload: {
           agentId: payload.agentId,
           partnertxnid: payload.partnertxnid,
           amount: payload.merchantTxnAmount,
+          agentname: payload.agentname,
+          agentmobile: payload.agentmobile,
+          agentemail: payload.agentemail,
         },
       };
 
       if (err.response) {
         errorDetails.responseStatus = err.response.status;
+        errorDetails.responseStatusText = err.response.statusText;
+        errorDetails.responseHeaders = err.response.headers;
 
-        // If GeoPay returns HTML error page, detect it
-        if (
-          typeof err.response.data === "string" &&
-          err.response.data.includes("Error 500")
-        ) {
-          errorDetails.geoPayError = "GeoPay returned 500 error page";
-          errorDetails.errorPagePreview = err.response.data.substring(0, 300);
+        // Log the actual response data (could be JSON, HTML, or text)
+        if (err.response.data) {
+          const responseData = err.response.data;
+          errorDetails.responseDataType = typeof responseData;
 
-          this.logger.error(
-            `PAYIN - createGeoPayCheckout - ⚠️ GeoPay API returned 500 error. Possible causes:
-            1. Invalid credentials (agentId/secretKey)
-            2. Server IP not whitelisted by GeoPay
-            3. GeoPay service is down
-            4. Invalid payload format`,
-          );
-        } else {
-          errorDetails.responseData = err.response.data;
+          if (typeof responseData === "string") {
+            errorDetails.responseDataPreview = responseData.substring(0, 500);
+
+            // If GeoPay returns HTML error page, detect it
+            if (
+              responseData.includes("Error 500") ||
+              responseData.includes("<html")
+            ) {
+              errorDetails.geoPayError = "GeoPay returned HTML error page";
+
+              this.logger.error(
+                `PAYIN - createGeoPayCheckout - ⚠️ GeoPay API returned HTML error. Possible causes:
+                1. Invalid credentials (agentId/secretKey)
+                2. Server IP not whitelisted by GeoPay
+                3. GeoPay service is down
+                4. Invalid payload format`,
+              );
+            }
+          } else if (typeof responseData === "object") {
+            errorDetails.responseData = responseData;
+            this.logger.error(
+              `PAYIN - createGeoPayCheckout - GeoPay returned JSON error: ${JSON.stringify(responseData)}`,
+            );
+          } else {
+            errorDetails.responseData = responseData;
+          }
         }
+      } else if (err.request) {
+        // Request was made but no response received
+        errorDetails.noResponse = true;
+        errorDetails.requestInfo = {
+          method: err.request.method,
+          path: err.request.path,
+        };
+        this.logger.error(
+          `PAYIN - createGeoPayCheckout - No response received from GeoPay. Network error or timeout.`,
+        );
+      } else {
+        // Something happened in setting up the request
+        errorDetails.setupError = true;
+        this.logger.error(
+          `PAYIN - createGeoPayCheckout - Error setting up request: ${err.message}`,
+        );
       }
 
       this.logger.error(
@@ -4483,6 +4532,17 @@ export class PaymentsService {
       if (err.response?.status === 500) {
         errorMessage =
           "Payment gateway error. Please verify credentials and contact support if this persists.";
+      } else if (err.response?.data) {
+        // Try to extract more specific error from response
+        const responseData = err.response.data;
+        if (typeof responseData === "object" && responseData.message) {
+          errorMessage = `Payment gateway error: ${responseData.message}`;
+        } else if (
+          typeof responseData === "string" &&
+          responseData.length < 200
+        ) {
+          errorMessage = `Payment gateway error: ${responseData}`;
+        }
       }
 
       throw new BadRequestException(errorMessage);
