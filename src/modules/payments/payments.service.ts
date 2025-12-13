@@ -4385,11 +4385,10 @@ export class PaymentsService {
 
       const htmlResponse = geoPayResponse;
 
-      // Extract form action URL
-      const actionMatch = htmlResponse.match(/action="([^"]+)"/);
-      const actionUrl = actionMatch
-        ? actionMatch[1]
-        : "https://secure-axispg.freecharge.in/payment/v1/checkout";
+      // Always use FreeCharge payment gateway URL (not the one from GeoPay response)
+      // GeoPay sometimes returns gopaydigital.in/login which causes CSP violations
+      const actionUrl =
+        "https://secure-axispg.freecharge.in/payment/v1/checkout";
 
       // Helper function to extract input value from HTML
       const extractValue = (fieldName: string): string => {
