@@ -309,10 +309,9 @@ export class PaymentsController {
   }
 
   @Public()
-  @ApiOperation({ summary: "GeoPay Checkout - Returns checkout page" })
+  @ApiOperation({ summary: "GeoPay Checkout - Returns checkout URL" })
   @UseGuards(ApiKeyGuard)
   @Post("payin/geopay/checkout")
-  @Render("geopay-checkout")
   async geoPayCheckout(
     @Body() createPayinTransactionDto: CreatePayinTransactionGeoPayDTO,
     @User() user: UsersEntity,
@@ -321,6 +320,14 @@ export class PaymentsController {
       createPayinTransactionDto,
       user,
     );
+  }
+
+  @Public()
+  @ApiOperation({ summary: "GeoPay Checkout Page - Displays payment page" })
+  @Get("payin/geopay/checkout/:merchantTxnId")
+  @Render("geopay-checkout")
+  async geoPayCheckoutPage(@Param("merchantTxnId") merchantTxnId: string) {
+    return this.paymentsService.getGeoPayCheckoutPage(merchantTxnId);
   }
 
   @ApiExcludeEndpoint()

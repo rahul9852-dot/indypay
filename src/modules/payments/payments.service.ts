@@ -4594,13 +4594,57 @@ export class PaymentsService {
       });
 
       this.logger.info(
-        `CHECKOUT FORM DATA BEING RETURNED: ${LoggerPlaceHolder.Json}`,
+        `CHECKOUT FORM DATA PREPARED: ${LoggerPlaceHolder.Json}`,
         checkoutFormData,
       );
 
-      // Return data directly for the template (interceptor will wrap it in { data: ... })
-      return checkoutFormData;
+      // Store checkout form data in cache for 30 minutes (TTL in milliseconds)
+      const cacheKey = `geopay:checkout:${txnRefId}`;
+      await this.cacheManager.set(cacheKey, checkoutFormData, 1800000); // 30 minutes
+
+      this.logger.info(
+        `Checkout data cached with key: ${cacheKey} for txnRefId: ${txnRefId}`,
+      );
+
+      // Return checkout URL instead of rendering HTML
+      const checkoutUrl = `${appConfig().beBaseUrl}/api/v1/payments/payin/geopay/checkout/${txnRefId}`;
+
+      return {
+        checkoutUrl,
+        merchantTxnId: txnRefId,
+        orderId,
+        amount,
+        status: "initiated",
+        message:
+          "Checkout URL created successfully. Open this URL to complete payment.",
+      };
     });
+  }
+
+  async getGeoPayCheckoutPage(merchantTxnId: string) {
+    this.logger.info(
+      `PAYIN - getGeoPayCheckoutPage - Retrieving checkout data for: ${merchantTxnId}`,
+    );
+
+    // Retrieve checkout form data from cache
+    const cacheKey = `geopay:checkout:${merchantTxnId}`;
+    const checkoutFormData = await this.cacheManager.get<any>(cacheKey);
+
+    if (!checkoutFormData) {
+      this.logger.error(
+        `PAYIN - getGeoPayCheckoutPage - Checkout data not found or expired for: ${merchantTxnId}`,
+      );
+      throw new NotFoundException(
+        "Checkout session not found or has expired. Please create a new payment request.",
+      );
+    }
+
+    this.logger.info(
+      `PAYIN - getGeoPayCheckoutPage - Checkout data retrieved successfully`,
+    );
+
+    // Return data for the template (interceptor will wrap it in { data: ... })
+    return checkoutFormData;
   }
 
   async handleGeoPayWebhook(webhookData: any) {
