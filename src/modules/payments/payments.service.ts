@@ -4323,8 +4323,19 @@ export class PaymentsService {
 
     try {
       this.logger.info(
-        `PAYIN - createGeoPayCheckout - Calling GeoPay API with payload: ${LoggerPlaceHolder.Json}`,
-        payload,
+        `PAYIN - createGeoPayCheckout - API Endpoint: ${GEOPAY.BASE_URL}${GEOPAY.PAYIN.LIVE}`,
+      );
+      this.logger.info(
+        `PAYIN - createGeoPayCheckout - Request payload: ${LoggerPlaceHolder.Json}`,
+        {
+          agentId: payload.agentId,
+          secretKey: payload.secretKey.substring(0, 4) + "****", // Mask secret
+          partnertxnid: payload.partnertxnid,
+          merchantTxnAmount: payload.merchantTxnAmount,
+          agentname: payload.agentname,
+          agentmobile: payload.agentmobile,
+          agentemail: payload.agentemail,
+        },
       );
 
       const geoPayResponse = await axiosServiceGeoPay.postRequest<any>(
@@ -4405,14 +4416,44 @@ export class PaymentsService {
       this.logger.error(
         `PAYIN - createGeoPayCheckout - Error: ${err.message || err}`,
       );
+
+      // Log detailed error information for debugging GeoPay API issues
+      const errorDetails: any = {
+        message: err.message,
+        requestEndpoint: `${GEOPAY.BASE_URL}${GEOPAY.PAYIN.LIVE}`,
+        requestPayload: {
+          agentId: payload.agentId,
+          partnertxnid: payload.partnertxnid,
+          amount: payload.merchantTxnAmount,
+        },
+      };
+
+      if (err.response) {
+        errorDetails.responseStatus = err.response.status;
+
+        // If GeoPay returns HTML error page, detect it
+        if (
+          typeof err.response.data === "string" &&
+          err.response.data.includes("Error 500")
+        ) {
+          errorDetails.geoPayError = "GeoPay returned 500 error page";
+          errorDetails.errorPagePreview = err.response.data.substring(0, 300);
+
+          this.logger.error(
+            `PAYIN - createGeoPayCheckout - ⚠️ GeoPay API returned 500 error. Possible causes:
+            1. Invalid credentials (agentId/secretKey)
+            2. Server IP not whitelisted by GeoPay
+            3. GeoPay service is down
+            4. Invalid payload format`,
+          );
+        } else {
+          errorDetails.responseData = err.response.data;
+        }
+      }
+
       this.logger.error(
         `PAYIN - createGeoPayCheckout - Full error details: ${LoggerPlaceHolder.Json}`,
-        {
-          message: err.message,
-          stack: err.stack,
-          response: err.response?.data,
-          status: err.response?.status,
-        },
+        errorDetails,
       );
 
       // Re-throw the original error if it's already a NestJS exception
@@ -4423,9 +4464,16 @@ export class PaymentsService {
         throw err;
       }
 
-      throw new BadRequestException(
-        "Failed to generate checkout page. Please try again later.",
-      );
+      // Provide helpful error message based on error type
+      let errorMessage =
+        "Failed to generate checkout page. Please try again later.";
+
+      if (err.response?.status === 500) {
+        errorMessage =
+          "Payment gateway error. Please verify credentials and contact support if this persists.";
+      }
+
+      throw new BadRequestException(errorMessage);
     }
 
     // Compute commissions
