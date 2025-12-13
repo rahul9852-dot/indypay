@@ -104,6 +104,9 @@ export class PayInOrdersEntity {
   @Column({ nullable: true, type: "timestamptz" })
   failureAt: Date;
 
+  @Column({ nullable: true, type: "jsonb" })
+  checkoutData: any;
+
   @Index()
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;

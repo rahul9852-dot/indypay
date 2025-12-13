@@ -4562,7 +4562,7 @@ export class PaymentsService {
 
     // Store transaction in database
     return await this.dataSource.transaction(async (manager) => {
-      // Create payin order
+      // Create payin order with checkout data
       const payinOrder = this.payInOrdersRepository.create({
         user,
         amount,
@@ -4575,6 +4575,7 @@ export class PaymentsService {
         orderId,
         txnRefId,
         status: PAYMENT_STATUS.INITIATED,
+        checkoutData: checkoutFormData, // Store checkout data in database as fallback
       });
       const savedPayinOrder = await manager.save(payinOrder);
 
@@ -4598,13 +4599,26 @@ export class PaymentsService {
         checkoutFormData,
       );
 
-      // Store checkout form data in cache for 30 minutes (TTL in milliseconds)
+      // Store checkout form data in cache for 30 minutes (TTL in seconds for cache-manager v5)
       const cacheKey = `geopay:checkout:${txnRefId}`;
-      await this.cacheManager.set(cacheKey, checkoutFormData, 1800000); // 30 minutes
 
       this.logger.info(
-        `Checkout data cached with key: ${cacheKey} for txnRefId: ${txnRefId}`,
+        `PAYIN - createGeoPayCheckout - Storing checkout data in cache with key: ${cacheKey}`,
       );
+
+      await this.cacheManager.set(cacheKey, checkoutFormData, 1800); // 30 minutes in seconds
+
+      // Verify cache storage immediately
+      const verifyCache = await this.cacheManager.get(cacheKey);
+      if (verifyCache) {
+        this.logger.info(
+          `PAYIN - createGeoPayCheckout - ✅ Checkout data successfully cached and verified for key: ${cacheKey}`,
+        );
+      } else {
+        this.logger.error(
+          `PAYIN - createGeoPayCheckout - ❌ Failed to verify cache storage for key: ${cacheKey}`,
+        );
+      }
 
       // Return checkout URL instead of rendering HTML
       const checkoutUrl = `${appConfig().beBaseUrl}/api/v1/payments/payin/geopay/checkout/${txnRefId}`;
@@ -4623,24 +4637,68 @@ export class PaymentsService {
 
   async getGeoPayCheckoutPage(merchantTxnId: string) {
     this.logger.info(
-      `PAYIN - getGeoPayCheckoutPage - Retrieving checkout data for: ${merchantTxnId}`,
+      `PAYIN - getGeoPayCheckoutPage - Retrieving checkout data for merchantTxnId: ${merchantTxnId}`,
     );
 
-    // Retrieve checkout form data from cache
+    // Try cache first
     const cacheKey = `geopay:checkout:${merchantTxnId}`;
-    const checkoutFormData = await this.cacheManager.get<any>(cacheKey);
 
-    if (!checkoutFormData) {
-      this.logger.error(
-        `PAYIN - getGeoPayCheckoutPage - Checkout data not found or expired for: ${merchantTxnId}`,
+    this.logger.info(
+      `PAYIN - getGeoPayCheckoutPage - Looking up cache with key: ${cacheKey}`,
+    );
+
+    let checkoutFormData = await this.cacheManager.get<any>(cacheKey);
+
+    if (checkoutFormData) {
+      this.logger.info(
+        `PAYIN - getGeoPayCheckoutPage - ✅ Checkout data retrieved from cache`,
       );
+
+      return checkoutFormData;
+    }
+
+    this.logger.warn(
+      `PAYIN - getGeoPayCheckoutPage - ⚠️ Cache miss. Falling back to database lookup...`,
+    );
+
+    // Fallback to database if cache miss
+    const payinOrder = await this.payInOrdersRepository.findOne({
+      where: { txnRefId: merchantTxnId },
+    });
+
+    if (!payinOrder || !payinOrder.checkoutData) {
+      this.logger.error(
+        `PAYIN - getGeoPayCheckoutPage - ❌ Checkout data not found in cache or database for merchantTxnId: ${merchantTxnId}`,
+      );
+
+      // Try to get all keys to debug (if cache supports it)
+      try {
+        const allKeys = await this.cacheManager.store.keys?.();
+        if (allKeys) {
+          this.logger.info(
+            `Available cache keys: ${allKeys.filter((k) => k.startsWith("geopay:")).join(", ")}`,
+          );
+        }
+      } catch (e) {
+        this.logger.warn("Could not retrieve cache keys for debugging");
+      }
+
       throw new NotFoundException(
         "Checkout session not found or has expired. Please create a new payment request.",
       );
     }
 
     this.logger.info(
-      `PAYIN - getGeoPayCheckoutPage - Checkout data retrieved successfully`,
+      `PAYIN - getGeoPayCheckoutPage - ✅ Checkout data retrieved from database (fallback)`,
+    );
+
+    checkoutFormData = payinOrder.checkoutData;
+
+    // Restore to cache for next access
+    await this.cacheManager.set(cacheKey, checkoutFormData, 1800);
+
+    this.logger.info(
+      `PAYIN - getGeoPayCheckoutPage - Restored checkout data to cache`,
     );
 
     // Return data for the template (interceptor will wrap it in { data: ... })
