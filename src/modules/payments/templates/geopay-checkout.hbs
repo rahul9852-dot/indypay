@@ -170,7 +170,7 @@
             </div>
         </div>
 
-        <button class="pay-button" onclick="submitPayment()">
+        <button class="pay-button" id="payButton">
             Pay Now
         </button>
 
@@ -204,6 +204,14 @@
             console.log('Submitting payment to FreeCharge gateway...');
             document.getElementById('geopayForm').submit();
         }
+
+        // Attach event listener to the button (CSP compliant - no inline handlers)
+        document.addEventListener('DOMContentLoaded', function() {
+            const payButton = document.getElementById('payButton');
+            if (payButton) {
+                payButton.addEventListener('click', submitPayment);
+            }
+        });
     </script>
 </body>
 </html>
