@@ -146,4 +146,10 @@ export const appConfig = registerAs("appConfig", () => ({
     redirectUrl: getOsEnv("TPI_REDIRECT_URL"),
     userEmail: getOsEnv("TPI_USER_EMAIL"),
   },
+
+  geopay: {
+    secretKey: getOsEnv("GEOPAY_SECRET_KEY"),
+    agentId: getOsEnv("GEOPAY_AGENT_ID"),
+    agentname: getOsEnv("GEOPAY_AGENT_NAME"),
+  },
 }));

@@ -26,6 +26,7 @@ import {
   CreatePayinPaymentResponseDto,
   PayinStatusDto,
   CreatePayinTransactionFlaPayDto,
+  CreatePayinTransactionGeoPayDTO,
 } from "./dto/create-payin-payment.dto";
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
@@ -82,7 +83,7 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createJioPayin(createTransactionDto, user);
+    return this.paymentsService.createGeoPay(createTransactionDto, user);
   }
 
   @Public()
@@ -241,6 +242,26 @@ export class PaymentsController {
   }
 
   @Public()
+  @ApiOperation({ summary: "GeoPay webhook for payment callback" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payin/geopay/webhook")
+  async geoPayWebhook(@Body() webhookData: any, @Res() res: Response) {
+    try {
+      this.logger.info("GeoPay webhook received:", webhookData);
+
+      // Process the webhook (you can expand this based on actual webhook format)
+      await this.paymentsService.handleGeoPayWebhook(webhookData);
+
+      return res.status(200).send("OK");
+    } catch (error) {
+      this.logger.error("GeoPay webhook processing failed:", error);
+
+      return res.status(200).send("OK"); // Still send OK to prevent retries
+    }
+  }
+
+  @Public()
   @ApiOperation({ summary: "External webhook for pay-in" })
   @UseGuards(WebhookGuard)
   @HttpCode(HttpStatus.OK)
@@ -285,6 +306,21 @@ export class PaymentsController {
     const data = await this.paymentsService.checkout(checkoutDto);
 
     return data;
+  }
+
+  @Public()
+  @ApiOperation({ summary: "GeoPay Checkout - Returns checkout page" })
+  @UseGuards(ApiKeyGuard)
+  @Post("payin/geopay/checkout")
+  @Render("geopay-checkout")
+  async geoPayCheckout(
+    @Body() createPayinTransactionDto: CreatePayinTransactionGeoPayDTO,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createGeoPayCheckout(
+      createPayinTransactionDto,
+      user,
+    );
   }
 
   @ApiExcludeEndpoint()
