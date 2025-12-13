@@ -4283,6 +4283,18 @@ export class PaymentsService {
   ) {
     const { amount, email, mobile, name, orderId } = createPayinTransactionDto;
 
+    // Ensure user exists (from ApiKeyGuard)
+    if (!user) {
+      this.logger.error(
+        `PAYIN - createGeoPayCheckout - User is undefined. ApiKeyGuard failed to load user.`,
+      );
+      throw new BadRequestException("Authentication error: User not found.");
+    }
+
+    this.logger.info(
+      `PAYIN - createGeoPayCheckout - User authenticated: ${user.id} (${user.email || "no-email"})`,
+    );
+
     // Validation
     if (amount < 100 || amount > 50000) {
       throw new BadRequestException("Amount must be between ₹100 and ₹50,000");
@@ -4476,12 +4488,17 @@ export class PaymentsService {
       throw new BadRequestException(errorMessage);
     }
 
-    // Compute commissions
+    // Compute commissions (with fallback to 0 if not set)
     const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
       amount,
-      commissionInPercentage: user.commissionInPercentagePayin,
-      gstInPercentage: user.gstInPercentagePayin,
+      commissionInPercentage: user.commissionInPercentagePayin || 0,
+      gstInPercentage: user.gstInPercentagePayin || 0,
     });
+
+    this.logger.info(
+      `PAYIN - createGeoPayCheckout - Commissions calculated: ${LoggerPlaceHolder.Json}`,
+      { commissionAmount, gstAmount, netPayableAmount },
+    );
 
     // Store transaction in database
     return await this.dataSource.transaction(async (manager) => {
