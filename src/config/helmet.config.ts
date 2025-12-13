@@ -16,7 +16,6 @@ export const helmetConfigs: Readonly<HelmetOptions> = {
         "'self'",
         "https://securepay.sabpaisa.in",
         "https://secure-axispg.freecharge.in",
-        "https://gopaydigital.in",
       ],
     },
   },
