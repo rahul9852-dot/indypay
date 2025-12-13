@@ -310,11 +310,12 @@ export class PaymentsController {
 
   @Public()
   @ApiOperation({ summary: "GeoPay Checkout - Returns checkout page" })
+  @UseGuards(ApiKeyGuard)
   @Post("payin/geopay/checkout")
   @Render("geopay-checkout")
   async geoPayCheckout(
     @Body() createPayinTransactionDto: CreatePayinTransactionGeoPayDTO,
-    @User() user?: UsersEntity,
+    @User() user: UsersEntity,
   ) {
     return this.paymentsService.createGeoPayCheckout(
       createPayinTransactionDto,
