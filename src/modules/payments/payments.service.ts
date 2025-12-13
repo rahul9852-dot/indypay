@@ -4296,7 +4296,7 @@ export class PaymentsService {
     );
 
     // Validation
-    if (amount < 100 || amount > 50000) {
+    if (amount < 50 || amount > 50000) {
       throw new BadRequestException("Amount must be between ₹100 and ₹50,000");
     }
 
