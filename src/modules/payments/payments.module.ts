@@ -7,6 +7,7 @@ import { CacheModule } from "@nestjs/cache-manager";
 import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
 import { PayoutProcessor } from "./payments.processor";
+import { PayoutProcessorGeopay } from "./geopay.processor";
 import { SESService } from "@/modules/aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
@@ -49,7 +50,11 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
       UserLoginIpsEntity,
       CheckoutEntity,
     ]),
-    BullModule.registerQueue({ name: "payouts" }, { name: "tpipay-payouts" }),
+    BullModule.registerQueue(
+      { name: "payouts" },
+      { name: "tpipay-payouts" },
+      { name: "Geopay-payouts" },
+    ),
     CacheModule.register(),
     ThirdPartyAuthModule,
   ],
@@ -65,6 +70,7 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
     PayoutService,
     CryptoService,
     DatabaseMonitorService,
+    PayoutProcessorGeopay,
   ],
   controllers: [PaymentsController],
   exports: [PaymentsService],

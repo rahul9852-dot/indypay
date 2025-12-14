@@ -193,3 +193,11 @@ export class PayoutWebhookResponseDto {
   @ApiProperty({ type: String, format: "date-time" })
   timestamp: string;
 }
+
+export class ExternalPayoutRequestDto {
+  partnertxnid: string;
+  resp_msg: string;
+  utr: string;
+  GPID: string;
+  status: string;
+}

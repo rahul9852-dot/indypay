@@ -468,3 +468,23 @@ export interface IExternalGeoPayCheckoutResponse {
   Signature: string;
   action: string;
 }
+
+export interface IExternalGeoPayPayoutRequest {
+  agentId: string;
+  secretKey: string;
+  partnertxnid: string;
+  bank_name: string;
+  account_number: string;
+  ifsc: string;
+  beneficiary_name: string;
+  mobile: string;
+  amount: string;
+  payment_type: string;
+}
+
+export interface IExternalGeoPayPayoutResponse {
+  partnertxnid: string;
+  resp_msg: string;
+  utr: string;
+  status: string;
+}
