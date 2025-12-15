@@ -83,7 +83,7 @@ export class PayoutProcessorGeopay {
             );
 
             const status = convertExternalPaymentStatusToInternal(
-              responseGeo.status.toUpperCase(),
+              responseGeo.title.toUpperCase(),
             );
 
             this.logger.info(

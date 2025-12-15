@@ -483,6 +483,7 @@ export interface IExternalGeoPayPayoutRequest {
 }
 
 export interface IExternalGeoPayPayoutResponse {
+  title: string;
   partnertxnid: string;
   resp_msg: string;
   utr: string;
