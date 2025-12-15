@@ -4359,20 +4359,20 @@ export class PaymentsService {
         payload,
       );
 
-      this.logger.info(
-        `GeoPay Checkout - Raw API Response Type: ${typeof geoPayResponse}, Length: ${typeof geoPayResponse === "string" ? geoPayResponse.length : "N/A"}`,
-      );
+      // this.logger.info(
+      //   `GeoPay Checkout - Raw API Response Type: ${typeof geoPayResponse}, Length: ${typeof geoPayResponse === "string" ? geoPayResponse.length : "N/A"}`,
+      // );
 
-      // Log first 500 characters of response for debugging
-      if (typeof geoPayResponse === "string") {
-        this.logger.info(
-          `GeoPay Checkout - Response Preview: ${geoPayResponse.substring(0, 500)}`,
-        );
-      } else {
-        this.logger.info(
-          `GeoPay Checkout - Response Data: ${JSON.stringify(geoPayResponse)}`,
-        );
-      }
+      // // Log first 500 characters of response for debugging
+      // if (typeof geoPayResponse === "string") {
+      //   this.logger.info(
+      //     `GeoPay Checkout - Response Preview: ${geoPayResponse.substring(0, 500)}`,
+      //   );
+      // } else {
+      //   this.logger.info(
+      //     `GeoPay Checkout - Response Data: ${JSON.stringify(geoPayResponse)}`,
+      //   );
+      // }
 
       // GeoPay API returns HTML with a form, not JSON
       // AxiosService returns res.data directly, so geoPayResponse is the HTML string
@@ -4637,16 +4637,16 @@ export class PaymentsService {
   }
 
   async getGeoPayCheckoutPage(merchantTxnId: string) {
-    this.logger.info(
-      `PAYIN - getGeoPayCheckoutPage - Retrieving checkout data for merchantTxnId: ${merchantTxnId}`,
-    );
+    // this.logger.info(
+    //   `PAYIN - getGeoPayCheckoutPage - Retrieving checkout data for merchantTxnId: ${merchantTxnId}`,
+    // );
 
     // Try cache first
     const cacheKey = `geopay:checkout:${merchantTxnId}`;
 
-    this.logger.info(
-      `PAYIN - getGeoPayCheckoutPage - Looking up cache with key: ${cacheKey}`,
-    );
+    // this.logger.info(
+    //   `PAYIN - getGeoPayCheckoutPage - Looking up cache with key: ${cacheKey}`,
+    // );
 
     let checkoutFormData = await this.cacheManager.get<any>(cacheKey);
 
@@ -4658,9 +4658,9 @@ export class PaymentsService {
       return checkoutFormData;
     }
 
-    this.logger.warn(
-      `PAYIN - getGeoPayCheckoutPage - ⚠️ Cache miss. Falling back to database lookup...`,
-    );
+    // this.logger.warn(
+    //   `PAYIN - getGeoPayCheckoutPage - ⚠️ Cache miss. Falling back to database lookup...`,
+    // );
 
     // Fallback to database if cache miss
     const payinOrder = await this.payInOrdersRepository.findOne({
@@ -4689,18 +4689,18 @@ export class PaymentsService {
       );
     }
 
-    this.logger.info(
-      `PAYIN - getGeoPayCheckoutPage - ✅ Checkout data retrieved from database (fallback)`,
-    );
+    // this.logger.info(
+    //   `PAYIN - getGeoPayCheckoutPage - ✅ Checkout data retrieved from database (fallback)`,
+    // );
 
     checkoutFormData = payinOrder.checkoutData;
 
     // Restore to cache for next access
     await this.cacheManager.set(cacheKey, checkoutFormData, 1800);
 
-    this.logger.info(
-      `PAYIN - getGeoPayCheckoutPage - Restored checkout data to cache`,
-    );
+    // this.logger.info(
+    //   `PAYIN - getGeoPayCheckoutPage - Restored checkout data to cache`,
+    // );
 
     // Return data for the template (interceptor will wrap it in { data: ... })
     return checkoutFormData;
@@ -4715,7 +4715,7 @@ export class PaymentsService {
 
       const {
         merchantTxnId,
-        status,
+        statusMessage,
         utr,
         merchantTxnAmount,
         partnertxnid,
@@ -4751,11 +4751,11 @@ export class PaymentsService {
 
       // Map external status to internal status
       let internalStatus: PAYMENT_STATUS;
-      if (status === "SUCCESS" || status === "success") {
+      if (statusMessage === "SUCCESS" || statusMessage === "success") {
         internalStatus = PAYMENT_STATUS.SUCCESS;
-      } else if (status === "FAILED" || status === "failed") {
+      } else if (statusMessage === "FAILED" || statusMessage === "failed") {
         internalStatus = PAYMENT_STATUS.FAILED;
-      } else if (status === "PENDING" || status === "pending") {
+      } else if (statusMessage === "PENDING" || statusMessage === "pending") {
         internalStatus = PAYMENT_STATUS.PENDING;
       } else {
         internalStatus = PAYMENT_STATUS.FAILED;
