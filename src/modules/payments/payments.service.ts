@@ -4293,9 +4293,9 @@ export class PaymentsService {
       throw new BadRequestException("Authentication error: User not found.");
     }
 
-    this.logger.info(
-      `PAYIN - createGeoPayCheckout - User authenticated: ${user.id} (${user.email || "no-email"})`,
-    );
+    // this.logger.info(
+    //   `PAYIN - createGeoPayCheckout - User authenticated: ${user.id} (${user.email || "no-email"})`,
+    // );
 
     // Validation
     if (amount < 50 || amount > 50000) {
@@ -4336,23 +4336,23 @@ export class PaymentsService {
     let txnRefId: string | undefined;
 
     try {
-      this.logger.info(
-        `PAYIN - createGeoPayCheckout - API Endpoint: ${GEOPAY.BASE_URL}${GEOPAY.PAYIN.LIVE}`,
-      );
-      this.logger.info(
-        `PAYIN - createGeoPayCheckout - Request payload: ${LoggerPlaceHolder.Json}`,
-        {
-          agentId: payload.agentId,
-          secretKey: payload.secretKey.substring(0, 4) + "****", // Mask secret
-          partnertxnid: payload.partnertxnid,
-          merchantTxnAmount: payload.merchantTxnAmount,
-          agentname: payload.agentname,
-          agentmobile: payload.agentmobile,
-          agentemail: payload.agentemail,
-        },
-      );
+      // this.logger.info(
+      //   `PAYIN - createGeoPayCheckout - API Endpoint: ${GEOPAY.BASE_URL}${GEOPAY.PAYIN.LIVE}`,
+      // );
+      // this.logger.info(
+      //   `PAYIN - createGeoPayCheckout - Request payload: ${LoggerPlaceHolder.Json}`,
+      //   {
+      //     agentId: payload.agentId,
+      //     secretKey: payload.secretKey.substring(0, 4) + "****", // Mask secret
+      //     partnertxnid: payload.partnertxnid,
+      //     merchantTxnAmount: payload.merchantTxnAmount,
+      //     agentname: payload.agentname,
+      //     agentmobile: payload.agentmobile,
+      //     agentemail: payload.agentemail,
+      //   },
+      // );
 
-      this.logger.info(`PAYIN - createGeoPayCheckout - Calling GeoPay API...`);
+      // this.logger.info(`PAYIN - createGeoPayCheckout - Calling GeoPay API...`);
 
       const geoPayResponse = await axiosServiceGeoPay.postRequest<any>(
         GEOPAY.PAYIN.LIVE,
@@ -4427,9 +4427,9 @@ export class PaymentsService {
         action: actionUrl,
       };
 
-      this.logger.info(
-        `GeoPay Callback URL from response: ${checkoutFormData.callbackUrl}`,
-      );
+      // this.logger.info(
+      //   `GeoPay Callback URL from response: ${checkoutFormData.callbackUrl}`,
+      // );
 
       this.logger.info(
         `CHECKOUT FORM DATA PREPARED: ${LoggerPlaceHolder.Json}`,
@@ -4556,11 +4556,6 @@ export class PaymentsService {
       gstInPercentage: user.gstInPercentagePayin || 0,
     });
 
-    this.logger.info(
-      `PAYIN - createGeoPayCheckout - Commissions calculated: ${LoggerPlaceHolder.Json}`,
-      { commissionAmount, gstAmount, netPayableAmount },
-    );
-
     // Store transaction in database
     return await this.dataSource.transaction(async (manager) => {
       // Create payin order with checkout data
@@ -4595,10 +4590,10 @@ export class PaymentsService {
         email,
       });
 
-      this.logger.info(
-        `CHECKOUT FORM DATA PREPARED: ${LoggerPlaceHolder.Json}`,
-        checkoutFormData,
-      );
+      // this.logger.info(
+      //   `CHECKOUT FORM DATA PREPARED: ${LoggerPlaceHolder.Json}`,
+      //   checkoutFormData,
+      // );
 
       // Store checkout form data in cache for 30 minutes (TTL in seconds for cache-manager v5)
       const cacheKey = `geopay:checkout:${txnRefId}`;
