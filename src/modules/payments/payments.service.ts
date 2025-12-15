@@ -4718,6 +4718,7 @@ export class PaymentsService {
         status,
         utr,
         merchantTxnAmount,
+        partnertxnid,
         amount: webhookAmount,
       } = webhookData;
 
@@ -4727,14 +4728,14 @@ export class PaymentsService {
 
       // Find the payin order by either our orderId or GeoPay's generated txnRefId
       let payinOrder = await this.payInOrdersRepository.findOne({
-        where: { orderId: merchantTxnId },
+        where: { orderId: partnertxnid },
         relations: ["user"],
       });
 
       // If not found by orderId, try finding by txnRefId (GeoPay's generated transaction ID)
       if (!payinOrder) {
         payinOrder = await this.payInOrdersRepository.findOne({
-          where: { txnRefId: merchantTxnId },
+          where: { txnRefId: partnertxnid },
           relations: ["user"],
         });
       }

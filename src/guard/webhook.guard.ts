@@ -15,6 +15,7 @@ const {
   utkarsh: { webhookIps: utkarshWebhookIps },
   payboltCreds: { webhookIps: payboltWebhookIps },
   tpipay: { webhookIps: tpiWebhookIps },
+  geopay,
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -39,6 +40,7 @@ export class WebhookGuard implements CanActivate {
       ...utkarshWebhookIps,
       ...payboltWebhookIps,
       ...tpiWebhookIps,
+      ...geopay.webhookips,
     ];
 
     if (!webhookIps.includes(requestIp)) {
