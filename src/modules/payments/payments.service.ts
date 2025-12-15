@@ -4730,7 +4730,7 @@ export class PaymentsService {
       // If not found by orderId, try finding by txnRefId (GeoPay's generated transaction ID)
       if (!payinOrder) {
         payinOrder = await this.payInOrdersRepository.findOne({
-          where: { txnRefId: partnertxnid },
+          where: { txnRefId: merchantTxnId },
           relations: ["user"],
         });
       }
