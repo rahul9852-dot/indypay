@@ -248,6 +248,17 @@ export class PaymentsController {
   }
 
   @Public()
+  @ApiOperation({
+    summary: "Payout Wallet of Merchant",
+  })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("payout/wallet")
+  async checkPayOutWallet(@User() user: UsersEntity) {
+    return this.paymentsService.checkPayOutWalletBalance(user);
+  }
+
+  @Public()
   @ApiOperation({ summary: "GeoPay Checkout Page - Displays payment page" })
   @Get("payin/geopay/checkout/:merchantTxnId")
   @Render("geopay-checkout")

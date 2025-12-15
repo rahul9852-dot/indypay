@@ -260,7 +260,7 @@ export class PaymentsService {
     }
   }
 
-  async checkPayOutWalletFlakPay(user: UsersEntity) {
+  async checkPayOutWalletBalance(user: UsersEntity) {
     const wallet = await this.walletRepository.findOne({
       where: { user: { id: user.id } },
       select: {
