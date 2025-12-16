@@ -432,6 +432,16 @@ export interface IExternalPayinPaymentRequestTPIPay {
   redirect_url: string;
 }
 
+export interface IExternalPayinPaymentResponseGeopay {
+  agentId: string;
+  secretKey: string;
+  partnertxnid: string;
+  merchantTxnAmount: string;
+  agentname: string;
+  agentmobile: string;
+  agentemail: string;
+}
+
 export interface IExternalPayinPaymentResponseTPI {
   status: string;
   data: {
@@ -446,6 +456,43 @@ export interface IExternalTpiPayoutFundResponse {
   message: string;
   utr: string;
   payid: string;
+}
+
+export interface IExternalGeoPayCheckoutResponse {
+  merchantId: string;
+  callbackUrl: string;
+  merchantTxnId: string;
+  merchantTxnAmount: string;
+  cctype: string;
+  currency: string;
+  customerName: string;
+  customerEmailId: string;
+  customerMobileNo: string;
+  customerStreetAddress: string;
+  timestamp: string;
+  Signature: string;
+  action: string;
+}
+
+export interface IExternalGeoPayPayoutRequest {
+  agentId: string;
+  secretKey: string;
+  partnertxnid: string;
+  bank_name: string;
+  account_number: string;
+  ifsc: string;
+  beneficiary_name: string;
+  mobile: string;
+  amount: string;
+  payment_type: string;
+}
+
+export interface IExternalGeoPayPayoutResponse {
+  title: string;
+  partnertxnid: string;
+  resp_msg: string;
+  utr: string;
+  status: string;
 }
 
 export interface IExternalBuckboxPayoutFundResponse {

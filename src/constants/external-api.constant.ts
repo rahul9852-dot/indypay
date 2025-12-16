@@ -98,6 +98,16 @@ export const TPI = {
   },
 };
 
+export const GEOPAY = {
+  BASE_URL: "https://gopaydigital.in/",
+  PAYIN: {
+    LIVE: "api/v1/auth/services/niyoin-ut",
+  },
+  PAYOUT: {
+    LIVE: "api/v1/auth/services/niyoin-po",
+  },
+};
+
 export const KDSPAYOUT = {
   BASE_URL: "https://partner.kdstechs.com/api",
   PAYOUT: {

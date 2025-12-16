@@ -7,11 +7,10 @@ import {
   UseGuards,
   Get,
   Query,
-  BadRequestException,
   Render,
   Res,
   Param,
-  NotFoundException,
+  BadRequestException,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -26,6 +25,7 @@ import {
   CreatePayinPaymentResponseDto,
   PayinStatusDto,
   CreatePayinTransactionFlaPayDto,
+  CreatePayinTransactionGeoPayDTO,
 } from "./dto/create-payin-payment.dto";
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
@@ -47,7 +47,6 @@ import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { PayoutService } from "@/modules/payout/payout.service";
 import { PaginationWithDateDto } from "@/dtos/common.dto";
-import { CheckoutDto } from "@/modules/payments/dto/checkout.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
@@ -82,7 +81,7 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createJioPayin(createTransactionDto, user);
+    return this.paymentsService.createGeoPay(createTransactionDto, user);
   }
 
   @Public()
@@ -99,23 +98,6 @@ export class PaymentsController {
       user,
     );
   }
-
-  // @Public()
-  // @ApiOperation({
-  //   summary: "Check status of pay-in transaction",
-  // })
-  // @UseGuards(ApiKeyGuard)
-  // @HttpCode(HttpStatus.OK)
-  // @Post("payin/status")
-  // async checkStatusTransactionPayin(
-  //   @Body() payinStatusDto: PayinStatusDto,
-  //   @User() user: UsersEntity,
-  // ) {
-  //   return this.paymentsService.checkPayInStatusTransaction(
-  //     payinStatusDto,
-  //     user,
-  //   );
-  // }
 
   @Public()
   @ApiOperation({
@@ -137,13 +119,13 @@ export class PaymentsController {
   @Public()
   @ApiOperation({ summary: "Create pay-out transaction for dias pay" })
   @UseGuards(ApiKeyGuard)
-  @Post("payout/create/dias-pay")
+  @Post("payout/create/kds")
   async createPayoutDiasPay(
     @Body() createPayoutDto: CreatePayoutDto,
     @User() user: UsersEntity,
   ) {
-    // return this.paymentsService.createPayoutKDS(createPayoutDto, user);
-    return this.paymentsService.createPayoutBuckBox(createPayoutDto, user);
+    return this.paymentsService.createPayoutKDS(createPayoutDto, user);
+    // return this.paymentsService.createPayoutBuckBox(createPayoutDto, user);
   }
 
   // @Public()
@@ -230,17 +212,6 @@ export class PaymentsController {
   }
 
   @Public()
-  @ApiOperation({
-    summary: "Payout Wallet of Merchant",
-  })
-  @UseGuards(ApiKeyGuard)
-  @HttpCode(HttpStatus.OK)
-  @Get("payout/wallet")
-  async checkPayOutWallet(@User() user: UsersEntity) {
-    return this.paymentsService.checkPayOutWalletFlakPay(user);
-  }
-
-  @Public()
   @ApiOperation({ summary: "External webhook for pay-in" })
   @UseGuards(WebhookGuard)
   @HttpCode(HttpStatus.OK)
@@ -250,6 +221,49 @@ export class PaymentsController {
     @Body() externalWebhookPayin: ExternalPayinWebhookTPIDto,
   ) {
     return this.paymentsService.externalWebhookPayinJio(externalWebhookPayin);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "GeoPay webhook for payment callback" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payin/geopay/webhook")
+  async geoPayWebhook(@Body() webhookData: any, @Res() res: Response) {
+    try {
+      this.logger.info("GeoPay webhook received:", webhookData);
+
+      // Process the webhook (you can expand this based on actual webhook format)
+      await this.paymentsService.handleGeoPayWebhook(webhookData);
+
+      return res.status(200).send("OK");
+    } catch (error) {
+      this.logger.error("GeoPay webhook processing failed:", error);
+
+      return res.status(200).send("OK"); // Still send OK to prevent retries
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Geo Pay Payout" })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payout/Geopay")
+  async geoPayPayout(
+    @Body() createPayoutDto: CreatePayoutDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutGeoPay(createPayoutDto, user);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "GeoPay Payout API" })
+  @UseGuards(WebhookGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payout/geopay/webhook")
+  async geoPayPayoutWebhook(@Body() webhookData: any, @Res() res: Response) {
+    return this.paymentsService.externalWebhookPayoutGeoPay(webhookData);
   }
 
   @Public()
@@ -312,13 +326,36 @@ export class PaymentsController {
   }
 
   @Public()
-  @ApiOperation({ summary: "Checkout API" })
-  @Post("checkout")
-  @Render("pg-form-request")
-  async checkout(@Body() checkoutDto: CheckoutDto) {
-    const data = await this.paymentsService.checkout(checkoutDto);
+  @ApiOperation({ summary: "GeoPay Checkout - Returns checkout URL" })
+  @UseGuards(ApiKeyGuard)
+  @Post("payin/geopay/checkout")
+  async geoPayCheckout(
+    @Body() createPayinTransactionDto: CreatePayinTransactionGeoPayDTO,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createGeoPayCheckout(
+      createPayinTransactionDto,
+      user,
+    );
+  }
 
-    return data;
+  @Public()
+  @ApiOperation({
+    summary: "Payout Wallet of Merchant",
+  })
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @Get("payout/wallet")
+  async checkPayOutWallet(@User() user: UsersEntity) {
+    return this.paymentsService.checkPayOutWalletBalance(user);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "GeoPay Checkout Page - Displays payment page" })
+  @Get("payin/geopay/checkout/:merchantTxnId")
+  @Render("geopay-checkout")
+  async geoPayCheckoutPage(@Param("merchantTxnId") merchantTxnId: string) {
+    return this.paymentsService.getGeoPayCheckoutPage(merchantTxnId);
   }
 
   @ApiExcludeEndpoint()
@@ -349,133 +386,6 @@ export class PaymentsController {
   async getMisspelledTransactions(@Query() query: PaginationWithDateDto) {
     return this.paymentsService.getMisspelledPayinTransactions(query);
   }
-
-  @Public()
-  @ApiOperation({ summary: "External webhook for checkout" })
-  @Post("webhook/checkout")
-  async sabpaisaWebhook(@Body() body: any, @Res() res: Response) {
-    try {
-      // Process the webhook data first
-      const rawBody = typeof body === "string" ? body : JSON.stringify(body);
-      await this.paymentsService.handleCheckoutWebhookRawBody(rawBody);
-
-      // Handle redirection if we have encResponse
-      if (body.encResponse) {
-        try {
-          const decoded = decodeURIComponent(body.encResponse);
-          const decryptedString = this.encryptionAlgoService.decrypt(decoded);
-          const params = new URLSearchParams(decryptedString);
-          const clientTxnId =
-            params.get("clientTxnId") ||
-            params.get("transactionId") ||
-            params.get("orderId");
-
-          if (clientTxnId) {
-            const statusPageUrl = `${process.env.BE_BASE_URL}/api/v1/payments/checkout/status/${clientTxnId}`;
-
-            return res.redirect(statusPageUrl);
-          }
-        } catch (decryptError) {
-          this.logger.error("Error decrypting data:", decryptError);
-        }
-      }
-
-      // If no redirection happened, send OK response
-      return res.status(200).send("OK");
-    } catch (error) {
-      this.logger.error("Webhook processing failed:", error);
-
-      return res.status(200).send("OK"); // Still send OK to payment gateway even if processing fails
-    }
-  }
-
-  @Public()
-  @ApiOperation({ summary: "Checkout Payment Status Page" })
-  @Get("checkout/status/:clientTxnId")
-  @Render("checkout-response")
-  async checkoutStatusPage(@Param("clientTxnId") id: string) {
-    const checkout = await this.paymentsService.getCheckoutByClientTxnId(id);
-
-    if (!checkout) {
-      throw new NotFoundException("Checkout not found");
-    }
-
-    const { payerEmail, payerName, amount, status, clientTxnId } = checkout;
-
-    const statusConfig = {
-      [PAYMENT_STATUS.SUCCESS]: {
-        title: "Payment Successful",
-        message:
-          "Your payment has been processed successfully thanks for choosing Paybolt",
-        statusClass: "success",
-      },
-      [PAYMENT_STATUS.FAILED]: {
-        title: "Payment Failed",
-        message: "We couldn't process your payment. Please try again.",
-        statusClass: "failed",
-      },
-      [PAYMENT_STATUS.PENDING]: {
-        title: "Payment Pending",
-        message: "Your payment is being processed. Please wait.",
-        statusClass: "pending",
-      },
-      [PAYMENT_STATUS.INITIATED]: {
-        title: "Payment Initiated",
-        message: "Your payment has been initiated.",
-        statusClass: "pending",
-      },
-      [PAYMENT_STATUS.ABORTED]: {
-        title: "Payment Aborted",
-        message: "Your payment was aborted.",
-        statusClass: "failed",
-      },
-    };
-
-    const config = statusConfig[checkout.status] || {
-      title: "Payment Status",
-      message: "Your payment status is being processed.",
-      statusClass: "pending",
-    };
-
-    const result = {
-      ...config,
-      status,
-      clientTxnId,
-      amount,
-      payerName,
-      payerEmail,
-      dateTime: new Date().toLocaleString(),
-      returnUrl: `https://paybolt.in`,
-    };
-
-    return result;
-  }
-
-  // this api is used to redirect user to payment link UI
-  // @Public()
-  // @IgnoreBusinessDetails()
-  // @IgnoreKyc()
-  // @IgnoreMobileVerification()
-  // @Get("redirect/payment-link/:payinId")
-  // async redirectPaymentLink(
-  //   @Param("payinId") payinId: string,
-  //   @Res() res: Response,
-  // ) {
-  //   return this.paymentsService.redirectPaymentLink(payinId, res);
-  // }
-
-  // this api is used to check payment status from payment link UI
-  // @Public()
-  // @IgnoreBusinessDetails()
-  // @IgnoreKyc()
-  // @IgnoreMobileVerification()
-  // @Get("redirect/payment-link/status/:orderId")
-  // async checkPaymentStatus(
-  //   @Param("orderId") orderId: string,
-  //   @Req() req: Request,
-  // ) {
-  //   return this.paymentsService.checkPaymentStatus(orderId, req);
-  // }
 
   @Get("health/database")
   @Role(USERS_ROLE.ADMIN)

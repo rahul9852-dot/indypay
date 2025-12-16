@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Rupeeflow - Complete Your Payment</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 3rem 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+        }
+        .logo-container {
+            margin-bottom: 2rem;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+        }
+        .logo svg {
+            width: 48px;
+            height: 48px;
+        }
+        .brand-name {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+        .tagline {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 2.5rem;
+        }
+        .payment-details {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+        .amount-label {
+            color: #64748b;
+            font-size: 13px;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .amount {
+            font-size: 36px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 1rem;
+        }
+        .customer-info {
+            font-size: 14px;
+            color: #475569;
+            line-height: 1.6;
+        }
+        .pay-button {
+            width: 100%;
+            padding: 18px 32px;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .pay-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(59, 130, 246, 0.6);
+        }
+        .pay-button:active {
+            transform: translateY(0);
+        }
+        .security-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 2rem;
+            padding: 12px;
+            background: #f0fdf4;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+        .security-badge svg {
+            width: 18px;
+            height: 18px;
+            color: #22c55e;
+        }
+        .powered-by {
+            margin-top: 1.5rem;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        @media (max-width: 480px) {
+            .container {
+                padding: 2rem 1.5rem;
+            }
+            .brand-name {
+                font-size: 28px;
+            }
+            .amount {
+                font-size: 32px;
+            }
+            .pay-button {
+                padding: 16px 28px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo-container">
+            <div class="logo">
+                <svg fill="white" viewBox="0 0 24 24">
+                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm-1 16.5l-4-4 1.41-1.41L11 15.68l5.59-5.59L18 11.5l-7 7z"/>
+                </svg>
+            </div>
+            <h1 class="brand-name">Rupeeflow</h1>
+            <p class="tagline">Secure & Fast Payments</p>
+        </div>
+
+        <div class="payment-details">
+            <div class="amount-label">Amount to Pay</div>
+            <div class="amount">₹{{data.merchantTxnAmount}}</div>
+            <div class="customer-info">
+                <strong>{{data.customerName}}</strong><br>
+                {{!-- {{data.customerEmailId}}<br>
+                {{data.customerMobileNo}} --}}
+            </div>
+        </div>
+
+        <button class="pay-button" id="payButton">
+            Pay Now
+        </button>
+
+        <div class="security-badge">
+            <svg fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <span>Secured with 256-bit SSL Encryption</span>
+        </div>
+
+        <p class="powered-by">Powered by Rupeeflow Payment Gateway</p>
+    </div>
+
+    <form id="geopayForm" method="post" action="{{data.action}}" style="display: none;">
+        <input type="hidden" name="merchantId" value="{{data.merchantId}}">
+        <input type="hidden" name="callbackUrl" value="{{data.callbackUrl}}">
+        <input type="hidden" name="merchantTxnId" value="{{data.merchantTxnId}}">
+        <input type="hidden" name="merchantTxnAmount" value="{{data.merchantTxnAmount}}">
+        <input type="hidden" name="cctype" value="{{data.cctype}}">
+        <input type="hidden" name="currency" value="{{data.currency}}">
+        <input type="hidden" name="customerName" value="{{data.customerName}}">
+        <input type="hidden" name="customerEmailId" value="{{data.customerEmailId}}">
+        <input type="hidden" name="customerMobileNo" value="{{data.customerMobileNo}}">
+        <input type="hidden" name="customerStreetAddress" value="{{data.customerStreetAddress}}">
+        <input type="hidden" name="timestamp" value="{{data.timestamp}}">
+        <input type="hidden" name="Signature" value="{{data.Signature}}">
+    </form>
+
+    <script>
+        function submitPayment() {
+            console.log('Submitting payment to FreeCharge gateway...');
+            document.getElementById('geopayForm').submit();
+        }
+
+        // Attach event listener to the button (CSP compliant - no inline handlers)
+        document.addEventListener('DOMContentLoaded', function() {
+            const payButton = document.getElementById('payButton');
+            if (payButton) {
+                payButton.addEventListener('click', submitPayment);
+            }
+        });
+    </script>
+</body>
+</html>

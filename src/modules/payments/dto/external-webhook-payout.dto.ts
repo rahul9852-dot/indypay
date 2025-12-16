@@ -231,3 +231,11 @@ export class PayoutWebhookResponseDto {
   @IsOptional()
   utr: string;
 }
+
+export class ExternalPayoutRequestDto {
+  partnertxnid: string;
+  resp_msg: string;
+  utr: string;
+  GPID: string;
+  status: string;
+}

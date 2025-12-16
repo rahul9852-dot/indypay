@@ -17,7 +17,7 @@ export class AxiosService {
 
   errorFormatter = (error: any) => {
     this.logger.error(
-      `error: ${LoggerPlaceHolder.Json}`,
+      `AxiosService error - Status: ${error?.response?.status}, Data: ${LoggerPlaceHolder.Json}`,
       error?.response?.data,
     );
 
@@ -29,15 +29,23 @@ export class AxiosService {
       error?.response?.data?.message ||
       "Something went wrong";
 
-    if (status === 401) {
-      throw new UnauthorizedException(message);
+    // Preserve original error data for debugging
+    const enhancedError: any =
+      status === 401
+        ? new UnauthorizedException(message)
+        : status !== 500
+          ? new BadRequestException(message)
+          : new Error(message);
+
+    // Attach original response data to error for debugging
+    if (error?.response) {
+      enhancedError.response = error.response;
+    }
+    if (error?.request) {
+      enhancedError.request = error.request;
     }
 
-    if (status !== 500) {
-      throw new BadRequestException(message);
-    }
-
-    throw new Error(message);
+    throw enhancedError;
   };
 
   async getRequest<T>(url: string, config?: AxiosRequestConfig): Promise<T> {

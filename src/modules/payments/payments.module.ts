@@ -7,6 +7,7 @@ import { CacheModule } from "@nestjs/cache-manager";
 import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
 import { PayoutProcessor } from "./payments.processor";
+import { PayoutProcessorGeopay } from "./geopay.processor";
 import { PayoutProcessorDiasPay } from "./payments.processorv2";
 import { PayoutProcessorBuckBox } from "./buckbox.processor";
 import { SESService } from "@/modules/aws/ses.service";
@@ -54,6 +55,11 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
     BullModule.registerQueue(
       { name: "payouts" },
       { name: "tpipay-payouts" },
+      { name: "Geopay-payouts" },
+    ),
+    BullModule.registerQueue(
+      { name: "payouts" },
+      { name: "tpipay-payouts" },
       { name: "payouts-kds-payout" },
       { name: "buckbox-payouts" },
     ),
@@ -74,6 +80,7 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
     PayoutService,
     CryptoService,
     DatabaseMonitorService,
+    PayoutProcessorGeopay,
   ],
   controllers: [PaymentsController],
   exports: [PaymentsService],

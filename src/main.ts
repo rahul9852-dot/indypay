@@ -126,9 +126,9 @@ async function bootstrap() {
   hbs.registerHelper("eq", function (v1, v2) {
     return v1 === v2;
   });
-  // hbs.registerHelper("json", function (context) {
-  //   return JSON.stringify(context, null, 2);
-  // });
+  hbs.registerHelper("json", function (context) {
+    return JSON.stringify(context, null, 2);
+  });
   hbs.registerPartials(join(viewsPath, "partials"));
   // Start server
   await app.listen(port, () => {

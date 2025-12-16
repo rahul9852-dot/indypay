@@ -25,6 +25,7 @@ import * as dayjs from "dayjs";
 import {
   CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionIsmartDto,
+  CreatePayinTransactionGeoPayDTO,
   PayinStatusDto,
 } from "./dto/create-payin-payment.dto";
 import {
@@ -33,6 +34,7 @@ import {
   SinglePayoutDto,
 } from "./dto/create-payout-payment.dto";
 import {
+  ExternalPayoutRequestDto,
   ExternalPayOutWebhookFlakPayDto,
   ExternalPayoutWebhookIsmartDto,
 } from "./dto/external-webhook-payout.dto";
@@ -73,6 +75,7 @@ import {
   UTKARSH,
   PAYBOLT,
   TPI,
+  GEOPAY,
 } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
 // import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
@@ -95,7 +98,9 @@ import {
   IExternalPayinPaymentResponsePayboltPayin,
   // IExternalDiasPayFundResponse,
   IExternalPayinPaymentRequestTPIPay,
+  IExternalGeoPayCheckoutResponse,
   IExternalPayinPaymentResponseTPI,
+  IExternalPayinPaymentResponseGeopay,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
@@ -123,6 +128,7 @@ const {
   utkarsh: { vpa, utkarshMid, utkarshTerminalId },
   payboltCreds,
   tpipay,
+  geopay,
 } = appConfig();
 
 @Injectable()
@@ -148,6 +154,7 @@ export class PaymentsService {
     private readonly checkoutRepository: Repository<CheckoutEntity>,
     @InjectQueue("payouts") private payoutQueue: Queue,
     @InjectQueue("tpipay-payouts") private payoutQueueTPI: Queue,
+    @InjectQueue("Geopay-payouts") private payoutQueueGeo: Queue,
     @InjectQueue("buckbox-payouts") private payoutQueueBuckBox: Queue,
     @InjectQueue("payouts-kds-payout") private payoutQueueKDS: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -252,7 +259,7 @@ export class PaymentsService {
     }
   }
 
-  async checkPayOutWalletFlakPay(user: UsersEntity) {
+  async checkPayOutWalletBalance(user: UsersEntity) {
     const wallet = await this.walletRepository.findOne({
       where: { user: { id: user.id } },
       select: {
@@ -4156,6 +4163,766 @@ export class PaymentsService {
     });
   }
 
+  async createGeoPay(
+    createPayinTransactionDto: CreatePayinTransactionFlaPayDto,
+    user: UsersEntity,
+  ) {
+    const { amount, email, mobile, name, orderId } = createPayinTransactionDto;
+
+    if (amount < 100 || amount > 3000) {
+      throw new BadRequestException(
+        "Amount must be greater than 100 and less than 3000",
+      );
+    }
+
+    const existingPayinOrder = await this.payInOrdersRepository.exists({
+      where: { orderId },
+    });
+    if (existingPayinOrder) {
+      throw new BadRequestException(
+        "Payin order already exists for given orderId",
+      );
+    }
+
+    // Call external TPI API **before starting transaction**
+    const axiosServiceGeoPay = new AxiosService(GEOPAY.BASE_URL);
+    const payload: IExternalPayinPaymentResponseGeopay = {
+      agentId: geopay.agentId,
+      secretKey: geopay.secretKey,
+      partnertxnid: orderId,
+      merchantTxnAmount: String(amount),
+      agentname: geopay.agentname,
+      agentmobile: mobile,
+      agentemail: email,
+    };
+
+    let paymentLink: string | undefined;
+    let txnRefId: string | undefined;
+    try {
+      const geoPayResponse =
+        await axiosServiceGeoPay.postRequest<IExternalPayinPaymentResponseTPI>(
+          GEOPAY.PAYIN.LIVE,
+          payload,
+        );
+
+      if (!geoPayResponse || geoPayResponse.status !== "success") {
+        this.logger.error(
+          `PAYIN - createTransaction - GeoPay API failed`,
+          geoPayResponse,
+        );
+        throw new BadRequestException(
+          new MessageResponseDto("Something went wrong"),
+        );
+      }
+
+      paymentLink = geoPayResponse.data?.qr_string;
+      txnRefId = geoPayResponse.data?.ref_id;
+    } catch (err: any) {
+      this.logger.error(
+        `PAYIN - createTransaction - Error calling TPI API`,
+        err,
+      );
+      throw new BadRequestException("Failed to generate payment link");
+    }
+
+    // Compute commissions
+    const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+      amount,
+      commissionInPercentage: user.commissionInPercentagePayin,
+      gstInPercentage: user.gstInPercentagePayin,
+    });
+
+    // Wrap DB operations in a safe TypeORM transaction
+    return await this.dataSource.transaction(async (manager) => {
+      // Create payin order
+      const payinOrder = this.payInOrdersRepository.create({
+        user,
+        amount,
+        email,
+        name,
+        mobile,
+        commissionAmount,
+        gstAmount,
+        netPayableAmount,
+        orderId,
+        txnRefId,
+        ...(paymentLink && { intent: paymentLink }),
+      });
+      const savedPayinOrder = await manager.save(payinOrder);
+
+      // Create transaction
+      const transaction = this.transactionsRepository.create({
+        user,
+        payInOrder: savedPayinOrder,
+        transactionType: PAYMENT_TYPE.PAYIN,
+      });
+      await manager.save(transaction);
+
+      this.logger.info(
+        `PAYIN CREATED: ${LoggerPlaceHolder.Json}`,
+        createPayinTransactionDto,
+      );
+
+      return {
+        orderId,
+        intent: paymentLink,
+        message: "Payment Link Generated successfully",
+      };
+    });
+  }
+
+  async createGeoPayCheckout(
+    createPayinTransactionDto: CreatePayinTransactionGeoPayDTO,
+    user: UsersEntity,
+  ) {
+    const { amount, email, mobile, name, orderId } = createPayinTransactionDto;
+
+    // Ensure user exists (from ApiKeyGuard)
+    if (!user) {
+      this.logger.error(
+        `PAYIN - createGeoPayCheckout - User is undefined. ApiKeyGuard failed to load user.`,
+      );
+      throw new BadRequestException("Authentication error: User not found.");
+    }
+
+    // this.logger.info(
+    //   `PAYIN - createGeoPayCheckout - User authenticated: ${user.id} (${user.email || "no-email"})`,
+    // );
+
+    // Validation
+    if (amount < 50 || amount > 50000) {
+      throw new BadRequestException("Amount must be between ₹100 and ₹50,000");
+    }
+
+    // Check if order already exists
+    const existingPayinOrder = await this.payInOrdersRepository.exists({
+      where: { orderId },
+    });
+    if (existingPayinOrder) {
+      throw new BadRequestException(
+        "Payment order already exists for given orderId",
+      );
+    }
+
+    // Call external GeoPay API to get checkout form data
+    // Note: GeoPay returns HTML, not JSON, so we need to configure Axios accordingly
+    const axiosServiceGeoPay = new AxiosService(GEOPAY.BASE_URL, {
+      responseType: "text", // Important: Tell Axios to expect text/HTML response
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/html,application/json,*/*",
+      },
+    });
+
+    const payload: IExternalPayinPaymentResponseGeopay = {
+      agentId: geopay.agentId,
+      secretKey: geopay.secretKey,
+      partnertxnid: orderId,
+      merchantTxnAmount: String(amount),
+      agentname: geopay.agentname,
+      agentmobile: mobile,
+      agentemail: email,
+    };
+
+    let checkoutFormData: IExternalGeoPayCheckoutResponse;
+    let txnRefId: string | undefined;
+
+    try {
+      // this.logger.info(
+      //   `PAYIN - createGeoPayCheckout - API Endpoint: ${GEOPAY.BASE_URL}${GEOPAY.PAYIN.LIVE}`,
+      // );
+      // this.logger.info(
+      //   `PAYIN - createGeoPayCheckout - Request payload: ${LoggerPlaceHolder.Json}`,
+      //   {
+      //     agentId: payload.agentId,
+      //     secretKey: payload.secretKey.substring(0, 4) + "****", // Mask secret
+      //     partnertxnid: payload.partnertxnid,
+      //     merchantTxnAmount: payload.merchantTxnAmount,
+      //     agentname: payload.agentname,
+      //     agentmobile: payload.agentmobile,
+      //     agentemail: payload.agentemail,
+      //   },
+      // );
+
+      // this.logger.info(`PAYIN - createGeoPayCheckout - Calling GeoPay API...`);
+
+      const geoPayResponse = await axiosServiceGeoPay.postRequest<any>(
+        GEOPAY.PAYIN.LIVE,
+        payload,
+      );
+
+      // this.logger.info(
+      //   `GeoPay Checkout - Raw API Response Type: ${typeof geoPayResponse}, Length: ${typeof geoPayResponse === "string" ? geoPayResponse.length : "N/A"}`,
+      // );
+
+      // // Log first 500 characters of response for debugging
+      // if (typeof geoPayResponse === "string") {
+      //   this.logger.info(
+      //     `GeoPay Checkout - Response Preview: ${geoPayResponse.substring(0, 500)}`,
+      //   );
+      // } else {
+      //   this.logger.info(
+      //     `GeoPay Checkout - Response Data: ${JSON.stringify(geoPayResponse)}`,
+      //   );
+      // }
+
+      // GeoPay API returns HTML with a form, not JSON
+      // AxiosService returns res.data directly, so geoPayResponse is the HTML string
+      if (typeof geoPayResponse !== "string") {
+        this.logger.error(
+          `PAYIN - createGeoPayCheckout - Expected HTML string but got: ${typeof geoPayResponse}. Response: ${JSON.stringify(geoPayResponse).substring(0, 200)}`,
+        );
+        throw new BadRequestException(
+          "Unable to initiate payment. Unexpected response from payment gateway.",
+        );
+      }
+
+      const htmlResponse = geoPayResponse;
+
+      // Always use FreeCharge payment gateway URL (not the one from GeoPay response)
+      // GeoPay sometimes returns gopaydigital.in/login which causes CSP violations
+      const actionUrl =
+        "https://secure-axispg.freecharge.in/payment/v1/checkout";
+
+      // Helper function to extract input value from HTML
+      const extractValue = (fieldName: string): string => {
+        const regex = new RegExp(
+          `<input[^>]*name="${fieldName}"[^>]*value="([^"]*)"`,
+          "i",
+        );
+        const match = htmlResponse.match(regex);
+
+        return match ? match[1] : "";
+      };
+
+      // Extract GeoPay's generated transaction ID (important for webhook matching)
+      const geoPayMerchantTxnId = extractValue("merchantTxnId");
+
+      // Extract form data from HTML response
+      // IMPORTANT: We use ALL values from GeoPay's response without modification
+      // Changing ANY field (especially callbackUrl) will invalidate the Signature
+      // and cause session expiry errors
+      checkoutFormData = {
+        merchantId: extractValue("merchantId") || "MERMERa7845c4",
+        callbackUrl: extractValue("callbackUrl"),
+        merchantTxnId: geoPayMerchantTxnId || orderId,
+        merchantTxnAmount: extractValue("merchantTxnAmount") || String(amount),
+        cctype: extractValue("cctype") || "HDFCAUCC",
+        currency: extractValue("currency") || "INR",
+        customerName: extractValue("customerName") || name,
+        customerEmailId: extractValue("customerEmailId") || email,
+        customerMobileNo: extractValue("customerMobileNo") || mobile,
+        customerStreetAddress: extractValue("customerStreetAddress") || "N/A",
+        timestamp:
+          extractValue("timestamp") || String(Math.floor(Date.now() / 1000)),
+        Signature: extractValue("Signature"),
+        action: actionUrl,
+      };
+
+      // this.logger.info(
+      //   `GeoPay Callback URL from response: ${checkoutFormData.callbackUrl}`,
+      // );
+
+      this.logger.info(
+        `CHECKOUT FORM DATA PREPARED: ${LoggerPlaceHolder.Json}`,
+        checkoutFormData,
+      );
+
+      // Store both our orderId and GeoPay's transaction ID for webhook matching
+      txnRefId = geoPayMerchantTxnId || orderId;
+    } catch (err: any) {
+      this.logger.error(
+        `PAYIN - createGeoPayCheckout - Error: ${err.message || err}`,
+      );
+
+      // Log detailed error information for debugging GeoPay API issues
+      const errorDetails: any = {
+        message: err.message,
+        errorName: err.name,
+        requestEndpoint: `${GEOPAY.BASE_URL}${GEOPAY.PAYIN.LIVE}`,
+        requestPayload: {
+          agentId: payload.agentId,
+          partnertxnid: payload.partnertxnid,
+          amount: payload.merchantTxnAmount,
+          agentname: payload.agentname,
+          agentmobile: payload.agentmobile,
+          agentemail: payload.agentemail,
+        },
+      };
+
+      if (err.response) {
+        errorDetails.responseStatus = err.response.status;
+        errorDetails.responseStatusText = err.response.statusText;
+        errorDetails.responseHeaders = err.response.headers;
+
+        // Log the actual response data (could be JSON, HTML, or text)
+        if (err.response.data) {
+          const responseData = err.response.data;
+          errorDetails.responseDataType = typeof responseData;
+
+          if (typeof responseData === "string") {
+            errorDetails.responseDataPreview = responseData.substring(0, 500);
+
+            // If GeoPay returns HTML error page, detect it
+            if (
+              responseData.includes("Error 500") ||
+              responseData.includes("<html")
+            ) {
+              errorDetails.geoPayError = "GeoPay returned HTML error page";
+
+              this.logger.error(
+                `PAYIN - createGeoPayCheckout - ⚠️ GeoPay API returned HTML error. Possible causes:
+                1. Invalid credentials (agentId/secretKey)
+                2. Server IP not whitelisted by GeoPay
+                3. GeoPay service is down
+                4. Invalid payload format`,
+              );
+            }
+          } else if (typeof responseData === "object") {
+            errorDetails.responseData = responseData;
+            this.logger.error(
+              `PAYIN - createGeoPayCheckout - GeoPay returned JSON error: ${JSON.stringify(responseData)}`,
+            );
+          } else {
+            errorDetails.responseData = responseData;
+          }
+        }
+      } else if (err.request) {
+        // Request was made but no response received
+        errorDetails.noResponse = true;
+        errorDetails.requestInfo = {
+          method: err.request.method,
+          path: err.request.path,
+        };
+        this.logger.error(
+          `PAYIN - createGeoPayCheckout - No response received from GeoPay. Network error or timeout.`,
+        );
+      } else {
+        // Something happened in setting up the request
+        errorDetails.setupError = true;
+        this.logger.error(
+          `PAYIN - createGeoPayCheckout - Error setting up request: ${err.message}`,
+        );
+      }
+
+      this.logger.error(
+        `PAYIN - createGeoPayCheckout - Full error details: ${LoggerPlaceHolder.Json}`,
+        errorDetails,
+      );
+
+      // Re-throw the original error if it's already a NestJS exception
+      if (
+        err instanceof BadRequestException ||
+        err instanceof NotFoundException
+      ) {
+        throw err;
+      }
+
+      // Provide helpful error message based on error type
+      let errorMessage =
+        "Failed to generate checkout page. Please try again later.";
+
+      if (err.response?.status === 500) {
+        errorMessage =
+          "Payment gateway error. Please verify credentials and contact support if this persists.";
+      } else if (err.response?.data) {
+        // Try to extract more specific error from response
+        const responseData = err.response.data;
+        if (typeof responseData === "object" && responseData.message) {
+          errorMessage = `Payment gateway error: ${responseData.message}`;
+        } else if (
+          typeof responseData === "string" &&
+          responseData.length < 200
+        ) {
+          errorMessage = `Payment gateway error: ${responseData}`;
+        }
+      }
+
+      throw new BadRequestException(errorMessage);
+    }
+
+    // Compute commissions (with fallback to 0 if not set)
+    const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+      amount,
+      commissionInPercentage: user.commissionInPercentagePayin || 0,
+      gstInPercentage: user.gstInPercentagePayin || 0,
+    });
+
+    // Store transaction in database
+    return await this.dataSource.transaction(async (manager) => {
+      // Create payin order with checkout data
+      const payinOrder = this.payInOrdersRepository.create({
+        user,
+        amount,
+        email,
+        name,
+        mobile,
+        commissionAmount,
+        gstAmount,
+        netPayableAmount,
+        orderId,
+        txnRefId,
+        status: PAYMENT_STATUS.INITIATED,
+        checkoutData: checkoutFormData, // Store checkout data in database as fallback
+      });
+      const savedPayinOrder = await manager.save(payinOrder);
+
+      // Create transaction record
+      const transaction = this.transactionsRepository.create({
+        user,
+        payInOrder: savedPayinOrder,
+        transactionType: PAYMENT_TYPE.PAYIN,
+      });
+      await manager.save(transaction);
+
+      this.logger.info(`PAYIN CHECKOUT CREATED: ${LoggerPlaceHolder.Json}`, {
+        orderId,
+        amount,
+        mobile,
+        email,
+      });
+
+      // this.logger.info(
+      //   `CHECKOUT FORM DATA PREPARED: ${LoggerPlaceHolder.Json}`,
+      //   checkoutFormData,
+      // );
+
+      // Store checkout form data in cache for 30 minutes (TTL in seconds for cache-manager v5)
+      const cacheKey = `geopay:checkout:${txnRefId}`;
+
+      this.logger.info(
+        `PAYIN - createGeoPayCheckout - Storing checkout data in cache with key: ${cacheKey}`,
+      );
+
+      await this.cacheManager.set(cacheKey, checkoutFormData, 1800); // 30 minutes in seconds
+
+      // Verify cache storage immediately
+      const verifyCache = await this.cacheManager.get(cacheKey);
+      if (verifyCache) {
+        this.logger.info(
+          `PAYIN - createGeoPayCheckout - ✅ Checkout data successfully cached and verified for key: ${cacheKey}`,
+        );
+      } else {
+        this.logger.error(
+          `PAYIN - createGeoPayCheckout - ❌ Failed to verify cache storage for key: ${cacheKey}`,
+        );
+      }
+
+      // Return checkout URL instead of rendering HTML
+      const checkoutUrl = `${appConfig().beBaseUrl}/api/v1/payments/payin/geopay/checkout/${txnRefId}`;
+
+      return {
+        checkoutUrl,
+        merchantTxnId: txnRefId,
+        orderId,
+        amount,
+        status: "initiated",
+        message:
+          "Checkout URL created successfully. Open this URL to complete payment.",
+      };
+    });
+  }
+
+  async getGeoPayCheckoutPage(merchantTxnId: string) {
+    // this.logger.info(
+    //   `PAYIN - getGeoPayCheckoutPage - Retrieving checkout data for merchantTxnId: ${merchantTxnId}`,
+    // );
+
+    // Try cache first
+    const cacheKey = `geopay:checkout:${merchantTxnId}`;
+
+    // this.logger.info(
+    //   `PAYIN - getGeoPayCheckoutPage - Looking up cache with key: ${cacheKey}`,
+    // );
+
+    let checkoutFormData = await this.cacheManager.get<any>(cacheKey);
+
+    if (checkoutFormData) {
+      this.logger.info(
+        `PAYIN - getGeoPayCheckoutPage - ✅ Checkout data retrieved from cache`,
+      );
+
+      return checkoutFormData;
+    }
+
+    // this.logger.warn(
+    //   `PAYIN - getGeoPayCheckoutPage - ⚠️ Cache miss. Falling back to database lookup...`,
+    // );
+
+    // Fallback to database if cache miss
+    const payinOrder = await this.payInOrdersRepository.findOne({
+      where: { txnRefId: merchantTxnId },
+    });
+
+    if (!payinOrder || !payinOrder.checkoutData) {
+      this.logger.error(
+        `PAYIN - getGeoPayCheckoutPage - ❌ Checkout data not found in cache or database for merchantTxnId: ${merchantTxnId}`,
+      );
+
+      // Try to get all keys to debug (if cache supports it)
+      try {
+        const allKeys = await this.cacheManager.store.keys?.();
+        if (allKeys) {
+          this.logger.info(
+            `Available cache keys: ${allKeys.filter((k) => k.startsWith("geopay:")).join(", ")}`,
+          );
+        }
+      } catch (e) {
+        this.logger.warn("Could not retrieve cache keys for debugging");
+      }
+
+      throw new NotFoundException(
+        "Checkout session not found or has expired. Please create a new payment request.",
+      );
+    }
+
+    // this.logger.info(
+    //   `PAYIN - getGeoPayCheckoutPage - ✅ Checkout data retrieved from database (fallback)`,
+    // );
+
+    checkoutFormData = payinOrder.checkoutData;
+
+    // Restore to cache for next access
+    await this.cacheManager.set(cacheKey, checkoutFormData, 1800);
+
+    // this.logger.info(
+    //   `PAYIN - getGeoPayCheckoutPage - Restored checkout data to cache`,
+    // );
+
+    // Return data for the template (interceptor will wrap it in { data: ... })
+    return checkoutFormData;
+  }
+
+  async handleGeoPayWebhook(webhookData: any) {
+    try {
+      this.logger.info(
+        `GeoPay Webhook - Received: ${LoggerPlaceHolder.Json}`,
+        webhookData,
+      );
+
+      const {
+        merchantTxnId,
+        statusMessage,
+        utr,
+        merchantTxnAmount,
+        partnertxnid,
+        amount: webhookAmount,
+      } = webhookData;
+
+      if (!merchantTxnId) {
+        throw new BadRequestException("merchantTxnId is required");
+      }
+
+      // Find the payin order by either our orderId or GeoPay's generated txnRefId
+      let payinOrder = await this.payInOrdersRepository.findOne({
+        where: { orderId: partnertxnid },
+        relations: ["user"],
+      });
+
+      // If not found by orderId, try finding by txnRefId (GeoPay's generated transaction ID)
+      if (!payinOrder) {
+        payinOrder = await this.payInOrdersRepository.findOne({
+          where: { txnRefId: merchantTxnId },
+          relations: ["user"],
+        });
+      }
+
+      if (!payinOrder) {
+        this.logger.error(
+          `GeoPay Webhook - Payin order not found for merchantTxnId: ${merchantTxnId}`,
+        );
+        throw new NotFoundException(
+          `Payin order not found for merchantTxnId: ${merchantTxnId}`,
+        );
+      }
+
+      // Map external status to internal status
+      let internalStatus: PAYMENT_STATUS;
+      if (statusMessage === "SUCCESS" || statusMessage === "success") {
+        internalStatus = PAYMENT_STATUS.SUCCESS;
+      } else if (statusMessage === "FAILED" || statusMessage === "failed") {
+        internalStatus = PAYMENT_STATUS.FAILED;
+      } else if (statusMessage === "PENDING" || statusMessage === "pending") {
+        internalStatus = PAYMENT_STATUS.PENDING;
+      } else {
+        internalStatus = PAYMENT_STATUS.FAILED;
+      }
+
+      // Skip if status hasn't changed
+      if (internalStatus === payinOrder.status) {
+        this.logger.info(
+          `GeoPay Webhook - Duplicate webhook for order: ${merchantTxnId}`,
+        );
+
+        return new MessageResponseDto("Webhook processed successfully");
+      }
+
+      // Get the amount from webhook (try both merchantTxnAmount and amount fields)
+      const amount = merchantTxnAmount || webhookAmount || payinOrder.amount;
+
+      // Check for amount mismatch
+      const isAmountMismatch = +payinOrder.amount !== +amount;
+
+      const { user } = payinOrder;
+
+      // Jumping Start
+      let successCount =
+        +(await this.cacheManager.get(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+        )) || 1;
+
+      let isMisspelled = false;
+      const { jumpingCount } = payinOrder.user;
+
+      if (internalStatus === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
+        if (successCount >= jumpingCount) {
+          const statusArr = [
+            PAYMENT_STATUS.PENDING,
+            PAYMENT_STATUS.DEEMED,
+            PAYMENT_STATUS.INITIATED,
+            PAYMENT_STATUS.FAILED,
+          ];
+          internalStatus =
+            statusArr[Math.floor(Math.random() * statusArr.length)];
+          successCount = 0;
+          isMisspelled = true;
+        } else {
+          successCount += 1;
+        }
+
+        await this.cacheManager.set(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+          successCount,
+          1000 * 60 * 60 * 24 * 365, // 365 days
+        );
+      }
+
+      // Jumping End
+
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        // Prepare update data
+        const updateData: any = {
+          status: internalStatus,
+          ...(!isMisspelled && { utr }),
+          isMisspelled,
+          updatedAt: new Date(),
+        };
+
+        if (isAmountMismatch) {
+          const { commissionAmount, gstAmount, netPayableAmount } =
+            getCommissions({
+              amount,
+              commissionInPercentage: user.commissionInPercentagePayin,
+              gstInPercentage: user.gstInPercentagePayin,
+            });
+
+          updateData.amount = amount;
+          updateData.commissionAmount = commissionAmount;
+          updateData.gstAmount = gstAmount;
+          updateData.netPayableAmount = netPayableAmount;
+          updateData.status = PAYMENT_STATUS.MISMATCH;
+        } else {
+          if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+            updateData.successAt = new Date();
+          } else if (internalStatus === PAYMENT_STATUS.FAILED) {
+            updateData.failureAt = new Date();
+          }
+        }
+
+        // Update the order
+        await queryRunner.manager.update(
+          PayInOrdersEntity,
+          { id: payinOrder.id },
+          updateData,
+        );
+
+        // Update wallet if successful
+        if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+          await this.cacheManager.del(
+            REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
+          );
+
+          // Use standardized wallet update with optimistic locking
+          const updatedWallet = await this.safeUpdateWalletBalance(
+            queryRunner,
+            user.id,
+            (wallet) => {
+              wallet.totalCollections =
+                (wallet.totalCollections ? +wallet.totalCollections : 0) +
+                +amount;
+            },
+          );
+
+          this.logger.info(
+            `PAYIN WEBHOOK - Wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+            {
+              walletId: updatedWallet.id,
+              newTotalCollections: updatedWallet.totalCollections,
+            },
+          );
+        }
+
+        await queryRunner.commitTransaction();
+
+        this.logger.info(
+          `GeoPay Webhook - Order ${merchantTxnId} updated to status: ${internalStatus}`,
+        );
+
+        // Call user webhook
+        if (user?.payInWebhookUrl) {
+          const webhookPayload = {
+            orderId: payinOrder.orderId,
+            status: internalStatus,
+            amount: +amount,
+            txnRefId: payinOrder.txnRefId,
+            ...(!isMisspelled && { utr }),
+            message: isAmountMismatch
+              ? "Amount mismatch in payin order"
+              : undefined,
+          };
+          this.logger.info(
+            `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+            webhookPayload,
+          );
+          axios
+            .post(user.payInWebhookUrl, webhookPayload, {
+              headers: {
+                "Content-Type": "application/json",
+              },
+            })
+            .then(({ data }) => {
+              this.logger.info(
+                `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
+              );
+            })
+            .catch((err) => {
+              this.logger.error(
+                `PAYIN - GeoPay Webhook - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+                err,
+              );
+            });
+        }
+
+        return new MessageResponseDto("Webhook processed successfully");
+      } catch (err: any) {
+        await queryRunner.rollbackTransaction();
+        throw err;
+      } finally {
+        await queryRunner.release();
+      }
+    } catch (error) {
+      this.logger.error(
+        `GeoPay Webhook - Error processing webhook: ${LoggerPlaceHolder.Json}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
   async externalWebhookPayinJio(
     externalWebhookPayin: ExternalPayinWebhookTPIDto,
   ) {
@@ -4906,5 +5673,224 @@ export class PaymentsService {
     }
 
     return new MessageResponseDto("Payout status updated successfully.");
+  }
+
+  async createPayoutGeoPay(
+    createPayoutDto: CreatePayoutDto,
+    user: UsersEntity,
+  ) {
+    const { data: payoutDataArr } = createPayoutDto;
+
+    if (payoutDataArr.length > 1000) {
+      throw new BadRequestException("Maximum 1000 payouts allowed");
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const totalAmount = payoutDataArr.reduce((acc, curr) => {
+        if (curr.amount <= 0) {
+          throw new BadRequestException("Amount should be greater than 0");
+        }
+        const commissionResult = calculateDynamicCommission({
+          amount: +curr.amount,
+          userCommissionRate: user.commissionInPercentagePayout,
+          userGstRate: user.gstInPercentagePayout,
+        });
+
+        return acc + commissionResult.netPayableAmount;
+      }, 0);
+
+      // Check and update wallet balance
+      await this.validateAndUpdateWallet(queryRunner, user, totalAmount);
+
+      // Create batch job identifier
+      const batchId = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
+
+      // Create payout orders in DB
+      const payoutOrders = await this.createPayoutOrders(
+        queryRunner,
+        payoutDataArr,
+        user,
+        batchId,
+      );
+
+      // Add to processing queue
+      await this.payoutQueueGeo.add("process-geopay-payouts", {
+        payoutOrders,
+        userId: user.id,
+        batchId,
+      });
+
+      await queryRunner.commitTransaction();
+
+      this.logger.info(
+        `PAYOUT CREATED: ${LoggerPlaceHolder.Json}`,
+        createPayoutDto,
+      );
+
+      return {
+        message: "Payout process initiated",
+        batchId,
+        payoutOrders: payoutOrders.map((payout) => ({
+          orderId: payout.orderId,
+          payoutId: payout.payoutId,
+          amount: payout.amount,
+          status: payout.status,
+          accountNumber: payout.bankAccountNumber,
+          bankName: payout.bankName,
+          ifscCode: payout.bankIfsc,
+        })),
+        summary: {
+          total: payoutDataArr.length,
+          status: "PROCESSING",
+        },
+      };
+    } catch (err) {
+      this.logger.error(
+        `PAYOUT - createTransaction - Error initiating payouts`,
+        err,
+      );
+      await queryRunner.rollbackTransaction();
+      throw new BadRequestException(err.message);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async externalWebhookPayoutGeoPay(
+    webhookData: ExternalPayoutRequestDto,
+  ): Promise<any> {
+    this.logger.info(
+      `Geo Webhook Data: ${LoggerPlaceHolder.Json}`,
+      webhookData,
+    );
+
+    const {
+      GPID,
+      partnertxnid,
+      status: status_code,
+      utr,
+      resp_msg,
+    } = webhookData;
+
+    const status = convertExternalPaymentStatusToInternal(
+      status_code.toUpperCase(),
+    );
+    const payOutOrder = await this.payOutOrdersRepository.findOne({
+      where: {
+        orderId: partnertxnid,
+      },
+      relations: ["user"],
+    });
+
+    this.logger.info(
+      `PAYOUT WEBHOOK - For OrderId: ${partnertxnid} :`,
+      payOutOrder,
+    );
+
+    if (!payOutOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payout order not found"),
+      );
+    }
+
+    if (payOutOrder.status === status) {
+      // this.logger.info(
+      //   `PAYOUT WEBHOOK - Duplicate webhook of order: ${order_id}`,
+      // );
+      return {
+        message: `Duplicate Webhook for PAYOUT/SETTLEMENT : ${partnertxnid}`,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    if (status === PAYMENT_STATUS.SUCCESS) {
+      const payOutOrderRaw = this.payOutOrdersRepository.create({
+        id: payOutOrder.id,
+        status,
+        successAt: new Date(),
+        // transferId: payid,
+        utr,
+      });
+
+      this.logger.info(
+        `PAYOUT - Geo Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
+        payOutOrderRaw,
+      );
+
+      await this.payOutOrdersRepository.save(payOutOrderRaw);
+    }
+
+    if (status === PAYMENT_STATUS.FAILED) {
+      const payOutOrderRaw = this.payOutOrdersRepository.create({
+        id: payOutOrder.id,
+        status,
+        failureAt: new Date(),
+        // transferId: payid,
+        utr,
+      });
+
+      await this.payOutOrdersRepository.save(payOutOrderRaw);
+
+      const wallet = await this.walletRepository.findOne({
+        where: {
+          user: {
+            id: payOutOrder.user.id,
+          },
+        },
+        relations: {
+          user: true,
+        },
+      });
+
+      if (wallet) {
+        await this.walletRepository.save(
+          this.walletRepository.create({
+            id: wallet.id,
+            availablePayoutBalance:
+              +wallet.availablePayoutBalance +
+              +payOutOrder.amountBeforeDeduction,
+          }),
+        );
+      }
+    }
+
+    // send webhook
+    if (payOutOrder.user?.payOutWebhookUrl) {
+      const webhookPayload = {
+        orderId: partnertxnid,
+        status,
+        amount: payOutOrder.amount,
+        // txnRefId: payid,
+        payoutId: payOutOrder.payoutId,
+        utr,
+      };
+
+      this.logger.info(
+        `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+        webhookPayload,
+      );
+
+      axios
+        .post(payOutOrder.user.payOutWebhookUrl, webhookPayload)
+        .then(({ data }) => {
+          this.logger.info(
+            `PAYOUT - User webhook - (${payOutOrder.user.payOutWebhookUrl}) - ${payOutOrder.payoutId} - Webhook sent successfully: ${JSON.stringify(data)}`,
+          );
+        })
+        .catch((err) => {
+          this.logger.error(
+            `PAYOUT - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+            err,
+          );
+        });
+    }
+
+    return {
+      message: "Payout status updated successfully.",
+      timestamp: new Date().toISOString(),
+    };
   }
 }
