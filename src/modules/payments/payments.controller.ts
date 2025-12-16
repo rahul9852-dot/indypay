@@ -93,10 +93,12 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createUtkarshPaymentLink(
-      createTransactionDto,
-      user,
-    );
+    // return this.paymentsService.createUtkarshPaymentLink(
+    //   createTransactionDto,
+    //   user,
+    // );
+
+    return this.paymentsService.createOnikPayin(createTransactionDto, user);
   }
 
   @Public()

@@ -163,4 +163,7 @@ export const appConfig = registerAs("appConfig", () => ({
     agentname: getOsEnv("GEOPAY_AGENT_NAME"),
     webhookips: getOsEnv("GEOPAY_IP").split(","),
   },
+  onik: {
+    apiToken: getOsEnv("ONIK_API_KEY"),
+  },
 }));

@@ -506,3 +506,19 @@ export interface IExternalBuckboxPayoutFundResponse {
     status: string;
   };
 }
+
+export interface IExternalPayinPaymentRequestOnik {
+  amount: number;
+  mobile: string;
+  name: string;
+}
+
+export interface IExternalPayinPaymentResponseOnik {
+  status: boolean;
+  message: string;
+  data: {
+    txn_id: string;
+    payment_url: string;
+    callback_url: string;
+  };
+}

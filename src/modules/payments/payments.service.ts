@@ -22,6 +22,7 @@ import {
 import { Queue } from "bull";
 import { InjectQueue } from "@nestjs/bull";
 import * as dayjs from "dayjs";
+import * as FormData from "form-data";
 import {
   CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionIsmartDto,
@@ -76,6 +77,7 @@ import {
   PAYBOLT,
   TPI,
   GEOPAY,
+  ONIK,
 } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
 // import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
@@ -101,6 +103,8 @@ import {
   IExternalGeoPayCheckoutResponse,
   IExternalPayinPaymentResponseTPI,
   IExternalPayinPaymentResponseGeopay,
+  IExternalPayinPaymentRequestOnik,
+  IExternalPayinPaymentResponseOnik,
 } from "@/interface/external-api.interface";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { getPagination } from "@/utils/pagination.utils";
@@ -129,6 +133,7 @@ const {
   payboltCreds,
   tpipay,
   geopay,
+  onik,
 } = appConfig();
 
 @Injectable()
@@ -5892,5 +5897,121 @@ export class PaymentsService {
       message: "Payout status updated successfully.",
       timestamp: new Date().toISOString(),
     };
+  }
+
+  async createOnikPayin(
+    createPayinTransactionDto: CreatePayinTransactionFlaPayDto,
+    user: UsersEntity,
+  ) {
+    const { amount, email, mobile, name, orderId } = createPayinTransactionDto;
+
+    if (amount < 100 || amount > 3000) {
+      throw new BadRequestException(
+        "Amount must be greater than 100 and less than 3000",
+      );
+    }
+
+    const existingPayinOrder = await this.payInOrdersRepository.exists({
+      where: { orderId },
+    });
+    if (existingPayinOrder) {
+      throw new BadRequestException(
+        "Payin order already exists for given orderId",
+      );
+    }
+
+    // Call external TPI API **before starting transaction**
+    const axiosServiceOnik = new AxiosService(ONIK.BASE_URL);
+    const payload: IExternalPayinPaymentRequestOnik = {
+      amount,
+      mobile,
+      name,
+    };
+
+    let paymentLink: string | undefined;
+    let txnRefId: string | undefined;
+    try {
+      const formData = new FormData();
+
+      formData.append("amount", String(payload.amount));
+      formData.append("mobile", payload.mobile);
+      formData.append("name", payload.name);
+
+      const onikResponse =
+        await axiosServiceOnik.postRequest<IExternalPayinPaymentResponseOnik>(
+          ONIK.PAYIN.LIVE,
+          formData,
+          {
+            headers: {
+              "X-API-KEY": onik.apiToken,
+              Accept: "application/json",
+              ...formData.getHeaders(),
+            },
+          },
+        );
+      if (!onikResponse || !onikResponse.status) {
+        this.logger.error(
+          `PAYIN - createTransaction - Onik API failed`,
+          onikResponse,
+        );
+        throw new BadRequestException(
+          new MessageResponseDto("Something went wrong"),
+        );
+      }
+
+      paymentLink = onikResponse.data?.payment_url;
+      txnRefId = onikResponse.data?.txn_id;
+    } catch (err: any) {
+      this.logger.error(
+        `PAYIN - createTransaction - Error calling Onik API`,
+        err,
+      );
+      throw new BadRequestException("Failed to generate payment link");
+    }
+
+    // Compute commissions
+    const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
+      amount,
+      commissionInPercentage: user.commissionInPercentagePayin,
+      gstInPercentage: user.gstInPercentagePayin,
+    });
+
+    // Wrap DB operations in a safe TypeORM transaction
+    return await this.dataSource.transaction(async (manager) => {
+      // Create payin order
+      const payinOrder = this.payInOrdersRepository.create({
+        user,
+        amount,
+        email,
+        name,
+        mobile,
+        commissionAmount,
+        gstAmount,
+        netPayableAmount,
+        orderId,
+        txnRefId,
+        ...(paymentLink && { intent: paymentLink }),
+      });
+      const savedPayinOrder = await manager.save(payinOrder);
+
+      // Create transaction
+      const transaction = this.transactionsRepository.create({
+        user,
+        payInOrder: savedPayinOrder,
+        transactionType: PAYMENT_TYPE.PAYIN,
+      });
+      await manager.save(transaction);
+
+      this.logger.info(
+        `PAYIN CREATED: ${LoggerPlaceHolder.Json}`,
+        createPayinTransactionDto,
+      );
+
+      return {
+        orderId,
+        intent: paymentLink,
+        message: "Payment Link Generated successfully",
+      };
+    });
   }
 }
