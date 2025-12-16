@@ -93,11 +93,21 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    // return this.paymentsService.createUtkarshPaymentLink(
-    //   createTransactionDto,
-    //   user,
-    // );
+    return this.paymentsService.createUtkarshPaymentLink(
+      createTransactionDto,
+      user,
+    );
+  }
 
+  @Public()
+  @ApiOperation({ summary: "Create pay-in transaction" })
+  @UseGuards(ApiKeyGuard)
+  @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })
+  @Post("/v3/payin/create")
+  async createPayInTransactionOnik(
+    @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
+    @User() user: UsersEntity,
+  ) {
     return this.paymentsService.createOnikPayin(createTransactionDto, user);
   }
 
