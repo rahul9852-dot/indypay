@@ -4859,6 +4859,10 @@ export class PaymentsService {
               wallet.totalCollections =
                 (wallet.totalCollections ? +wallet.totalCollections : 0) +
                 +amount;
+              wallet.availablePayoutBalance =
+                (wallet.availablePayoutBalance
+                  ? +wallet.availablePayoutBalance
+                  : 0) + +payinOrder.netPayableAmount;
             },
           );
 
