@@ -7,7 +7,6 @@ import {
   UseGuards,
   Get,
   Query,
-  Render,
   Res,
   Param,
   BadRequestException,
@@ -363,11 +362,49 @@ export class PaymentsController {
   }
 
   @Public()
-  @ApiOperation({ summary: "GeoPay Checkout Page - Displays payment page" })
   @Get("payin/geopay/checkout/:merchantTxnId")
-  @Render("geopay-checkout")
-  async geoPayCheckoutPage(@Param("merchantTxnId") merchantTxnId: string) {
-    return this.paymentsService.getGeoPayCheckoutPage(merchantTxnId);
+  async geoPayCheckoutPage(
+    @Param("merchantTxnId") merchantTxnId: string,
+    @Res({ passthrough: false }) res: Response,
+  ) {
+    const checkoutData =
+      await this.paymentsService.getGeoPayCheckoutPage(merchantTxnId);
+
+    const inputs = Object.entries(checkoutData)
+      .filter(([key]) => key !== "action")
+      .map(
+        ([key, value]) =>
+          `<input type="hidden" name="${key}" value="${String(value)}" />`,
+      )
+      .join("\n");
+
+    const html = `<!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>Redirecting...</title>
+        </head>
+        <body>
+          <form id="pgForm" method="POST" action="${checkoutData.action}">
+            ${inputs}
+            <noscript>
+              <button type="submit">Continue to payment</button>
+            </noscript>
+          </form>
+
+          <script>
+            document.getElementById("pgForm").submit();
+          </script>
+        </body>
+        </html>`;
+
+    res.status(200);
+    res.setHeader("Content-Type", "text/html; charset=UTF-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
+    res.end(html);
   }
 
   @ApiExcludeEndpoint()
