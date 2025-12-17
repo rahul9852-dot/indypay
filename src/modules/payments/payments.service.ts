@@ -4708,7 +4708,7 @@ export class PaymentsService {
       const {
         merchantTxnId,
         statusMessage,
-        utr,
+        rrn: utr,
         merchantTxnAmount,
         partnertxnid,
         amount: webhookAmount,

@@ -177,6 +177,17 @@ export class PaymentsController {
     return this.paymentsService.createPayoutBuckBox(createPayoutDto, user);
   }
 
+  @Public()
+  @ApiOperation({ summary: "Create pay-out transaction Bulk" })
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @Post("v2/settle/admin")
+  async createPayoutAdminBuckBox(
+    @Body() createPayoutDto: CreatePayoutDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPayoutBuckBox(createPayoutDto, user);
+  }
+
   // @Public()
   // @ApiOperation({ summary: "Create pay-out transaction" })
   // @UseGuards(ApiKeyGuard)
