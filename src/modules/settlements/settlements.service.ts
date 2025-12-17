@@ -1454,11 +1454,11 @@ export class SettlementsService {
       },
     });
 
-    if (!user.address) {
-      throw new NotFoundException(
-        new MessageResponseDto("User address not found"),
-      );
-    }
+    // if (!user.address) {
+    //   throw new NotFoundException(
+    //     new MessageResponseDto("User address not found"),
+    //   );
+    // }
 
     const banks = await this.bankService.getAllBanks(userId);
 
