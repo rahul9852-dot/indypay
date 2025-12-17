@@ -42,6 +42,7 @@ import {
 import {
   ExternalPayinWebhookFlakPayDto,
   ExternalPayinWebhookIsmartDto,
+  ExternalPayinWebhookOnikDto,
   ExternalPayinWebhookPayboltDto,
   ExternalPayinWebhookTPIDto,
   ExternalPayinWebhookUtkarshDto,
@@ -6017,5 +6018,215 @@ export class PaymentsService {
         message: "Payment Link Generated successfully",
       };
     });
+  }
+
+  async externalWebhookPayinOnik(
+    externalWebhookPayin: ExternalPayinWebhookOnikDto,
+  ) {
+    try {
+      const { status, amount, rrn, txn_id } = externalWebhookPayin;
+
+      let internalStatus = convertExternalPaymentStatusToInternal(
+        status.toUpperCase(),
+      );
+
+      const payinOrder = await this.payInOrdersRepository.findOne({
+        where: {
+          txnRefId: txn_id,
+        },
+        relations: ["user"],
+      });
+
+      this.logger.info(
+        `PAYIN - Webhook called - Payin order: ${LoggerPlaceHolder.Json}`,
+        payinOrder.id,
+      );
+
+      if (!payinOrder) {
+        throw new NotFoundException(
+          new MessageResponseDto("Payin order not found"),
+        );
+      }
+
+      if (internalStatus === payinOrder.status) {
+        // this.logger.info(
+        //   `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+        // );
+        return {
+          message: "Status updated successfully.",
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      // Jumping Start
+
+      let successCount =
+        +(await this.cacheManager.get(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+        )) || 1;
+
+      let isMisspelled = false;
+      const { jumpingCount } = payinOrder.user;
+
+      if (internalStatus === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
+        if (successCount >= jumpingCount) {
+          const statusArr = [
+            PAYMENT_STATUS.PENDING,
+            PAYMENT_STATUS.DEEMED,
+            PAYMENT_STATUS.INITIATED,
+            PAYMENT_STATUS.FAILED,
+          ];
+          internalStatus =
+            statusArr[Math.floor(Math.random() * statusArr.length)];
+          successCount = 0;
+          isMisspelled = true;
+        } else {
+          successCount += 1;
+        }
+
+        await this.cacheManager.set(
+          REDIS_KEYS.SUCCESS_COUNT(payinOrder.user.id),
+          successCount,
+          1000 * 60 * 60 * 24 * 20, // 20 days
+        );
+
+        if (
+          status === payinOrder.status &&
+          payinOrder.isMisspelled === isMisspelled
+        ) {
+          this.logger.info(
+            `PAYIN WEBHOOK - Duplicate webhook of order: ${payinOrder.orderId}`,
+          );
+
+          return {
+            message: "Status updated successfully.",
+            timestamp: new Date().toISOString(),
+          };
+        }
+      }
+      const { user } = payinOrder;
+
+      const isAmountMismatch = +payinOrder.amount !== +amount;
+
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        // FIXED: Use direct updated intstead of create+save
+        const updateData: any = {
+          status: internalStatus,
+          txnRefId: txn_id,
+          ...(!isMisspelled && { utr: rrn }),
+          isMisspelled,
+          updatedAt: new Date(),
+        };
+        if (isAmountMismatch) {
+          const { commissionAmount, gstAmount, netPayableAmount } =
+            getCommissions({
+              amount: +amount,
+              commissionInPercentage: user.commissionInPercentagePayin,
+              gstInPercentage: user.gstInPercentagePayin,
+            });
+
+          updateData.amount = +amount;
+          updateData.commissionAmount = commissionAmount;
+          updateData.gstAmount = gstAmount;
+          updateData.netPayableAmount = netPayableAmount;
+          updateData.status = PAYMENT_STATUS.MISMATCH;
+        } else {
+          if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+            updateData.successAt = new Date();
+          } else if (internalStatus === PAYMENT_STATUS.FAILED) {
+            updateData.failureAt = new Date();
+          }
+        }
+
+        // FIXED: Direct update - no dead tuples
+        await queryRunner.manager.update(
+          PayInOrdersEntity,
+          { id: payinOrder.id },
+          updateData,
+        );
+        // update wallet
+        if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+          await this.cacheManager.del(
+            REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
+          );
+
+          // Use safeUpdateWalletBalance for proper locking - only update totalCollections
+          const updatedWallet = await this.safeUpdateWalletBalance(
+            queryRunner,
+            user.id,
+            (wallet) => {
+              wallet.totalCollections =
+                (wallet.totalCollections ? +wallet.totalCollections : 0) +
+                +amount;
+            },
+          );
+
+          this.logger.info(
+            `PAYIN WEBHOOK - Wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
+            {
+              walletId: updatedWallet.id,
+              newTotalCollections: updatedWallet.totalCollections,
+            },
+          );
+        }
+
+        await queryRunner.commitTransaction();
+
+        if (user?.payInWebhookUrl) {
+          const webhookPayload = {
+            orderId: payinOrder.orderId,
+            status: internalStatus,
+            amount: +amount,
+            txnRefId: payinOrder.txnRefId,
+            ...(!isMisspelled && { utr: rrn }),
+            // utr: custRef,
+            message: isAmountMismatch
+              ? "Amount mismatch in payin order"
+              : "Not paid on same orderId",
+          };
+          this.logger.info(
+            `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
+            webhookPayload,
+          );
+          axios
+            .post(user.payInWebhookUrl, webhookPayload, {
+              headers: {
+                "Content-Type": "application/json ",
+              },
+            })
+            .then(({ data }) => {
+              this.logger.info(
+                `PAYIN - User webhook (${user?.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
+              );
+            })
+            .catch((err) => {
+              this.logger.error(
+                `PAYIN - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+                err,
+              );
+            });
+        }
+
+        return {
+          message: "Transaction status updated successfully.",
+          timestamp: new Date().toISOString(),
+        };
+      } catch (err: any) {
+        await queryRunner.rollbackTransaction();
+        throw err;
+      } finally {
+        await queryRunner.release();
+      }
+    } catch (error) {
+      this.logger.error(
+        `PAYIN - externalWebhookPayinTPI - Error processing webhook: ${LoggerPlaceHolder.Json}`,
+        error.message || error,
+      );
+      throw new BadRequestException(error.message);
+    }
   }
 }

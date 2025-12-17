@@ -270,3 +270,25 @@ export class ExternalPayinWebhookTPIDto {
   @IsNotEmpty()
   bank_ref_no: string;
 }
+
+export class ExternalPayinWebhookOnikDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  txn_id: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  amount?: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  status: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  rrn?: string;
+}

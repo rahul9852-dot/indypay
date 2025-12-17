@@ -50,8 +50,8 @@ import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import {
+  ExternalPayinWebhookOnikDto,
   ExternalPayinWebhookTPIDto,
-  ExternalPayinWebhookUtkarshDto,
 } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
@@ -295,11 +295,13 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("v2/payin/webhook")
   async externalWebhookPayinV2(
-    @Body() externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
+    @Body() externalWebhookPayin: ExternalPayinWebhookOnikDto,
   ) {
-    return this.paymentsService.externalWebhookPayinUtkarsh(
-      externalWebhookPayin,
-    );
+    // return this.paymentsService.externalWebhookPayinUtkarsh(
+    //   externalWebhookPayin,
+    // );
+
+    return this.paymentsService.externalWebhookPayinOnik(externalWebhookPayin);
   }
 
   @Public()
