@@ -76,7 +76,7 @@ export class SettlementsController {
     @Body() initiateSettlementAdminDto: InitiateSettlementAdminDto,
     @User() user: UsersEntity,
   ) {
-    return this.settlementsService.initiateSettlementEritech(
+    return this.settlementsService.initiateSettlementBuckBox(
       initiateSettlementAdminDto,
       user,
     );
