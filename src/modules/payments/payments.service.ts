@@ -6408,105 +6408,11 @@ export class PaymentsService {
       webhookData,
     );
 
-    [
-      {
-        Txn_ID: "TESTPAYOT000001",
-        TXN_date: "2025-12-18 19:42:41",
-        TXN_amount: "108.5",
-        UTR: "535219069090",
-        TXN_Status: "success",
-      },
-    ];
-
     const { Txn_ID, TXN_amount, UTR, TXN_Status } = webhookData[0];
 
     const internalStatus = convertExternalPaymentStatusToInternal(
       TXN_Status.toUpperCase(),
     );
-    // const isSettlement = external_order_id.startsWith("stl_");
-    // if (isSettlement) {
-    //   const settlement = await this.settlementRepository.findOne({
-    //     where: {
-    //       id: external_order_id,
-    //     },
-    //     relations: {
-    //       user: true,
-    //     },
-    //   });
-
-    //   if (!settlement) {
-    //     throw new BadRequestException(
-    //       new MessageResponseDto("No Settlement Found"),
-    //     );
-    //   }
-
-    //   if (settlement.status === internalStatus) {
-    //     // this.logger.info(
-    //     //   `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
-    //     // );
-
-    //     return new MessageResponseDto(
-    //       `Duplicate Webhook for PAYOUT/SETTLEMENT : ${external_order_id}`,
-    //     );
-    //   }
-
-    //   if (internalStatus === PAYMENT_STATUS.SUCCESS) {
-    //     const settlementRaw = this.settlementRepository.create({
-    //       id: external_order_id,
-    //       status: internalStatus,
-    //       successAt: new Date(),
-    //       transferId: id,
-    //       utr: utr_number,
-    //     });
-
-    //     await this.settlementRepository.save(settlementRaw);
-    //   }
-
-    //   if (internalStatus === PAYMENT_STATUS.FAILED) {
-    //     const settlementRaw = this.settlementRepository.create({
-    //       id: external_order_id,
-    //       status: internalStatus,
-    //       failureAt: new Date(),
-    //       transferId: id,
-    //       utr: utr_number,
-    //     });
-
-    //     await this.settlementRepository.save(settlementRaw);
-
-    //     const userId = settlement.user.id;
-
-    //     const wallet = await this.walletRepository.findOne({
-    //       where: {
-    //         user: {
-    //           id: userId,
-    //         },
-    //       },
-    //       relations: {
-    //         user: true,
-    //       },
-    //     });
-
-    //     const collectionAmount = calculateOriginalAmountFromNetPayable({
-    //       netPayableAmount: +settlementRaw.collectionAmount,
-    //       commissionInPercentage: +wallet.user.commissionInPercentagePayin,
-    //       gstInPercentage: +wallet.user.gstInPercentagePayin,
-    //     });
-
-    //     const walletRaw = this.walletRepository.create({
-    //       ...(wallet?.id && { id: wallet.id }),
-    //       id: wallet.id,
-    //       totalCollections: +wallet.totalCollections - collectionAmount,
-    //       availablePayoutBalance:
-    //         +wallet.availablePayoutBalance + collectionAmount,
-
-    //       user: wallet.user,
-    //     });
-
-    //     await this.walletRepository.save(walletRaw);
-    //   }
-
-    //   return new MessageResponseDto("Transaction status updated successfully.");
-    // } else {
     const payOutOrder = await this.payOutOrdersRepository.findOne({
       where: {
         orderId: Txn_ID,
