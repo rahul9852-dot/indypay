@@ -1549,8 +1549,6 @@ export class SettlementsService {
         bene_address: "Mumbai",
       };
 
-      this.logger.info("hiiiiiiiii");
-
       const buckboxSettlementResponse =
         await axiosServiceBuckBox.postRequest<IExternalBuckboxPayoutFundResponse>(
           BUCKBOX.PAYOUT.LIVE,
