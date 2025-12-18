@@ -29,7 +29,7 @@ import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { UsersEntity } from "@/entities/user.entity";
 import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
-import { FALKPAY, ISMART_PAY } from "@/constants/external-api.constant";
+import { FALKPAY, ISMART_PAY, ROCKY } from "@/constants/external-api.constant";
 import {
   getFlakPayPgConfig,
   getIsmartPayPgConfig,
@@ -40,6 +40,7 @@ import {
   IExternalEritechStatusResponse,
   IExternalPayoutStatusResponseFlakPay,
   IExternalPayoutStatusResponseIsmart,
+  IExternalRockyStatusResponse,
 } from "@/interface/external-api.interface";
 import {
   PayoutStatusDto,
@@ -718,6 +719,113 @@ export class PayoutService {
       orderId: payoutOrder.orderId,
       status,
       transferId: ertechStatusResponse.data.response.txn_status.utrNo,
+    };
+  }
+
+  async checkPayOutStatusTransactionRocky(
+    { orderId }: PayoutStatusDto,
+    user: UsersEntity,
+  ) {
+    const payoutOrder = await this.payoutRepository.findOne({
+      where: { orderId },
+    });
+
+    if (!payoutOrder) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payout order not found"),
+      );
+    }
+
+    if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
+      return {
+        orderId: payoutOrder.orderId,
+        status: payoutOrder.status,
+        transferId: payoutOrder.transferId,
+        payoutId: payoutOrder.payoutId,
+        utr: payoutOrder.utr,
+      };
+    }
+
+    // call api
+    const axiosServiceBuckBox = new AxiosService(ROCKY.BASE_URL);
+
+    const rockyResponse =
+      await axiosServiceBuckBox.postRequest<IExternalRockyStatusResponse>(
+        ROCKY.PAYOUT.STATUS_CHECK,
+        {
+          mid: externalPaymentConfig.rocky.mid,
+          apikey: externalPaymentConfig.rocky.apiKey,
+          route: 0,
+          client_txn_id: payoutOrder.orderId,
+        },
+      );
+
+    this.logger.info(
+      `Rocky Status Response: ${LoggerPlaceHolder.Json}`,
+      rockyResponse,
+    );
+
+    if (rockyResponse.data.status != "success") {
+      throw new BadRequestException(
+        new MessageResponseDto("Transaction is not success"),
+      );
+    }
+
+    this.logger.info(
+      `Rocky Status Response: ${LoggerPlaceHolder.Json}`,
+      rockyResponse,
+    );
+
+    // update payout order
+
+    const status = convertExternalPaymentStatusToInternal(
+      rockyResponse.data.status.toUpperCase(),
+    );
+
+    this.logger.info(`Internal Status Response: ${LoggerPlaceHolder.Json}`, {
+      status,
+    });
+
+    const savedPayout = await this.payoutRepository.save(
+      this.payoutRepository.create({
+        ...payoutOrder,
+        status,
+        transferId: rockyResponse.data.txnid,
+      }),
+    );
+
+    if (user?.payOutWebhookUrl) {
+      const payload = {
+        orderId: savedPayout.orderId,
+        status,
+        amount: +savedPayout.amount,
+        txnRefId: savedPayout.transferId,
+        utr: savedPayout.utr,
+      };
+      this.logger.info(
+        `Payout webhook for ${savedPayout.orderId} PAYLOAD : ${LoggerPlaceHolder.Json}`,
+        payload,
+      );
+      axios
+        .post(user.payOutWebhookUrl, payload)
+        .then((res) => {
+          this.logger.info(
+            `Payout webhook sent successfully: ${savedPayout.orderId} : ${LoggerPlaceHolder.Json}`,
+            res,
+          );
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Payout webhook failed for order: ${savedPayout.orderId} : ${LoggerPlaceHolder.Json}`,
+            error,
+          );
+        });
+    }
+
+    return {
+      orderId: payoutOrder.orderId,
+      status,
+      transferId: rockyResponse.data.txnid,
     };
   }
 

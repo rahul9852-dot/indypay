@@ -128,3 +128,11 @@ export const ONIK = {
     LIVE: "/api/v1/newpayin",
   },
 };
+
+export const ROCKY = {
+  BASE_URL: "https://api.rockypayz.shop",
+  PAYOUT: {
+    LIVE: "/api/v1/transfer",
+    STATUS_CHECK: "/api/v1/check_order_status",
+  },
+};

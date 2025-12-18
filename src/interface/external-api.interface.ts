@@ -401,6 +401,16 @@ export interface IExternalEritechStatusResponse {
   exception: string;
 }
 
+export interface IExternalRockyStatusResponse {
+  status: boolean;
+  msg: string;
+  data: {
+    txnid: string;
+    utr: string;
+    status: string;
+  };
+}
+
 export interface IExternalPayinStatusResponseUtkarsh {
   data: string;
   message: string;
@@ -503,6 +513,17 @@ export interface IExternalBuckboxPayoutFundResponse {
     msg: string;
     external_order_id: string;
     transaction_id: string;
+    status: string;
+  };
+}
+
+export interface IExternalRockyPayoutFundResponse {
+  statuscode: string;
+  msg: string;
+  data: {
+    TXN_ID: string;
+    Amount: string;
+    UTR: string;
     status: string;
   };
 }

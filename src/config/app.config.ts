@@ -92,6 +92,10 @@ export const appConfig = registerAs("appConfig", () => ({
       apiKey: getOsEnv("BUCKBOX_API_KEY"),
       webhookIps: getOsEnv("BUCKBOX_WEBHOOK_IPS").split(","),
     },
+    rocky: {
+      apiKey: getOsEnv("ROCKY_API_KEY"),
+      mid: getOsEnv("ROCKY_MID"),
+    },
   },
   transactionConfig: {
     commissionInPercentagePayIn:

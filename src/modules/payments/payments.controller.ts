@@ -174,7 +174,7 @@ export class PaymentsController {
     @Body() createPayoutDto: CreatePayoutDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createPayoutBuckBox(createPayoutDto, user);
+    return this.paymentsService.createPayoutRockyPayz(createPayoutDto, user);
   }
 
   // @Public()
@@ -216,7 +216,7 @@ export class PaymentsController {
     @Body() payoutStatusDto: PayoutStatusDto,
     @User() user: UsersEntity,
   ) {
-    return this.payoutService.checkPayOutStatusTransactionEritech(
+    return this.payoutService.checkPayOutStatusTransactionRocky(
       payoutStatusDto,
       user,
     );
@@ -322,7 +322,7 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("v2/payout/webhook")
   async externalWebhookPayoutBuckBox(@Body() externalWebhookPayout: any) {
-    return this.paymentsService.externalWebhookPayoutBuckBox(
+    return this.paymentsService.externalWebhookPayoutRockyPayz(
       externalWebhookPayout,
     );
   }
