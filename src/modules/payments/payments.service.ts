@@ -5576,113 +5576,198 @@ export class PaymentsService {
     const internalStatus = convertExternalPaymentStatusToInternal(
       payment_status.toUpperCase(),
     );
-    const payOutOrder = await this.payOutOrdersRepository.findOne({
-      where: {
-        orderId: external_order_id,
-      },
-      relations: ["user"],
-    });
-
-    this.logger.info(
-      `PAYOUT WEBHOOK - For OrderId: ${external_order_id} :`,
-      payOutOrder,
-    );
-
-    if (!payOutOrder) {
-      throw new NotFoundException(
-        new MessageResponseDto("Payout order not found"),
-      );
-    }
-
-    if (payOutOrder.status === internalStatus) {
-      return new MessageResponseDto(
-        `Duplicate Webhook for PAYOUT/SETTLEMENT : ${external_order_id}`,
-      );
-    }
-
-    if (internalStatus === PAYMENT_STATUS.SUCCESS) {
-      const payOutOrderRaw = this.payOutOrdersRepository.create({
-        id: payOutOrder.id,
-        status: internalStatus,
-        successAt: new Date(),
-        transferId: id,
-        utr: utr_number,
-      });
-
-      this.logger.info(
-        `PAYOUT - Buckbox Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
-        payOutOrderRaw,
-      );
-
-      await this.payOutOrdersRepository.save(payOutOrderRaw);
-    }
-
-    if (internalStatus === PAYMENT_STATUS.FAILED) {
-      const payOutOrderRaw = this.payOutOrdersRepository.create({
-        id: payOutOrder.id,
-        status: internalStatus,
-        failureAt: new Date(),
-        transferId: id,
-        utr: utr_number,
-      });
-
-      await this.payOutOrdersRepository.save(payOutOrderRaw);
-
-      const wallet = await this.walletRepository.findOne({
+    const isSettlement = external_order_id.startsWith("stl_");
+    if (isSettlement) {
+      const settlement = await this.settlementRepository.findOne({
         where: {
-          user: {
-            id: payOutOrder.user.id,
-          },
+          id: external_order_id,
         },
         relations: {
           user: true,
         },
       });
 
-      if (wallet) {
-        await this.walletRepository.save(
-          this.walletRepository.create({
-            id: wallet.id,
-            availablePayoutBalance:
-              +wallet.availablePayoutBalance +
-              +payOutOrder.amountBeforeDeduction,
-          }),
+      if (!settlement) {
+        throw new BadRequestException(
+          new MessageResponseDto("No Settlement Found"),
         );
       }
-    }
 
-    // send webhook
-    if (payOutOrder.user?.payOutWebhookUrl) {
-      const webhookPayload = {
-        orderId: external_order_id,
-        status: internalStatus,
-        amount: payOutOrder.amount,
-        txnRefId: id,
-        payoutId: payOutOrder.payoutId,
-        utr: utr_number,
-      };
+      if (settlement.status === internalStatus) {
+        // this.logger.info(
+        //   `SETTLEMENT WEBHOOK: Duplicate webhook of order: ${settlement.id}`,
+        // );
+
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${external_order_id}`,
+        );
+      }
+
+      if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+        const settlementRaw = this.settlementRepository.create({
+          id: external_order_id,
+          status: internalStatus,
+          successAt: new Date(),
+          transferId: id,
+          utr: utr_number,
+        });
+
+        await this.settlementRepository.save(settlementRaw);
+      }
+
+      if (internalStatus === PAYMENT_STATUS.FAILED) {
+        const settlementRaw = this.settlementRepository.create({
+          id: external_order_id,
+          status: internalStatus,
+          failureAt: new Date(),
+          transferId: id,
+          utr: utr_number,
+        });
+
+        await this.settlementRepository.save(settlementRaw);
+
+        const userId = settlement.user.id;
+
+        const wallet = await this.walletRepository.findOne({
+          where: {
+            user: {
+              id: userId,
+            },
+          },
+          relations: {
+            user: true,
+          },
+        });
+
+        const collectionAmount = calculateOriginalAmountFromNetPayable({
+          netPayableAmount: +settlementRaw.collectionAmount,
+          commissionInPercentage: +wallet.user.commissionInPercentagePayin,
+          gstInPercentage: +wallet.user.gstInPercentagePayin,
+        });
+
+        const walletRaw = this.walletRepository.create({
+          ...(wallet?.id && { id: wallet.id }),
+          id: wallet.id,
+          totalCollections: +wallet.totalCollections - collectionAmount,
+          availablePayoutBalance:
+            +wallet.availablePayoutBalance + collectionAmount,
+
+          user: wallet.user,
+        });
+
+        await this.walletRepository.save(walletRaw);
+      }
+
+      return new MessageResponseDto("Transaction status updated successfully.");
+    } else {
+      const payOutOrder = await this.payOutOrdersRepository.findOne({
+        where: {
+          orderId: external_order_id,
+        },
+        relations: ["user"],
+      });
 
       this.logger.info(
-        `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
-        webhookPayload,
+        `PAYOUT WEBHOOK - For OrderId: ${external_order_id} :`,
+        payOutOrder,
       );
 
-      axios
-        .post(payOutOrder.user.payOutWebhookUrl, webhookPayload)
-        .then(({ data }) => {
-          this.logger.info(
-            `PAYOUT - User webhook - (${payOutOrder.user.payOutWebhookUrl}) - ${payOutOrder.payoutId} - Webhook sent successfully: ${JSON.stringify(data)}`,
-          );
-        })
-        .catch((err) => {
-          this.logger.error(
-            `PAYOUT - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
-            err,
-          );
-        });
-    }
+      if (!payOutOrder) {
+        throw new NotFoundException(
+          new MessageResponseDto("Payout order not found"),
+        );
+      }
 
-    return new MessageResponseDto("Payout status updated successfully.");
+      if (payOutOrder.status === internalStatus) {
+        return new MessageResponseDto(
+          `Duplicate Webhook for PAYOUT/SETTLEMENT : ${external_order_id}`,
+        );
+      }
+
+      if (internalStatus === PAYMENT_STATUS.SUCCESS) {
+        const payOutOrderRaw = this.payOutOrdersRepository.create({
+          id: payOutOrder.id,
+          status: internalStatus,
+          successAt: new Date(),
+          transferId: id,
+          utr: utr_number,
+        });
+
+        this.logger.info(
+          `PAYOUT - Buckbox Webhook - ${payOutOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
+          payOutOrderRaw,
+        );
+
+        await this.payOutOrdersRepository.save(payOutOrderRaw);
+      }
+
+      if (internalStatus === PAYMENT_STATUS.FAILED) {
+        const payOutOrderRaw = this.payOutOrdersRepository.create({
+          id: payOutOrder.id,
+          status: internalStatus,
+          failureAt: new Date(),
+          transferId: id,
+          utr: utr_number,
+        });
+
+        await this.payOutOrdersRepository.save(payOutOrderRaw);
+
+        const wallet = await this.walletRepository.findOne({
+          where: {
+            user: {
+              id: payOutOrder.user.id,
+            },
+          },
+          relations: {
+            user: true,
+          },
+        });
+
+        if (wallet) {
+          await this.walletRepository.save(
+            this.walletRepository.create({
+              id: wallet.id,
+              availablePayoutBalance:
+                +wallet.availablePayoutBalance +
+                +payOutOrder.amountBeforeDeduction,
+            }),
+          );
+        }
+      }
+
+      // send webhook
+      if (payOutOrder.user?.payOutWebhookUrl) {
+        const webhookPayload = {
+          orderId: external_order_id,
+          status: internalStatus,
+          amount: payOutOrder.amount,
+          txnRefId: id,
+          payoutId: payOutOrder.payoutId,
+          utr: utr_number,
+        };
+
+        this.logger.info(
+          `Payout webhook payload: ${LoggerPlaceHolder.Json}`,
+          webhookPayload,
+        );
+
+        axios
+          .post(payOutOrder.user.payOutWebhookUrl, webhookPayload)
+          .then(({ data }) => {
+            this.logger.info(
+              `PAYOUT - User webhook - (${payOutOrder.user.payOutWebhookUrl}) - ${payOutOrder.payoutId} - Webhook sent successfully: ${JSON.stringify(data)}`,
+            );
+          })
+          .catch((err) => {
+            this.logger.error(
+              `PAYOUT - externalPayinWebhookUpdateStatus - error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+              err,
+            );
+          });
+      }
+
+      return new MessageResponseDto("Payout status updated successfully.");
+    }
   }
 
   async createPayoutGeoPay(
