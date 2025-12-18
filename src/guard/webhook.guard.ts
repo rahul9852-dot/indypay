@@ -23,6 +23,7 @@ const {
   payboltCreds: { webhookIps: payboltWebhookIps },
   tpipay: { webhookIps: tpiWebhookIps },
   geopay,
+  onik,
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -50,6 +51,7 @@ export class WebhookGuard implements CanActivate {
       ...geopay.webhookips,
       ...kdsPayout.kdsIp,
       ...buckbox.webhookIps,
+      ...onik.webhookIps,
     ];
 
     if (!webhookIps.includes(requestIp)) {

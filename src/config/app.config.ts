@@ -165,5 +165,6 @@ export const appConfig = registerAs("appConfig", () => ({
   },
   onik: {
     apiToken: getOsEnv("ONIK_API_KEY"),
+    webhookIps: getOsEnv("ONIK_IPs"),
   },
 }));
