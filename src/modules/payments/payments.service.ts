@@ -6053,7 +6053,7 @@ export class PaymentsService {
         );
       }
 
-      paymentLink = onikResponse.data?.payment_url;
+      paymentLink = onikResponse.data?.upi_intent;
       txnRefId = onikResponse.data?.txn_id;
     } catch (err: any) {
       this.logger.error(
