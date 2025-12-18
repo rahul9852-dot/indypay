@@ -6,9 +6,7 @@ import { Repository } from "typeorm";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { ROCKY } from "@/constants/external-api.constant";
 import { AxiosService } from "@/shared/axios/axios.service";
-import {
-  IExternalRockyPayoutFundResponse,
-} from "@/interface/external-api.interface";
+import { IExternalRockyPayoutFundResponse } from "@/interface/external-api.interface";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";

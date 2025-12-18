@@ -18,6 +18,7 @@ const {
     ertech,
     kdsPayout,
     buckbox,
+    rocky,
   },
   utkarsh: { webhookIps: utkarshWebhookIps },
   payboltCreds: { webhookIps: payboltWebhookIps },
@@ -52,6 +53,7 @@ export class WebhookGuard implements CanActivate {
       ...kdsPayout.kdsIp,
       ...buckbox.webhookIps,
       ...onik.webhookIps,
+      ...rocky.webhookIps,
     ];
 
     if (!webhookIps.includes(requestIp)) {
