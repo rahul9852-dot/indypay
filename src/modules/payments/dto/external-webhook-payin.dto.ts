@@ -280,7 +280,7 @@ export class ExternalPayinWebhookOnikDto {
   @ApiProperty()
   @IsString()
   @IsOptional()
-  amount?: number;
+  amount?: string;
 
   @ApiProperty()
   @IsString()
