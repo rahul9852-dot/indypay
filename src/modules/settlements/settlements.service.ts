@@ -1454,11 +1454,11 @@ export class SettlementsService {
       },
     });
 
-    // if (!user.address) {
-    //   throw new NotFoundException(
-    //     new MessageResponseDto("User address not found"),
-    //   );
-    // }
+    if (!user.address) {
+      throw new NotFoundException(
+        new MessageResponseDto("User address not found"),
+      );
+    }
 
     const banks = await this.bankService.getAllBanks(userId);
 
@@ -1541,7 +1541,7 @@ export class SettlementsService {
         payment_mode: "IMPS",
         bene_name: targetBank.name,
         bene_account_number: targetBank.accountNumber,
-        bene_mobile: user.mobile,
+        bene_mobile: `+91${user.mobile}`,
         bene_ifsc: targetBank.bankIFSC,
         purpose: remarks,
         bank_name: targetBank.bankName,
