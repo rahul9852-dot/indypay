@@ -6039,10 +6039,6 @@ export class PaymentsService {
             },
           },
         );
-      this.logger.info(
-        `Onik API response: ${LoggerPlaceHolder.Json}`,
-        onikResponse,
-      );
       if (!onikResponse || !onikResponse.status) {
         this.logger.error(
           `PAYIN - createTransaction - Onik API failed`,
