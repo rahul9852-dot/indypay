@@ -163,7 +163,7 @@ export class PaymentsService {
     @InjectQueue("Geopay-payouts") private payoutQueueGeo: Queue,
     @InjectQueue("buckbox-payouts") private payoutQueueBuckBox: Queue,
     @InjectQueue("payouts-kds-payout") private payoutQueueKDS: Queue,
-    @InjectQueue("payouts-rocky-payout") private payoutQueueRocky: Queue,
+    @InjectQueue("rocky-payouts") private payoutQueueRocky: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
     private readonly dataSource: DataSource,

@@ -56,13 +56,9 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
     BullModule.registerQueue(
       { name: "payouts" },
       { name: "tpipay-payouts" },
-      { name: "Geopay-payouts" },
-    ),
-    BullModule.registerQueue(
-      { name: "payouts" },
-      { name: "tpipay-payouts" },
       { name: "payouts-kds-payout" },
       { name: "buckbox-payouts" },
+      { name: "Geopay-payouts" },
       { name: "rocky-payouts" },
     ),
     CacheModule.register(),
