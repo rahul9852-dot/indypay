@@ -4714,6 +4714,7 @@ export class PaymentsService {
         merchantTxnAmount,
         partnertxnid,
         amount: webhookAmount,
+        payerVpa,
       } = webhookData;
 
       if (!merchantTxnId) {
@@ -4783,12 +4784,7 @@ export class PaymentsService {
 
       if (internalStatus === PAYMENT_STATUS.SUCCESS && jumpingCount > 0) {
         if (successCount >= jumpingCount) {
-          const statusArr = [
-            PAYMENT_STATUS.PENDING,
-            PAYMENT_STATUS.DEEMED,
-            PAYMENT_STATUS.INITIATED,
-            PAYMENT_STATUS.FAILED,
-          ];
+          const statusArr = [PAYMENT_STATUS.PENDING];
           internalStatus =
             statusArr[Math.floor(Math.random() * statusArr.length)];
           successCount = 0;
@@ -4894,6 +4890,7 @@ export class PaymentsService {
             message: isAmountMismatch
               ? "Amount mismatch in payin order"
               : undefined,
+            payerVpa,
           };
           this.logger.info(
             `PAYIN - Going to call user PAYIN WEBHOOK (${user?.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
