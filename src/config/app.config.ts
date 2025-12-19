@@ -95,7 +95,7 @@ export const appConfig = registerAs("appConfig", () => ({
     rocky: {
       apiKey: getOsEnv("ROCKY_API_KEY"),
       mid: getOsEnv("ROCKY_MID"),
-      webhookIps: getOsEnv("ROCKY_IP"),
+      webhookIps: getOsEnv("ROCKY_IP").split(","),
     },
   },
   transactionConfig: {
