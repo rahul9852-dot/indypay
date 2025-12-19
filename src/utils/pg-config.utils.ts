@@ -102,3 +102,24 @@ export const getConfigNxt = ({ payload, secret }) => {
     timestamp: currentTimestamp,
   };
 };
+
+export const verifyWebhookSignature = (
+  rawBody: Buffer,
+  receivedSignature: string,
+  secret: string,
+): boolean => {
+  const rawBodyString = rawBody.toString("utf8");
+
+  const expectedSignatureHex = crypto
+    .createHmac("sha256", secret)
+    .update(rawBodyString, "utf8")
+    .digest("hex");
+
+  const expectedBytes = Uint8Array.from(
+    Buffer.from(expectedSignatureHex, "hex"),
+  );
+
+  const receivedBytes = Uint8Array.from(Buffer.from(receivedSignature, "hex"));
+
+  return crypto.timingSafeEqual(expectedBytes, receivedBytes);
+};

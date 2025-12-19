@@ -42,6 +42,7 @@ import {
 import {
   ExternalPayinWebhookFlakPayDto,
   ExternalPayinWebhookIsmartDto,
+  ExternalPayinWebhookNxtDto,
   ExternalPayinWebhookOnikDto,
   ExternalPayinWebhookPayboltDto,
   ExternalPayinWebhookTPIDto,
@@ -6634,21 +6635,23 @@ export class PaymentsService {
     });
   }
 
-  async externalWebhookPayinNxt(externalWebhookPayin: any) {
+  async externalWebhookPayinNxt(
+    externalWebhookPayin: ExternalPayinWebhookNxtDto,
+  ) {
     try {
       this.logger.info(
         `Webhook raw data ${LoggerPlaceHolder.Json}`,
         externalWebhookPayin,
       );
-      const { status, amount, rrn, txn_id } = externalWebhookPayin;
+      const { data } = externalWebhookPayin;
 
       let internalStatus = convertExternalPaymentStatusToInternal(
-        status.toUpperCase(),
+        data.status.toUpperCase(),
       );
 
       const payinOrder = await this.payInOrdersRepository.findOne({
         where: {
-          txnRefId: txn_id,
+          orderId: data.reference_id,
         },
         relations: ["user"],
       });
@@ -6707,7 +6710,7 @@ export class PaymentsService {
         );
 
         if (
-          status === payinOrder.status &&
+          data.status === payinOrder.status &&
           payinOrder.isMisspelled === isMisspelled
         ) {
           this.logger.info(
@@ -6722,7 +6725,7 @@ export class PaymentsService {
       }
       const { user } = payinOrder;
 
-      const isAmountMismatch = +payinOrder.amount !== +amount;
+      const isAmountMismatch = +payinOrder.amount !== +data.amount;
 
       const queryRunner = this.dataSource.createQueryRunner();
       await queryRunner.connect();
@@ -6732,20 +6735,20 @@ export class PaymentsService {
         // FIXED: Use direct updated intstead of create+save
         const updateData: any = {
           status: internalStatus,
-          txnRefId: txn_id,
-          ...(!isMisspelled && { utr: rrn }),
+          txnRefId: data.transaction_id,
+          ...(!isMisspelled && { utr: data.utr_number }),
           isMisspelled,
           updatedAt: new Date(),
         };
         if (isAmountMismatch) {
           const { commissionAmount, gstAmount, netPayableAmount } =
             getCommissions({
-              amount: +amount,
+              amount: +data.amount,
               commissionInPercentage: user.commissionInPercentagePayin,
               gstInPercentage: user.gstInPercentagePayin,
             });
 
-          updateData.amount = +amount;
+          updateData.amount = +data.amount;
           updateData.commissionAmount = commissionAmount;
           updateData.gstAmount = gstAmount;
           updateData.netPayableAmount = netPayableAmount;
@@ -6777,7 +6780,7 @@ export class PaymentsService {
             (wallet) => {
               wallet.totalCollections =
                 (wallet.totalCollections ? +wallet.totalCollections : 0) +
-                +amount;
+                +data.amount;
             },
           );
 
@@ -6796,9 +6799,9 @@ export class PaymentsService {
           const webhookPayload = {
             orderId: payinOrder.orderId,
             status: internalStatus,
-            amount: +amount,
+            amount: +data.amount,
             txnRefId: payinOrder.txnRefId,
-            ...(!isMisspelled && { utr: rrn }),
+            ...(!isMisspelled && { utr: data.utr_number }),
             // utr: custRef,
             message: isAmountMismatch
               ? "Amount mismatch in payin order"

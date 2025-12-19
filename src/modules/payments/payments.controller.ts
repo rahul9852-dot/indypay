@@ -12,6 +12,7 @@ import {
   BadRequestException,
   Req,
   Headers,
+  UnauthorizedException,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -51,9 +52,13 @@ import { PaginationWithDateDto } from "@/dtos/common.dto";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
-import { ExternalPayinWebhookOnikDto } from "@/modules/payments/dto/external-webhook-payin.dto";
+import {
+  ExternalPayinWebhookNxtDto,
+  ExternalPayinWebhookOnikDto,
+} from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
+import { verifyWebhookSignature } from "@/utils/pg-config.utils";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -198,11 +203,22 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
   async externalWebhookPayin(
-    @Req() req: any,
+    @Req() req,
+    @Body() webhookDto: ExternalPayinWebhookNxtDto,
     @Headers("x-webhook-signature") signature: string,
     @Headers("x-webhook-event") event: string,
   ) {
-    return this.paymentsService.externalWebhookPayinNxt({ signature, event });
+    const isValid = verifyWebhookSignature(
+      req.body,
+      signature,
+      process.env.WEBHOOK_SECRET!,
+    );
+
+    if (!isValid) {
+      throw new UnauthorizedException("Invalid webhook signature");
+    }
+
+    return this.paymentsService.externalWebhookPayinNxt(webhookDto);
   }
 
   @Public()

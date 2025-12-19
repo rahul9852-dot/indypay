@@ -7,8 +7,10 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  ValidateNested,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 
 class DataDto {
   @ApiProperty()
@@ -293,24 +295,81 @@ export class ExternalPayinWebhookOnikDto {
   rrn?: string;
 }
 
-export class ExternalPayinWebhookNxtDto {
-  @ApiProperty()
+export class ExternalPayinWebhookDataNxtDto {
+  @ApiProperty({ example: "TEST_Drtityvwdo" })
   @IsString()
   @IsNotEmpty()
-  txn_id: string;
+  transaction_id: string;
 
-  @ApiProperty()
-  @IsString()
-  @IsOptional()
-  amount?: string;
+  @ApiProperty({ example: 1000 })
+  @IsNumber()
+  amount: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: "success" })
   @IsString()
   @IsNotEmpty()
   status: string;
 
-  @ApiPropertyOptional()
+  @ApiProperty({ example: "collection" })
   @IsString()
-  @IsOptional()
-  rrn?: string;
+  @IsNotEmpty()
+  service: string;
+
+  @ApiProperty({ example: 2694 })
+  @IsNumber()
+  collection_id: number;
+
+  @ApiProperty({ example: "100290545453" })
+  @IsString()
+  @IsNotEmpty()
+  order_id: string;
+
+  @ApiProperty({ example: "TEST_REF_Th6pZl5A" })
+  @IsString()
+  @IsNotEmpty()
+  reference_id: string;
+
+  @ApiProperty({ example: "dynamic_qr" })
+  @IsString()
+  @IsNotEmpty()
+  collection_type: string;
+
+  @ApiProperty({ example: "717739173715" })
+  @IsString()
+  @IsNotEmpty()
+  utr_number: string;
+
+  @ApiProperty({ example: "customer@upi" })
+  @IsString()
+  @IsNotEmpty()
+  customer_vpa: string;
+
+  @ApiProperty({ example: 994.1 })
+  @IsNumber()
+  net_amount: number;
+
+  @ApiProperty({ example: 5 })
+  @IsNumber()
+  charge: number;
+
+  @ApiProperty({ example: 0.9 })
+  @IsNumber()
+  gst: number;
+}
+export class ExternalPayinWebhookNxtDto {
+  @ApiProperty({ example: "collection.success" })
+  @IsString()
+  @IsNotEmpty()
+  event: string;
+
+  @ApiProperty({ example: "2025-12-20T02:00:45+05:30" })
+  @IsString()
+  @IsNotEmpty()
+  timestamp: string;
+
+  @ApiProperty({ type: ExternalPayinWebhookDataNxtDto })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ExternalPayinWebhookDataNxtDto)
+  data: ExternalPayinWebhookDataNxtDto;
 }
