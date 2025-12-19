@@ -544,3 +544,22 @@ export interface IExternalPayinPaymentResponseOnik {
     callback_url: string;
   };
 }
+
+export interface IExternalPayinPaymentRequestNxt {
+  amount: number;
+  reference_id: string;
+  customer_name: string;
+  customer_mobile: string;
+  purpose: string;
+  expiry_minutes: number;
+}
+
+export interface IExternalPayinPaymentResponseNxt {
+  success: boolean;
+  message: string;
+  data: {
+    collection_id: number;
+    order_id: string;
+    upi_intent: string;
+  };
+}

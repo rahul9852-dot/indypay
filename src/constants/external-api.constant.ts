@@ -136,3 +136,10 @@ export const ROCKY = {
     STATUS_CHECK: "/api/v1/check_order_status",
   },
 };
+
+export const NXT = {
+  BASE_URL: "https://nxtbanking.ai",
+  PAYIN: {
+    LIVE: "/api/v1/collection/generate-dynamic-qr",
+  },
+};

@@ -292,3 +292,25 @@ export class ExternalPayinWebhookOnikDto {
   @IsOptional()
   rrn?: string;
 }
+
+export class ExternalPayinWebhookNxtDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  txn_id: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  amount?: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  status: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  rrn?: string;
+}

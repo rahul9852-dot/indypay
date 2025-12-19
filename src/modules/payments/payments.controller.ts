@@ -10,6 +10,8 @@ import {
   Res,
   Param,
   BadRequestException,
+  Req,
+  Headers,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -51,7 +53,6 @@ import { AuthGuard } from "@/guard/auth.guard";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import {
   ExternalPayinWebhookOnikDto,
-  ExternalPayinWebhookTPIDto,
 } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
@@ -80,7 +81,7 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createGeoPay(createTransactionDto, user);
+    return this.paymentsService.createNxtPayin(createTransactionDto, user);
   }
 
   @Public()
@@ -139,22 +140,6 @@ export class PaymentsController {
     // return this.paymentsService.createPayoutBuckBox(createPayoutDto, user);
   }
 
-  // @Public()
-  // @ApiOperation({
-  //   summary: "Check status of pay-out transaction",
-  // })
-  // @HttpCode(HttpStatus.OK)
-  // @Post("payout/status/dias-pay")
-  // async checkStatusTransactionPayoutDiasPay(
-  //   @Body() payoutStatusDto: PayoutStatusDto,
-  //   @User() user: UsersEntity,
-  // ) {
-  //   return this.paymentsService.checkPayOutStatusTransactionDiasPay(
-  //     payoutStatusDto,
-  //     user,
-  //   );
-  // }
-
   @Public()
   @ApiOperation({ summary: "Create pay-out transaction Bulk" })
   @UseGuards(ApiKeyGuard)
@@ -176,20 +161,6 @@ export class PaymentsController {
   ) {
     return this.paymentsService.createPayoutRockyPayz(createPayoutDto, user);
   }
-
-  // @Public()
-  // @ApiOperation({ summary: "Create pay-out transaction" })
-  // @UseGuards(ApiKeyGuard)
-  // @Post("payout/single-create")
-  // async createPayout(
-  //   @Body() singlePayoutDto: SinglePayoutDto,
-  //   @User() user: UsersEntity,
-  // ) {
-  //   return this.paymentsService.createPayoutEritechSingle(
-  //     singlePayoutDto,
-  //     user,
-  //   );
-  // }
 
   @ApiOperation({
     summary: "Create pay-out transaction for dashboard",
@@ -229,9 +200,11 @@ export class PaymentsController {
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("payin/webhook")
   async externalWebhookPayin(
-    @Body() externalWebhookPayin: ExternalPayinWebhookTPIDto,
+    @Req() req: any,
+    @Headers("x-webhook-signature") signature: string,
+    @Headers("x-webhook-event") event: string,
   ) {
-    return this.paymentsService.externalWebhookPayinJio(externalWebhookPayin);
+    return this.paymentsService.externalWebhookPayinNxt({ signature, event });
   }
 
   @Public()

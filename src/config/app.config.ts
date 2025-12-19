@@ -172,4 +172,9 @@ export const appConfig = registerAs("appConfig", () => ({
     apiToken: getOsEnv("ONIK_API_KEY"),
     webhookIps: getOsEnv("ONIK_IPs").split(","),
   },
+  nxt: {
+    clientId: getOsEnv("NXT_CLIENT_ID"),
+    secretKey: getOsEnv("NXT_SECRET_KEY"),
+    webhookIps: getOsEnv("NXT_IP").split(","),
+  },
 }));
