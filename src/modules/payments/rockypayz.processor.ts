@@ -61,7 +61,7 @@ export class PayoutProcessorRocky {
 
             const rockyPayload = {
               mid,
-              apiKey,
+              apikey: apiKey,
               route: 1,
               ref_no: order.orderId,
               amount: order.amount,
