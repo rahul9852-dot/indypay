@@ -342,7 +342,7 @@ export class ExternalPayinWebhookDataNxtDto {
   @ApiProperty({ example: "customer@upi" })
   @IsString()
   @IsOptional()
-  customer_vpa: string;
+  customer_vpa?: string;
 }
 export class ExternalPayinWebhookNxtDto {
   @ApiProperty({ example: "collection.success" })
