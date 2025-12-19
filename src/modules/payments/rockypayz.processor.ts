@@ -63,7 +63,7 @@ export class PayoutProcessorRocky {
               mid,
               apikey: apiKey,
               route: 1,
-              ref_no: order.orderId,
+              ref_no: order.payoutId,
               amount: order.amount,
               customer_name: order.name,
               account_number: order.bankAccountNumber,
@@ -123,7 +123,7 @@ export class PayoutProcessorRocky {
                 payOutOrder.orderId,
               );
               const payload = {
-                orderId: order.orderId,
+                orderId: order.payoutId,
                 status,
                 amount: order.amount,
                 txnRefId: responseRocky.data.TXN_ID,

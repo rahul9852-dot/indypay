@@ -6412,7 +6412,7 @@ export class PaymentsService {
     );
     const payOutOrder = await this.payOutOrdersRepository.findOne({
       where: {
-        orderId: Txn_ID,
+        payoutId: Txn_ID,
       },
       relations: ["user"],
     });
