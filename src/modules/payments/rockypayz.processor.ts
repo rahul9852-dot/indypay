@@ -86,10 +86,11 @@ export class PayoutProcessorRocky {
               responseRocky,
             );
 
-            await this.payOutOrdersRepository.save(
-              this.payOutOrdersRepository.create({
-                payoutId: order.payoutId,
+            await this.payOutOrdersRepository.update(
+              { id: order.id },
+              {
                 transferId: responseRocky.data.TXN_ID,
+                utr: responseRocky.data.UTR,
                 ...(status === PAYMENT_STATUS.SUCCESS && {
                   status,
                   successAt: new Date(),
@@ -100,10 +101,10 @@ export class PayoutProcessorRocky {
                 }),
                 ...(![PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.FAILED].includes(
                   status,
-                ) && { status }),
-
-                utr: responseRocky.data.UTR,
-              }),
+                ) && {
+                  status,
+                }),
+              },
             );
 
             if (status === PAYMENT_STATUS.FAILED) {
