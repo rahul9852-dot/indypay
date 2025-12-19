@@ -13,8 +13,8 @@ import { AppModule } from "./app.module";
 import {
   webhookBodyParserUtkarsh,
   WEBHOOK_ROUTES_UTK,
-  webhookBodyParserJio,
-  WEBHOOK_ROUTES_JIO,
+  WEBHOOK_ROUTES,
+  webhookBodyParserNxt,
 } from "./utils/webhook.middleware";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
@@ -42,8 +42,8 @@ async function bootstrap() {
     app.use(route, webhookBodyParserUtkarsh);
   });
 
-  WEBHOOK_ROUTES_JIO.forEach((route) => {
-    app.use(route, webhookBodyParserJio);
+  WEBHOOK_ROUTES.forEach((route) => {
+    app.use(route, webhookBodyParserNxt);
   });
 
   // Apply standard body parsing globally

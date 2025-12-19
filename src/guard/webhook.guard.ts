@@ -25,6 +25,7 @@ const {
   tpipay: { webhookIps: tpiWebhookIps },
   geopay,
   onik,
+  nxt,
 } = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -55,6 +56,7 @@ export class WebhookGuard implements CanActivate {
       ...buckbox.webhookIps,
       ...onik.webhookIps,
       ...rocky.webhookIps,
+      ...nxt.webhookIps,
     ];
 
     if (!webhookIps.includes(requestIp)) {
