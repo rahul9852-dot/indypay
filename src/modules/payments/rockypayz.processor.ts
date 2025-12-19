@@ -78,7 +78,7 @@ export class PayoutProcessorRocky {
               );
 
             const status = convertExternalPaymentStatusToInternal(
-              responseRocky.data.status,
+              responseRocky.data.status.toUpperCase(),
             );
 
             this.logger.info(
@@ -108,6 +108,15 @@ export class PayoutProcessorRocky {
             );
 
             if (status === PAYMENT_STATUS.FAILED) {
+              await this.payOutOrdersRepository.update(
+                { id: order.id },
+                {
+                  status: PAYMENT_STATUS.FAILED,
+                  failureAt: new Date(),
+                  transferId: responseRocky.data.TXN_ID,
+                  utr: responseRocky.data.UTR,
+                },
+              );
               throw {
                 status: PAYMENT_STATUS.FAILED,
                 message: responseRocky.msg || "Payout failed",
