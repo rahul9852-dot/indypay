@@ -88,7 +88,7 @@ export class PayoutProcessorRocky {
 
             await this.payOutOrdersRepository.save(
               this.payOutOrdersRepository.create({
-                id: order.id,
+                payoutId: order.payoutId,
                 transferId: responseRocky.data.TXN_ID,
                 ...(status === PAYMENT_STATUS.SUCCESS && {
                   status,
@@ -102,7 +102,7 @@ export class PayoutProcessorRocky {
                   status,
                 ) && { status }),
 
-                // utr: responseBuckBox.data.utr,
+                utr: responseRocky.data.UTR,
               }),
             );
 
