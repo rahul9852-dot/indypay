@@ -299,7 +299,7 @@ export class ExternalPayinWebhookDataNxtDto {
   @ApiProperty({ example: "TEST_Drtityvwdo" })
   @IsString()
   @IsNotEmpty()
-  transaction_id: string;
+  upi_transaction_id: string;
 
   @ApiProperty({ example: 1000 })
   @IsNumber()
@@ -337,24 +337,12 @@ export class ExternalPayinWebhookDataNxtDto {
   @ApiProperty({ example: "717739173715" })
   @IsString()
   @IsNotEmpty()
-  utr_number: string;
+  utr: string;
 
   @ApiProperty({ example: "customer@upi" })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   customer_vpa: string;
-
-  @ApiProperty({ example: 994.1 })
-  @IsNumber()
-  net_amount: number;
-
-  @ApiProperty({ example: 5 })
-  @IsNumber()
-  charge: number;
-
-  @ApiProperty({ example: 0.9 })
-  @IsNumber()
-  gst: number;
 }
 export class ExternalPayinWebhookNxtDto {
   @ApiProperty({ example: "collection.success" })

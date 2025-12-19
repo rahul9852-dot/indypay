@@ -6735,8 +6735,8 @@ export class PaymentsService {
         // FIXED: Use direct updated intstead of create+save
         const updateData: any = {
           status: internalStatus,
-          txnRefId: data.transaction_id,
-          ...(!isMisspelled && { utr: data.utr_number }),
+          txnRefId: data.upi_transaction_id,
+          ...(!isMisspelled && { utr: data.utr }),
           isMisspelled,
           updatedAt: new Date(),
         };
@@ -6801,7 +6801,7 @@ export class PaymentsService {
             status: internalStatus,
             amount: +data.amount,
             txnRefId: payinOrder.txnRefId,
-            ...(!isMisspelled && { utr: data.utr_number }),
+            ...(!isMisspelled && { utr: data.utr }),
             // utr: custRef,
             message: isAmountMismatch
               ? "Amount mismatch in payin order"
