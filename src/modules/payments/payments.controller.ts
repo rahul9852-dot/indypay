@@ -12,7 +12,6 @@ import {
   BadRequestException,
   Req,
   Headers,
-  UnauthorizedException,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -58,7 +57,6 @@ import {
 } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
-import { verifyWebhookSignature } from "@/utils/pg-config.utils";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -208,15 +206,15 @@ export class PaymentsController {
     @Headers("x-webhook-signature") signature: string,
     @Headers("x-webhook-event") event: string,
   ) {
-    const isValid = verifyWebhookSignature(
-      req.body,
-      signature,
-      process.env.WEBHOOK_SECRET!,
-    );
+    // const isValid = verifyWebhookSignature(
+    //   req.body,
+    //   signature,
+    //   process.env.WEBHOOK_SECRET!,
+    // );
 
-    if (!isValid) {
-      throw new UnauthorizedException("Invalid webhook signature");
-    }
+    // if (!isValid) {
+    //   throw new UnauthorizedException("Invalid webhook signature");
+    // }
 
     return this.paymentsService.externalWebhookPayinNxt(webhookDto);
   }
