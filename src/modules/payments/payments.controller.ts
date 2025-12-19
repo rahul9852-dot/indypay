@@ -321,7 +321,7 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: MessageResponseDto })
   @Post("v2/payout/webhook")
-  async externalWebhookPayoutBuckBox(@Body() externalWebhookPayout: any) {
+  async externalWebhookPayoutBuckBox(@Body() externalWebhookPayout: any[]) {
     return this.paymentsService.externalWebhookPayoutRockyPayz(
       externalWebhookPayout,
     );
