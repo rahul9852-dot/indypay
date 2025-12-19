@@ -55,7 +55,7 @@ import {
   ExternalPayinWebhookNxtDto,
   ExternalPayinWebhookOnikDto,
 } from "@/modules/payments/dto/external-webhook-payin.dto";
-import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 
 @IgnoreKyc()
@@ -215,11 +215,6 @@ export class PaymentsController {
     // if (!isValid) {
     //   throw new UnauthorizedException("Invalid webhook signature");
     // }
-    this.logger.info(
-      `Webhook controller logger ${LoggerPlaceHolder.Json}`,
-      webhookDto,
-    );
-
     return this.paymentsService.externalWebhookPayinNxt(webhookDto);
   }
 
