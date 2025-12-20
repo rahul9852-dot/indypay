@@ -120,20 +120,6 @@ export class PayoutProcessorRocky {
                   utr: responseRocky.data.UTR,
                 },
               );
-              const wallet = await this.walletRepository.findOne({
-                where: { user: { id: userId } },
-                relations: { user: true },
-              });
-              if (wallet) {
-                await this.walletRepository.save(
-                  this.walletRepository.create({
-                    id: wallet.id,
-                    availablePayoutBalance:
-                      +wallet.availablePayoutBalance +
-                      +order.amountBeforeDeduction,
-                  }),
-                );
-              }
               throw {
                 status: PAYMENT_STATUS.FAILED,
                 message: responseRocky.msg || "Payout failed",
