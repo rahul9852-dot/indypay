@@ -71,11 +71,14 @@ export class PayoutProcessorRocky {
               customer_mobile: order.beneficiaryMobile,
             };
 
+            this.logger.info("ROCKY PAYOUT - BEFORE API CALL", rockyPayload);
+
             const responseRocky =
               await axiosServiceBuckBox.postRequest<IExternalRockyPayoutFundResponse>(
                 ROCKY.PAYOUT.LIVE,
                 rockyPayload,
               );
+            this.logger.info("ROCKY PAYOUT - AFTER API CALL", responseRocky);
 
             const status = convertExternalPaymentStatusToInternal(
               responseRocky.data.status.toUpperCase(),
