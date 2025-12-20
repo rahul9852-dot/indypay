@@ -6454,7 +6454,10 @@ export class PaymentsService {
       await this.payOutOrdersRepository.save(payOutOrderRaw);
     }
 
-    if (internalStatus === PAYMENT_STATUS.FAILED) {
+    if (
+      internalStatus === PAYMENT_STATUS.FAILED &&
+      internalStatus !== payOutOrder.status
+    ) {
       const payOutOrderRaw = this.payOutOrdersRepository.create({
         id: payOutOrder.id,
         status: internalStatus,
