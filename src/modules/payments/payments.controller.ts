@@ -175,7 +175,7 @@ export class PaymentsController {
       throw new BadRequestException("Payout is disabled from dashboard");
     }
 
-    return this.paymentsService.createPayoutFlakPayBulk(createPayoutDto, user);
+    return this.paymentsService.createPayoutRockyPayz(createPayoutDto, user);
   }
 
   @Public()
