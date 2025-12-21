@@ -6479,16 +6479,16 @@ export class PaymentsService {
         },
       });
 
-      if (wallet) {
-        await this.walletRepository.save(
-          this.walletRepository.create({
-            id: wallet.id,
-            availablePayoutBalance:
-              +wallet.availablePayoutBalance +
-              +payOutOrder.amountBeforeDeduction,
-          }),
-        );
-      }
+      // if (wallet) {
+      //   await this.walletRepository.save(
+      //     this.walletRepository.create({
+      //       id: wallet.id,
+      //       availablePayoutBalance:
+      //         +wallet.availablePayoutBalance +
+      //         +payOutOrder.amountBeforeDeduction,
+      //     }),
+      //   );
+      // }
     }
 
     // send webhook
