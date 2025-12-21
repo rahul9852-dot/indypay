@@ -176,7 +176,7 @@ export function calculateDynamicCommission({
   userCommissionRate,
   userGstRate,
   commissionConfigs = [
-    // { amountThreshold: 1000, commissionRate: 12, gstRate: 18 }, // Default config for amounts < 1000
+    { amountThreshold: 1000, commissionRate: 9, gstRate: 18 }, // Default config for amounts < 1000
     // we also add multiple config if i need later on.
   ],
 }: DynamicCommissionParams) {
