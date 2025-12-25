@@ -143,3 +143,10 @@ export const NXT = {
     LIVE: "/api/v1/collection/generate-dynamic-qr",
   },
 };
+
+export const FYNTRA = {
+  BASE_URL: "https://api.fyntrapay.in",
+  PAYIN: {
+    LIVE: "api/v1/payin/create",
+  },
+};

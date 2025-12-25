@@ -113,6 +113,18 @@ export class PaymentsController {
   }
 
   @Public()
+  @ApiOperation({ summary: "Create pay-in transaction" })
+  @UseGuards(ApiKeyGuard)
+  @ApiCreatedResponse({ type: CreatePayinPaymentResponseDto })
+  @Post("/v4/payin/create")
+  async createPayInTransactionFyntra(
+    @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createFyntraPayin(createTransactionDto, user);
+  }
+
+  @Public()
   @ApiOperation({
     summary: "Check status of pay-in transaction",
   })
@@ -233,6 +245,26 @@ export class PaymentsController {
       return res.status(200).send("OK");
     } catch (error) {
       this.logger.error("GeoPay webhook processing failed:", error);
+
+      return res.status(200).send("OK"); // Still send OK to prevent retries
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "GeoPay webhook for payment callback" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payin/fyntra/webhook")
+  async fyntraPayWebhook(@Body() webhookData: any, @Res() res: Response) {
+    try {
+      this.logger.info("FyntraPay webhook received:", webhookData);
+
+      // Process the webhook (you can expand this based on actual webhook format)
+      await this.paymentsService.externalWebhookPayinFyntra(webhookData);
+
+      return res.status(200).send("OK");
+    } catch (error) {
+      this.logger.error("FyntraPay webhook processing failed:", error);
 
       return res.status(200).send("OK"); // Still send OK to prevent retries
     }

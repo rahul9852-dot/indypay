@@ -563,3 +563,30 @@ export interface IExternalPayinPaymentResponseNxt {
     upi_intent: string;
   };
 }
+
+export interface IExternalFyntraPayPayinRequest {
+  order_id: string;
+  amount: number;
+  customer_details: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  payment_method: "UPI";
+}
+
+export interface IExternalFyntraPayPayinResponse {
+  txn_id: string;
+  order_id: string;
+  amount: string;
+  status: string;
+  provider_ref_id: string;
+  payment_method: string;
+  customer_details: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  payment_link: string;
+  created_at: string;
+}

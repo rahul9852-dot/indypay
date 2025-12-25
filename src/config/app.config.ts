@@ -177,4 +177,8 @@ export const appConfig = registerAs("appConfig", () => ({
     secretKey: getOsEnv("NXT_SECRET_KEY"),
     webhookIps: getOsEnv("NXT_IP").split(","),
   },
+  fyntra: {
+    apiToken: getOsEnv("FYNTRA_API_KEY"),
+    webhookIps: getOsEnv("FYNTRA_IPs").split(","),
+  },
 }));
