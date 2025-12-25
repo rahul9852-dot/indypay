@@ -539,7 +539,7 @@ export interface IExternalPayinPaymentResponseOnik {
   message: string;
   data: {
     txn_id: string;
-    upi_intent: string;
+    upi_link: string;
     qr_code: string;
     callback_url: string;
   };
