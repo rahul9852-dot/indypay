@@ -6055,6 +6055,10 @@ export class PaymentsService {
 
       paymentLink = onikResponse.data?.upi_link;
       txnRefId = onikResponse.data?.txn_id;
+      this.logger.info(
+        `PAYIN - createTransaction - Onik API response: ${LoggerPlaceHolder.Json}`,
+        onikResponse,
+      );
     } catch (err: any) {
       this.logger.error(
         `PAYIN - createTransaction - Error calling Onik API`,
