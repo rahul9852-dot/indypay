@@ -125,7 +125,7 @@ export const BUCKBOX = {
 export const ONIK = {
   BASE_URL: "https://api.oniktech.com",
   PAYIN: {
-    LIVE: "/api/v1/newpayin",
+    LIVE: "api/v1/oniktech/payin",
   },
 };
 
