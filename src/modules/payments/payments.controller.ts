@@ -82,7 +82,7 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createOnikPayin(createTransactionDto, user);
+    return this.paymentsService.createNxtPayin(createTransactionDto, user);
   }
 
   @Public()
