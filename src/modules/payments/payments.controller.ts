@@ -57,6 +57,8 @@ import {
 } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
+import { IntegrationMappingService } from "@/modules/integrations/integration-mapping.service";
+import { IntegrationPayinRouterService } from "@/modules/integrations/integration-payin-router.service";
 
 @IgnoreKyc()
 @IgnoreBusinessDetails()
@@ -71,6 +73,8 @@ export class PaymentsController {
     private readonly payoutService: PayoutService,
     private readonly encryptionAlgoService: CryptoService,
     private readonly databaseMonitorService: DatabaseMonitorService,
+    private readonly integrationMappingService: IntegrationMappingService,
+    private readonly integrationPayinRouterService: IntegrationPayinRouterService,
   ) {}
 
   @Public()
@@ -82,7 +86,27 @@ export class PaymentsController {
     @Body() createTransactionDto: CreatePayinTransactionFlaPayDto,
     @User() user: UsersEntity,
   ) {
-    return this.paymentsService.createOnikPayin(createTransactionDto, user);
+    // Step 1: Get user's integration mapping
+    const integrationCode =
+      await this.integrationMappingService.getUserIntegration(user.id);
+
+    // Step 2: Route to the appropriate integration
+    const result = await this.integrationPayinRouterService.routePayin(
+      integrationCode,
+      createTransactionDto,
+      user,
+    );
+
+    // Step 3: Record transaction amount for limit tracking (async, don't wait)
+    this.integrationMappingService
+      .recordTransactionAmount(integrationCode, createTransactionDto.amount)
+      .catch((err) => {
+        this.logger.error(
+          `Failed to record transaction amount for limit tracking: ${err.message}`,
+        );
+      });
+
+    return result;
   }
 
   @Public()

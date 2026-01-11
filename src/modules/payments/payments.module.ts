@@ -1,16 +1,16 @@
 import { JwtService } from "@nestjs/jwt";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
 import { CacheModule } from "@nestjs/cache-manager";
 
 import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
-import { PayoutProcessor } from "./payments.processor";
-import { PayoutProcessorGeopay } from "./geopay.processor";
-import { PayoutProcessorDiasPay } from "./payments.processorv2";
-import { PayoutProcessorBuckBox } from "./buckbox.processor";
-import { PayoutProcessorRocky } from "./rockypayz.processor";
+import { PayoutProcessor } from "./payout/processor/payments.processor";
+import { PayoutProcessorGeopay } from "./payout/processor/geopay.processor";
+import { PayoutProcessorDiasPay } from "./payout/processor/payments.processorv2";
+import { PayoutProcessorBuckBox } from "./payout/processor/buckbox.processor";
+import { PayoutProcessorRocky } from "./payout/processor/rockypayz.processor";
 import { SESService } from "@/modules/aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
@@ -34,6 +34,7 @@ import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth.module";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
+import { IntegrationsModule } from "@/modules/integrations/integrations.module";
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
     ),
     CacheModule.register(),
     ThirdPartyAuthModule,
+    forwardRef(() => IntegrationsModule),
   ],
   providers: [
     PaymentsService,

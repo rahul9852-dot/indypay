@@ -16,4 +16,6 @@ export const REDIS_KEYS = {
     `stats:merchant:${userId}:${startDate}:${endDate}`,
   STATS_ADMIN: (startDate: string, endDate: string) =>
     `stats:admin:${startDate}:${endDate}`,
+  USER_INTEGRATION_MAPPING: (userId: string) =>
+    `user_integration_mapping:${userId}`,
 };
