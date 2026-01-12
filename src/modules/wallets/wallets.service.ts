@@ -19,6 +19,7 @@ import {
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
 
 @Injectable()
 export class WalletsService {
@@ -26,6 +27,8 @@ export class WalletsService {
   constructor(
     @InjectRepository(WalletEntity)
     private readonly walletRepository: Repository<WalletEntity>,
+    @InjectRepository(PayinWalletEntity)
+    private readonly payinWalletRepository: Repository<PayinWalletEntity>,
     @InjectRepository(WalletTopupEntity)
     private readonly walletTopupRepository: Repository<WalletTopupEntity>,
     @InjectRepository(PayOutOrdersEntity)
@@ -550,5 +553,67 @@ export class WalletsService {
       availablePayoutBalance: savedWallet.availablePayoutBalance,
       message: "Refund successful",
     };
+  }
+
+  async rechargePayinWallet(
+    merchantUserId: string,
+    adminUser: UsersEntity,
+    amount: number,
+  ) {
+    const payinWallet = await this.payinWalletRepository.findOne({
+      where: { user: { id: merchantUserId } },
+    });
+
+    if (!payinWallet) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payin wallet not found"),
+      );
+    }
+
+    const merchantUser = await this.usersRepository.findOne({
+      where: { id: merchantUserId },
+    });
+
+    this.logger.info(
+      `RECHARGE - Recharge payin wallet - Net payable amount payout: ${LoggerPlaceHolder.Json}`,
+      {
+        amount,
+      },
+    );
+
+    // update payin wallet balance
+    const savedPayinWallet = await this.payinWalletRepository.save(
+      this.payinWalletRepository.create({
+        id: payinWallet.id,
+        user: payinWallet.user,
+        totalPayinBalance: +payinWallet.totalPayinBalance + amount,
+      }),
+    );
+
+    return {
+      userId: merchantUserId,
+      totalPayinBalance: savedPayinWallet.totalPayinBalance,
+      message: "Recharge successful",
+    };
+  }
+
+  async getPayinWallet(userId: string) {
+    return this.payinWalletRepository.findOne({
+      where: { user: { id: userId } },
+      select: {
+        id: true,
+        totalPayinBalance: true,
+        user: {
+          id: true,
+          fullName: true,
+          email: true,
+          mobile: true,
+          accountStatus: true,
+        },
+      },
+      relations: {
+        user: true,
+      },
+    });
   }
 }

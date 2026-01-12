@@ -35,6 +35,7 @@ import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 import { IntegrationsModule } from "@/modules/integrations/integrations.module";
+import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { IntegrationsModule } from "@/modules/integrations/integrations.module";
       UserWhitelistIpsEntity,
       UserAddressEntity,
       WalletEntity,
+      PayinWalletEntity,
       SettlementsEntity,
       ApiCredentialsEntity,
       UserLoginIpsEntity,
