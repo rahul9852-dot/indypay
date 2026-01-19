@@ -33,6 +33,9 @@ import {
   CreatePayoutDto,
   PayoutStatusDto,
 } from "./dto/create-payout-payment.dto";
+import { OnikPayinService } from "./payin/integrations/onik-payin.service";
+import { GeoPayPayinService } from "./payin/integrations/geopay-payin.service";
+import { UtkarshPayinService } from "./payin/integrations/utkarsh-payin.service";
 import { User } from "@/decorators/user.decorator";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -54,6 +57,7 @@ import { CryptoService } from "@/utils/encryption-algo.utils";
 import {
   ExternalPayinWebhookNxtDto,
   ExternalPayinWebhookOnikDto,
+  ExternalPayinWebhookUtkarshDto,
 } from "@/modules/payments/dto/external-webhook-payin.dto";
 import { CustomLogger } from "@/logger";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
@@ -75,6 +79,11 @@ export class PaymentsController {
     private readonly databaseMonitorService: DatabaseMonitorService,
     private readonly integrationMappingService: IntegrationMappingService,
     private readonly integrationPayinRouterService: IntegrationPayinRouterService,
+    // Payin integration services for webhooks
+    private readonly onikPayinService: OnikPayinService,
+    // private readonly fyntraPayinService: FyntraPayinService,
+    private readonly geoPayPayinService: GeoPayPayinService,
+    private readonly utkarshPayinService: UtkarshPayinService,
   ) {}
 
   @Public()
@@ -292,6 +301,48 @@ export class PaymentsController {
 
       return res.status(200).send("OK"); // Still send OK to prevent retries
     }
+  }
+
+  // ========== NEW MODULAR WEBHOOK ENDPOINTS ==========
+  // These endpoints use the modular integration services
+
+  @Public()
+  @ApiOperation({ summary: "Onik payin webhook" })
+  @UseGuards(WebhookGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payin/webhook/onik")
+  async onikPayinWebhook(@Body() webhookData: ExternalPayinWebhookOnikDto) {
+    return this.onikPayinService.handleWebhook(webhookData);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "GeoPay payin webhook" })
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payin/webhook/geopay")
+  async geoPayPayinWebhook(@Body() webhookData: any, @Res() res: Response) {
+    try {
+      const result = await this.geoPayPayinService.handleWebhook(webhookData);
+
+      return res.status(200).send("OK");
+    } catch (error) {
+      this.logger.error("GeoPay webhook processing failed:", error);
+
+      return res.status(200).send("OK"); // Still send OK to prevent retries
+    }
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Utkarsh payin webhook" })
+  @UseGuards(WebhookGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseDto })
+  @Post("payin/webhook/utkarsh")
+  async utkarshPayinWebhook(
+    @Body() webhookData: ExternalPayinWebhookUtkarshDto,
+  ) {
+    return this.utkarshPayinService.handleWebhook(webhookData);
   }
 
   @Public()

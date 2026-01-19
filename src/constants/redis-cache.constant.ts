@@ -18,4 +18,14 @@ export const REDIS_KEYS = {
     `stats:admin:${startDate}:${endDate}`,
   USER_INTEGRATION_MAPPING: (userId: string) =>
     `user_integration_mapping:${userId}`,
+  USER_COMMISSION_PLAN: (userId: string, type: string) =>
+    `user_commission_plan:${userId}:${type}`,
+  // Week-based stats caching keys
+  STATS_ADMIN_WEEK: (weekStart: string) => `stats:admin:week:${weekStart}`,
+  STATS_MERCHANT_WEEK: (userId: string, weekStart: string) =>
+    `stats:merchant:week:${userId}:${weekStart}`,
+  // Daily stats caching keys (for incremental aggregation)
+  STATS_ADMIN_DAILY: (date: string) => `stats:admin:daily:${date}`,
+  STATS_MERCHANT_DAILY: (userId: string, date: string) =>
+    `stats:merchant:daily:${userId}:${date}`,
 };

@@ -1,5 +1,14 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsNumber, IsPositive, IsString } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+} from "class-validator";
+import { PaginationDto } from "@/dtos/common.dto";
+import { MODE_OPTIONS, PAYIN_WALLET_LOAD_STATUS } from "@/enums/payment.enum";
 
 export class WalletTopUpDto {
   @ApiProperty()
@@ -11,6 +20,44 @@ export class WalletTopUpDto {
   @IsString()
   @IsNotEmpty()
   userId: string;
+}
+
+export class WalletPayinTopUpDto {
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  topUpId?: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsPositive()
+  @IsOptional()
+  amount?: number;
+
+  @ApiProperty()
+  @IsOptional()
+  @IsEnum(PAYIN_WALLET_LOAD_STATUS)
+  status?: PAYIN_WALLET_LOAD_STATUS;
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  userId?: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  masterBankId?: string;
+
+  @ApiProperty()
+  @IsEnum(MODE_OPTIONS)
+  @IsOptional()
+  mode?: MODE_OPTIONS;
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  utr?: string;
 }
 
 export class WalletListDto {
@@ -45,4 +92,14 @@ export class RefundWalletDto {
   @IsNumber()
   @IsPositive()
   amount: number;
+}
+
+export class PayinTopUpWalletPaginationDto extends PaginationDto {
+  @ApiPropertyOptional({
+    enum: PAYIN_WALLET_LOAD_STATUS,
+    description: "Filter by status",
+  })
+  @IsEnum(PAYIN_WALLET_LOAD_STATUS)
+  @IsOptional()
+  status?: PAYIN_WALLET_LOAD_STATUS;
 }

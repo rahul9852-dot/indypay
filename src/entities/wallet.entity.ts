@@ -27,6 +27,14 @@ export class WalletEntity {
   })
   totalCollections: number;
 
+  @Column({
+    type: "decimal",
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  totalPayinBalance: number;
+
   // PAYOUT
   @Column({
     type: "decimal",

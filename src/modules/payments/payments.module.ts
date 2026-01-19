@@ -11,6 +11,9 @@ import { PayoutProcessorGeopay } from "./payout/processor/geopay.processor";
 import { PayoutProcessorDiasPay } from "./payout/processor/payments.processorv2";
 import { PayoutProcessorBuckBox } from "./payout/processor/buckbox.processor";
 import { PayoutProcessorRocky } from "./payout/processor/rockypayz.processor";
+import { OnikPayinService } from "./payin/integrations/onik-payin.service";
+import { GeoPayPayinService } from "./payin/integrations/geopay-payin.service";
+import { UtkarshPayinService } from "./payin/integrations/utkarsh-payin.service";
 import { SESService } from "@/modules/aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
@@ -35,7 +38,8 @@ import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 import { IntegrationsModule } from "@/modules/integrations/integrations.module";
-import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
+// import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
+import { CommissionsModule } from "@/modules/commissions/commissions.module";
 
 @Module({
   imports: [
@@ -50,7 +54,7 @@ import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
       UserWhitelistIpsEntity,
       UserAddressEntity,
       WalletEntity,
-      PayinWalletEntity,
+      // PayinWalletEntity,
       SettlementsEntity,
       ApiCredentialsEntity,
       UserLoginIpsEntity,
@@ -67,6 +71,7 @@ import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
     CacheModule.register(),
     ThirdPartyAuthModule,
     forwardRef(() => IntegrationsModule),
+    forwardRef(() => CommissionsModule),
   ],
   providers: [
     PaymentsService,
@@ -84,8 +89,18 @@ import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
     CryptoService,
     DatabaseMonitorService,
     PayoutProcessorGeopay,
+    // Payin integration services
+    OnikPayinService,
+    GeoPayPayinService,
+    UtkarshPayinService,
   ],
   controllers: [PaymentsController],
-  exports: [PaymentsService],
+  exports: [
+    PaymentsService,
+    // Export payin services so IntegrationsModule can use them
+    OnikPayinService,
+    GeoPayPayinService,
+    UtkarshPayinService,
+  ],
 })
 export class PaymentsModule {}

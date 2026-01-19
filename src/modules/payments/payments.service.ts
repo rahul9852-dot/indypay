@@ -25,7 +25,6 @@ import * as dayjs from "dayjs";
 import * as FormData from "form-data";
 import {
   CreatePayinTransactionFlaPayDto,
-  CreatePayinTransactionIsmartDto,
   CreatePayinTransactionGeoPayDTO,
   PayinStatusDto,
 } from "./dto/create-payin-payment.dto";
@@ -73,7 +72,6 @@ import {
 import {
   ERTITECH,
   FALKPAY,
-  ISMART_PAY,
   SABPAISA,
   UTKARSH,
   PAYBOLT,
@@ -84,7 +82,7 @@ import {
   FYNTRA,
 } from "@/constants/external-api.constant";
 import { WalletEntity } from "@/entities/wallet.entity";
-import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
+// import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
 import {
   calculateOriginalAmountFromNetPayable,
   calculatePayoutOriginalAmountFromNetPayable,
@@ -93,9 +91,7 @@ import {
 } from "@/utils/commissions.utils";
 import {
   IExternalPayinPaymentRequestFlakPay,
-  IExternalPayinPaymentRequestIsmart,
   IExternalPayinPaymentResponseFlakPay,
-  IExternalPayinPaymentResponseIsmart,
   IExternalPayoutResponseFlakPay,
   IExternalPayoutStatusResponseFlakPay,
   IExternalEritecPayoutFundResponse,
@@ -122,7 +118,6 @@ import {
   getConfigNxt,
   getEritechPgConfig,
   getFlakPayPgConfig,
-  getIsmartPayPgConfig,
   getUtkarshPgConfig,
 } from "@/utils/pg-config.utils";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
@@ -160,8 +155,8 @@ export class PaymentsService {
     private readonly payOutOrdersRepository: Repository<PayOutOrdersEntity>,
     @InjectRepository(WalletEntity)
     private readonly walletRepository: Repository<WalletEntity>,
-    @InjectRepository(PayinWalletEntity)
-    private readonly PayinWalletRepository: Repository<PayinWalletEntity>,
+    // @InjectRepository(PayinWalletEntity)
+    // private readonly PayinWalletRepository: Repository<PayinWalletEntity>,
     @InjectRepository(SettlementsEntity)
     private readonly settlementRepository: Repository<SettlementsEntity>,
     @InjectRepository(ApiCredentialsEntity)
@@ -293,247 +288,6 @@ export class PaymentsService {
     });
 
     return wallet;
-  }
-
-  async createTransactionPayinIsmart(
-    createPayinTransactionDto: CreatePayinTransactionIsmartDto,
-    user: UsersEntity,
-  ) {
-    const axiosServiceIsmart = new AxiosService(
-      ISMART_PAY.BASE_URL,
-      getIsmartPayPgConfig({
-        clientId: externalPaymentConfig.ismart.clientId,
-        clientSecret: externalPaymentConfig.ismart.clientSecret,
-      }),
-    );
-
-    const { amount, email, mobile, name, orderId, vpa } =
-      createPayinTransactionDto;
-    const queryRunner = this.dataSource.createQueryRunner();
-
-    const existingPayinOrder = await this.payInOrdersRepository.exists({
-      where: { orderId },
-    });
-
-    if (existingPayinOrder) {
-      throw new BadRequestException(
-        "Payin order already exists for given orderId",
-      );
-    }
-
-    // Start transaction
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const existingOrder = await this.payInOrdersRepository.exists({
-        where: {
-          orderId: createPayinTransactionDto.orderId,
-        },
-      });
-
-      if (existingOrder) {
-        throw new BadRequestException(
-          new MessageResponseDto(
-            "Payin Order id already exists. Please with different order id.",
-          ),
-        );
-      }
-      const { commissionAmount, gstAmount, netPayableAmount } = getCommissions({
-        amount,
-        commissionInPercentage: user.commissionInPercentagePayin,
-        gstInPercentage: user.gstInPercentagePayin,
-      });
-
-      const wallet = await this.walletRepository.findOne({
-        where: {
-          user: {
-            id: user.id,
-          },
-        },
-        relations: {
-          user: true,
-        },
-      });
-
-      if (!wallet) {
-        await queryRunner.manager.save(
-          this.walletRepository.create({
-            user,
-          }),
-        );
-      }
-
-      // 1. create pay-in order
-      const payinOrder = this.payInOrdersRepository.create({
-        user,
-        amount,
-        email,
-        name,
-        mobile,
-        orderId,
-        commissionAmount,
-        gstAmount,
-        netPayableAmount,
-      });
-
-      // 2. save pay-in order
-      const savedPayinOrder = await queryRunner.manager.save(payinOrder);
-
-      // 3. create transaction
-      const transaction = this.transactionsRepository.create({
-        user,
-        payInOrder: savedPayinOrder,
-        transactionType: PAYMENT_TYPE.PAYIN,
-      });
-
-      // 4. save transaction
-      const savedTransaction = await queryRunner.manager.save(transaction);
-
-      // this.logger.info(
-      //   `PAYIN - createTransaction - transaction: ${LoggerPlaceHolder.Json}`,
-      //   savedTransaction,
-      // );
-
-      const frontendUrl = `https://dash.${new URL(beBaseUrl).host.replace("api.", "")}`;
-      const webhook_url = `${beBaseUrl}/api/v1/payments/payin/webhook`;
-      // 5. create external payment
-      const payload: IExternalPayinPaymentRequestIsmart = {
-        amount: createPayinTransactionDto.amount.toFixed(2),
-        currency: "INR",
-        email: createPayinTransactionDto.email,
-        mobile: createPayinTransactionDto.mobile,
-        name: createPayinTransactionDto.name,
-        order_id: createPayinTransactionDto.orderId,
-        redirect_url: frontendUrl,
-        ...(!!vpa && { pay_type: "UPI", vpa }),
-        webhook_url,
-      };
-
-      // this.logger.info(
-      //   `PAYIN - calling external (${ISMART_PAY.PAYIN}) API with payload: ${LoggerPlaceHolder.Json}`,
-      //   payload,
-      // );
-
-      let externalPaymentResponse:
-        | IExternalPayinPaymentResponseIsmart
-        | undefined;
-      try {
-        externalPaymentResponse =
-          await axiosServiceIsmart.postRequest<IExternalPayinPaymentResponseIsmart>(
-            ISMART_PAY.PAYIN,
-            payload,
-          );
-
-        // this.logger.info(
-        //   `PAYIN - createTransaction - externalPaymentResponse: ${LoggerPlaceHolder.Json}`,
-        //   externalPaymentResponse,
-        // );
-      } catch (error: any) {
-        this.logger.error(
-          `PAYIN - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
-          error,
-        );
-        throw new BadRequestException(error.message);
-      }
-
-      if (!externalPaymentResponse) {
-        throw new BadRequestException(
-          externalPaymentResponse?.errors || "Something went wrong",
-        );
-      }
-
-      if (!externalPaymentResponse.status) {
-        throw new BadRequestException(
-          externalPaymentResponse?.errors || "Something went wrong",
-        );
-      }
-
-      const internalStatus = convertExternalPaymentStatusToInternal(
-        externalPaymentResponse.status_code,
-      );
-
-      // try {
-      //   const response = await axios.get(externalPaymentResponse?.payment_url, {
-      //     maxRedirects: 5,
-      //     validateStatus: (status) => status >= 200 && status < 400,
-      //   });
-      //   this.logger.info(
-      //     `PAYIN - createTransaction - response: ${LoggerPlaceHolder.Json}`,
-      //     response,
-      //   );
-      //   paymentLink = response.headers["location"];
-      //   const response2 = await axios.get(paymentLink, {
-      //     maxRedirects: 5,
-      //     validateStatus: (status) => status >= 200 && status < 400,
-      //   });
-      //   this.logger.info(
-      //     `PAYIN - createTransaction - response2: ${LoggerPlaceHolder.Json}`,
-      //     response2,
-      //   );
-      //   const $ = cheerio.load(response2.data);
-      //   this.logger.info(
-      //     `PAYIN - createTransaction HTML- $: ${LoggerPlaceHolder.Json}`,
-      //     $,
-      //   );
-      //   paytmIntent = $("#paytmform").attr("action");
-      //   phonepeIntent = $("#phonepeform").attr("action");
-      //   googlepayIntent = $("#gpay2form").attr("action");
-      //   intent = $("#bhim2form").attr("action");
-      // } catch (error: any) {
-      //   this.logger.error(
-      //     `PAYIN - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
-      //     error,
-      //   );
-      //   paymentLink = externalPaymentResponse?.payment_url;
-      // }
-
-      // 6. save external payment
-      const savedOrder = await queryRunner.manager.save(
-        this.payInOrdersRepository.create({
-          ...savedPayinOrder,
-          ...(externalPaymentResponse?.intent && {
-            intent: externalPaymentResponse?.intent,
-          }),
-          status: internalStatus,
-          txnRefId: externalPaymentResponse.transaction_id,
-          paymentLink: externalPaymentResponse?.payment_url,
-        }),
-      );
-
-      // const paymentLink = getCheckoutUrl(savedOrder.id);
-
-      await this.cacheManager.set(
-        REDIS_KEYS.PAYMENT_STATUS(savedOrder.orderId),
-        PAYMENT_STATUS.PENDING,
-      );
-
-      await queryRunner.commitTransaction();
-
-      return {
-        orderId: createPayinTransactionDto.orderId,
-        message: !!vpa
-          ? "Payment Request Sent Successfully"
-          : "Payment Created Successfully",
-        ...(externalPaymentResponse?.intent && {
-          intent: externalPaymentResponse?.intent,
-        }),
-        // paymentLink: externalPaymentResponse?.payment_url,
-      };
-
-      // Commit transaction
-    } catch (err: any) {
-      this.logger.error(
-        `PAYIN - createTransaction - Got error while creating transaction - err: ${LoggerPlaceHolder.Json}`,
-        err,
-      );
-      // Rollback transaction if any operation fails
-      await queryRunner.rollbackTransaction();
-      throw new BadRequestException(err.message);
-    } finally {
-      // Release the queryRunner to avoid memory leaks
-      await queryRunner.release();
-    }
   }
 
   private async getFlakPayCredentials(userId: string) {
@@ -1337,85 +1091,6 @@ export class PaymentsService {
     }
   }
 
-  async createPayoutIsmart(
-    createPayoutDto: CreatePayoutDto,
-    user: UsersEntity,
-  ) {
-    const { data: payoutDataArr } = createPayoutDto;
-
-    if (payoutDataArr.length > 1000) {
-      throw new BadRequestException("Maximum 1000 payouts allowed");
-    }
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      // Validate amounts and calculate total
-      const totalAmount = payoutDataArr.reduce((acc, curr) => {
-        if (curr.amount <= 0) {
-          throw new BadRequestException("Amount should be greater than 0");
-        }
-
-        return acc + +curr.amount;
-      }, 0);
-
-      // Check and update wallet balance
-      const walletAfterDeduction = await this.validateAndUpdateWallet(
-        queryRunner,
-        user,
-        totalAmount,
-      );
-
-      // Create batch job identifier
-      const batchId = getUlidId(ID_TYPE.PAYOUT_BATCH_KEY);
-
-      // Create payout orders in DB
-      const payoutOrders = await this.createPayoutOrders(
-        queryRunner,
-        payoutDataArr,
-        user,
-        batchId,
-      );
-
-      // Add to processing queue
-      await this.payoutQueue.add("process-payouts", {
-        payoutOrders,
-        userId: user.id,
-        batchId,
-      });
-
-      await queryRunner.commitTransaction();
-
-      return {
-        message: "Payout process initiated",
-        batchId,
-        payoutOrders: payoutOrders.map((payout) => ({
-          orderId: payout.orderId,
-          name: payout.name,
-          amount: payout.amount,
-          status: payout.status,
-          accountNumber: payout.bankAccountNumber,
-          bankName: payout.bankName,
-          ifscCode: payout.bankIfsc,
-        })),
-        summary: {
-          total: payoutDataArr.length,
-          status: "PROCESSING",
-        },
-      };
-    } catch (err) {
-      this.logger.error(
-        `PAYOUT - createTransaction - Error initiating payouts`,
-        err,
-      );
-      await queryRunner.rollbackTransaction();
-      throw new BadRequestException(err.message);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
   private async validateAndUpdateWallet(
     queryRunner: QueryRunner,
     user: UsersEntity,
@@ -1670,69 +1345,6 @@ export class PaymentsService {
     };
   }
 
-  // dias pay status check
-  // async checkPayOutStatusTransactionDiasPay(
-  //   { orderId }: PayoutStatusDto,
-  //   user: UsersEntity,
-  // ) {
-  //   const payoutOrder = await this.payOutOrdersRepository.findOne({
-  //     where: { orderId },
-  //   });
-
-  //   if (!payoutOrder) {
-  //     throw new NotFoundException(
-  //       new MessageResponseDto("Payout order not found"),
-  //     );
-  //   }
-
-  //   if (payoutOrder.status !== PAYMENT_STATUS.PENDING) {
-  //     return {
-  //       orderId: payoutOrder.orderId,
-  //       status: payoutOrder.status,
-  //       transferId: payoutOrder.transferId,
-  //     };
-  //   }
-
-  //   // call api
-  //   const axiosServiceDiasPay = new AxiosService(
-  //     DIASPAY.BASE_URL,
-  //     getDiaspayConfig({
-  //       token: externalPaymentConfig.diaspay.token,
-  //     }),
-  //   );
-
-  //   const diasPayResponse =
-  //     await axiosServiceDiasPay.postRequest<IExternalDiasPayFundResponse>(
-  //       DIASPAY.PAYOUT.QUERY,
-  //       {
-  //         order_id: orderId,
-  //       },
-  //     );
-
-  //   this.logger.info(
-  //     `Dias Pay Response: ${LoggerPlaceHolder.Json}`,
-  //     diasPayResponse,
-  //   );
-
-  //   // update payout order
-  //   const status = convertExternalPaymentStatusToInternal(
-  //     diasPayResponse.status.toUpperCase(),
-  //   );
-
-  //   await this.payOutOrdersRepository.save(
-  //     this.payOutOrdersRepository.create({
-  //       ...payoutOrder,
-  //       status,
-  //       transferId: diasPayResponse.UTR,
-  //     }),
-  //   );
-
-  //   return {
-  //     orderId: payoutOrder.orderId,
-  //     status,
-  //     transferId: diasPayResponse.UTR,
-  //   };
-  // }
   // flakpay status check
   async checkPayOutStatusTransactionFlakPay({ orderId }: PayoutStatusDto) {
     const payoutOrder = await this.payOutOrdersRepository.findOne({
@@ -3521,149 +3133,149 @@ export class PaymentsService {
     }
   }
 
-  private async safeUpdatePayinWalletBalance(
-    queryRunner: QueryRunner,
-    userId: string,
-    updateFn: (payinWallet: PayinWalletEntity) => void,
-  ): Promise<PayinWalletEntity> {
-    const maxRetries = 3;
-    const baseDelay = 100;
-    const operationTimeout = 5000;
-    const lockTimeout = 5000;
-    const lockTtl = 10000;
+  // private async safeUpdatePayinWalletBalance(
+  //   queryRunner: QueryRunner,
+  //   userId: string,
+  //   updateFn: (payinWallet: PayinWalletEntity) => void,
+  // ): Promise<PayinWalletEntity> {
+  //   const maxRetries = 3;
+  //   const baseDelay = 100;
+  //   const operationTimeout = 5000;
+  //   const lockTimeout = 5000;
+  //   const lockTtl = 10000;
 
-    const startTime = Date.now();
-    const lockKey = `payin_wallet_update:${userId}`;
-    let lockAcquired = false;
+  //   const startTime = Date.now();
+  //   const lockKey = `payin_wallet_update:${userId}`;
+  //   let lockAcquired = false;
 
-    // ✅ FIXED: Wait for lock instead of failing immediately
-    const acquireLock = async (): Promise<boolean> => {
-      const lockStartTime = Date.now();
+  //   // ✅ FIXED: Wait for lock instead of failing immediately
+  //   const acquireLock = async (): Promise<boolean> => {
+  //     const lockStartTime = Date.now();
 
-      while (Date.now() - lockStartTime < lockTimeout) {
-        const existingLock = await this.cacheManager.get(lockKey);
+  //     while (Date.now() - lockStartTime < lockTimeout) {
+  //       const existingLock = await this.cacheManager.get(lockKey);
 
-        if (!existingLock) {
-          // Try to acquire lock
-          await this.cacheManager.set(lockKey, "locked", lockTtl);
-          // Double-check we got the lock (race condition safety)
-          const checkLock = await this.cacheManager.get(lockKey);
-          if (checkLock) {
-            return true;
-          }
-        }
-        // Wait before checking again
-        await new Promise((resolve) =>
-          setTimeout(resolve, 50 + Math.random() * 50),
-        );
-      }
+  //       if (!existingLock) {
+  //         // Try to acquire lock
+  //         await this.cacheManager.set(lockKey, "locked", lockTtl);
+  //         // Double-check we got the lock (race condition safety)
+  //         const checkLock = await this.cacheManager.get(lockKey);
+  //         if (checkLock) {
+  //           return true;
+  //         }
+  //       }
+  //       // Wait before checking again
+  //       await new Promise((resolve) =>
+  //         setTimeout(resolve, 50 + Math.random() * 50),
+  //       );
+  //     }
 
-      return false; // Couldn't acquire lock within timeout
-    };
+  //     return false; // Couldn't acquire lock within timeout
+  //   };
 
-    try {
-      // Wait for lock acquisition
-      lockAcquired = await acquireLock();
+  //   try {
+  //     // Wait for lock acquisition
+  //     lockAcquired = await acquireLock();
 
-      if (!lockAcquired) {
-        throw new Error(
-          `Could not acquire payin wallet lock for user ${userId} within ${lockTimeout}ms`,
-        );
-      }
+  //     if (!lockAcquired) {
+  //       throw new Error(
+  //         `Could not acquire payin wallet lock for user ${userId} within ${lockTimeout}ms`,
+  //       );
+  //     }
 
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-          // Check if we've exceeded the operation timeout
-          if (Date.now() - startTime > operationTimeout) {
-            throw new Error(
-              `Payin wallet update timeout after ${operationTimeout}ms for user: ${userId}`,
-            );
-          }
+  //     for (let attempt = 0; attempt < maxRetries; attempt++) {
+  //       try {
+  //         // Check if we've exceeded the operation timeout
+  //         if (Date.now() - startTime > operationTimeout) {
+  //           throw new Error(
+  //             `Payin wallet update timeout after ${operationTimeout}ms for user: ${userId}`,
+  //           );
+  //         }
 
-          // Get wallet with current version
-          const payinWallet = await queryRunner.manager
-            .createQueryBuilder(PayinWalletEntity, "payinWallet")
-            .where("payinWallet.userId = :userId", { userId })
-            .getOne();
+  //         // Get wallet with current version
+  //         const payinWallet = await queryRunner.manager
+  //           .createQueryBuilder(PayinWalletEntity, "payinWallet")
+  //           .where("payinWallet.userId = :userId", { userId })
+  //           .getOne();
 
-          if (!payinWallet) {
-            throw new NotFoundException(`Wallet not found for user: ${userId}`);
-          }
+  //         if (!payinWallet) {
+  //           throw new NotFoundException(`Wallet not found for user: ${userId}`);
+  //         }
 
-          const originalVersion = payinWallet.version;
+  //         const originalVersion = payinWallet.version;
 
-          // Apply the update function
-          updateFn(payinWallet);
+  //         // Apply the update function
+  //         updateFn(payinWallet);
 
-          // Increment version for optimistic locking
-          payinWallet.version = originalVersion + 1;
-          payinWallet.updatedAt = new Date();
+  //         // Increment version for optimistic locking
+  //         payinWallet.version = originalVersion + 1;
+  //         payinWallet.updatedAt = new Date();
 
-          // Update with version check - optimized for index usage
-          const result = await queryRunner.manager
-            .createQueryBuilder()
-            .update(PayinWalletEntity)
-            .set({
-              totalPayinBalance: payinWallet.totalPayinBalance,
-              version: payinWallet.version,
-              updatedAt: payinWallet.updatedAt,
-            })
-            .where("userId = :userId AND version = :version", {
-              userId,
-              version: originalVersion,
-            })
-            .execute();
+  //         // Update with version check - optimized for index usage
+  //         const result = await queryRunner.manager
+  //           .createQueryBuilder()
+  //           .update(PayinWalletEntity)
+  //           .set({
+  //             totalPayinBalance: payinWallet.totalPayinBalance,
+  //             version: payinWallet.version,
+  //             updatedAt: payinWallet.updatedAt,
+  //           })
+  //           .where("userId = :userId AND version = :version", {
+  //             userId,
+  //             version: originalVersion,
+  //           })
+  //           .execute();
 
-          if (result.affected === 0) {
-            // Version conflict, retry with exponential backoff
-            if (attempt === maxRetries - 1) {
-              throw new Error(
-                `Payin wallet update conflict after ${maxRetries} retries for user: ${userId}`,
-              );
-            }
+  //         if (result.affected === 0) {
+  //           // Version conflict, retry with exponential backoff
+  //           if (attempt === maxRetries - 1) {
+  //             throw new Error(
+  //               `Payin wallet update conflict after ${maxRetries} retries for user: ${userId}`,
+  //             );
+  //           }
 
-            const delay = baseDelay * Math.pow(2, attempt);
-            const jitter = Math.floor(Math.random() * delay * 0.5);
-            await new Promise((resolve) => setTimeout(resolve, delay + jitter));
-            continue;
-          }
+  //           const delay = baseDelay * Math.pow(2, attempt);
+  //           const jitter = Math.floor(Math.random() * delay * 0.5);
+  //           await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+  //           continue;
+  //         }
 
-          this.logger.info(
-            `Wallet updated successfully for user ${userId} on attempt ${attempt + 1}`,
-            {
-              userId,
-              attempt: attempt + 1,
-              newVersion: payinWallet.version,
-              totalPayinBalance: payinWallet.totalPayinBalance,
-            },
-          );
+  //         this.logger.info(
+  //           `Wallet updated successfully for user ${userId} on attempt ${attempt + 1}`,
+  //           {
+  //             userId,
+  //             attempt: attempt + 1,
+  //             newVersion: payinWallet.version,
+  //             totalPayinBalance: payinWallet.totalPayinBalance,
+  //           },
+  //         );
 
-          return payinWallet;
-        } catch (error) {
-          if (attempt === maxRetries - 1) {
-            this.logger.error(
-              `Failed to update payin wallet for user ${userId} after ${maxRetries} attempts`,
-              error,
-            );
-            throw error;
-          }
+  //         return payinWallet;
+  //       } catch (error) {
+  //         if (attempt === maxRetries - 1) {
+  //           this.logger.error(
+  //             `Failed to update payin wallet for user ${userId} after ${maxRetries} attempts`,
+  //             error,
+  //           );
+  //           throw error;
+  //         }
 
-          const delay = baseDelay * Math.pow(2, attempt);
-          const jitter = Math.floor(Math.random() * delay * 0.5);
-          await new Promise((resolve) => setTimeout(resolve, delay + jitter));
-        }
-      }
+  //         const delay = baseDelay * Math.pow(2, attempt);
+  //         const jitter = Math.floor(Math.random() * delay * 0.5);
+  //         await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+  //       }
+  //     }
 
-      throw new Error(
-        `Unexpected error in payin wallet update for user: ${userId}`,
-      );
-    } finally {
-      // ✅ Always release lock if we acquired it
-      if (lockAcquired) {
-        await this.cacheManager.del(lockKey);
-      }
-    }
-  }
+  //     throw new Error(
+  //       `Unexpected error in payin wallet update for user: ${userId}`,
+  //     );
+  //   } finally {
+  //     // ✅ Always release lock if we acquired it
+  //     if (lockAcquired) {
+  //       await this.cacheManager.del(lockKey);
+  //     }
+  //   }
+  // }
 
   async externalWebhookPayinUtkarsh(
     externalWebhookPayin: ExternalPayinWebhookUtkarshDto,
@@ -3816,22 +3428,22 @@ export class PaymentsService {
             },
           );
 
-          const updatedWallet2 = await this.safeUpdatePayinWalletBalance(
-            queryRunner,
-            user.id,
-            (wallet) => {
-              wallet.totalPayinBalance =
-                (wallet.totalPayinBalance ? +wallet.totalPayinBalance : 0) -
-                (+payinOrder.amount - +payinOrder.netPayableAmount);
-            },
-          );
+          // const updatedWallet2 = await this.safeUpdatePayinWalletBalance(
+          //   queryRunner,
+          //   user.id,
+          //   (wallet) => {
+          //     wallet.totalPayinBalance =
+          //       (wallet.totalPayinBalance ? +wallet.totalPayinBalance : 0) -
+          //       (+payinOrder.amount - +payinOrder.netPayableAmount);
+          //   },
+          // );
 
           this.logger.info(
             `PAYIN WEBHOOK - Wallet updated successfully ${user.fullName}: ${LoggerPlaceHolder.Json}`,
             {
               walletId: updatedWallet.id,
               newTotalCollections: updatedWallet.totalCollections,
-              payinwallet: updatedWallet2.totalPayinBalance,
+              // payinwallet: updatedWallet2.totalPayinBalance,
             },
           );
         }
@@ -7329,5 +6941,14 @@ export class PaymentsService {
       );
       throw new BadRequestException(error.message);
     }
+  }
+
+  async createNsdlPayin(
+    createPayinTransactionDto: CreatePayinTransactionFlaPayDto,
+    user: UsersEntity,
+  ) {
+    return {
+      message: "Payment Link Generated successfully",
+    };
   }
 }

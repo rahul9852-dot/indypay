@@ -1,0 +1,9 @@
+export enum COMMISSION_TYPE {
+  PAYIN = "PAYIN",
+  PAYOUT = "PAYOUT",
+}
+
+export enum CHARGE_TYPE {
+  FLAT = "FLAT",
+  PERCENTAGE = "PERCENTAGE"
+}

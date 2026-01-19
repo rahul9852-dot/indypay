@@ -1,7 +1,12 @@
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { WalletsService } from "./wallets.service";
-import { RefundWalletDto, WalletTopUpDto } from "./dto/wallet.dto";
+import {
+  PayinTopUpWalletPaginationDto,
+  RefundWalletDto,
+  WalletPayinTopUpDto,
+  WalletTopUpDto,
+} from "./dto/wallet.dto";
 import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
@@ -115,23 +120,60 @@ export class WalletsController {
     return this.walletsService.refundWallet(merchantUserId, user, amount);
   }
 
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
-  @ApiOperation({ summary: "Refund user - Admin" })
-  @Post("payin-wallet/recharge")
-  rechargePayinWallet(
+  @Role(USERS_ROLE.MERCHANT)
+  @ApiOperation({ summary: "Payin Top Up Wallet - Request" })
+  @Post("request/payin/top-up")
+  requestPayinTopUpWallet(
     @User() user: UsersEntity,
-    @Body() { userId: merchantUserId, amount }: RefundWalletDto,
+    @Body() { amount, utr, masterBankId, mode }: WalletPayinTopUpDto,
   ) {
-    return this.walletsService.rechargePayinWallet(
-      merchantUserId,
-      user,
+    return this.walletsService.requestPayinTopUpWallet(
+      user.id,
       amount,
+      utr,
+      masterBankId,
+      mode,
     );
   }
 
-  @Get("payin-wallet")
-  @ApiOperation({ summary: "Get Wallet" })
-  getPayinWallet(@User() user: UsersEntity) {
-    return this.walletsService.getPayinWallet(user.id);
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  @ApiOperation({ summary: "Payin Top Up Wallet - Admin" })
+  @Post("payin/top-up")
+  payinTopUpWallet(
+    @User() user: UsersEntity,
+    @Body() { userId: merchantUserId, topUpId, status }: WalletPayinTopUpDto,
+  ) {
+    return this.walletsService.payinTopUpWallet(
+      merchantUserId,
+      user,
+      topUpId,
+      status,
+    );
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER, USERS_ROLE.MERCHANT)
+  @ApiOperation({ summary: "Payin Top Up Wallet - Admin/Owner/Merchant" })
+  @Get("payin/top-up")
+  getAllPayinTopUpWallet(
+    @User() user: UsersEntity,
+    @Query()
+    {
+      limit,
+      page,
+      sort = "createdAt",
+      order = "DESC",
+      search,
+      status,
+    }: PayinTopUpWalletPaginationDto,
+  ) {
+    return this.walletsService.getAllPayinTopUpWallet(
+      user,
+      limit,
+      page,
+      sort,
+      order,
+      search,
+      status,
+    );
   }
 }

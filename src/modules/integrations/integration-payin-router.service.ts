@@ -1,12 +1,9 @@
-import {
-  Injectable,
-  BadRequestException,
-  Inject,
-  forwardRef,
-} from "@nestjs/common";
+import { Injectable, BadRequestException } from "@nestjs/common";
 import { CreatePayinTransactionFlaPayDto } from "@/modules/payments/dto/create-payin-payment.dto";
 import { UsersEntity } from "@/entities/user.entity";
-import { PaymentsService } from "@/modules/payments/payments.service";
+import { OnikPayinService } from "@/modules/payments/payin/integrations/onik-payin.service";
+import { GeoPayPayinService } from "@/modules/payments/payin/integrations/geopay-payin.service";
+import { UtkarshPayinService } from "@/modules/payments/payin/integrations/utkarsh-payin.service";
 import { CustomLogger } from "@/logger";
 
 @Injectable()
@@ -16,8 +13,9 @@ export class IntegrationPayinRouterService {
   );
 
   constructor(
-    @Inject(forwardRef(() => PaymentsService))
-    private readonly paymentsService: PaymentsService,
+    private readonly onikPayinService: OnikPayinService,
+    private readonly geoPayPayinService: GeoPayPayinService,
+    private readonly utkarshPayinService: UtkarshPayinService,
   ) {}
 
   /**
@@ -40,33 +38,26 @@ export class IntegrationPayinRouterService {
 
     switch (code) {
       case "ONIK":
-        return this.paymentsService.createOnikPayin(
-          createPayinTransactionDto,
-          user,
-        );
-
-      case "FYNTRA":
-        return this.paymentsService.createFyntraPayin(
+        return this.onikPayinService.createPayin(
           createPayinTransactionDto,
           user,
         );
 
       case "GEOPAY":
-        // GeoPay uses a different DTO type, but we'll handle it
-        return this.paymentsService.createGeoPayCheckout(
+        return this.geoPayPayinService.createPayin(
           createPayinTransactionDto as any,
           user,
         );
 
       case "UTKARSH":
-        return this.paymentsService.createUtkarshPaymentLink(
+        return this.utkarshPayinService.createPayin(
           createPayinTransactionDto,
           user,
         );
 
       default:
         throw new BadRequestException(
-          `Unsupported integration code: ${integrationCode}. Supported codes: ONIK, FYNTRA, GEOPAY, UTKARSH`,
+          `Unsupported integration code: ${integrationCode}. Supported codes: ONIK, FYNTRA, GEOPAY, UTKARSH. To add a new integration, create a service file in payin/integrations/ and add it here.`,
         );
     }
   }

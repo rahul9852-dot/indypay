@@ -31,7 +31,9 @@ export class CreateIntegrationMapping1767781624597
     await queryRunner.query(
       `CREATE INDEX "IDX_e122b4131eba90a0becaa0e3b9" ON "checkouts" ("status") `,
     );
-    await queryRunner.query(`ALTER TABLE "payin_orders" DROP COLUMN "vpa"`);
+    await queryRunner.query(
+      `ALTER TABLE "payin_orders" DROP COLUMN IF EXISTS "vpa"`,
+    );
     await queryRunner.query(
       `ALTER TABLE "payin_orders" ALTER COLUMN "commissionInPercentage" SET DEFAULT '4.5'`,
     );
@@ -72,7 +74,7 @@ export class CreateIntegrationMapping1767781624597
       `ALTER TABLE "payin_orders" ALTER COLUMN "commissionInPercentage" SET DEFAULT 4.5`,
     );
     await queryRunner.query(
-      `ALTER TABLE "payin_orders" ADD "vpa" character varying(255)`,
+      `ALTER TABLE "payin_orders" ADD COLUMN IF NOT EXISTS "vpa" character varying(255)`,
     );
     await queryRunner.query(
       `DROP INDEX "public"."IDX_e122b4131eba90a0becaa0e3b9"`,

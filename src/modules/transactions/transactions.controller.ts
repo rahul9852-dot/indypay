@@ -107,6 +107,24 @@ export class TransactionsController {
   }
 
   @ApiOperation({
+    summary: "Get admin stats with week-over-week comparison - Admin Only",
+    description:
+      "Returns current week stats compared to last week with percentage changes. Uses cache for optimal performance.",
+  })
+  @Role(
+    USERS_ROLE.ADMIN,
+    USERS_ROLE.OWNER,
+    USERS_ROLE.OPS,
+    USERS_ROLE.VIEW_ONLY_ADMIN,
+  )
+  @Get("stats/admin/week-comparison")
+  @IgnoreBusinessDetails()
+  @IgnoreKyc()
+  async getStatsForAdminWithComparison() {
+    return this.transactionsService.getStatsForAdminWithComparison();
+  }
+
+  @ApiOperation({
     summary: "Get all transactions done by merchant - Admin Only",
   })
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER)

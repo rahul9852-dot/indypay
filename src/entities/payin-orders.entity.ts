@@ -65,6 +65,7 @@ export class PayInOrdersEntity {
   @Column({ default: false })
   isMisspelled: boolean;
 
+  // Legacy fields (kept for backward compatibility)
   @Column({ type: "decimal", precision: 10, scale: 2, default: 4.5 })
   commissionInPercentage: number;
 
@@ -80,8 +81,24 @@ export class PayInOrdersEntity {
   @Column({ type: "decimal", precision: 10, scale: 2 })
   netPayableAmount: number;
 
+  // New dynamic commission fields
+  @Column({ nullable: true })
+  commissionId: string; // ID of the commission plan used
+
+  @Column({ nullable: true })
+  commissionSlabId: string; // ID of the commission slab applied
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  chargeType: string; // PERCENTAGE or FLAT
+
+  @Column({ type: "decimal", precision: 18, scale: 2, nullable: true })
+  chargeValue: number; // The percentage or flat value used
+
   @Column({ enum: SETTLEMENT_STATUS, default: SETTLEMENT_STATUS.NOT_INITIATED })
   settlementStatus: string;
+
+  @Column({ nullable: true })
+  userVpa: string;
 
   @Index()
   @Column()

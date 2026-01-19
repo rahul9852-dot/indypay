@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Between, ILike, Repository } from "typeorm";
+import * as dayjs from "dayjs";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { WalletTopupEntity } from "@/entities/wallet-topup.entity";
@@ -19,7 +20,8 @@ import {
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
-import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
+import { PayinWalletLoadEntity } from "@/entities/payin-wallet-topup.entity";
+import { MODE_OPTIONS, PAYIN_WALLET_LOAD_STATUS } from "@/enums/payment.enum";
 
 @Injectable()
 export class WalletsService {
@@ -27,8 +29,8 @@ export class WalletsService {
   constructor(
     @InjectRepository(WalletEntity)
     private readonly walletRepository: Repository<WalletEntity>,
-    @InjectRepository(PayinWalletEntity)
-    private readonly payinWalletRepository: Repository<PayinWalletEntity>,
+    @InjectRepository(PayinWalletLoadEntity)
+    private readonly payinWalletLoadRepository: Repository<PayinWalletLoadEntity>,
     @InjectRepository(WalletTopupEntity)
     private readonly walletTopupRepository: Repository<WalletTopupEntity>,
     @InjectRepository(PayOutOrdersEntity)
@@ -555,65 +557,258 @@ export class WalletsService {
     };
   }
 
-  async rechargePayinWallet(
+  async requestPayinTopUpWallet(
     merchantUserId: string,
-    adminUser: UsersEntity,
-    amount: number,
+    collectionAmount: number,
+    utr: string,
+    masterBankId: string,
+    mode: MODE_OPTIONS,
   ) {
-    const payinWallet = await this.payinWalletRepository.findOne({
+    const wallet = await this.walletRepository.findOne({
       where: { user: { id: merchantUserId } },
+      relations: {
+        user: true,
+      },
     });
 
-    if (!payinWallet) {
-      throw new NotFoundException(
-        new MessageResponseDto("Payin wallet not found"),
-      );
+    if (!wallet) {
+      throw new NotFoundException(new MessageResponseDto("Wallet not found"));
     }
 
     const merchantUser = await this.usersRepository.findOne({
       where: { id: merchantUserId },
     });
 
-    this.logger.info(
-      `RECHARGE - Recharge payin wallet - Net payable amount payout: ${LoggerPlaceHolder.Json}`,
-      {
-        amount,
-      },
-    );
+    if (!merchantUser) {
+      throw new NotFoundException(
+        new MessageResponseDto("Merchant user not found"),
+      );
+    }
 
-    // update payin wallet balance
-    const savedPayinWallet = await this.payinWalletRepository.save(
-      this.payinWalletRepository.create({
-        id: payinWallet.id,
-        user: payinWallet.user,
-        totalPayinBalance: +payinWallet.totalPayinBalance + amount,
-      }),
-    );
+    const payinWalletLoad = this.payinWalletLoadRepository.create({
+      user: merchantUser,
+      amount: collectionAmount,
+      utr,
+      masterBankId,
+      status: PAYIN_WALLET_LOAD_STATUS.PENDING,
+      mode,
+    });
+
+    await this.payinWalletLoadRepository.save(payinWalletLoad);
 
     return {
       userId: merchantUserId,
-      totalPayinBalance: savedPayinWallet.totalPayinBalance,
-      message: "Recharge successful",
+      message: "Payin top up request successful",
+      payinWalletLoad: {
+        id: payinWalletLoad.id,
+        amount: payinWalletLoad.amount,
+        utr: payinWalletLoad.utr,
+        status: payinWalletLoad.status,
+        createdAt: payinWalletLoad.createdAt,
+      },
     };
   }
 
-  async getPayinWallet(userId: string) {
-    return this.payinWalletRepository.findOne({
-      where: { user: { id: userId } },
-      select: {
-        id: true,
-        totalPayinBalance: true,
-        user: {
-          id: true,
-          fullName: true,
-          email: true,
-          mobile: true,
-          accountStatus: true,
+  async payinTopUpWallet(
+    merchantUserId: string,
+    adminUser: UsersEntity,
+    topUpId: string,
+    status: PAYIN_WALLET_LOAD_STATUS,
+  ) {
+    const wallet = await this.walletRepository.findOne({
+      where: { user: { id: merchantUserId } },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException(new MessageResponseDto("Wallet not found"));
+    }
+
+    this.logger.info(
+      `TOPUP - Topup payin wallet - Net payable amount payout: ${LoggerPlaceHolder.Json}`,
+      {
+        wallet: {
+          id: wallet.id,
+          totalPayinBalance: wallet.totalPayinBalance,
         },
       },
-      relations: {
-        user: true,
+    );
+
+    // record a topup transaction
+    const payinWalletLoad = await this.payinWalletLoadRepository.findOne({
+      where: {
+        user: { id: merchantUserId },
+        id: topUpId,
       },
     });
+
+    if (!payinWalletLoad) {
+      throw new NotFoundException(
+        new MessageResponseDto("Payin wallet load request not found"),
+      );
+    }
+
+    if (status === PAYIN_WALLET_LOAD_STATUS.APPROVED) {
+      // Update wallet balance with optimistic locking
+      wallet.totalPayinBalance =
+        +wallet.totalPayinBalance + +payinWalletLoad.amount;
+      wallet.version = wallet.version + 1;
+      await this.walletRepository.save(wallet);
+    }
+
+    // update wallet balance
+    const result = await this.payinWalletLoadRepository.update(
+      payinWalletLoad.id,
+      {
+        status,
+        topupBy: adminUser,
+      },
+    );
+
+    return result.affected > 0
+      ? new MessageResponseDto("Payin wallet load request approved")
+      : new NotFoundException(
+          new MessageResponseDto("Payin wallet load request not found"),
+        );
+  }
+
+  async getAllPayinTopUpWallet(
+    user: UsersEntity,
+    limit: number,
+    page: number,
+    sort: string,
+    order: "ASC" | "DESC",
+    search: string,
+    status?: PAYIN_WALLET_LOAD_STATUS,
+  ) {
+    if (user.role === USERS_ROLE.MERCHANT) {
+      const wallet = await this.walletRepository.findOne({
+        where: { user: { id: user.id } },
+      });
+      if (!wallet) {
+        throw new NotFoundException(new MessageResponseDto("Wallet not found"));
+      }
+
+      const payinWalletLoads = await this.payinWalletLoadRepository.find({
+        where: { user: { id: user.id } },
+        skip: (page - 1) * limit,
+        take: limit,
+        order: {
+          [sort]: order as "ASC" | "DESC",
+        },
+      });
+
+      return {
+        requests: payinWalletLoads,
+        pagination: getPagination({
+          totalItems: payinWalletLoads.length,
+          page,
+          limit,
+        }),
+      };
+    }
+    const whereConditions: any[] = [];
+    const hasSearch = search && search.trim().length > 0;
+
+    // Build search conditions with OR logic
+    if (hasSearch) {
+      const searchConditions = [
+        {
+          user: {
+            fullName: ILike(`%${search.trim()}%`),
+          },
+        },
+        {
+          user: {
+            email: ILike(`%${search.trim()}%`),
+          },
+        },
+        {
+          user: {
+            mobile: ILike(`%${search.trim()}%`),
+          },
+        },
+        {
+          utr: ILike(`%${search.trim()}%`),
+        },
+      ];
+
+      if (status) {
+        whereConditions.push(
+          ...searchConditions.map((condition) => ({ ...condition, status })),
+        );
+      } else {
+        whereConditions.push(...searchConditions);
+      }
+    } else if (status) {
+      whereConditions.push({ status });
+    }
+
+    // Calculate date ranges for stats
+    const todayStart = todayStartDate();
+    const todayEnd = todayEndDate();
+    const monthStart = dayjs().startOf("month").toDate();
+    const monthEnd = dayjs().tz().endOf("month").toDate();
+
+    // Fetch transactions, total items, and stats in parallel
+    const [[transactions, totalItems], todayTopup, thisMonthTopup] =
+      await Promise.all([
+        // Main query for paginated transactions
+        this.payinWalletLoadRepository.findAndCount({
+          ...(whereConditions.length > 0 && { where: whereConditions }),
+          skip: (page - 1) * limit,
+          take: limit,
+          order: {
+            [sort]: order as "ASC" | "DESC",
+          },
+          select: {
+            id: true,
+            amount: true,
+            utr: true,
+            status: true,
+            topupBy: {
+              id: true,
+              fullName: true,
+            },
+            mode: true,
+            createdAt: true,
+            updatedAt: true,
+            user: {
+              id: true,
+              fullName: true,
+              email: true,
+              mobile: true,
+            },
+          },
+          relations: {
+            user: true,
+            topupBy: true,
+          },
+        }),
+        // Today's topup stats (only APPROVED)
+        this.payinWalletLoadRepository.sum("amount", {
+          status: PAYIN_WALLET_LOAD_STATUS.APPROVED,
+          createdAt: Between(todayStart, todayEnd),
+        }),
+        // This month's topup stats (only APPROVED)
+        this.payinWalletLoadRepository.sum("amount", {
+          status: PAYIN_WALLET_LOAD_STATUS.APPROVED,
+          createdAt: Between(monthStart, monthEnd),
+        }),
+      ]);
+
+    const pagination = getPagination({
+      totalItems,
+      page,
+      limit,
+    });
+
+    return {
+      requests: transactions,
+      pagination,
+      stats: {
+        todayTopup: +todayTopup || 0,
+        thisMonthTopup: +thisMonthTopup || 0,
+      },
+    };
   }
 }
