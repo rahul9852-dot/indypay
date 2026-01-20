@@ -1,4 +1,13 @@
-import { Controller, Get, Put, Body, Param, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Put,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  BadRequestException,
+} from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
@@ -9,6 +18,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { IntegrationMappingService } from "./integration-mapping.service";
 import { UpdateUserIntegrationDto } from "./dto/update-user-integration.dto";
+import { CreateIntegrationDto } from "./dto/create-integration.dto";
 import { User } from "@/decorators/user.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 import { AuthGuard } from "@/guard/auth.guard";
@@ -71,6 +81,34 @@ export class IntegrationsController {
       userId,
       updateDto.integrationCode,
     );
+  }
+
+  @ApiOperation({ summary: "Create a new integration (Admin/Ops only)" })
+  @ApiOkResponse({ description: "Integration created successfully" })
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OWNER, USERS_ROLE.OPS)
+  @Post()
+  async createIntegration(@Body() createDto: CreateIntegrationDto) {
+    // Check if integration with this code already exists
+    const existing = await this.integrationRepository.findOne({
+      where: { code: createDto.code.toUpperCase() },
+    });
+
+    if (existing) {
+      throw new BadRequestException(
+        `Integration with code ${createDto.code.toUpperCase()} already exists`,
+      );
+    }
+
+    const integration = this.integrationRepository.create({
+      name: createDto.name,
+      code: createDto.code.toUpperCase(),
+      config: createDto.config || {},
+      isActive: createDto.isActive ?? true,
+      dailyLimit: createDto.dailyLimit ?? 0,
+      monthlyLimit: createDto.monthlyLimit ?? 0,
+    });
+
+    return this.integrationRepository.save(integration);
   }
 
   @ApiOperation({ summary: "Get all integrations" })

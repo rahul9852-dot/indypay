@@ -5,7 +5,7 @@ import {
   Optional,
   forwardRef,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { DataSource, QueryRunner, Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
@@ -38,6 +38,7 @@ export abstract class BasePayinWebhookService extends BasePayinService {
     protected readonly walletRepository: Repository<WalletEntity>,
     // @InjectRepository(PayinWalletEntity)
     // protected readonly payinWalletRepository: Repository<PayinWalletEntity>,
+    @InjectDataSource()
     dataSource: DataSource,
     @Inject(CACHE_MANAGER) protected readonly cacheManager: Cache,
     @Optional()

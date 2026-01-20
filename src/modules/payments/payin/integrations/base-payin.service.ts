@@ -1,5 +1,5 @@
 import { Injectable, Optional, Inject, forwardRef } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { CreatePayinTransactionFlaPayDto } from "../../dto/create-payin-payment.dto";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
@@ -27,6 +27,7 @@ export abstract class BasePayinService {
     protected readonly payInOrdersRepository: Repository<PayInOrdersEntity>,
     @InjectRepository(TransactionsEntity)
     protected readonly transactionsRepository: Repository<TransactionsEntity>,
+    @InjectDataSource()
     protected readonly dataSource: DataSource,
     @Optional()
     @Inject(forwardRef(() => CommissionService))
