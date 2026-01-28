@@ -11,6 +11,7 @@ import { Request, Response } from "express";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { OAuth2Client } from "google-auth-library";
 import { ReSendOtpDto, SendOtpDto, VerifyOtpDto } from "./dto/send-otp.dto";
 import { RegisterUserDto } from "./dto/register-user.dto";
 import { LoginUserDto } from "./dto/login-user.dto";
@@ -28,7 +29,7 @@ import {
   mobileVerifyCookieOptions,
   refreshCookieOptions,
 } from "@/utils/cookies.utils";
-import { ACCOUNT_STATUS, COOKIE_KEYS } from "@/enums";
+import { ACCOUNT_STATUS, COOKIE_KEYS, OAUTH_PROVIDER } from "@/enums";
 import {
   IAccessTokenPayload,
   IRefreshTokenPayload,
@@ -86,6 +87,7 @@ interface IVerifyTokenPayload {
 @Injectable()
 export class AuthService {
   private readonly logger = new CustomLogger(AuthService.name);
+  private googleClient: OAuth2Client;
   constructor(
     @InjectRepository(UsersEntity)
     private readonly usersRepository: Repository<UsersEntity>,
@@ -101,7 +103,9 @@ export class AuthService {
     private readonly snsService: SNSService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly sesService: SESService,
-  ) {}
+  ) {
+    this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  }
 
   async generate2FAToken(user: UsersEntity): Promise<string> {
     const token = generateOtp(6);
@@ -322,6 +326,114 @@ export class AuthService {
     };
 
     return response;
+  }
+
+  async googleAuth(dto: { googleToken: string }, req: Request, res: Response) {
+    const ticket = await this.googleClient.verifyIdToken({
+      idToken: dto.googleToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      throw new BadRequestException("Invalid Google token");
+    }
+
+    const {
+      email,
+      email_verified,
+      sub: googleId,
+      given_name,
+      family_name,
+    } = payload;
+
+    if (!email || !email_verified) {
+      throw new BadRequestException("Google email not verified");
+    }
+
+    let user = await this.usersRepository.findOne({
+      where: [{ googleId }, { email }],
+    });
+
+    // 🆕 FIRST TIME GOOGLE SIGNUP
+    if (!user) {
+      user = this.usersRepository.create({
+        id: getUlidId(),
+        email,
+        googleId,
+        authProvider: OAUTH_PROVIDER.GOOGLE,
+        firstName: given_name,
+        lastName: family_name,
+        fullName: `${given_name ?? ""} ${family_name ?? ""}`.trim(),
+        onboardingStatus: ONBOARDING_STATUS.SIGN_UP,
+        role: USERS_ROLE.MERCHANT,
+        accountStatus: ACCOUNT_STATUS.ACTIVE,
+      });
+
+      user = await this.usersRepository.save(user);
+
+      // Create wallet (same as normal signup)
+      await this.walletRepository.save(this.walletRepository.create({ user }));
+    }
+
+    // 🚫 Block disabled accounts
+    if (
+      ![ACCOUNT_STATUS.ACTIVE, ACCOUNT_STATUS.INTERNAL_USER].includes(
+        user.accountStatus,
+      )
+    ) {
+      throw new BadRequestException(
+        ERROR_MESSAGES.accountStatusMsg(user.accountStatus),
+      );
+    }
+
+    if (user.authProvider !== OAUTH_PROVIDER.GOOGLE) {
+      throw new BadRequestException("Please login with password");
+    }
+
+    // 📍 Save login IP (reuse logic)
+    const currentIp = getCurrentUserIp(req);
+
+    const isExistingIp = await this.userLoginIpsRepository.findOne({
+      where: { userId: user.id, ipAddress: currentIp },
+    });
+
+    if (!isExistingIp) {
+      await this.userLoginIpsRepository.save(
+        this.userLoginIpsRepository.create({
+          userId: user.id,
+          ipAddress: currentIp,
+          isApproved: true,
+        }),
+      );
+    }
+
+    // 🕒 Update login info
+    await this.usersRepository.update(user.id, {
+      lastLoginAt: new Date(),
+      lastLoginIp: currentIp,
+    });
+
+    // // 🔐 Generate tokens (reuse existing helpers)
+    const tokenPayload: IAccessTokenPayload = {
+      id: user.id,
+      mobile: user.mobile,
+      onboardingStatus: user.onboardingStatus,
+      role: user.role,
+      email: user.email,
+    };
+
+    const accessToken = this.generateAccessToken(tokenPayload);
+    const refreshToken = this.generateRefreshToken(tokenPayload);
+
+    // // 🍪 Set cookies
+    res.cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions);
+    res.cookie(COOKIE_KEYS.REFRESH_TOKEN, refreshToken, refreshCookieOptions);
+
+    return res.json({
+      message: "Google login successful",
+    });
   }
 
   async verify2FA(token: string, req: Request, res: Response) {

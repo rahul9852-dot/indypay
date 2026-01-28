@@ -2994,11 +2994,11 @@ export class PaymentsService {
     userId: string,
     updateFn: (wallet: WalletEntity) => void,
   ): Promise<WalletEntity> {
-    const maxRetries = 3;
-    const baseDelay = 100;
-    const operationTimeout = 5000;
-    const lockTimeout = 5000;
-    const lockTtl = 10000;
+    const maxRetries = 3; // Reduced from 8 to prevent long transaction duration
+    const baseDelay = 50; // Reduced from 100 for faster retries
+    const operationTimeout = 3000; // Reduced from 5000 to fail faster
+    const lockTimeout = 2000; // Reduced from 5000 to fail faster on lock contention
+    const lockTtl = 5000; // Reduced from 10000 to match lockTimeout
 
     const startTime = Date.now();
     const lockKey = `wallet_update:${userId}`;
@@ -3020,9 +3020,9 @@ export class PaymentsService {
             return true;
           }
         }
-        // Wait before checking again
-        await new Promise((resolve) =>
-          setTimeout(resolve, 50 + Math.random() * 50),
+        // Wait before checking again (reduced delay for faster lock acquisition)
+        await new Promise(
+          (resolve) => setTimeout(resolve, 25 + Math.random() * 25), // Reduced from 50-100ms to 25-50ms
         );
       }
 

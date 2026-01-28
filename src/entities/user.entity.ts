@@ -33,6 +33,7 @@ import {
   ACCOUNT_STATUS,
   USERS_ROLE,
   ID_TYPE,
+  OAUTH_PROVIDER,
 } from "@/enums";
 import { InvoiceEntity } from "@/entities/invoice.entity";
 import { ItemEntity } from "@/entities/item.entity";
@@ -57,10 +58,10 @@ export class UsersEntity {
   email: string;
 
   @Index()
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   mobile: string;
 
-  @Column({ select: false })
+  @Column({ select: false, nullable: true })
   password: string;
 
   @Column({ enum: ACCOUNT_STATUS, default: ACCOUNT_STATUS.ACTIVE })
@@ -140,6 +141,12 @@ export class UsersEntity {
 
   @Column({ type: "boolean", default: false })
   twoFactorEnabled: boolean;
+
+  @Column({ nullable: true })
+  googleId: string;
+
+  @Column({ enum: OAUTH_PROVIDER, default: OAUTH_PROVIDER.PASSWORD })
+  authProvider: OAUTH_PROVIDER;
 
   @OneToMany(() => PayInOrdersEntity, ({ user }) => user, { cascade: true })
   payInOrders: PayInOrdersEntity[];

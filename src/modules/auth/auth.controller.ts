@@ -165,6 +165,19 @@ export class AuthController {
     return this.authService.verifyContact(verifyContactDto, req, res);
   }
 
+  @Public()
+  @Post("google")
+  @HttpCode(200)
+  @ApiOkResponse({ type: MessageResponseDto })
+  async googleAuth(
+    @Body() dto: any,
+    // @Body() dto: GoogleAuthDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    return this.authService.googleAuth(dto, req, res);
+  }
+
   @ApiOperation({
     summary: "Merchant Register by Admin",
   })
