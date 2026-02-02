@@ -28,6 +28,9 @@ export class ItemEntity {
   price: number;
 
   @Column()
+  hsnCode: string;
+
+  @Column()
   merchantId: string;
 
   @CreateDateColumn({ type: "timestamptz" })

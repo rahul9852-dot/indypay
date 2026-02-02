@@ -6,30 +6,38 @@ export class CreateIntegrationMapping1767781624597
   name = "CreateIntegrationMapping1767781624597";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "public"."IDX_wallets_userId_version"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_wallets_updatedAt"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_wallets_userId"`);
     await queryRunner.query(
-      `DROP INDEX "public"."IDX_wallets_userId_version_covering"`,
+      `DROP INDEX IF EXISTS "public"."IDX_wallets_userId_version"`,
     );
     await queryRunner.query(
-      `DROP INDEX "public"."IDX_wallets_userId_version_quick"`,
-    );
-    await queryRunner.query(`DROP INDEX "public"."IDX_wallets_userId_quick"`);
-    await queryRunner.query(
-      `CREATE TABLE "user_integration_mappings" ("id" character varying NOT NULL, "userId" character varying NOT NULL, "integrationCode" character varying(50) NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_6fb69bd956977211e02e0962924" PRIMARY KEY ("id"))`,
+      `DROP INDEX IF EXISTS "public"."IDX_wallets_updatedAt"`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_d942df0f5e17d4e9c8f29841a2" ON "user_integration_mappings" ("userId") `,
+      `DROP INDEX IF EXISTS "public"."IDX_wallets_userId"`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_17304ae535877f04f5cf96ba9e" ON "user_integration_mappings" ("userId", "isActive") `,
+      `DROP INDEX IF EXISTS "public"."IDX_wallets_userId_version_covering"`,
     );
     await queryRunner.query(
-      `CREATE TABLE "checkouts" ("id" character varying NOT NULL, "payerName" text, "payerEmail" text NOT NULL, "payerMobile" text, "payerAddress" text, "amount" numeric(10,2) NOT NULL, "clientTxnId" text NOT NULL, "status" character varying NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_50ff635b5d91851d87a54eeb9f7" UNIQUE ("clientTxnId"), CONSTRAINT "PK_5800730d89f4137fc18770e4d4d" PRIMARY KEY ("id"))`,
+      `DROP INDEX IF EXISTS "public"."IDX_wallets_userId_version_quick"`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_e122b4131eba90a0becaa0e3b9" ON "checkouts" ("status") `,
+      `DROP INDEX IF EXISTS "public"."IDX_wallets_userId_quick"`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE IF NOT EXISTS "user_integration_mappings" ("id" character varying NOT NULL, "userId" character varying NOT NULL, "integrationCode" character varying(50) NOT NULL, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_6fb69bd956977211e02e0962924" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_d942df0f5e17d4e9c8f29841a2" ON "user_integration_mappings" ("userId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_17304ae535877f04f5cf96ba9e" ON "user_integration_mappings" ("userId", "isActive") `,
+    );
+    await queryRunner.query(
+      `CREATE TABLE IF NOT EXISTS "checkouts" ("id" character varying NOT NULL, "payerName" text, "payerEmail" text NOT NULL, "payerMobile" text, "payerAddress" text, "amount" numeric(10,2) NOT NULL, "clientTxnId" text NOT NULL, "status" character varying NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_50ff635b5d91851d87a54eeb9f7" UNIQUE ("clientTxnId"), CONSTRAINT "PK_5800730d89f4137fc18770e4d4d" PRIMARY KEY ("id"))`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_e122b4131eba90a0becaa0e3b9" ON "checkouts" ("status") `,
     );
     await queryRunner.query(
       `ALTER TABLE "payin_orders" DROP COLUMN IF EXISTS "vpa"`,
@@ -47,10 +55,10 @@ export class CreateIntegrationMapping1767781624597
       `ALTER TABLE "users" ALTER COLUMN "commissionInPercentagePayout" SET DEFAULT '1.5'`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_ceabcf58fac82c77db4be6c219" ON "wallets" ("userId", "version") `,
+      `CREATE INDEX IF NOT EXISTS "IDX_ceabcf58fac82c77db4be6c219" ON "wallets" ("userId", "version") `,
     );
     await queryRunner.query(
-      `ALTER TABLE "user_integration_mappings" ADD CONSTRAINT "FK_d942df0f5e17d4e9c8f29841a29" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_d942df0f5e17d4e9c8f29841a29') THEN ALTER TABLE "user_integration_mappings" ADD CONSTRAINT "FK_d942df0f5e17d4e9c8f29841a29" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
   }
 

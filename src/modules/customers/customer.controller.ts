@@ -14,7 +14,7 @@ export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}
 
   @ApiOperation({ summary: "Create a new customer (Merchant Only)" })
-  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.VIEW_ONLY_ADMIN)
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.VIEW_ONLY_ADMIN)
   @Post()
   @ApiResponse({ type: MessageResponseDto })
   async createCustomerForMerchant(
@@ -30,7 +30,7 @@ export class CustomerController {
     required: false,
     description: "Customer name for search",
   })
-  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.VIEW_ONLY_ADMIN)
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.VIEW_ONLY_ADMIN)
   @Get("list")
   async getListOfCustomersForSelect(
     @User() user: UsersEntity,

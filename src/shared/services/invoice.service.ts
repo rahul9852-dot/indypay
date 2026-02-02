@@ -12,6 +12,86 @@ export class InvoiceService {
   private readonly logger = new CustomLogger(InvoiceService.name);
   private readonly TIMEOUT = 30000; // 30 seconds
 
+  private numberToWords(num: number): string {
+    const ones = [
+      "",
+      "One",
+      "Two",
+      "Three",
+      "Four",
+      "Five",
+      "Six",
+      "Seven",
+      "Eight",
+      "Nine",
+      "Ten",
+      "Eleven",
+      "Twelve",
+      "Thirteen",
+      "Fourteen",
+      "Fifteen",
+      "Sixteen",
+      "Seventeen",
+      "Eighteen",
+      "Nineteen",
+    ];
+    const tens = [
+      "",
+      "",
+      "Twenty",
+      "Thirty",
+      "Forty",
+      "Fifty",
+      "Sixty",
+      "Seventy",
+      "Eighty",
+      "Ninety",
+    ];
+
+    const numToWords = (n: number): string => {
+      if (n < 20) return ones[n];
+      if (n < 100)
+        return tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
+      if (n < 1000)
+        return (
+          ones[Math.floor(n / 100)] +
+          " Hundred" +
+          (n % 100 ? " " + numToWords(n % 100) : "")
+        );
+      if (n < 100000)
+        return (
+          numToWords(Math.floor(n / 1000)) +
+          " Thousand" +
+          (n % 1000 ? " " + numToWords(n % 1000) : "")
+        );
+      if (n < 10000000)
+        return (
+          numToWords(Math.floor(n / 100000)) +
+          " Lakh" +
+          (n % 100000 ? " " + numToWords(n % 100000) : "")
+        );
+
+      return (
+        numToWords(Math.floor(n / 10000000)) +
+        " Crore" +
+        (n % 10000000 ? " " + numToWords(n % 10000000) : "")
+      );
+    };
+
+    const rupees = Math.floor(num);
+    const paise = Math.round((num - rupees) * 100);
+
+    let result = "";
+    if (rupees > 0) {
+      result = numToWords(rupees) + " Rupees";
+    }
+    if (paise > 0) {
+      result += (result ? " and " : "") + numToWords(paise) + " Paise";
+    }
+
+    return result ? result + " Only" : "Zero Rupees Only";
+  }
+
   private readonly invoiceTemplate = `
 <!DOCTYPE html>
     <html>
@@ -195,246 +275,494 @@ export class InvoiceService {
   `;
 
   private readonly customerInvoiceTemplate = `<!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Invoice for {{customer.name}}</title>
-        <style>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Invoice {{invoiceNumber}}</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
       body {
-        font-family: 'Arial Unicode MS', 'Arial', 'Helvetica', 'DejaVu Sans', 'Noto Sans', sans-serif;
+        font-family: 'Segoe UI', 'Arial', 'Helvetica', sans-serif;
         color: #333;
+        background: #fff;
+        font-size: 12px;
+        line-height: 1.4;
       }
 
+      .invoice-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px 30px;
+      }
+
+      /* Header */
       .header {
-        padding-bottom: 20px;
-        border-bottom: 2px solid #ddd;
         display: flex;
         justify-content: space-between;
+        align-items: flex-start;
+        padding-bottom: 15px;
+        border-bottom: 3px solid #10B981;
+        margin-bottom: 15px;
       }
 
-      .header img {
-        max-width: 150px;
-        height: auto;
-        margin-bottom: 10px;
+      .company-info {
+        flex: 1;
       }
 
-      .invoice-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+      .company-logo {
+        margin-bottom: 8px;
+      }
+
+      .company-logo img {
+        height: 40px;
+        width: auto;
+      }
+
+      .company-details {
+        font-size: 10px;
+        color: #666;
+        line-height: 1.5;
+      }
+
+      .company-details p {
+        margin: 1px 0;
+      }
+
+      .invoice-title-section {
+        text-align: right;
       }
 
       .invoice-title {
-        font-size: 24px;
-        font-weight: bold;
-        color: #333;
-        margin-top: 10px;
+        font-size: 32px;
+        font-weight: 700;
+        color: #1F2937;
+        letter-spacing: 2px;
       }
 
-      .invoice-address h2 {
-        font-size: 18px;
-        font-weight: bold;
-        color: #333;
-        margin-top: 10px;
+      .invoice-number {
+        font-size: 13px;
+        color: #10B981;
+        font-weight: 600;
+        margin-top: 3px;
       }
 
-      .invoice-address p {
-        font-size: 16px;
-        color: #555;
-        width: 30%;
+      /* Invoice Meta - Bill To Only */
+      .invoice-meta {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 15px;
+        gap: 20px;
       }
 
-      .invoice-details {
-        margin-top: 20px;
-        font-size: 16px;
-        color: #555;
+      .meta-box {
+        flex: 1;
+        background: #F9FAFB;
+        padding: 12px 15px;
+        border-radius: 6px;
       }
+
+      .meta-box h3 {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #10B981;
+        font-weight: 600;
+        margin-bottom: 6px;
+        letter-spacing: 0.5px;
+      }
+
+      .meta-box p {
+        margin: 2px 0;
+        color: #374151;
+        font-size: 11px;
+      }
+
+      .meta-box .name {
+        font-weight: 600;
+        font-size: 13px;
+        color: #1F2937;
+      }
+
+      /* Invoice Details Row */
       .invoice-details-row {
         display: flex;
-        gap: 40px;
-        align-items: center;
+        justify-content: space-between;
+        background: #F9FAFB;
+        padding: 10px 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
       }
 
-      .invoice-details p {
-        margin: 5px 0;
+      .detail-item {
+        text-align: center;
       }
 
+      .detail-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #6B7280;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+      }
+
+      .detail-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: #1F2937;
+        margin-top: 2px;
+      }
+
+      /* Items Table */
       .table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 20px;
+        margin-bottom: 12px;
       }
 
       .table th {
-        background: #2a63c3;
+        background: #10B981;
         color: #fff;
-        padding: 10px;
-        font-size: 14px;
+        padding: 10px 12px;
+        font-size: 11px;
+        font-weight: 600;
         text-align: left;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .table th:first-child {
+        border-radius: 6px 0 0 0;
+      }
+
+      .table th:last-child {
+        border-radius: 0 6px 0 0;
+        text-align: right;
       }
 
       .table td {
-        border: 1px solid #ddd;
-        padding: 10px;
+        padding: 10px 12px;
+        border-bottom: 1px solid #E5E7EB;
+        color: #374151;
+        font-size: 11px;
       }
 
-      .section-title {
-        font-size: 16px;
-        font-weight: bold;
-        margin-top: 20px;
-        color: #333;
-        padding-bottom: 5px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+      .table td:last-child {
+        text-align: right;
+        font-weight: 500;
       }
 
-      .service {
+      /* Tax Summary */
+      .tax-summary {
+        margin-bottom: 12px;
+      }
+
+      .tax-summary h4 {
+        font-size: 12px;
+        font-weight: 600;
+        color: #1F2937;
+        margin-bottom: 8px;
+      }
+
+      .tax-row {
         display: flex;
         justify-content: space-between;
-        // gap: 10px;
+        padding: 6px 0;
+        border-bottom: 1px solid #E5E7EB;
+        font-size: 11px;
       }
 
-      .address {
-        margin-top: 10px;
-        font-size: 14px;
-        color: #444;
+      .tax-row:last-child {
+        border-bottom: none;
+        font-weight: 600;
       }
 
-      .item {
-        font-size: 14px;
-        color: #444;
+      .tax-label {
+        color: #374151;
       }
 
-      .footer {
-        margin-top: 30px;
+      .tax-value {
+        color: #1F2937;
+      }
+
+      /* Totals Box */
+      .totals-box {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 10px;
+      }
+
+      .totals-table {
+        width: 280px;
+        border: 1px solid #E5E7EB;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+
+      .totals-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 12px;
+        border-bottom: 1px solid #E5E7EB;
+        font-size: 11px;
+      }
+
+      .totals-row:last-child {
+        border-bottom: none;
+        background: #EBF5FF;
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .totals-row .label {
+        color: #374151;
+      }
+
+      .totals-row .value {
+        color: #1F2937;
+      }
+
+      .totals-row:last-child .label {
+        color: #1E40AF;
+      }
+
+      .totals-row:last-child .value {
+        color: #1E40AF;
+      }
+
+      /* Amount in Words */
+      .amount-words {
         text-align: center;
-        font-size: 14px;
-        color: #777;
+        font-size: 11px;
+        color: #1E40AF;
+        font-style: italic;
+        margin-bottom: 12px;
+        padding: 8px;
+        background: #F0F9FF;
+        border-radius: 6px;
       }
 
-      .footer p {
-        margin: 5px 0;
+      /* Notes Section */
+      .notes-section {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 12px;
       }
-      
-      /* Ensure rupee symbol renders properly */
-      .rupee-symbol {
-        font-family: 'Arial Unicode MS', 'Arial', 'Helvetica', sans-serif;
-        font-weight: normal;
+
+      .notes-box {
+        flex: 1;
+        padding: 10px 12px;
+        background: #F9FAFB;
+        border-radius: 6px;
       }
-      
-      /* Fallback for rupee symbol */
-      .rupee-fallback::before {
-        content: "₹";
-        font-family: 'Arial Unicode MS', 'Arial', 'Helvetica', sans-serif;
+
+      .notes-box h4 {
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #10B981;
+        font-weight: 600;
+        margin-bottom: 5px;
+        letter-spacing: 0.5px;
+      }
+
+      .notes-box p {
+        color: #4B5563;
+        font-size: 10px;
+        line-height: 1.5;
+      }
+
+      /* Footer */
+      .footer {
+        text-align: center;
+        padding-top: 12px;
+        border-top: 2px solid #E5E7EB;
+      }
+
+      .footer-thanks {
+        font-size: 14px;
+        font-weight: 600;
+        color: #10B981;
+        margin-bottom: 5px;
+      }
+
+      .footer-contact {
+        font-size: 12px;
+        color: #6B7280;
+        margin-bottom: 15px;
+      }
+
+      .footer-company {
+        font-size: 11px;
+        color: #9CA3AF;
+        line-height: 1.6;
+      }
+
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
       }
     </style>
-      </head>
-      <body>
+  </head>
+  <body>
     <div class="invoice-container">
+      <!-- Header -->
       <div class="header">
-        <img src="data:image/png;base64,{{logo}}" alt="Logo" />
-        <div class="invoice-title">INVOICE</div>
+        <div class="company-info">
+          <div class="company-logo">
+            <img src="data:image/svg+xml;base64,{{logo}}" alt="Rupeeflow" style="height: 40px; width: auto;" />
+          </div>
+          <div class="company-details">
+            <p><strong>RUPEEFLOW FINANCE PRIVATE LIMITED</strong></p>
+            <p>CIN: U64990KA2025PTC209485</p>
+            <p>GSTIN: 29AAPCR1174A1ZD</p>
+            <p>NO. 112 AKR TECH PARK, KRISHNA REDDY IND. AREA</p>
+            <p>Bommanahalli, Bangalore, Karnataka 560068, India</p>
+          </div>
+        </div>
+        <div class="invoice-title-section">
+          <div class="invoice-title">INVOICE</div>
+          <div class="invoice-number">#{{invoiceNumber}}</div>
+        </div>
       </div>
 
-      <div class="invoice-header">
-        <div class="invoice-header-left">
-          <p><strong>Invoice Number:</strong> {{invoiceNumber}}</p>
+      <!-- Invoice Meta - Bill To Only -->
+      <div class="invoice-meta">
+        <div class="meta-box" style="max-width: 350px;">
+          <h3>Bill To</h3>
+          <p class="name">{{address.shipping.name}}</p>
+          <p>{{address.shipping.shippingAddress}}</p>
+          {{#if customer.gstin}}
+          <p><strong>GSTIN:</strong> {{customer.gstin}}</p>
+          {{/if}}
         </div>
-        <div class="invoice-header-right">
+        <div class="meta-box" style="max-width: 200px;">
+          <h3>Invoice Details</h3>
           <p><strong>Date:</strong> {{dateTime}}</p>
+          <p><strong>Invoice #:</strong> {{invoiceNumber}}</p>
         </div>
       </div>
 
-      <div class="address">
-        <div class="section-title">Invoice To:</div>
-        <p>{{address.shipping.name}}</p>
-        <p>{{address.shipping.shippingAddress}}</p>
-      </div>
-
-      <div class="invoice-details">
-        <div class="invoice-details-row">
-          <div class="section-title">Status</div>
-          <p>SUCCESS</p>
-        </div>
-
-        <div class="invoice-details-row">
-          <div class="section-title">GSTIN</div>
-          <p>{{customer.gstin}}</p>
-        </div>
-
-      </div>
-
+      <!-- Items Table -->
       <table class="table">
         <thead>
           <tr>
-            <th>SL.</th>
+            <th style="width: 35px;">SL.</th>
             <th>Item Name</th>
-            <th>Price</th>
-            <th>Qty.</th>
-            <th>Total</th>
+            <th style="width: 90px;">HSN Code</th>
+            <th style="width: 80px;">Price</th>
+            <th style="width: 50px;">Qty.</th>
+            <th style="width: 90px;">Total</th>
           </tr>
         </thead>
         <tbody>
           {{#each items}}
           <tr>
-            <td class="item">{{add @index 1}}</td>
-            <td class="item">{{item.name}}</td>
-            <td class="item">{{item.price}}</td>
-            <td class="item">{{quantity}}</td>
-            <td class="item">{{formatNumber total}}</td>
+            <td>{{add @index 1}}</td>
+            <td>{{item.name}}</td>
+            <td>{{item.hsnCode}}</td>
+            <td>{{formatNumber item.price}}</td>
+            <td>{{quantity}}</td>
+            <td>{{formatNumber total}}</td>
           </tr>
           {{/each}}
         </tbody>
-
-                  <tfoot>
-            <tr>
-              <td colspan="4" style="text-align: right;"><strong>Sub Total:</strong></td>
-              <td>Rs. {{subTotal}}</td>
-            </tr>
-            <tr>
-              <td colspan="4" style="text-align: right;"><strong>GST:</strong></td>
-              <td>{{gst}}%</td>
-            </tr>
-            <tr>
-              <td colspan="4" style="text-align: right;"><strong>Total:</strong></td>
-              <td>Rs.{{amount}}</td>
-            </tr>
-          </tfoot>
       </table>
 
-
-      <div class="section-title">Billing Address</div>
-      <div class="address">
-        <p>{{address.billing.name}}</p>
-        <p>{{address.billing.billingAddress}}</p>
+      <!-- Tax Summary -->
+      <div class="tax-summary">
+        <h4>Tax Summary {{#if isInterState}}(Inter-State){{else}}(Intra-State){{/if}}</h4>
+        {{#if isInterState}}
+        <!-- Inter-State: IGST -->
+        <div class="tax-row">
+          <span class="tax-label">IGST @ {{gst}}%</span>
+          <span class="tax-value">₹ {{formatNumber igstAmount}}</span>
+        </div>
+        {{else}}
+        <!-- Intra-State: CGST + SGST -->
+        <div class="tax-row">
+          <span class="tax-label">CGST @ {{halfGst}}%</span>
+          <span class="tax-value">₹ {{formatNumber cgstAmount}}</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-label">SGST @ {{halfGst}}%</span>
+          <span class="tax-value">₹ {{formatNumber sgstAmount}}</span>
+        </div>
+        {{/if}}
+        <div class="tax-row">
+          <span class="tax-label">Total GST ({{gst}}%)</span>
+          <span class="tax-value">₹ {{formatNumber gstAmount}}</span>
+        </div>
       </div>
 
-      <div class="service">
-      <div class="service-left">
-        <div class="section-title">Customer Notes</div>
-        <div class="customer-notes">
+      <!-- Totals Box -->
+      <div class="totals-box">
+        <div class="totals-table">
+          <div class="totals-row">
+            <span class="label">Sub Total:</span>
+            <span class="value">₹ {{formatNumber subTotal}}</span>
+          </div>
+          {{#if isInterState}}
+          <div class="totals-row">
+            <span class="label">IGST ({{gst}}%):</span>
+            <span class="value">₹ {{formatNumber igstAmount}}</span>
+          </div>
+          {{else}}
+          <div class="totals-row">
+            <span class="label">CGST ({{halfGst}}%):</span>
+            <span class="value">₹ {{formatNumber cgstAmount}}</span>
+          </div>
+          <div class="totals-row">
+            <span class="label">SGST ({{halfGst}}%):</span>
+            <span class="value">₹ {{formatNumber sgstAmount}}</span>
+          </div>
+          {{/if}}
+          <div class="totals-row">
+            <span class="label">Grand Total:</span>
+            <span class="value">₹ {{formatNumber amount}}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Amount in Words -->
+      <div class="amount-words">
+        (Amount in Words: {{amountInWords}})
+      </div>
+
+      <!-- Notes Section -->
+      <div class="notes-section">
+        {{#if customerNotes}}
+        <div class="notes-box">
+          <h4>Notes</h4>
           <p>{{customerNotes}}</p>
         </div>
-      </div>
-
-      <div class="service-right">
-        <div class="section-title">Terms and Conditions</div>
-        <div class="terms-and-conditions">
-          <p>{{termsAndServices}}</p>
+        {{/if}}
+        <div class="notes-box">
+          <h4>Terms & Conditions</h4>
+          <p style="font-size: 9px; line-height: 1.4;">
+            1. Payment is due within the specified due date. Late payments may incur additional charges.<br>
+            2. All disputes are subject to Bangalore jurisdiction.<br>
+            3. This is a computer-generated invoice and does not require a signature.<br>
+            4. For complete terms, visit: <span style="color: #10B981;">https://rupeeflow.co/legal/terms/</span>
+          </p>
         </div>
       </div>
 
-      </div>
-
+      <!-- Footer -->
       <div class="footer">
-        <p>Thank you for your business!</p>
-        <p>If you have any questions, please contact us.</p>
+        <div class="footer-thanks">Thank you for your business!</div>
+        <div class="footer-contact">For any queries, please contact us at support@rupeeflow.co</div>
+        <div class="footer-company">
+          RUPEEFLOW FINANCE PRIVATE LIMITED | CIN: U64990KA2025PTC209485 | GSTIN: 29AAPCR1174A1ZD
+        </div>
       </div>
     </div>
   </body>
-    </html>
+</html>
 `;
 
   async generateInvoicePDF(data: {
@@ -536,6 +864,7 @@ export class InvoiceService {
     amount: number;
     subTotal: number;
     gst: number;
+    isInterState: boolean;
     invoiceNumber: string;
     userName: string;
     status: string;
@@ -556,15 +885,13 @@ export class InvoiceService {
       name: string;
       email: string;
       gstin: string;
+      state?: string;
     };
     items: InvoiceItemEntity[];
   }): Promise<Buffer> {
     try {
       // Use process.cwd() to get the project root directory
-      const logoPath = path.join(
-        process.cwd(),
-        "src/assets/images/color-full.png",
-      );
+      const logoPath = path.join(process.cwd(), "public/Rupeeflow.svg");
 
       let logoBase64 = "";
       try {
@@ -583,9 +910,23 @@ export class InvoiceService {
         };
       });
 
+      const gstAmount = (data.subTotal * data.gst) / 100;
+      const halfGst = data.gst / 2;
+      const cgstAmount = gstAmount / 2;
+      const sgstAmount = gstAmount / 2;
+      const igstAmount = gstAmount; // Full GST for inter-state
+      const amountInWords = this.numberToWords(data.amount);
+
       const modifiedData = {
         ...data,
         items,
+        gstAmount,
+        halfGst,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        amountInWords,
+        isInterState: data.isInterState,
         dateTime: formatDateTime(data.dateTime),
       };
 
@@ -643,7 +984,12 @@ handlebars.registerHelper("add", function (value1, value2) {
 });
 
 handlebars.registerHelper("formatNumber", function (value) {
-  return value.toFixed(2);
+  const num = parseFloat(value);
+  if (isNaN(num)) {
+    return "0.00";
+  }
+
+  return num.toFixed(2);
 });
 
 handlebars.registerHelper("rupee", function (value) {

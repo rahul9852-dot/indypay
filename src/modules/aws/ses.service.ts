@@ -10,9 +10,8 @@ import { appConfig } from "@/config/app.config";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
 const {
-  aws: { accessKeyId, secretAccessKey, region },
-  emailConfig: { from },
-  isProduction,
+  aws: { accessKeyId, secretAccessKey },
+  emailConfig: { from, sesRegion },
 } = appConfig();
 
 @Injectable()
@@ -22,13 +21,13 @@ export class SESService {
 
   constructor() {
     this.ses = new SES({
-      region,
+      region: sesRegion,
       credentials: {
         accessKeyId,
         secretAccessKey,
       },
     });
-    this.logger.info(`SES Service initialized with region: ${region}`);
+    this.logger.info(`SES Service initialized with region: ${sesRegion}`);
   }
 
   async sendEmail(
@@ -42,12 +41,6 @@ export class SESService {
     },
   ): Promise<{ success: boolean; message: string }> {
     try {
-      if (!isProduction) {
-        return {
-          success: true,
-          message: "Email sent successfully",
-        };
-      }
       if (attachment) {
         // Use SendRawEmailCommand for emails with attachments
         const boundary = "boundary_" + Math.random().toString(36).substring(2);
@@ -73,7 +66,7 @@ export class SESService {
 
         const rawParams: SendRawEmailCommandInput = {
           RawMessage: {
-            Data: Buffer.from(mimeBody),
+            Data: new Uint8Array(Buffer.from(mimeBody)),
           },
           Source: from,
           Destinations: [email],

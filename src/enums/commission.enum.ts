@@ -5,5 +5,5 @@ export enum COMMISSION_TYPE {
 
 export enum CHARGE_TYPE {
   FLAT = "FLAT",
-  PERCENTAGE = "PERCENTAGE"
+  PERCENTAGE = "PERCENTAGE",
 }

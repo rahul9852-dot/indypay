@@ -125,6 +125,7 @@ export const appConfig = registerAs("appConfig", () => ({
     username: getOsEnv("EMAIL_SMTP_USER"),
     password: getOsEnv("EMAIL_SMTP_PASSWORD"),
     from: getOsEnv("EMAIL_SMTP_FROM"),
+    sesRegion: getOsEnv("EMAIL_SES_REGION"),
   },
   aws: {
     accessKeyId: getOsEnv("AWS_ACCESS_KEY_ID"),

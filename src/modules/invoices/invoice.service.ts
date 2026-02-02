@@ -542,6 +542,12 @@ export class InvoiceCustomerService {
       throw new NotFoundException("Billing address not found");
     }
 
+    // Determine if inter-state or intra-state GST applies
+    // Rupeeflow is based in Karnataka - if customer is in different state, apply IGST
+    const sellerState = "Karnataka";
+    const customerState = invoice.customer.state?.trim().toLowerCase();
+    const isInterState = customerState !== sellerState.toLowerCase();
+
     const invoicePdfBuffer =
       await this.invoiceService.generateInvoiceToCustomer({
         amount: invoice.totalAmount,
@@ -550,6 +556,7 @@ export class InvoiceCustomerService {
           0,
         ),
         gst: 18,
+        isInterState,
         invoiceNumber: invoice.invoiceNumber,
         userName: user.fullName,
         customerNotes: invoice.customerNotes,
@@ -571,26 +578,112 @@ export class InvoiceCustomerService {
           name: invoice.customer.name,
           email: invoice.customer.email,
           gstin: invoice.customer.gstin,
+          state: invoice.customer.state,
         },
         items: invoice.items,
       });
 
-    const invoiceSubject = `Your Invoice from ${user.fullName}`;
+    const invoiceSubject = `Invoice ${invoice.invoiceNumber} from Rupeeflow`;
     const invoiceBody = `
-        <html>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-              <h2 style="color: #4CAF50;">Invoice #${invoice.id}</h2>
-              <p>Dear ${invoice.customer.name},</p>
-              <p>You have received an invoice from <strong>${user.fullName}</strong> for a total amount of <strong>₹${(+invoice.totalAmount).toFixed(
-                2,
-              )}</strong>.</p>
-              <p>Please find your invoice attached.</p>
-              <p style="margin-top: 30px;">Best regards,<br>${user.fullName} Team</p>
-            </div>
-          </body>
-        </html>
-      `;
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f4; padding: 30px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <!-- Header -->
+            <tr>
+              <td style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 30px 40px; text-align: center;">
+                <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">RUPEEFLOW</h1>
+                <p style="margin: 5px 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Invoice Notification</p>
+              </td>
+            </tr>
+
+            <!-- Content -->
+            <tr>
+              <td style="padding: 40px;">
+                <p style="margin: 0 0 20px; color: #1F2937; font-size: 16px;">Dear <strong>${invoice.customer.name}</strong>,</p>
+
+                <p style="margin: 0 0 20px; color: #4B5563; font-size: 15px; line-height: 1.7;">
+                  I hope this message finds you well. Please find attached <strong style="color: #10B981;">Invoice ${invoice.invoiceNumber}</strong> dated <strong>${new Date(invoice.issueDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</strong>.
+                </p>
+
+                <!-- Invoice Summary Box -->
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F0FDF4; border-radius: 10px; margin: 25px 0;">
+                  <tr>
+                    <td style="padding: 25px;">
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                        <tr>
+                          <td style="color: #6B7280; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Invoice Number</td>
+                          <td style="text-align: right; color: #1F2937; font-weight: 600; font-size: 15px;">${invoice.invoiceNumber}</td>
+                        </tr>
+                        <tr><td colspan="2" style="padding: 8px 0;"><hr style="border: none; border-top: 1px solid #D1FAE5; margin: 0;"></td></tr>
+                        <tr>
+                          <td style="color: #6B7280; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Invoice Date</td>
+                          <td style="text-align: right; color: #1F2937; font-weight: 600; font-size: 15px;">${new Date(invoice.issueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                        </tr>
+                        <tr><td colspan="2" style="padding: 8px 0;"><hr style="border: none; border-top: 1px solid #D1FAE5; margin: 0;"></td></tr>
+                        <tr>
+                          <td style="color: #6B7280; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Due Date</td>
+                          <td style="text-align: right; color: #1F2937; font-weight: 600; font-size: 15px;">${new Date(invoice.expiryDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                        </tr>
+                        <tr><td colspan="2" style="padding: 12px 0;"><hr style="border: none; border-top: 2px solid #10B981; margin: 0;"></td></tr>
+                        <tr>
+                          <td style="color: #1F2937; font-size: 16px; font-weight: 700;">Total Amount</td>
+                          <td style="text-align: right; color: #10B981; font-weight: 700; font-size: 24px;">₹${(+invoice.totalAmount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin: 0 0 20px; color: #4B5563; font-size: 15px; line-height: 1.7;">
+                  We would greatly appreciate it if the payment could be processed by <strong>${new Date(invoice.expiryDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</strong>. Prompt processing helps us continue providing you with seamless service.
+                </p>
+
+                <p style="margin: 0 0 25px; color: #4B5563; font-size: 15px; line-height: 1.7;">
+                  Should you have any questions or require further details regarding this invoice, please don't hesitate to reach out.
+                </p>
+
+                <p style="margin: 0 0 5px; color: #4B5563; font-size: 15px;">Thank you for your business.</p>
+
+                <p style="margin: 25px 0 0; color: #1F2937; font-size: 15px;">
+                  Best regards,<br>
+                  <strong>${user.fullName}</strong><br>
+                  <span style="color: #10B981; font-weight: 600;">Rupeeflow Finance Private Limited</span>
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="background-color: #F9FAFB; padding: 25px 40px; text-align: center; border-top: 1px solid #E5E7EB;">
+                <p style="margin: 0 0 5px; color: #6B7280; font-size: 12px;">
+                  <strong>RUPEEFLOW FINANCE PRIVATE LIMITED</strong>
+                </p>
+                <p style="margin: 0 0 5px; color: #9CA3AF; font-size: 11px;">
+                  CIN: U64990KA2025PTC209485 | GSTIN: 29AAPCR1174A1ZD
+                </p>
+                <p style="margin: 0 0 10px; color: #9CA3AF; font-size: 11px;">
+                  NO. 112 AKR TECH PARK, KRISHNA REDDY IND. AREA, Bommanahalli, Bangalore 560068
+                </p>
+                <p style="margin: 0; color: #9CA3AF; font-size: 11px;">
+                  Email: support@rupeeflow.co
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+`;
 
     // return res
     //   .setHeader("Content-Type", "application/pdf")

@@ -22,4 +22,9 @@ export class CreateItemDto {
   @IsNumber()
   @IsPositive()
   price: number;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  hsnCode: string;
 }
