@@ -6,7 +6,7 @@ import {
   Optional,
   forwardRef,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
@@ -47,6 +47,7 @@ export class GeoPayPayinService extends BasePayinWebhookService {
     walletRepository: Repository<WalletEntity>,
     // @InjectRepository(PayinWalletEntity)
     // payinWalletRepository: Repository<PayinWalletEntity>,
+    @InjectDataSource()
     dataSource: DataSource,
     @Inject(CACHE_MANAGER) cacheManager: Cache,
     @Optional()

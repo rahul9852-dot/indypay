@@ -53,3 +53,9 @@ export class RegisterUserDto {
   @IsString()
   channelPartnerId?: string;
 }
+
+export class GoogleAuthDto {
+  @IsString()
+  @IsNotEmpty()
+  googleToken: string;
+}

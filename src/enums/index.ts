@@ -98,15 +98,13 @@ export enum ID_TYPE {
   SETTLEMENT_PAYOUT = "stl",
   TRANSACTIONS_KEY = "txn",
   USER_API_KEY = "apik",
+  USER_BANK_DETAILS_KEY = "ubank",
+  USER_COMMISSION_MAPPING = "ucm",
+  USER_INTEGRATION_MAPPING = "uim",
   USER_KYC = "ukyc",
   USER_LOGIN_IP = "ip",
   USER_MULTI_FACTOR_AUTH = "umfa",
   USER_WHITELIST_IP = "uwip",
-  USER_INTEGRATION_MAPPING = "uim",
-  USER_BANK_DETAILS_KEY = "ubank",
-  USER = "usr",
-  USER_ADDRESS = "uad",
-  USER_COMMISSION_MAPPING = "ucm",
   WALLET = "wlt",
   WALLET_TOPUP = "wtop",
 }
@@ -179,6 +177,7 @@ export enum BUSINESS_INDUSTRIES {
 export enum OAUTH_PROVIDER {
   GOOGLE = "google",
   MICROSOFT = "microsoft",
+  PASSWORD = "password",
 }
 
 export enum VERIFICATION_GATEWAY_EVENT {

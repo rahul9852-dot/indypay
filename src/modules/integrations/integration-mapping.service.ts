@@ -178,18 +178,24 @@ export class IntegrationMappingService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Convert lastResetDate to Date object if it's a string (PostgreSQL date type returns as string)
+    const lastResetDate = integration.lastResetDate
+      ? new Date(integration.lastResetDate)
+      : null;
+
     // Reset daily limit if it's a new day
-    if (
-      !integration.lastResetDate ||
-      integration.lastResetDate.getTime() !== today.getTime()
-    ) {
+    if (!lastResetDate || lastResetDate.getTime() !== today.getTime()) {
+      // Check if we need to reset monthly limit (before resetting daily)
+      const shouldResetMonthly =
+        !lastResetDate ||
+        lastResetDate.getMonth() !== today.getMonth() ||
+        lastResetDate.getFullYear() !== today.getFullYear();
+
       integration.dailyLimitConsumed = 0;
       integration.lastResetDate = today;
 
       // Reset monthly limit if it's a new month
-      const lastResetMonth = integration.lastResetDate.getMonth();
-      const currentMonth = today.getMonth();
-      if (lastResetMonth !== currentMonth) {
+      if (shouldResetMonthly) {
         integration.monthlyLimitConsumed = 0;
       }
     }

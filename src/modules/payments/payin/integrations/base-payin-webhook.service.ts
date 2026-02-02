@@ -5,7 +5,7 @@ import {
   Optional,
   forwardRef,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { DataSource, QueryRunner, Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
@@ -38,6 +38,7 @@ export abstract class BasePayinWebhookService extends BasePayinService {
     protected readonly walletRepository: Repository<WalletEntity>,
     // @InjectRepository(PayinWalletEntity)
     // protected readonly payinWalletRepository: Repository<PayinWalletEntity>,
+    @InjectDataSource()
     dataSource: DataSource,
     @Inject(CACHE_MANAGER) protected readonly cacheManager: Cache,
     @Optional()
@@ -193,11 +194,11 @@ export abstract class BasePayinWebhookService extends BasePayinService {
     userId: string,
     updateFn: (wallet: WalletEntity) => void,
   ): Promise<WalletEntity> {
-    const maxRetries = 8;
-    const baseDelay = 100;
-    const operationTimeout = 5000;
-    const lockTimeout = 5000;
-    const lockTtl = 10000;
+    const maxRetries = 3; // Reduced from 8 to prevent long transaction duration
+    const baseDelay = 50; // Reduced from 100 for faster retries
+    const operationTimeout = 3000; // Reduced from 5000 to fail faster
+    const lockTimeout = 2000; // Reduced from 5000 to fail faster on lock contention
+    const lockTtl = 5000; // Reduced from 10000 to match lockTimeout
 
     const startTime = Date.now();
     const lockKey = `wallet_update:${userId}`;
@@ -219,9 +220,9 @@ export abstract class BasePayinWebhookService extends BasePayinService {
             return true;
           }
         }
-        // Wait before checking again
-        await new Promise((resolve) =>
-          setTimeout(resolve, 50 + Math.random() * 50),
+        // Wait before checking again (reduced delay for faster lock acquisition)
+        await new Promise(
+          (resolve) => setTimeout(resolve, 25 + Math.random() * 25), // Reduced from 50-100ms to 25-50ms
         );
       }
 
