@@ -26,11 +26,12 @@ export class ItemService {
   ) {}
 
   async createItem(createItemDto: CreateItemDto, merchant: UsersEntity) {
-    createItemDto.name = createItemDto.name.toLowerCase();
-
-    const existingItem = await this.itemRepo.findOne({
-      where: { name: createItemDto.name, merchantId: merchant.id },
-    });
+    // Check for duplicate items (case-insensitive) while preserving original case
+    const existingItem = await this.itemRepo
+      .createQueryBuilder("item")
+      .where("LOWER(item.name) = LOWER(:name)", { name: createItemDto.name })
+      .andWhere("item.merchantId = :merchantId", { merchantId: merchant.id })
+      .getOne();
 
     if (existingItem) {
       throw new ConflictException("Item with this name already exists.");

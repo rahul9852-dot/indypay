@@ -97,6 +97,8 @@ export enum ID_TYPE {
   PG_CONFIG = "conf",
   SETTLEMENT_PAYOUT = "stl",
   TRANSACTIONS_KEY = "txn",
+  USER = "usr",
+  USER_ADDRESS = "uad",
   USER_API_KEY = "apik",
   USER_BANK_DETAILS_KEY = "ubank",
   USER_COMMISSION_MAPPING = "ucm",
