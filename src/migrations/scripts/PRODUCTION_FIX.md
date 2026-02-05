@@ -10,9 +10,11 @@ Migration "Start1736502134195" failed
 ## Root Cause
 Your production database has tables that were created previously, but the `migrations` table doesn't have records showing those migrations were executed. TypeORM tries to run all migrations from scratch and fails because tables already exist.
 
-## Immediate Fix (Choose One)
+## ⚠️ IMPORTANT: The Real Solution
 
-### Option 1: Sync Migrations Table (RECOMMENDED)
+**The root cause is that your migrations table is out of sync with your database.** The proper fix is to sync the migrations table, not to make all migrations idempotent.
+
+### ✅ RECOMMENDED: Sync Migrations Table
 
 Run this SQL script to mark all existing migrations as executed:
 
@@ -22,9 +24,10 @@ psql -U your_db_user -d your_production_db -f src/migrations/scripts/sync-produc
 ```
 
 This will:
-- Insert all 38 migration records into the migrations table
+- Insert all 39 migration records into the migrations table
 - Make future `npm run mig:run` commands work correctly
 - Safe to run multiple times (idempotent)
+- **This is the proper solution** - it tells TypeORM which migrations have already run
 
 ### Option 2: Check Status First
 
@@ -53,14 +56,14 @@ This will show you:
    ```
    This should now work without errors.
 
-## Code Changes Made
+## Code Changes Made (Safety Measures)
 
-The `Start1736502134195` migration has been updated to be idempotent:
-- All `CREATE TABLE` statements now use `IF NOT EXISTS`
-- All `CREATE INDEX` statements now use `IF NOT EXISTS`
-- This prevents future "relation already exists" errors
+Some migrations have been updated to be idempotent as a safety measure:
+- `Start1736502134195`: All `CREATE TABLE` and `CREATE INDEX` statements use `IF NOT EXISTS`
+- `Start1736502134195`: All foreign key constraints check for existence before adding
+- `WalletPayout1736590106622`: Column additions check for existence before adding
 
-**Note:** You still need to sync the migrations table using the SQL script above.
+**However, the proper solution is still to sync your migrations table.** Making migrations idempotent is a safety measure, but the real fix is ensuring TypeORM knows which migrations have already run.
 
 ## Prevention
 
