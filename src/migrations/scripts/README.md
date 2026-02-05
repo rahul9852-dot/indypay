@@ -16,25 +16,9 @@ Migration "Start1736502134195" failed
 
 ## Solution Scripts
 
-### 🚀 1. Quick Fix (RECOMMENDED)
-
-**File:** `quick-fix-add-checkout-data.sql`
-
-**Use when:** You just want to add the checkoutData column and get your app working ASAP.
-
-```bash
-# Connect to production
-psql -U your_user -d your_production_db -f src/migrations/scripts/quick-fix-add-checkout-data.sql
-```
-
-**What it does:**
-- Adds `checkoutData` column to `payin_orders` table
-- Marks the migration as executed
-- Safe to run (uses `IF NOT EXISTS`)
-
 ---
 
-### 🔍 2. Check Status First
+### 🔍 1. Check Status First
 
 **File:** `check-migration-status.sql`
 
@@ -47,12 +31,12 @@ psql -U your_user -d your_production_db -f src/migrations/scripts/check-migratio
 **What it shows:**
 - How many migrations are recorded
 - Which migrations have been executed
-- If checkoutData column exists
 - Status of critical tables
+- Existence of key columns
 
 ---
 
-### 🛠️ 3. Full Migration Sync
+### 🛠️ 2. Full Migration Sync (RECOMMENDED)
 
 **File:** `sync-production-migrations.sql`
 
@@ -63,10 +47,10 @@ psql -U your_user -d your_production_db -f src/migrations/scripts/sync-productio
 ```
 
 **What it does:**
-- Marks ALL old migrations as executed (31 migrations)
-- Adds checkoutData column
-- Records the new migration
+- Marks ALL old migrations as executed (38 migrations)
+- Syncs the migrations table with the actual database state
 - Now `npm run mig:run` will work for future migrations
+- Safe to run multiple times (idempotent)
 
 ---
 
@@ -74,10 +58,19 @@ psql -U your_user -d your_production_db -f src/migrations/scripts/sync-productio
 
 | Scenario | Script to Use |
 |----------|--------------|
-| Just need checkoutData working ASAP | `quick-fix-add-checkout-data.sql` ✅ |
+| Production database has tables but migrations table is empty | `sync-production-migrations.sql` ✅ |
 | Want to understand what's in production | `check-migration-status.sql` |
-| Want to fix migration tracking for good | `sync-production-migrations.sql` |
 | Deploying for the first time | `sync-production-migrations.sql` |
+
+## Code Fix Applied
+
+The `Start1736502134195` migration has been updated to be **idempotent** - it now uses `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` statements. This means:
+
+- ✅ The migration can be run safely even if tables already exist
+- ✅ No more "relation already exists" errors
+- ✅ Future deployments will be more resilient
+
+**Note:** You still need to sync the migrations table using `sync-production-migrations.sql` to mark existing migrations as executed.
 
 ---
 
@@ -116,12 +109,8 @@ To avoid this in the future:
 **Q: Script fails with "migrations table doesn't exist"**  
 A: Your database is completely new. Run `npm run mig:run` - it will create the migrations table and run all migrations.
 
-**Q: checkoutData column already exists**  
-A: Good! Just run the script to record the migration:
-```sql
-INSERT INTO migrations (timestamp, name)
-VALUES (1765647235092, 'AddedCheckoutDataColumnInPayinOrder1765647235092');
-```
+**Q: Tables already exist but migrations table is empty**  
+A: Run `sync-production-migrations.sql` to mark all migrations as executed. This will sync your migrations table with the actual database state.
 
 **Q: I still get migration errors**  
 A: Run `check-migration-status.sql` and share the output for diagnosis.

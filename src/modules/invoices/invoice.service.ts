@@ -173,6 +173,8 @@ export class InvoiceCustomerService {
           item: {
             id: true,
             price: true,
+            name: true,
+            hsnCode: true,
           },
           quantity: true,
         },
