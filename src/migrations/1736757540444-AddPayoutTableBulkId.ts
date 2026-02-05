@@ -4,9 +4,11 @@ export class AddPayoutTableBulkId1736757540444 implements MigrationInterface {
   name = "AddPayoutTableBulkId1736757540444";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Add column only if it doesn't exist
     await queryRunner.query(
-      `ALTER TABLE "payout_orders" ADD "batchId" character varying`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payout_orders' AND column_name = 'batchId') THEN ALTER TABLE "payout_orders" ADD "batchId" character varying; END IF; END $$`,
     );
+    // ALTER COLUMN operations are safe to run multiple times
     await queryRunner.query(
       `ALTER TABLE "payin_orders" ALTER COLUMN "commissionInPercentage" SET DEFAULT '4.5'`,
     );
