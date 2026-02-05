@@ -68,64 +68,64 @@ export class Start1736502134195 implements MigrationInterface {
       `CREATE TABLE IF NOT EXISTS "media_kyc" ("id" character varying NOT NULL, "kycStatus" integer NOT NULL DEFAULT '1', "fileName" character varying, "fileType" character varying, "url" character varying, "documentType" character varying, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "userKycId" character varying, CONSTRAINT "PK_c5445c0fe72ddf3947fa0fe720c" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `ALTER TABLE "user_api_keys" ADD CONSTRAINT "FK_e131705cbbc8fb589889b02d457" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_e131705cbbc8fb589889b02d457') THEN ALTER TABLE "user_api_keys" ADD CONSTRAINT "FK_e131705cbbc8fb589889b02d457" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settlements" ADD CONSTRAINT "FK_4ff643af81bd6ae92eaaabdd2f4" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_4ff643af81bd6ae92eaaabdd2f4') THEN ALTER TABLE "settlements" ADD CONSTRAINT "FK_4ff643af81bd6ae92eaaabdd2f4" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settlements" ADD CONSTRAINT "FK_746ab925e9ff66a7fa95220f564" FOREIGN KEY ("bankDetailsId") REFERENCES "user_bank_details"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_746ab925e9ff66a7fa95220f564') THEN ALTER TABLE "settlements" ADD CONSTRAINT "FK_746ab925e9ff66a7fa95220f564" FOREIGN KEY ("bankDetailsId") REFERENCES "user_bank_details"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "settlements" ADD CONSTRAINT "FK_ba40101ac8dfb96097f9d6bc0c4" FOREIGN KEY ("settledById") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_ba40101ac8dfb96097f9d6bc0c4') THEN ALTER TABLE "settlements" ADD CONSTRAINT "FK_ba40101ac8dfb96097f9d6bc0c4" FOREIGN KEY ("settledById") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "user_bank_details" ADD CONSTRAINT "FK_ae92220673e2399dabfc69930b2" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_ae92220673e2399dabfc69930b2') THEN ALTER TABLE "user_bank_details" ADD CONSTRAINT "FK_ae92220673e2399dabfc69930b2" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "user_media" ADD CONSTRAINT "FK_6e58ba5609d4d2b3e271d624fdc" FOREIGN KEY ("kycId") REFERENCES "user_kyc"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_6e58ba5609d4d2b3e271d624fdc') THEN ALTER TABLE "user_media" ADD CONSTRAINT "FK_6e58ba5609d4d2b3e271d624fdc" FOREIGN KEY ("kycId") REFERENCES "user_kyc"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "payout_orders" ADD CONSTRAINT "FK_43a99b6a22cbe5a0c511ff11b84" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_43a99b6a22cbe5a0c511ff11b84') THEN ALTER TABLE "payout_orders" ADD CONSTRAINT "FK_43a99b6a22cbe5a0c511ff11b84" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "transactions" ADD CONSTRAINT "FK_56253ef17752a6d04ecee9ec9c5" FOREIGN KEY ("payInOrderId") REFERENCES "payin_orders"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_56253ef17752a6d04ecee9ec9c5') THEN ALTER TABLE "transactions" ADD CONSTRAINT "FK_56253ef17752a6d04ecee9ec9c5" FOREIGN KEY ("payInOrderId") REFERENCES "payin_orders"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "transactions" ADD CONSTRAINT "FK_3abe8c03b9c4ebcc1db34f5d0eb" FOREIGN KEY ("payOutOrderId") REFERENCES "payout_orders"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_3abe8c03b9c4ebcc1db34f5d0eb') THEN ALTER TABLE "transactions" ADD CONSTRAINT "FK_3abe8c03b9c4ebcc1db34f5d0eb" FOREIGN KEY ("payOutOrderId") REFERENCES "payout_orders"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "transactions" ADD CONSTRAINT "FK_6bb58f2b6e30cb51a6504599f41" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_6bb58f2b6e30cb51a6504599f41') THEN ALTER TABLE "transactions" ADD CONSTRAINT "FK_6bb58f2b6e30cb51a6504599f41" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "payin_orders" ADD CONSTRAINT "FK_cfc9049095f9e4c6d9fd549747d" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_cfc9049095f9e4c6d9fd549747d') THEN ALTER TABLE "payin_orders" ADD CONSTRAINT "FK_cfc9049095f9e4c6d9fd549747d" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "user_whitelist_ips" ADD CONSTRAINT "FK_ecd98d8bbe89545748689296c8c" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_ecd98d8bbe89545748689296c8c') THEN ALTER TABLE "user_whitelist_ips" ADD CONSTRAINT "FK_ecd98d8bbe89545748689296c8c" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "users" ADD CONSTRAINT "FK_2d6f34363c7c6e0ef7961624bdb" FOREIGN KEY ("channelPartnerId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_2d6f34363c7c6e0ef7961624bdb') THEN ALTER TABLE "users" ADD CONSTRAINT "FK_2d6f34363c7c6e0ef7961624bdb" FOREIGN KEY ("channelPartnerId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "users" ADD CONSTRAINT "FK_abfb8b60c24e6e22a6b0b8f18ef" FOREIGN KEY ("businessDetailsId") REFERENCES "user_business_details"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_abfb8b60c24e6e22a6b0b8f18ef') THEN ALTER TABLE "users" ADD CONSTRAINT "FK_abfb8b60c24e6e22a6b0b8f18ef" FOREIGN KEY ("businessDetailsId") REFERENCES "user_business_details"("id") ON DELETE NO ACTION ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "users" ADD CONSTRAINT "FK_02f203b01625d8dab98d7916329" FOREIGN KEY ("multiFactorAuthId") REFERENCES "user_multi_factor_auth"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_02f203b01625d8dab98d7916329') THEN ALTER TABLE "users" ADD CONSTRAINT "FK_02f203b01625d8dab98d7916329" FOREIGN KEY ("multiFactorAuthId") REFERENCES "user_multi_factor_auth"("id") ON DELETE NO ACTION ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "users" ADD CONSTRAINT "FK_0a95e6aab86ff1b0278c18cf48e" FOREIGN KEY ("walletId") REFERENCES "wallets"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_0a95e6aab86ff1b0278c18cf48e') THEN ALTER TABLE "users" ADD CONSTRAINT "FK_0a95e6aab86ff1b0278c18cf48e" FOREIGN KEY ("walletId") REFERENCES "wallets"("id") ON DELETE NO ACTION ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "users" ADD CONSTRAINT "FK_bafb08f60d7857f4670c172a6ea" FOREIGN KEY ("addressId") REFERENCES "user_address"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_bafb08f60d7857f4670c172a6ea') THEN ALTER TABLE "users" ADD CONSTRAINT "FK_bafb08f60d7857f4670c172a6ea" FOREIGN KEY ("addressId") REFERENCES "user_address"("id") ON DELETE NO ACTION ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "users" ADD CONSTRAINT "FK_8d7891ecc41ac3858a5f477afc7" FOREIGN KEY ("kycId") REFERENCES "user_kyc"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_8d7891ecc41ac3858a5f477afc7') THEN ALTER TABLE "users" ADD CONSTRAINT "FK_8d7891ecc41ac3858a5f477afc7" FOREIGN KEY ("kycId") REFERENCES "user_kyc"("id") ON DELETE NO ACTION ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "kyc" ADD CONSTRAINT "FK_ca948073ed4a3ba22030d37b3db" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_ca948073ed4a3ba22030d37b3db') THEN ALTER TABLE "kyc" ADD CONSTRAINT "FK_ca948073ed4a3ba22030d37b3db" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION; END IF; END $$`,
     );
     await queryRunner.query(
-      `ALTER TABLE "media_kyc" ADD CONSTRAINT "FK_283cce8ee2a4c77f32c1a5f11eb" FOREIGN KEY ("userKycId") REFERENCES "user_kyc"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_283cce8ee2a4c77f32c1a5f11eb') THEN ALTER TABLE "media_kyc" ADD CONSTRAINT "FK_283cce8ee2a4c77f32c1a5f11eb" FOREIGN KEY ("userKycId") REFERENCES "user_kyc"("id") ON DELETE CASCADE ON UPDATE NO ACTION; END IF; END $$`,
     );
   }
 
