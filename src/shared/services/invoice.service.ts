@@ -680,22 +680,22 @@ export class InvoiceService {
         <!-- Inter-State: IGST -->
         <div class="tax-row">
           <span class="tax-label">IGST @ {{gst}}%</span>
-          <span class="tax-value">₹ {{formatNumber igstAmount}}</span>
+          <span class="tax-value">&#8377; {{formatNumber igstAmount}}</span>
         </div>
         {{else}}
         <!-- Intra-State: CGST + SGST -->
         <div class="tax-row">
           <span class="tax-label">CGST @ {{halfGst}}%</span>
-          <span class="tax-value">₹ {{formatNumber cgstAmount}}</span>
+          <span class="tax-value">&#8377; {{formatNumber cgstAmount}}</span>
         </div>
         <div class="tax-row">
           <span class="tax-label">SGST @ {{halfGst}}%</span>
-          <span class="tax-value">₹ {{formatNumber sgstAmount}}</span>
+          <span class="tax-value">&#8377; {{formatNumber sgstAmount}}</span>
         </div>
         {{/if}}
         <div class="tax-row">
           <span class="tax-label">Total GST ({{gst}}%)</span>
-          <span class="tax-value">₹ {{formatNumber gstAmount}}</span>
+          <span class="tax-value">&#8377; {{formatNumber gstAmount}}</span>
         </div>
       </div>
 
@@ -704,26 +704,26 @@ export class InvoiceService {
         <div class="totals-table">
           <div class="totals-row">
             <span class="label">Sub Total:</span>
-            <span class="value">₹ {{formatNumber subTotal}}</span>
+            <span class="value">&#8377; {{formatNumber subTotal}}</span>
           </div>
           {{#if isInterState}}
           <div class="totals-row">
             <span class="label">IGST ({{gst}}%):</span>
-            <span class="value">₹ {{formatNumber igstAmount}}</span>
+            <span class="value">&#8377; {{formatNumber igstAmount}}</span>
           </div>
           {{else}}
           <div class="totals-row">
             <span class="label">CGST ({{halfGst}}%):</span>
-            <span class="value">₹ {{formatNumber cgstAmount}}</span>
+            <span class="value">&#8377; {{formatNumber cgstAmount}}</span>
           </div>
           <div class="totals-row">
             <span class="label">SGST ({{halfGst}}%):</span>
-            <span class="value">₹ {{formatNumber sgstAmount}}</span>
+            <span class="value">&#8377; {{formatNumber sgstAmount}}</span>
           </div>
           {{/if}}
           <div class="totals-row">
             <span class="label">Grand Total:</span>
-            <span class="value">₹ {{formatNumber amount}}</span>
+            <span class="value">&#8377; {{formatNumber amount}}</span>
           </div>
         </div>
       </div>
