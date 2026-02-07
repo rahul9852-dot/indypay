@@ -167,6 +167,7 @@ export class InvoiceCustomerService {
         customer: {
           id: true,
           name: true,
+          gstin: true,
         },
         items: {
           id: true,
