@@ -78,7 +78,10 @@ export class PayoutProcessorRocky {
                 ROCKY.PAYOUT.LIVE,
                 rockyPayload,
               );
-            this.logger.info("ROCKY PAYOUT - AFTER API CALL", responseRocky);
+            this.logger.info(
+              `ROCKY PAYOUT - AFTER API CALL ${LoggerPlaceHolder.Json}`,
+              responseRocky,
+            );
 
             const status = convertExternalPaymentStatusToInternal(
               responseRocky.data.status.toUpperCase(),
@@ -163,9 +166,17 @@ export class PayoutProcessorRocky {
                 });
             }
           } catch (error) {
+            const errorDetails = {
+              message: error?.message || "Unknown error",
+              status: error?.status,
+              response: error?.response?.data || error?.response,
+              stack: error?.stack,
+              orderId: order.orderId,
+              payoutId: order.payoutId,
+            };
             this.logger.error(
               `Payout failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
-              error || error.message,
+              errorDetails,
             );
 
             const { amount, orderId, payoutId, amountBeforeDeduction } = order;
