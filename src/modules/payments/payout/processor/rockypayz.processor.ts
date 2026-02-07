@@ -114,6 +114,15 @@ export class PayoutProcessorRocky {
             );
 
             if (status === PAYMENT_STATUS.FAILED) {
+              this.logger.error(
+                `ROCKY PAYOUT - FAILED STATUS for order: ${order.orderId}`,
+                {
+                  rockyResponse: responseRocky,
+                  status: responseRocky.data?.status,
+                  msg: responseRocky.msg,
+                  statuscode: responseRocky.statuscode,
+                },
+              );
               await this.payOutOrdersRepository.update(
                 { id: order.id },
                 {
@@ -169,10 +178,10 @@ export class PayoutProcessorRocky {
             const errorDetails = {
               message: error?.message || "Unknown error",
               status: error?.status,
-              response: error?.response?.data || error?.response,
-              stack: error?.stack,
               orderId: order.orderId,
               payoutId: order.payoutId,
+              errorType: error?.constructor?.name || typeof error,
+              fullError: error,
             };
             this.logger.error(
               `Payout failed for order: ${order.orderId} : ${LoggerPlaceHolder.Json}`,
