@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "dashboard-api",
+      name: "rupeeflow-api",
       script: "./dist/src/main.js",
       instances: 6, // Matches your 8-core CPU
       exec_mode: "cluster",
