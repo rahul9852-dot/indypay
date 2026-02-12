@@ -181,10 +181,14 @@ export class IntegrationMappingService {
       const lastResetDate = await this.cacheManager.get<string>(lastResetKey);
       const needsDailyReset = !lastResetDate || lastResetDate !== todayStr;
 
+      // TTL constants in seconds (cache manager expects seconds, not milliseconds)
+      const DAILY_TTL_SECONDS = 86400; // 24 hours
+      const MONTHLY_TTL_SECONDS = 2592000; // 30 days (safe limit for 32-bit)
+
       if (needsDailyReset) {
         // Reset daily counter
-        await this.cacheManager.set(dailyKey, amount, 86400000); // 24 hours TTL
-        await this.cacheManager.set(lastResetKey, todayStr, 86400000);
+        await this.cacheManager.set(dailyKey, amount, DAILY_TTL_SECONDS);
+        await this.cacheManager.set(lastResetKey, todayStr, DAILY_TTL_SECONDS);
 
         // Check if monthly reset is needed
         if (lastResetDate) {
@@ -195,7 +199,11 @@ export class IntegrationMappingService {
 
           if (needsMonthlyReset) {
             // Reset monthly counter
-            await this.cacheManager.set(monthlyKey, amount, 2678400000); // ~31 days TTL
+            await this.cacheManager.set(
+              monthlyKey,
+              amount,
+              MONTHLY_TTL_SECONDS,
+            );
           } else {
             // Increment monthly counter
             const currentMonthly =
@@ -203,12 +211,12 @@ export class IntegrationMappingService {
             await this.cacheManager.set(
               monthlyKey,
               currentMonthly + amount,
-              2678400000,
+              MONTHLY_TTL_SECONDS,
             );
           }
         } else {
           // First time - initialize monthly counter
-          await this.cacheManager.set(monthlyKey, amount, 2678400000);
+          await this.cacheManager.set(monthlyKey, amount, MONTHLY_TTL_SECONDS);
         }
       } else {
         // Increment both daily and monthly counters
@@ -218,11 +226,15 @@ export class IntegrationMappingService {
           (await this.cacheManager.get<number>(monthlyKey)) || 0;
 
         await Promise.all([
-          this.cacheManager.set(dailyKey, currentDaily + amount, 86400000),
+          this.cacheManager.set(
+            dailyKey,
+            currentDaily + amount,
+            DAILY_TTL_SECONDS,
+          ),
           this.cacheManager.set(
             monthlyKey,
             currentMonthly + amount,
-            2678400000,
+            MONTHLY_TTL_SECONDS,
           ),
         ]);
       }
@@ -273,16 +285,19 @@ export class IntegrationMappingService {
 
     if (integration) {
       // Initialize Redis with database values
+      // TTL constants in seconds
+      const DAILY_TTL_SECONDS = 86400; // 24 hours
+      const MONTHLY_TTL_SECONDS = 2592000; // 30 days
       await Promise.all([
         this.cacheManager.set(
           dailyKey,
           Number(integration.dailyLimitConsumed) || 0,
-          86400000,
+          DAILY_TTL_SECONDS,
         ),
         this.cacheManager.set(
           monthlyKey,
           Number(integration.monthlyLimitConsumed) || 0,
-          2678400000,
+          MONTHLY_TTL_SECONDS,
         ),
       ]);
 
@@ -312,7 +327,7 @@ export class IntegrationMappingService {
       const yearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 
       for (const integration of integrations) {
-        const {code} = integration;
+        const { code } = integration;
         const dailyKey = REDIS_KEYS.INTEGRATION_LIMIT_DAILY(code, todayStr);
         const monthlyKey = REDIS_KEYS.INTEGRATION_LIMIT_MONTHLY(
           code,
