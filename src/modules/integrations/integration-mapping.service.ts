@@ -156,6 +156,8 @@ export class IntegrationMappingService {
 
   /**
    * Record transaction amount for limit tracking
+   * Uses Redis counters for fast, non-blocking updates
+   * Database is synced periodically via background job
    * @param integrationCode - The integration code
    * @param amount - The transaction amount
    */
@@ -163,49 +165,181 @@ export class IntegrationMappingService {
     integrationCode: string,
     amount: number,
   ): Promise<void> {
-    const integration = await this.integrationRepository.findOne({
-      where: { code: integrationCode.toUpperCase() },
-    });
+    try {
+      const code = integrationCode.toUpperCase();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split("T")[0]; // YYYY-MM-DD
+      const yearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`; // YYYY-MM
 
-    if (!integration) {
-      this.logger.warn(
-        `Integration not found for limit tracking: ${integrationCode}`,
+      // Redis keys for counters
+      const dailyKey = REDIS_KEYS.INTEGRATION_LIMIT_DAILY(code, todayStr);
+      const monthlyKey = REDIS_KEYS.INTEGRATION_LIMIT_MONTHLY(code, yearMonth);
+      const lastResetKey = REDIS_KEYS.INTEGRATION_LAST_RESET(code);
+
+      // Check if we need to reset (compare with cached last reset date)
+      const lastResetDate = await this.cacheManager.get<string>(lastResetKey);
+      const needsDailyReset = !lastResetDate || lastResetDate !== todayStr;
+
+      if (needsDailyReset) {
+        // Reset daily counter
+        await this.cacheManager.set(dailyKey, amount, 86400000); // 24 hours TTL
+        await this.cacheManager.set(lastResetKey, todayStr, 86400000);
+
+        // Check if monthly reset is needed
+        if (lastResetDate) {
+          const lastReset = new Date(lastResetDate);
+          const needsMonthlyReset =
+            lastReset.getMonth() !== today.getMonth() ||
+            lastReset.getFullYear() !== today.getFullYear();
+
+          if (needsMonthlyReset) {
+            // Reset monthly counter
+            await this.cacheManager.set(monthlyKey, amount, 2678400000); // ~31 days TTL
+          } else {
+            // Increment monthly counter
+            const currentMonthly =
+              (await this.cacheManager.get<number>(monthlyKey)) || 0;
+            await this.cacheManager.set(
+              monthlyKey,
+              currentMonthly + amount,
+              2678400000,
+            );
+          }
+        } else {
+          // First time - initialize monthly counter
+          await this.cacheManager.set(monthlyKey, amount, 2678400000);
+        }
+      } else {
+        // Increment both daily and monthly counters
+        const currentDaily =
+          (await this.cacheManager.get<number>(dailyKey)) || 0;
+        const currentMonthly =
+          (await this.cacheManager.get<number>(monthlyKey)) || 0;
+
+        await Promise.all([
+          this.cacheManager.set(dailyKey, currentDaily + amount, 86400000),
+          this.cacheManager.set(
+            monthlyKey,
+            currentMonthly + amount,
+            2678400000,
+          ),
+        ]);
+      }
+    } catch (error) {
+      // Silently fail - this is a non-critical operation
+      // Redis operations are fast and shouldn't fail, but if they do, we don't want to block
+      this.logger.debug(
+        `Failed to record transaction amount in Redis for ${integrationCode}: ${error.message}`,
       );
-
-      return;
     }
+  }
 
+  /**
+   * Get current limit consumption from Redis (fast, no DB hit)
+   * Falls back to database if Redis is empty
+   * @param integrationCode - The integration code
+   * @returns Object with daily and monthly consumed amounts
+   */
+  async getLimitConsumption(integrationCode: string): Promise<{
+    dailyConsumed: number;
+    monthlyConsumed: number;
+  }> {
+    const code = integrationCode.toUpperCase();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split("T")[0];
+    const yearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 
-    // Convert lastResetDate to Date object if it's a string (PostgreSQL date type returns as string)
-    const lastResetDate = integration.lastResetDate
-      ? new Date(integration.lastResetDate)
-      : null;
+    const dailyKey = REDIS_KEYS.INTEGRATION_LIMIT_DAILY(code, todayStr);
+    const monthlyKey = REDIS_KEYS.INTEGRATION_LIMIT_MONTHLY(code, yearMonth);
 
-    // Reset daily limit if it's a new day
-    if (!lastResetDate || lastResetDate.getTime() !== today.getTime()) {
-      // Check if we need to reset monthly limit (before resetting daily)
-      const shouldResetMonthly =
-        !lastResetDate ||
-        lastResetDate.getMonth() !== today.getMonth() ||
-        lastResetDate.getFullYear() !== today.getFullYear();
+    const dailyConsumed = await this.cacheManager.get<number>(dailyKey);
+    const monthlyConsumed = await this.cacheManager.get<number>(monthlyKey);
 
-      integration.dailyLimitConsumed = 0;
-      integration.lastResetDate = today;
-
-      // Reset monthly limit if it's a new month
-      if (shouldResetMonthly) {
-        integration.monthlyLimitConsumed = 0;
-      }
+    // If Redis has values, return them
+    if (dailyConsumed !== null && dailyConsumed !== undefined) {
+      return {
+        dailyConsumed: dailyConsumed || 0,
+        monthlyConsumed: monthlyConsumed || 0,
+      };
     }
 
-    // Update consumed amounts
-    integration.dailyLimitConsumed =
-      Number(integration.dailyLimitConsumed) + amount;
-    integration.monthlyLimitConsumed =
-      Number(integration.monthlyLimitConsumed) + amount;
+    // Fallback to database if Redis is empty (first time or after restart)
+    const integration = await this.integrationRepository.findOne({
+      where: { code },
+      select: ["dailyLimitConsumed", "monthlyLimitConsumed"],
+    });
 
-    await this.integrationRepository.save(integration);
+    if (integration) {
+      // Initialize Redis with database values
+      await Promise.all([
+        this.cacheManager.set(
+          dailyKey,
+          Number(integration.dailyLimitConsumed) || 0,
+          86400000,
+        ),
+        this.cacheManager.set(
+          monthlyKey,
+          Number(integration.monthlyLimitConsumed) || 0,
+          2678400000,
+        ),
+      ]);
+
+      return {
+        dailyConsumed: Number(integration.dailyLimitConsumed) || 0,
+        monthlyConsumed: Number(integration.monthlyLimitConsumed) || 0,
+      };
+    }
+
+    return { dailyConsumed: 0, monthlyConsumed: 0 };
+  }
+
+  /**
+   * Sync Redis counters to database (call this periodically via cron job)
+   * This method should be called every few minutes to persist Redis data to DB
+   */
+  async syncLimitsToDatabase(): Promise<void> {
+    try {
+      // Get all integration codes
+      const integrations = await this.integrationRepository.find({
+        select: ["code"],
+      });
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split("T")[0];
+      const yearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+
+      for (const integration of integrations) {
+        const {code} = integration;
+        const dailyKey = REDIS_KEYS.INTEGRATION_LIMIT_DAILY(code, todayStr);
+        const monthlyKey = REDIS_KEYS.INTEGRATION_LIMIT_MONTHLY(
+          code,
+          yearMonth,
+        );
+
+        const dailyConsumed =
+          (await this.cacheManager.get<number>(dailyKey)) || 0;
+        const monthlyConsumed =
+          (await this.cacheManager.get<number>(monthlyKey)) || 0;
+
+        // Update database with Redis values
+        await this.integrationRepository.update(
+          { code },
+          {
+            dailyLimitConsumed: dailyConsumed,
+            monthlyLimitConsumed: monthlyConsumed,
+            lastResetDate: today,
+          },
+        );
+      }
+
+      this.logger.debug(
+        `Synced limits to database for ${integrations.length} integrations`,
+      );
+    } catch (error) {
+      this.logger.error(`Failed to sync limits to database: ${error.message}`);
+    }
   }
 }

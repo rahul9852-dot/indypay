@@ -56,8 +56,8 @@ export class AuthEncryptionInterceptor implements NestInterceptor {
 
     // Store original json method to intercept response.json() calls
     const originalJson = response.json.bind(response);
-    const {authEncryptionService} = this;
-    const {logger} = this;
+    const { authEncryptionService } = this;
+    const { logger } = this;
 
     // Override response.json to encrypt before sending
     response.json = function (body: any) {

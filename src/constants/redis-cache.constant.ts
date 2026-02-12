@@ -18,6 +18,12 @@ export const REDIS_KEYS = {
     `stats:admin:${startDate}:${endDate}`,
   USER_INTEGRATION_MAPPING: (userId: string) =>
     `user_integration_mapping:${userId}`,
+  INTEGRATION_LIMIT_DAILY: (integrationCode: string, date: string) =>
+    `integration_limit:daily:${integrationCode}:${date}`,
+  INTEGRATION_LIMIT_MONTHLY: (integrationCode: string, yearMonth: string) =>
+    `integration_limit:monthly:${integrationCode}:${yearMonth}`,
+  INTEGRATION_LAST_RESET: (integrationCode: string) =>
+    `integration_last_reset:${integrationCode}`,
   USER_COMMISSION_PLAN: (userId: string, type: string) =>
     `user_commission_plan:${userId}:${type}`,
   // Week-based stats caching keys
