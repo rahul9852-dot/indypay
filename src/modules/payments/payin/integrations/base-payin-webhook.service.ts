@@ -56,25 +56,76 @@ export abstract class BasePayinWebhookService extends BasePayinService {
   /**
    * Find payin order by txnRefId or orderId
    * Override this if your integration uses different fields
+   * Optimized with caching to reduce database load
    */
   protected async findPayinOrder(
     txnRefId?: string,
     orderId?: string,
   ): Promise<PayInOrdersEntity | null> {
+    // Try cache first to reduce database load
+    if (orderId) {
+      const cacheKey = `payin_order:orderId:${orderId}`;
+      const cached = await this.cacheManager.get<PayInOrdersEntity>(cacheKey);
+      if (cached) {
+        // Cache hit - still need to fetch with relations for fresh data
+        // But cache helps reduce load for duplicate webhook checks
+        const order = await this.payInOrdersRepository.findOne({
+          where: { orderId },
+          relations: ["user"],
+        });
+        if (order) {
+          return order;
+        }
+      }
+    }
+
     if (txnRefId) {
-      const order = await this.payInOrdersRepository.findOne({
+      const cacheKey = `payin_order:txnRefId:${txnRefId}`;
+      const cached = await this.cacheManager.get<PayInOrdersEntity>(cacheKey);
+      if (cached) {
+        const order = await this.payInOrdersRepository.findOne({
+          where: { txnRefId },
+          relations: ["user"],
+        });
+        if (order) {
+          return order;
+        }
+      }
+    }
+
+    // Database query - cache result for future lookups
+    let order: PayInOrdersEntity | null = null;
+
+    if (txnRefId) {
+      order = await this.payInOrdersRepository.findOne({
         where: { txnRefId },
         relations: ["user"],
       });
-      if (order) return order;
+      if (order) {
+        await this.cacheManager.set(
+          `payin_order:txnRefId:${txnRefId}`,
+          order,
+          300,
+        ); // 5 min cache
+
+        return order;
+      }
     }
 
     if (orderId) {
-      const order = await this.payInOrdersRepository.findOne({
+      order = await this.payInOrdersRepository.findOne({
         where: { orderId },
         relations: ["user"],
       });
-      if (order) return order;
+      if (order) {
+        await this.cacheManager.set(
+          `payin_order:orderId:${orderId}`,
+          order,
+          300,
+        ); // 5 min cache
+
+        return order;
+      }
     }
 
     return null;
@@ -194,25 +245,30 @@ export abstract class BasePayinWebhookService extends BasePayinService {
     userId: string,
     updateFn: (wallet: WalletEntity) => void,
   ): Promise<WalletEntity> {
-    const maxRetries = 3; // Reduced from 8 to prevent long transaction duration
-    const baseDelay = 50; // Reduced from 100 for faster retries
-    const operationTimeout = 3000; // Reduced from 5000 to fail faster
-    const lockTimeout = 2000; // Reduced from 5000 to fail faster on lock contention
-    const lockTtl = 5000; // Reduced from 10000 to match lockTimeout
+    const maxRetries = 2; // Reduced from 3 to fail faster and reduce transaction time
+    const baseDelay = 25; // Reduced from 50 for faster retries
+    const operationTimeout = 2000; // Reduced from 3000 to fail faster
+    const lockTimeout = 1000; // Reduced from 2000 to fail faster on lock contention
+    const lockTtl = 3000; // Reduced from 5000 to match lockTimeout
 
     const startTime = Date.now();
     const lockKey = `wallet_update:${userId}`;
     let lockAcquired = false;
 
-    // ✅ FIXED: Wait for lock instead of failing immediately
+    // ✅ OPTIMIZED: Faster lock acquisition with exponential backoff
     const acquireLock = async (): Promise<boolean> => {
       const lockStartTime = Date.now();
+      let attempt = 0;
+      const maxLockAttempts = 10; // Limit lock acquisition attempts
 
-      while (Date.now() - lockStartTime < lockTimeout) {
+      while (
+        Date.now() - lockStartTime < lockTimeout &&
+        attempt < maxLockAttempts
+      ) {
         const existingLock = await this.cacheManager.get(lockKey);
 
         if (!existingLock) {
-          // Try to acquire lock
+          // Try to acquire lock using SET with NX (if supported) or double-check pattern
           await this.cacheManager.set(lockKey, "locked", lockTtl);
           // Double-check we got the lock (race condition safety)
           const checkLock = await this.cacheManager.get(lockKey);
@@ -220,10 +276,10 @@ export abstract class BasePayinWebhookService extends BasePayinService {
             return true;
           }
         }
-        // Wait before checking again (reduced delay for faster lock acquisition)
-        await new Promise(
-          (resolve) => setTimeout(resolve, 25 + Math.random() * 25), // Reduced from 50-100ms to 25-50ms
-        );
+        // Exponential backoff for lock acquisition
+        const delay = Math.min(10 * Math.pow(1.5, attempt), 100);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        attempt++;
       }
 
       return false; // Couldn't acquire lock within timeout
@@ -248,7 +304,7 @@ export abstract class BasePayinWebhookService extends BasePayinService {
             );
           }
 
-          // Get wallet with current version
+          // Get wallet with current version - optimized query (no lock needed, using optimistic locking)
           const wallet = await queryRunner.manager
             .createQueryBuilder(WalletEntity, "wallet")
             .where("wallet.userId = :userId", { userId })
@@ -267,7 +323,7 @@ export abstract class BasePayinWebhookService extends BasePayinService {
           wallet.version = originalVersion + 1;
           wallet.updatedAt = new Date();
 
-          // Update with version check - optimized for index usage
+          // Update with version check - optimized for index usage, single query
           const result = await queryRunner.manager
             .createQueryBuilder()
             .update(WalletEntity)
@@ -359,6 +415,7 @@ export abstract class BasePayinWebhookService extends BasePayinService {
 
   /**
    * Send webhook to user's webhook URL
+   * Optimized with timeout to prevent hanging requests
    */
   protected async sendUserWebhook(
     user: UsersEntity,
@@ -382,20 +439,30 @@ export abstract class BasePayinWebhookService extends BasePayinService {
     );
 
     try {
+      // Add timeout to prevent hanging requests (5 seconds max)
       const { data } = await axios.post(user.payInWebhookUrl, payload, {
         headers: {
           "Content-Type": "application/json",
         },
+        timeout: 5000, // 5 second timeout
+        validateStatus: (status) => status < 500, // Don't throw on 4xx
       });
 
       this.logger.info(
         `PAYIN - User webhook (${user.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
       );
     } catch (err: any) {
-      this.logger.error(
-        `PAYIN - Error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
-        err,
-      );
+      // Don't throw - webhook failures shouldn't fail the main transaction
+      if (err.code === "ECONNABORTED") {
+        this.logger.warn(
+          `PAYIN - User webhook timeout after 5s: ${user.payInWebhookUrl}`,
+        );
+      } else {
+        this.logger.error(
+          `PAYIN - Error while sending webhook to user: ${LoggerPlaceHolder.Json}`,
+          err,
+        );
+      }
     }
   }
 

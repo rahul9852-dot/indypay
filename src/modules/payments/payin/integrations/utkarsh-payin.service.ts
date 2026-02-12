@@ -197,17 +197,26 @@ export class UtkarshPayinService extends BasePayinWebhookService {
 
       await queryRunner.commitTransaction();
 
-      // Send user webhook
-      await this.sendUserWebhook(user, {
-        orderId: payinOrder.orderId,
-        status: isAmountMismatch ? PAYMENT_STATUS.MISMATCH : status,
-        amount: +amount,
-        txnRefId: payinOrder.txnRefId,
-        ...(!isMisspelled && { utr: custRef }),
-        payerVpa,
-        message: isAmountMismatch
-          ? "Amount mismatch in payin order"
-          : "Not paid on same orderId",
+      // Send user webhook OUTSIDE transaction to reduce transaction duration
+      // Use setImmediate to not block the response
+      setImmediate(() => {
+        this.sendUserWebhook(user, {
+          orderId: payinOrder.orderId,
+          status: isAmountMismatch ? PAYMENT_STATUS.MISMATCH : status,
+          amount: +amount,
+          txnRefId: payinOrder.txnRefId,
+          ...(!isMisspelled && { utr: custRef }),
+          payerVpa,
+          message: isAmountMismatch
+            ? "Amount mismatch in payin order"
+            : "Not paid on same orderId",
+        }).catch((err) => {
+          // Log but don't throw - webhook failures shouldn't affect response
+          this.logger.error(
+            `Failed to send user webhook for order ${payinOrder.orderId}`,
+            err,
+          );
+        });
       });
 
       return {
