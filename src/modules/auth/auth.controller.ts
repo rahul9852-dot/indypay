@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Request, Response } from "express";
+import { UseInterceptors } from "@nestjs/common";
 import { SendOtpDto, SendOtpResDto, VerifyOtpDto } from "./dto/send-otp.dto";
 import { Verify2FADto } from "./dto/verify-2fa.dto";
 import { AuthService } from "./auth.service";
@@ -38,6 +39,7 @@ import { AuthGuard } from "@/guard/auth.guard";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import { UsersEntity } from "@/entities/user.entity";
+import { AuthEncryptionInterceptor } from "@/interceptors/auth-encryption.interceptor";
 
 @ApiTags("Auth")
 @IgnoreBusinessDetails()
@@ -117,6 +119,7 @@ export class AuthController {
   }
 
   @Public()
+  @UseInterceptors(AuthEncryptionInterceptor)
   @ApiOperation({
     summary: "Login",
   })
@@ -151,6 +154,7 @@ export class AuthController {
   }
 
   @Public()
+  @UseInterceptors(AuthEncryptionInterceptor)
   @ApiOperation({
     summary: "Register merchant - Step 2: Verify contact",
   })

@@ -15,6 +15,7 @@ import { SNSService } from "@/modules/aws/sns.service";
 import { appConfig } from "@/config/app.config";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
+import { AuthEncryptionService } from "@/utils/auth-encryption.utils";
 
 const {
   redisConfig: { redisHostUrl, redisPort },
@@ -40,7 +41,13 @@ const {
     }),
     AwsModule,
   ],
-  providers: [AuthService, BcryptService, JwtService, SNSService],
+  providers: [
+    AuthService,
+    BcryptService,
+    JwtService,
+    SNSService,
+    AuthEncryptionService,
+  ],
   controllers: [AuthController],
   exports: [JwtModule, AuthService],
 })

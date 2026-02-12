@@ -16,6 +16,8 @@ export const appConfig = registerAs("appConfig", () => ({
   encryptionAlgorithm: getOsEnv("ENCRYPTION_ALGORITHM"),
   authKey: getOsEnv("AUTH_KEY"),
   encryptionIV: getOsEnv("AUTH_IV"),
+  loginSignupEncryptionKey: getOsEnv("LOGIN_SIGNUP_ENCRYPTION_KEY"),
+  loginSignupEncryptionIV: getOsEnv("LOGIN_SIGNUP_ENCRYPTION_IV"),
   allowCookiesDomain: getOsEnv("ALLOW_COOKIES_DOMAIN"),
   database: {
     host: getOsEnv("DB_HOST"),
