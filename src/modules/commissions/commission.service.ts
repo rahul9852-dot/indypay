@@ -51,19 +51,28 @@ export class CommissionService {
     type: COMMISSION_TYPE,
   ): Promise<CommissionEntity> {
     const cacheKey = REDIS_KEYS.USER_COMMISSION_PLAN(userId, type);
+    this.logger.info(
+      `[COMMISSION] getUserCommissionPlan called for ${userId}:${type}, cacheKey: ${cacheKey}`,
+    );
 
     // ✅ OPTIMIZED: Add error handling for Redis cache lookup
     // If Redis is slow or fails, we'll still try database (but log it)
     let commissionPlan: CommissionEntity | null = null;
+    const cacheStartTime = Date.now();
     try {
       commissionPlan = await this.cacheManager.get<CommissionEntity>(cacheKey);
+      const cacheTime = Date.now() - cacheStartTime;
+      this.logger.info(
+        `[COMMISSION] Cache lookup took ${cacheTime}ms for ${userId}:${type}, found: ${!!commissionPlan}`,
+      );
       if (commissionPlan) {
         // ✅ CRITICAL FIX: Check if slabs are loaded (they might not serialize properly)
         // If slabs are missing or empty, reload them from database
         if (!commissionPlan.slabs || commissionPlan.slabs.length === 0) {
-          this.logger.debug(
-            `Cache HIT but slabs missing for commission plan: ${userId}:${type} - Reloading slabs`,
+          this.logger.warn(
+            `[COMMISSION] ⚠️ Cache HIT but slabs missing for ${userId}:${type}, planId: ${commissionPlan.id} - Querying DB for slabs - THIS WILL TIMEOUT IF CONNECTION POOL EXHAUSTED`,
           );
+          const slabsQueryStart = Date.now();
           // Reload slabs from database
           commissionPlan.slabs = await this.commissionSlabRepository.find({
             where: {
@@ -75,6 +84,10 @@ export class CommissionService {
               minAmount: "ASC",
             },
           });
+          const slabsQueryTime = Date.now() - slabsQueryStart;
+          this.logger.info(
+            `[COMMISSION] Slabs query took ${slabsQueryTime}ms, found ${commissionPlan.slabs.length} slabs for planId: ${commissionPlan.id}`,
+          );
           // Update cache with slabs
           try {
             await this.cacheManager.set(cacheKey, commissionPlan, 3600);
@@ -103,6 +116,10 @@ export class CommissionService {
     }
 
     if (!commissionPlan) {
+      this.logger.warn(
+        `[COMMISSION] Cache MISS - Querying database for ${userId}:${type} - THIS WILL TIMEOUT IF CONNECTION POOL EXHAUSTED`,
+      );
+      const dbQueryStart = Date.now();
       const mapping = await this.userCommissionMappingRepository.findOne({
         where: {
           userId,
@@ -114,6 +131,10 @@ export class CommissionService {
             : "payoutCommission",
         ],
       });
+      const dbQueryTime = Date.now() - dbQueryStart;
+      this.logger.info(
+        `[COMMISSION] Database query took ${dbQueryTime}ms for ${userId}:${type}`,
+      );
 
       if (!mapping) {
         // Fallback to default commission or user's legacy rates

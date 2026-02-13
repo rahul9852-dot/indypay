@@ -64,12 +64,20 @@ export abstract class BasePayinService {
     // Try to use dynamic commission if service is available
     if (this.commissionService) {
       try {
+        this.logger.debug(
+          `[COMMISSION] Starting commission calculation for user ${user.id}, amount ${amount}`,
+        );
+        const commissionStartTime = Date.now();
         const commissionResult =
           await this.commissionService.calculateCommission(
             user.id,
             amount,
             COMMISSION_TYPE.PAYIN,
           );
+        const commissionTime = Date.now() - commissionStartTime;
+        this.logger.debug(
+          `[COMMISSION] Commission calculated in ${commissionTime}ms for user ${user.id}`,
+        );
 
         commissionAmount = commissionResult.commissionAmount;
         gstAmount = commissionResult.gstAmount;
