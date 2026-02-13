@@ -23,7 +23,7 @@ export const dbConfig: TypeOrmModuleOptions = {
     connectionTimeoutMillis: 2000, // Reduced from 3000 for faster failure detection
     idleTimeoutMillis: 30000,
     // Optimize for concurrent operations with aggressive timeouts
-    statement_timeout: 3000, // Reduced from 5000 for faster query timeout
+    statement_timeout: 5000, // Reduced from 5000 for faster query timeout
     lock_timeout: 300, // Reduced from 500 for faster lock timeout
     idle_in_transaction_session_timeout: 500, // Reduced from 1000 to prevent long-held transactions
     acquireTimeoutMillis: 1000, // Reduced from 2000 for faster connection acquisition

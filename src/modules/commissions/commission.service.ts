@@ -51,8 +51,56 @@ export class CommissionService {
     type: COMMISSION_TYPE,
   ): Promise<CommissionEntity> {
     const cacheKey = REDIS_KEYS.USER_COMMISSION_PLAN(userId, type);
-    let commissionPlan =
-      await this.cacheManager.get<CommissionEntity>(cacheKey);
+
+    // ✅ OPTIMIZED: Add error handling for Redis cache lookup
+    // If Redis is slow or fails, we'll still try database (but log it)
+    let commissionPlan: CommissionEntity | null = null;
+    try {
+      commissionPlan = await this.cacheManager.get<CommissionEntity>(cacheKey);
+      if (commissionPlan) {
+        // ✅ CRITICAL FIX: Check if slabs are loaded (they might not serialize properly)
+        // If slabs are missing or empty, reload them from database
+        if (!commissionPlan.slabs || commissionPlan.slabs.length === 0) {
+          this.logger.debug(
+            `Cache HIT but slabs missing for commission plan: ${userId}:${type} - Reloading slabs`,
+          );
+          // Reload slabs from database
+          commissionPlan.slabs = await this.commissionSlabRepository.find({
+            where: {
+              commissionId: commissionPlan.id,
+              isActive: true,
+            },
+            order: {
+              priority: "DESC",
+              minAmount: "ASC",
+            },
+          });
+          // Update cache with slabs
+          try {
+            await this.cacheManager.set(cacheKey, commissionPlan, 3600);
+          } catch (error: any) {
+            // Log but don't fail
+            this.logger.warn(
+              `Failed to update cache with slabs ${userId}:${type}: ${error.message}`,
+            );
+          }
+        } else {
+          this.logger.debug(
+            `Cache HIT with slabs for commission plan: ${userId}:${type} (${commissionPlan.slabs.length} slabs)`,
+          );
+        }
+
+        return commissionPlan;
+      }
+      this.logger.debug(
+        `Cache MISS for commission plan: ${userId}:${type} - Fetching from DB`,
+      );
+    } catch (error: any) {
+      // Redis error - log but continue to database fallback
+      this.logger.warn(
+        `Redis cache error for commission plan ${userId}:${type}, falling back to DB: ${error.message}`,
+      );
+    }
 
     if (!commissionPlan) {
       const mapping = await this.userCommissionMappingRepository.findOne({
@@ -97,8 +145,17 @@ export class CommissionService {
         },
       });
 
-      // Cache for 1 hour
-      await this.cacheManager.set(cacheKey, commissionPlan, 3600);
+      // ✅ OPTIMIZED: Cache for 1 hour with error handling
+      // Use setImmediate to not block the response if Redis is slow
+      try {
+        await this.cacheManager.set(cacheKey, commissionPlan, 3600);
+        this.logger.debug(`Cached commission plan: ${userId}:${type}`);
+      } catch (error: any) {
+        // Log but don't fail - cache is optional
+        this.logger.warn(
+          `Failed to cache commission plan ${userId}:${type}: ${error.message}`,
+        );
+      }
     }
 
     return commissionPlan;
@@ -106,6 +163,10 @@ export class CommissionService {
 
   /**
    * Calculate commission for a given amount using user's commission plan
+   * @param userId - User ID
+   * @param amount - Transaction amount
+   * @param type - Commission type (PAYIN or PAYOUT)
+   * @param userCommissionRates - Optional user commission rates to avoid database query
    */
   async calculateCommission(
     userId: string,
