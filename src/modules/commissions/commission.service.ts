@@ -120,21 +120,31 @@ export class CommissionService {
         `[COMMISSION] Cache MISS - Querying database for ${userId}:${type} - THIS WILL TIMEOUT IF CONNECTION POOL EXHAUSTED`,
       );
       const dbQueryStart = Date.now();
-      const mapping = await this.userCommissionMappingRepository.findOne({
-        where: {
-          userId,
-          isActive: true,
-        },
-        relations: [
-          type === COMMISSION_TYPE.PAYIN
-            ? "payinCommission"
-            : "payoutCommission",
-        ],
-      });
-      const dbQueryTime = Date.now() - dbQueryStart;
-      this.logger.info(
-        `[COMMISSION] Database query took ${dbQueryTime}ms for ${userId}:${type}`,
-      );
+      let mapping;
+      try {
+        mapping = await this.userCommissionMappingRepository.findOne({
+          where: {
+            userId,
+            isActive: true,
+          },
+          relations: [
+            type === COMMISSION_TYPE.PAYIN
+              ? "payinCommission"
+              : "payoutCommission",
+          ],
+        });
+        const dbQueryTime = Date.now() - dbQueryStart;
+        this.logger.info(
+          `[COMMISSION] ✅ Database query completed in ${dbQueryTime}ms for ${userId}:${type}`,
+        );
+      } catch (error: any) {
+        const dbQueryTime = Date.now() - dbQueryStart;
+        this.logger.error(
+          `[COMMISSION] ❌ Database query FAILED after ${dbQueryTime}ms for ${userId}:${type} - ${error.message}. Connection pool likely exhausted.`,
+        );
+        // Re-throw so the error propagates up
+        throw error;
+      }
 
       if (!mapping) {
         // Fallback to default commission or user's legacy rates
@@ -155,6 +165,10 @@ export class CommissionService {
       }
 
       // Load slabs
+      this.logger.info(
+        `[COMMISSION] Loading slabs for planId: ${commissionPlan.id}, userId: ${userId}`,
+      );
+      const slabsQueryStart = Date.now();
       commissionPlan.slabs = await this.commissionSlabRepository.find({
         where: {
           commissionId: commissionPlan.id,
@@ -165,16 +179,41 @@ export class CommissionService {
           minAmount: "ASC",
         },
       });
+      const slabsQueryTime = Date.now() - slabsQueryStart;
+      this.logger.info(
+        `[COMMISSION] Slabs loaded in ${slabsQueryTime}ms, found ${commissionPlan.slabs.length} slabs for planId: ${commissionPlan.id}`,
+      );
 
-      // ✅ OPTIMIZED: Cache for 1 hour with error handling
-      // Use setImmediate to not block the response if Redis is slow
+      // ✅ CRITICAL: Cache for 1 hour - MUST succeed to avoid future timeouts
+      this.logger.info(
+        `[COMMISSION] Attempting to cache commission plan ${userId}:${type} with ${commissionPlan.slabs.length} slabs`,
+      );
+      const cacheSetStart = Date.now();
       try {
-        await this.cacheManager.set(cacheKey, commissionPlan, 3600);
-        this.logger.debug(`Cached commission plan: ${userId}:${type}`);
+        // ✅ CRITICAL: Ensure slabs are properly serialized (TypeORM entities don't serialize relations well)
+        const planToCache = {
+          ...commissionPlan,
+          slabs: commissionPlan.slabs.map((slab) => ({
+            id: slab.id,
+            commissionId: slab.commissionId,
+            minAmount: slab.minAmount,
+            maxAmount: slab.maxAmount,
+            chargeType: slab.chargeType,
+            chargeValue: slab.chargeValue,
+            gstPercentage: slab.gstPercentage,
+            priority: slab.priority,
+            isActive: slab.isActive,
+          })),
+        };
+        await this.cacheManager.set(cacheKey, planToCache, 36000);
+        const cacheSetTime = Date.now() - cacheSetStart;
+        this.logger.info(
+          `[COMMISSION] ✅ Successfully cached commission plan ${userId}:${type} in ${cacheSetTime}ms with ${commissionPlan.slabs.length} slabs`,
+        );
       } catch (error: any) {
         // Log but don't fail - cache is optional
-        this.logger.warn(
-          `Failed to cache commission plan ${userId}:${type}: ${error.message}`,
+        this.logger.error(
+          `[COMMISSION] ❌ FAILED to cache commission plan ${userId}:${type}: ${error.message} - This will cause future timeouts!`,
         );
       }
     }
