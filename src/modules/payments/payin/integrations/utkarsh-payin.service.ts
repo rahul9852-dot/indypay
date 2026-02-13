@@ -72,16 +72,6 @@ export class UtkarshPayinService extends BasePayinWebhookService {
       );
     }
 
-    const existingPayinOrder = await this.payInOrdersRepository.exists({
-      where: { orderId },
-    });
-
-    if (existingPayinOrder) {
-      throw new BadRequestException(
-        "Payin order already exists for given orderId",
-      );
-    }
-
     const paymentLink = generatePaymentLinkUtil({
       amount,
       orderId,

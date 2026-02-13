@@ -96,14 +96,31 @@ export class ApiKeyGuard implements CanActivate {
 
       const userId = apiKeyEntity.user.id;
 
-      const userWhitelistIps = await this.userWhitelistIpsRepository.find({
-        where: { user: { id: userId } },
-      });
+      // ✅ OPTIMIZED: Cache IP whitelist to avoid database query on every request
+      const ipWhitelistCacheKey = `user_whitelist_ips:${userId}`;
+      let userWhitelistIps =
+        await this.cacheManager.get<Array<{ ipAddress: string }>>(
+          ipWhitelistCacheKey,
+        );
 
-      // this.logger.info(
-      //   `user whitelist ips: ${LoggerPlaceHolder.Json}`,
-      //   userWhitelistIps.map((ip) => ip.ipAddress),
-      // );
+      if (!userWhitelistIps) {
+        // Cache miss - fetch from database
+        const dbWhitelistIps = await this.userWhitelistIpsRepository.find({
+          where: { user: { id: userId } },
+          select: ["ipAddress"], // Only select what we need
+        });
+
+        userWhitelistIps = dbWhitelistIps.map((ip) => ({
+          ipAddress: ip.ipAddress,
+        }));
+
+        // Cache for 1 hour (IP whitelist doesn't change frequently)
+        await this.cacheManager.set(
+          ipWhitelistCacheKey,
+          userWhitelistIps,
+          3600,
+        );
+      }
 
       const isIpWhitelisted = userWhitelistIps.some(
         (whitelistIp) => whitelistIp.ipAddress === requestIp,

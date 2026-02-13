@@ -114,10 +114,10 @@ export abstract class BasePayinService {
     }
 
     // Wrap DB operations in a transaction
-    return await this.dataSource.transaction(async (manager) => {
-      // Create payin order
+    const result = await this.dataSource.transaction(async (manager) => {
+      // ✅ OPTIMIZED: Create entity with only userId (not full user object) for faster processing
       const payinOrder = this.payInOrdersRepository.create({
-        user,
+        userId: user.id, // Use userId directly instead of full user object
         amount,
         email,
         name,
@@ -137,18 +137,13 @@ export abstract class BasePayinService {
       });
       const savedPayinOrder = await manager.save(payinOrder);
 
-      // Create transaction
+      // ✅ OPTIMIZED: Create transaction with only IDs (not full objects)
       const transaction = this.transactionsRepository.create({
-        user,
-        payInOrder: savedPayinOrder,
+        userId: user.id, // Use userId directly
+        payInOrderId: savedPayinOrder.id, // Use payInOrderId directly
         transactionType: PAYMENT_TYPE.PAYIN,
       });
       await manager.save(transaction);
-
-      this.logger.info(
-        `PAYIN CREATED: ${LoggerPlaceHolder.Json}`,
-        createPayinTransactionDto,
-      );
 
       return {
         orderId,
@@ -156,6 +151,14 @@ export abstract class BasePayinService {
         message: "Payment Link Generated successfully",
       };
     });
+
+    // ✅ OPTIMIZED: Move logging outside transaction to reduce transaction duration
+    this.logger.info(
+      `PAYIN CREATED: ${LoggerPlaceHolder.Json}`,
+      createPayinTransactionDto,
+    );
+
+    return result;
   }
 
   /**

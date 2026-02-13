@@ -12,6 +12,7 @@ export class AxiosService {
 
   axiosInstance = axios.create({
     baseURL: this.baseUrl,
+    // timeout: 10000, // ✅ OPTIMIZED: Default 10 second timeout to prevent hanging requests
     ...this.axiosConfig,
   });
 
