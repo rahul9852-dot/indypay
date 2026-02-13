@@ -169,10 +169,10 @@ export class UtkarshPayinService extends BasePayinWebhookService {
           REDIS_KEYS.PAYMENT_STATUS(payinOrder.orderId),
         );
 
-        await this.safeUpdateWalletBalance(queryRunner, user.id, (wallet) => {
-          wallet.totalCollections =
-            (wallet.totalCollections ? +wallet.totalCollections : 0) + +amount;
-        });
+        // await this.safeUpdateWalletBalance(queryRunner, user.id, (wallet) => {
+        //   wallet.totalCollections =
+        //     (wallet.totalCollections ? +wallet.totalCollections : 0) + +amount;
+        // });
 
         // await this.safeUpdatePayinWalletBalance(queryRunner, user.id, (wallet) => {
         //   wallet.totalPayinBalance =
