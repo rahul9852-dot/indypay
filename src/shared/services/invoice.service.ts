@@ -207,7 +207,7 @@ export class InvoiceService {
     <body>
         <div class="invoice-container">
         <div class="header">
-            <div class="company-name">PayBolt Technologies</div>
+            <div class="company-name">Rupeeflow Finance Private Limited</div>
             <h2>Settlement {{status}} Invoice</h2>
         </div>
         <div class="content">

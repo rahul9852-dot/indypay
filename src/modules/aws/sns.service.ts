@@ -50,7 +50,7 @@ export class SNSService {
           },
           "AWS.SNS.SMS.SenderID": {
             DataType: "String",
-            StringValue: "PayBolt", // Your sender ID
+            StringValue: "Rupeeflow", // Your sender ID
           },
         },
       };

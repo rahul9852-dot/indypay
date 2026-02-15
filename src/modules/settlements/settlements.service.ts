@@ -746,7 +746,7 @@ export class SettlementsService {
             country: userAddress.country,
           },
           shipping: {
-            name: "PayBolt Technologies Pvt. Ltd.",
+            name: "Rupeeflow Finance Private Limited",
             street: "#1068, 3rd Floor, 1st Stage, Kumaraswamy Layout",
             city: "Bengaluru",
             state: "Karnataka",
@@ -763,7 +763,7 @@ export class SettlementsService {
 
       this.emailService.sendEmail(
         settlement.user.email,
-        `Settlement ${status} - PayBolt`,
+        `Settlement ${status} - Rupeeflow`,
         `Your settlement request for ₹${settlement.amountAfterDeduction} has been ${status.toLowerCase()}.`,
         [
           {

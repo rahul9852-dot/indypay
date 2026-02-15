@@ -195,12 +195,12 @@ export class KycService {
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f9f9f9;">
         <div style="max-width: 600px; margin: 20px auto; padding: 20px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
           <div style="text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #4CAF50;">
-            PayBolt
+            Rupeeflow
           </div>
           <h2 style="color: #333; text-align: center;">Dear User,</h2>
           <p style="text-align: center;">Your KYC documents have been successfully submitted. Verification is pending!</p>
           <p style="text-align: center;">Thank you for your patience.</p>
-          <p style="text-align: center; margin-top: 30px; color: #777;">Regards,<br>PayBolt Support</p>
+          <p style="text-align: center; margin-top: 30px; color: #777;">Regards,<br>Rupeeflow Support</p>
         </div>
       </body>
     </html>

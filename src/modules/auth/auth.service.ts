@@ -752,7 +752,7 @@ export class AuthService {
 
     const smsSent = await this.snsService.sendSMS(
       formattedPhone,
-      `Your PayBolt OTP to reset your password is: ${mobileOtp}`,
+      `Your Rupeeflow OTP to reset your password is: ${mobileOtp}`,
     );
     if (!smsSent) {
       throw new BadRequestException(
@@ -1376,7 +1376,7 @@ export class AuthService {
 
     const smsSent = await this.snsService.sendSMS(
       formattedPhone,
-      `Your PayBolt verification code is: ${mobileOtp}`,
+      `Your Rupeeflow verification code is: ${mobileOtp}`,
     );
 
     if (!smsSent) {
@@ -1385,19 +1385,19 @@ export class AuthService {
       );
     }
 
-    const subject = `Let's verify your email with PayBolt!`;
+    const subject = `Let's verify your email with Rupeeflow!`;
     const body = `
         <html>
           <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
               <div style="text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 20px;">
-                PayBolt
+                Rupeeflow
               </div>
               <h2 style="color: #4CAF50; text-align: center;">Hey there,</h2>
               <p style="text-align: center;">Great to see you aboard! Let's quickly verify your email to get you started. Your verification code is:</p>
               <h3 style="background-color: #f0f0f0; padding: 10px; border-radius: 5px; text-align: center;">${emailOtp}</h3>
               <p style="text-align: center;">Remember, this code is valid only for the next 10 minutes. We can't wait for you to explore all the amazing features we have to offer!</p>
-              <p style="text-align: center; margin-top: 30px;">Regards,<br>Paybolt Support</p>
+              <p style="text-align: center; margin-top: 30px;">Regards,<br>Rupeeflow Support</p>
             </div>
           </body>
         </html>
