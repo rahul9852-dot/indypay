@@ -8,7 +8,6 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
-import Redis from "ioredis";
 import { CommissionPlanCacheDTO } from "./dto/assign-commission-to-user.dto";
 import { CommissionEntity } from "@/entities/commission.entity";
 import { CommissionSlabEntity } from "@/entities/commission-slab.entity";
@@ -43,7 +42,6 @@ export class CommissionService {
     @InjectRepository(UsersEntity)
     private readonly userRepository: Repository<UsersEntity>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-    @Inject("REDIS_CLIENT") private readonly redisClient: Redis,
   ) {}
 
   /**
@@ -229,12 +227,9 @@ export class CommissionService {
     type: COMMISSION_TYPE,
   ): Promise<CommissionPlanCacheDTO> {
     const cacheKey = REDIS_KEYS.USER_COMMISSION_PLAN(userId, type);
-    const lockKey = `lock:${cacheKey}`;
-    const TTL = 3600;
+    const TTL = 86400; // 1 day
 
-    this.logger.info(`[COMMISSION] Fetching plan ${userId}:${type}`);
-
-    // 1️⃣ FAST PATH — CACHE HIT
+    // 1️⃣ TRY CACHE FIRST (simple read - no locks needed!)
     try {
       const cached =
         await this.cacheManager.get<CommissionPlanCacheDTO>(cacheKey);
@@ -243,115 +238,77 @@ export class CommissionService {
 
         return cached;
       }
-    } catch (err) {
-      this.logger.warn(`[COMMISSION] Redis read failed: ${err.message}`);
+    } catch (err: any) {
+      // Redis failed? No problem, just query DB
+      this.logger.warn(
+        `[COMMISSION] Cache read failed, using DB: ${err.message}`,
+      );
     }
 
-    // 2️⃣ ACQUIRE LOCK (prevent DB flood)
-    const lockAcquired = await this.acquireLock(lockKey);
+    // 2️⃣ CACHE MISS → QUERY DB
+    // Multiple requests hitting at once? That's fine! They'll all query DB,
+    // first one to finish populates cache, others will use it next time.
+    this.logger.info(`[COMMISSION] Cache MISS → DB ${userId}:${type}`);
 
-    if (!lockAcquired) {
-      // another request is already fetching DB
-      this.logger.warn(`[COMMISSION] Waiting for cache fill ${userId}:${type}`);
+    const mapping = await this.userCommissionMappingRepository.findOne({
+      where: { userId, isActive: true },
+      relations: [
+        type === COMMISSION_TYPE.PAYIN ? "payinCommission" : "payoutCommission",
+      ],
+    });
 
-      await new Promise((res) => setTimeout(res, 120));
-
-      const retryCache =
-        await this.cacheManager.get<CommissionPlanCacheDTO>(cacheKey);
-      if (retryCache && retryCache.slabs?.length) {
-        return retryCache;
-      }
+    if (!mapping) {
+      throw new NotFoundException(
+        `No commission plan mapped for user ${userId}`,
+      );
     }
 
+    const commission =
+      type === COMMISSION_TYPE.PAYIN
+        ? mapping.payinCommission
+        : mapping.payoutCommission;
+
+    if (!commission || !commission.isActive) {
+      throw new NotFoundException(`Inactive commission plan for ${userId}`);
+    }
+
+    // Load slabs
+    const slabs = await this.commissionSlabRepository.find({
+      where: { commissionId: commission.id, isActive: true },
+      order: { priority: "DESC", minAmount: "ASC" },
+    });
+
+    if (!slabs.length) {
+      throw new Error(`No slabs found for commission ${commission.id}`);
+    }
+
+    // Build DTO
+    const dto: CommissionPlanCacheDTO = {
+      id: commission.id,
+      isActive: commission.isActive,
+      slabs: slabs.map((s) => ({
+        id: s.id,
+        commissionId: s.commissionId,
+        minAmount: s.minAmount,
+        maxAmount: s.maxAmount,
+        chargeType: s.chargeType,
+        chargeValue: s.chargeValue,
+        gstPercentage: s.gstPercentage,
+        priority: s.priority,
+        isActive: s.isActive,
+      })),
+    };
+
+    // 3️⃣ WRITE TO CACHE (best effort - don't block if it fails)
     try {
-      // 3️⃣ DOUBLE CHECK CACHE after lock
-      const retryCache =
-        await this.cacheManager.get<CommissionPlanCacheDTO>(cacheKey);
-      if (retryCache && retryCache.slabs?.length) {
-        return retryCache;
-      }
-
-      // 4️⃣ DB QUERY
-      this.logger.warn(`[COMMISSION] Cache MISS → DB ${userId}:${type}`);
-
-      const mapping = await this.userCommissionMappingRepository.findOne({
-        where: { userId, isActive: true },
-        relations: [
-          type === COMMISSION_TYPE.PAYIN
-            ? "payinCommission"
-            : "payoutCommission",
-        ],
-      });
-
-      if (!mapping) {
-        throw new NotFoundException(
-          `No commission plan mapped for user ${userId}`,
-        );
-      }
-
-      const commission =
-        type === COMMISSION_TYPE.PAYIN
-          ? mapping.payinCommission
-          : mapping.payoutCommission;
-
-      if (!commission || !commission.isActive) {
-        throw new NotFoundException(`Inactive commission plan for ${userId}`);
-      }
-
-      // 5️⃣ LOAD SLABS
-      const slabs = await this.commissionSlabRepository.find({
-        where: { commissionId: commission.id, isActive: true },
-        order: { priority: "DESC", minAmount: "ASC" },
-      });
-
-      if (!slabs.length) {
-        throw new Error(`No slabs found for commission ${commission.id}`);
-      }
-
-      // 6️⃣ BUILD DTO
-      const dto: CommissionPlanCacheDTO = {
-        id: commission.id,
-        isActive: commission.isActive,
-        slabs: slabs.map((s) => ({
-          id: s.id,
-          commissionId: s.commissionId,
-          minAmount: s.minAmount,
-          maxAmount: s.maxAmount,
-          chargeType: s.chargeType,
-          chargeValue: s.chargeValue,
-          gstPercentage: s.gstPercentage,
-          priority: s.priority,
-          isActive: s.isActive,
-        })),
-      };
-
-      // 7️⃣ CACHE WRITE
-      try {
-        await this.cacheManager.set(cacheKey, dto, TTL);
-        this.logger.info(`[COMMISSION] Cached ${userId}:${type}`);
-      } catch (err) {
-        this.logger.error(`[COMMISSION] Cache write failed: ${err.message}`);
-      }
-
-      return dto;
-    } finally {
-      // 8️⃣ RELEASE LOCK
-      if (lockAcquired) {
-        await this.releaseLock(lockKey);
-      }
+      await this.cacheManager.set(cacheKey, dto, TTL);
+      this.logger.debug(`[COMMISSION] Cached ${userId}:${type}`);
+    } catch (err: any) {
+      // Cache write failed? No problem, we still have the data
+      this.logger.warn(`[COMMISSION] Cache write failed: ${err.message}`);
     }
-  }
 
-  private async acquireLock(lockKey: string, ttl = 5): Promise<boolean> {
-    // ioredis: SET key value NX EX seconds
-    // Returns 'OK' if lock acquired, null if key already exists
-    const result = await this.redisClient.set(lockKey, "1", "EX", ttl, "NX");
-
-    return result === "OK";
-  }
-
-  private async releaseLock(lockKey: string): Promise<void> {
-    await this.redisClient.del(lockKey);
+    return dto;
   }
 
   /**
