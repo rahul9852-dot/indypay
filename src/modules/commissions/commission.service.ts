@@ -8,6 +8,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
+import { CommissionPlanCacheDTO } from "./dto/assign-commission-to-user.dto";
 import { CommissionEntity } from "@/entities/commission.entity";
 import { CommissionSlabEntity } from "@/entities/commission-slab.entity";
 import { UserCommissionMappingEntity } from "@/entities/user-commission-mapping.entity";
@@ -44,181 +45,316 @@ export class CommissionService {
   ) {}
 
   /**
+   * Get the underlying Redis client from the cache manager store
+   */
+  private get redisClient() {
+    return (this.cacheManager.store as any).client;
+  }
+
+  /**
    * Get user's commission plan for payin/payout (with caching)
    */
+  // async getUserCommissionPlan(
+  //   userId: string,
+  //   type: COMMISSION_TYPE,
+  // ): Promise<CommissionEntity> {
+  //   const cacheKey = REDIS_KEYS.USER_COMMISSION_PLAN(userId, type);
+  //   this.logger.info(
+  //     `[COMMISSION] getUserCommissionPlan called for ${userId}:${type}, cacheKey: ${cacheKey}`,
+  //   );
+
+  //   // ✅ OPTIMIZED: Add error handling for Redis cache lookup
+  //   // If Redis is slow or fails, we'll still try database (but log it)
+  //   let commissionPlan: CommissionEntity | null = null;
+  //   const cacheStartTime = Date.now();
+  //   try {
+  //     commissionPlan = await this.cacheManager.get<CommissionEntity>(cacheKey);
+  //     const cacheTime = Date.now() - cacheStartTime;
+  //     this.logger.info(
+  //       `[COMMISSION] Cache lookup took ${cacheTime}ms for ${userId}:${type}, found: ${!!commissionPlan}`,
+  //     );
+  //     if (commissionPlan) {
+  //       // ✅ CRITICAL FIX: Check if slabs are loaded (they might not serialize properly)
+  //       // If slabs are missing or empty, reload them from database
+  //       if (!commissionPlan.slabs || commissionPlan.slabs.length === 0) {
+  //         this.logger.warn(
+  //           `[COMMISSION] ⚠️ Cache HIT but slabs missing for ${userId}:${type}, planId: ${commissionPlan.id} - Querying DB for slabs - THIS WILL TIMEOUT IF CONNECTION POOL EXHAUSTED`,
+  //         );
+  //         const slabsQueryStart = Date.now();
+  //         // Reload slabs from database
+  //         commissionPlan.slabs = await this.commissionSlabRepository.find({
+  //           where: {
+  //             commissionId: commissionPlan.id,
+  //             isActive: true,
+  //           },
+  //           order: {
+  //             priority: "DESC",
+  //             minAmount: "ASC",
+  //           },
+  //         });
+  //         const slabsQueryTime = Date.now() - slabsQueryStart;
+  //         this.logger.info(
+  //           `[COMMISSION] Slabs query took ${slabsQueryTime}ms, found ${commissionPlan.slabs.length} slabs for planId: ${commissionPlan.id}`,
+  //         );
+  //         // Update cache with slabs
+  //         try {
+  //           await this.cacheManager.set(cacheKey, commissionPlan, 36000);
+  //         } catch (error: any) {
+  //           // Log but don't fail
+  //           this.logger.warn(
+  //             `Failed to update cache with slabs ${userId}:${type}: ${error.message}`,
+  //           );
+  //         }
+  //       } else {
+  //         this.logger.debug(
+  //           `Cache HIT with slabs for commission plan: ${userId}:${type} (${commissionPlan.slabs.length} slabs)`,
+  //         );
+  //       }
+
+  //       return commissionPlan;
+  //     }
+  //     this.logger.debug(
+  //       `Cache MISS for commission plan: ${userId}:${type} - Fetching from DB`,
+  //     );
+  //   } catch (error: any) {
+  //     // Redis error - log but continue to database fallback
+  //     this.logger.warn(
+  //       `Redis cache error for commission plan ${userId}:${type}, falling back to DB: ${error.message}`,
+  //     );
+  //   }
+
+  //   if (!commissionPlan) {
+  //     this.logger.warn(
+  //       `[COMMISSION] Cache MISS - Querying database for ${userId}:${type} - THIS WILL TIMEOUT IF CONNECTION POOL EXHAUSTED`,
+  //     );
+  //     const dbQueryStart = Date.now();
+  //     let mapping;
+  //     try {
+  //       mapping = await this.userCommissionMappingRepository.findOne({
+  //         where: {
+  //           userId,
+  //           isActive: true,
+  //         },
+  //         relations: [
+  //           type === COMMISSION_TYPE.PAYIN
+  //             ? "payinCommission"
+  //             : "payoutCommission",
+  //         ],
+  //       });
+  //       const dbQueryTime = Date.now() - dbQueryStart;
+  //       this.logger.info(
+  //         `[COMMISSION] ✅ Database query completed in ${dbQueryTime}ms for ${userId}:${type}`,
+  //       );
+  //     } catch (error: any) {
+  //       const dbQueryTime = Date.now() - dbQueryStart;
+  //       this.logger.error(
+  //         `[COMMISSION] ❌ Database query FAILED after ${dbQueryTime}ms for ${userId}:${type} - ${error.message}. Connection pool likely exhausted.`,
+  //       );
+  //       // Re-throw so the error propagates up
+  //       throw error;
+  //     }
+
+  //     if (!mapping) {
+  //       // Fallback to default commission or user's legacy rates
+  //       throw new NotFoundException(
+  //         `No commission plan found for user ${userId} for type ${type}. Please assign a commission plan.`,
+  //       );
+  //     }
+
+  //     commissionPlan =
+  //       type === COMMISSION_TYPE.PAYIN
+  //         ? mapping.payinCommission
+  //         : mapping.payoutCommission;
+
+  //     if (!commissionPlan || !commissionPlan.isActive) {
+  //       throw new NotFoundException(
+  //         `Commission plan not found or inactive for user ${userId}`,
+  //       );
+  //     }
+
+  //     // Load slabs
+  //     this.logger.info(
+  //       `[COMMISSION] Loading slabs for planId: ${commissionPlan.id}, userId: ${userId}`,
+  //     );
+  //     const slabsQueryStart = Date.now();
+  //     commissionPlan.slabs = await this.commissionSlabRepository.find({
+  //       where: {
+  //         commissionId: commissionPlan.id,
+  //         isActive: true,
+  //       },
+  //       order: {
+  //         priority: "DESC",
+  //         minAmount: "ASC",
+  //       },
+  //     });
+  //     const slabsQueryTime = Date.now() - slabsQueryStart;
+  //     this.logger.info(
+  //       `[COMMISSION] Slabs loaded in ${slabsQueryTime}ms, found ${commissionPlan.slabs.length} slabs for planId: ${commissionPlan.id}`,
+  //     );
+
+  //     // ✅ CRITICAL: Cache for 1 hour - MUST succeed to avoid future timeouts
+  //     this.logger.info(
+  //       `[COMMISSION] Attempting to cache commission plan ${userId}:${type} with ${commissionPlan.slabs.length} slabs`,
+  //     );
+  //     const cacheSetStart = Date.now();
+  //     try {
+  //       // ✅ CRITICAL: Ensure slabs are properly serialized (TypeORM entities don't serialize relations well)
+  //       const planToCache = {
+  //         ...commissionPlan,
+  //         slabs: commissionPlan.slabs.map((slab) => ({
+  //           id: slab.id,
+  //           commissionId: slab.commissionId,
+  //           minAmount: slab.minAmount,
+  //           maxAmount: slab.maxAmount,
+  //           chargeType: slab.chargeType,
+  //           chargeValue: slab.chargeValue,
+  //           gstPercentage: slab.gstPercentage,
+  //           priority: slab.priority,
+  //           isActive: slab.isActive,
+  //         })),
+  //       };
+  //       await this.cacheManager.set(cacheKey, planToCache, 36000);
+  //       const cacheSetTime = Date.now() - cacheSetStart;
+  //       this.logger.info(
+  //         `[COMMISSION] ✅ Successfully cached commission plan ${userId}:${type} in ${cacheSetTime}ms with ${commissionPlan.slabs.length} slabs`,
+  //       );
+  //     } catch (error: any) {
+  //       // Log but don't fail - cache is optional
+  //       this.logger.error(
+  //         `[COMMISSION] ❌ FAILED to cache commission plan ${userId}:${type}: ${error.message} - This will cause future timeouts!`,
+  //       );
+  //     }
+  //   }
+
+  //   return commissionPlan;
+  // }
+
   async getUserCommissionPlan(
     userId: string,
     type: COMMISSION_TYPE,
-  ): Promise<CommissionEntity> {
+  ): Promise<CommissionPlanCacheDTO> {
     const cacheKey = REDIS_KEYS.USER_COMMISSION_PLAN(userId, type);
-    this.logger.info(
-      `[COMMISSION] getUserCommissionPlan called for ${userId}:${type}, cacheKey: ${cacheKey}`,
-    );
+    const lockKey = `lock:${cacheKey}`;
+    const TTL = 3600;
 
-    // ✅ OPTIMIZED: Add error handling for Redis cache lookup
-    // If Redis is slow or fails, we'll still try database (but log it)
-    let commissionPlan: CommissionEntity | null = null;
-    const cacheStartTime = Date.now();
+    this.logger.info(`[COMMISSION] Fetching plan ${userId}:${type}`);
+
+    // 1️⃣ FAST PATH — CACHE HIT
     try {
-      commissionPlan = await this.cacheManager.get<CommissionEntity>(cacheKey);
-      const cacheTime = Date.now() - cacheStartTime;
-      this.logger.info(
-        `[COMMISSION] Cache lookup took ${cacheTime}ms for ${userId}:${type}, found: ${!!commissionPlan}`,
-      );
-      if (commissionPlan) {
-        // ✅ CRITICAL FIX: Check if slabs are loaded (they might not serialize properly)
-        // If slabs are missing or empty, reload them from database
-        if (!commissionPlan.slabs || commissionPlan.slabs.length === 0) {
-          this.logger.warn(
-            `[COMMISSION] ⚠️ Cache HIT but slabs missing for ${userId}:${type}, planId: ${commissionPlan.id} - Querying DB for slabs - THIS WILL TIMEOUT IF CONNECTION POOL EXHAUSTED`,
-          );
-          const slabsQueryStart = Date.now();
-          // Reload slabs from database
-          commissionPlan.slabs = await this.commissionSlabRepository.find({
-            where: {
-              commissionId: commissionPlan.id,
-              isActive: true,
-            },
-            order: {
-              priority: "DESC",
-              minAmount: "ASC",
-            },
-          });
-          const slabsQueryTime = Date.now() - slabsQueryStart;
-          this.logger.info(
-            `[COMMISSION] Slabs query took ${slabsQueryTime}ms, found ${commissionPlan.slabs.length} slabs for planId: ${commissionPlan.id}`,
-          );
-          // Update cache with slabs
-          try {
-            await this.cacheManager.set(cacheKey, commissionPlan, 3600);
-          } catch (error: any) {
-            // Log but don't fail
-            this.logger.warn(
-              `Failed to update cache with slabs ${userId}:${type}: ${error.message}`,
-            );
-          }
-        } else {
-          this.logger.debug(
-            `Cache HIT with slabs for commission plan: ${userId}:${type} (${commissionPlan.slabs.length} slabs)`,
-          );
-        }
+      const cached =
+        await this.cacheManager.get<CommissionPlanCacheDTO>(cacheKey);
+      if (cached && cached.slabs?.length) {
+        this.logger.debug(`[COMMISSION] Cache HIT ${userId}:${type}`);
 
-        return commissionPlan;
+        return cached;
       }
-      this.logger.debug(
-        `Cache MISS for commission plan: ${userId}:${type} - Fetching from DB`,
-      );
-    } catch (error: any) {
-      // Redis error - log but continue to database fallback
-      this.logger.warn(
-        `Redis cache error for commission plan ${userId}:${type}, falling back to DB: ${error.message}`,
-      );
+    } catch (err) {
+      this.logger.warn(`[COMMISSION] Redis read failed: ${err.message}`);
     }
 
-    if (!commissionPlan) {
-      this.logger.warn(
-        `[COMMISSION] Cache MISS - Querying database for ${userId}:${type} - THIS WILL TIMEOUT IF CONNECTION POOL EXHAUSTED`,
-      );
-      const dbQueryStart = Date.now();
-      let mapping;
-      try {
-        mapping = await this.userCommissionMappingRepository.findOne({
-          where: {
-            userId,
-            isActive: true,
-          },
-          relations: [
-            type === COMMISSION_TYPE.PAYIN
-              ? "payinCommission"
-              : "payoutCommission",
-          ],
-        });
-        const dbQueryTime = Date.now() - dbQueryStart;
-        this.logger.info(
-          `[COMMISSION] ✅ Database query completed in ${dbQueryTime}ms for ${userId}:${type}`,
-        );
-      } catch (error: any) {
-        const dbQueryTime = Date.now() - dbQueryStart;
-        this.logger.error(
-          `[COMMISSION] ❌ Database query FAILED after ${dbQueryTime}ms for ${userId}:${type} - ${error.message}. Connection pool likely exhausted.`,
-        );
-        // Re-throw so the error propagates up
-        throw error;
+    // 2️⃣ ACQUIRE LOCK (prevent DB flood)
+    const lockAcquired = await this.acquireLock(lockKey);
+
+    if (!lockAcquired) {
+      // another request is already fetching DB
+      this.logger.warn(`[COMMISSION] Waiting for cache fill ${userId}:${type}`);
+
+      await new Promise((res) => setTimeout(res, 120));
+
+      const retryCache =
+        await this.cacheManager.get<CommissionPlanCacheDTO>(cacheKey);
+      if (retryCache && retryCache.slabs?.length) {
+        return retryCache;
       }
+    }
+
+    try {
+      // 3️⃣ DOUBLE CHECK CACHE after lock
+      const retryCache =
+        await this.cacheManager.get<CommissionPlanCacheDTO>(cacheKey);
+      if (retryCache && retryCache.slabs?.length) {
+        return retryCache;
+      }
+
+      // 4️⃣ DB QUERY
+      this.logger.warn(`[COMMISSION] Cache MISS → DB ${userId}:${type}`);
+
+      const mapping = await this.userCommissionMappingRepository.findOne({
+        where: { userId, isActive: true },
+        relations: [
+          type === COMMISSION_TYPE.PAYIN
+            ? "payinCommission"
+            : "payoutCommission",
+        ],
+      });
 
       if (!mapping) {
-        // Fallback to default commission or user's legacy rates
         throw new NotFoundException(
-          `No commission plan found for user ${userId} for type ${type}. Please assign a commission plan.`,
+          `No commission plan mapped for user ${userId}`,
         );
       }
 
-      commissionPlan =
+      const commission =
         type === COMMISSION_TYPE.PAYIN
           ? mapping.payinCommission
           : mapping.payoutCommission;
 
-      if (!commissionPlan || !commissionPlan.isActive) {
-        throw new NotFoundException(
-          `Commission plan not found or inactive for user ${userId}`,
-        );
+      if (!commission || !commission.isActive) {
+        throw new NotFoundException(`Inactive commission plan for ${userId}`);
       }
 
-      // Load slabs
-      this.logger.info(
-        `[COMMISSION] Loading slabs for planId: ${commissionPlan.id}, userId: ${userId}`,
-      );
-      const slabsQueryStart = Date.now();
-      commissionPlan.slabs = await this.commissionSlabRepository.find({
-        where: {
-          commissionId: commissionPlan.id,
-          isActive: true,
-        },
-        order: {
-          priority: "DESC",
-          minAmount: "ASC",
-        },
+      // 5️⃣ LOAD SLABS
+      const slabs = await this.commissionSlabRepository.find({
+        where: { commissionId: commission.id, isActive: true },
+        order: { priority: "DESC", minAmount: "ASC" },
       });
-      const slabsQueryTime = Date.now() - slabsQueryStart;
-      this.logger.info(
-        `[COMMISSION] Slabs loaded in ${slabsQueryTime}ms, found ${commissionPlan.slabs.length} slabs for planId: ${commissionPlan.id}`,
-      );
 
-      // ✅ CRITICAL: Cache for 1 hour - MUST succeed to avoid future timeouts
-      this.logger.info(
-        `[COMMISSION] Attempting to cache commission plan ${userId}:${type} with ${commissionPlan.slabs.length} slabs`,
-      );
-      const cacheSetStart = Date.now();
+      if (!slabs.length) {
+        throw new Error(`No slabs found for commission ${commission.id}`);
+      }
+
+      // 6️⃣ BUILD DTO
+      const dto: CommissionPlanCacheDTO = {
+        id: commission.id,
+        isActive: commission.isActive,
+        slabs: slabs.map((s) => ({
+          id: s.id,
+          commissionId: s.commissionId,
+          minAmount: s.minAmount,
+          maxAmount: s.maxAmount,
+          chargeType: s.chargeType,
+          chargeValue: s.chargeValue,
+          gstPercentage: s.gstPercentage,
+          priority: s.priority,
+          isActive: s.isActive,
+        })),
+      };
+
+      // 7️⃣ CACHE WRITE
       try {
-        // ✅ CRITICAL: Ensure slabs are properly serialized (TypeORM entities don't serialize relations well)
-        const planToCache = {
-          ...commissionPlan,
-          slabs: commissionPlan.slabs.map((slab) => ({
-            id: slab.id,
-            commissionId: slab.commissionId,
-            minAmount: slab.minAmount,
-            maxAmount: slab.maxAmount,
-            chargeType: slab.chargeType,
-            chargeValue: slab.chargeValue,
-            gstPercentage: slab.gstPercentage,
-            priority: slab.priority,
-            isActive: slab.isActive,
-          })),
-        };
-        await this.cacheManager.set(cacheKey, planToCache, 36000);
-        const cacheSetTime = Date.now() - cacheSetStart;
-        this.logger.info(
-          `[COMMISSION] ✅ Successfully cached commission plan ${userId}:${type} in ${cacheSetTime}ms with ${commissionPlan.slabs.length} slabs`,
-        );
-      } catch (error: any) {
-        // Log but don't fail - cache is optional
-        this.logger.error(
-          `[COMMISSION] ❌ FAILED to cache commission plan ${userId}:${type}: ${error.message} - This will cause future timeouts!`,
-        );
+        await this.cacheManager.set(cacheKey, dto, TTL);
+        this.logger.info(`[COMMISSION] Cached ${userId}:${type}`);
+      } catch (err) {
+        this.logger.error(`[COMMISSION] Cache write failed: ${err.message}`);
+      }
+
+      return dto;
+    } finally {
+      // 8️⃣ RELEASE LOCK
+      if (lockAcquired) {
+        await this.releaseLock(lockKey);
       }
     }
+  }
 
-    return commissionPlan;
+  private async acquireLock(lockKey: string, ttl = 5): Promise<boolean> {
+    const result = await this.redisClient.set(lockKey, "1", "NX", "EX", ttl);
+
+    return result === "OK";
+  }
+
+  private async releaseLock(lockKey: string): Promise<void> {
+    await this.redisClient.del(lockKey);
   }
 
   /**
@@ -237,7 +373,7 @@ export class CommissionService {
 
     // Find applicable slab
     const applicableSlab = this.findApplicableSlab(
-      commissionPlan.slabs,
+      commissionPlan.slabs as CommissionSlabEntity[],
       amount,
     );
 
@@ -283,7 +419,9 @@ export class CommissionService {
     }
 
     const gstPercentage =
-      applicableSlab.gstPercentage ?? commissionPlan.defaultGstPercentage;
+      applicableSlab.gstPercentage ??
+      commissionPlan.slabs[0]?.gstPercentage ??
+      18;
     const gstAmount = (commissionAmount * gstPercentage) / 100;
     const netPayableAmount = amount - commissionAmount - gstAmount;
 

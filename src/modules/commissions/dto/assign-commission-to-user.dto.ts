@@ -12,3 +12,19 @@ export class AssignCommissionToUserDto {
   @IsOptional()
   payoutCommissionId?: string | null;
 }
+
+export interface CommissionPlanCacheDTO {
+  id: string;
+  isActive: boolean;
+  slabs: {
+    id: string;
+    commissionId: string;
+    minAmount: number;
+    maxAmount: number;
+    chargeType: string;
+    chargeValue: number;
+    gstPercentage: number;
+    priority: number;
+    isActive: boolean;
+  }[];
+}
