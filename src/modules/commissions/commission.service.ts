@@ -8,6 +8,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
+import Redis from "ioredis";
 import { CommissionPlanCacheDTO } from "./dto/assign-commission-to-user.dto";
 import { CommissionEntity } from "@/entities/commission.entity";
 import { CommissionSlabEntity } from "@/entities/commission-slab.entity";
@@ -42,14 +43,8 @@ export class CommissionService {
     @InjectRepository(UsersEntity)
     private readonly userRepository: Repository<UsersEntity>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    @Inject("REDIS_CLIENT") private readonly redisClient: Redis,
   ) {}
-
-  /**
-   * Get the underlying Redis client from the cache manager store
-   */
-  private get redisClient() {
-    return (this.cacheManager.store as any).client;
-  }
 
   /**
    * Get user's commission plan for payin/payout (with caching)
@@ -348,7 +343,9 @@ export class CommissionService {
   }
 
   private async acquireLock(lockKey: string, ttl = 5): Promise<boolean> {
-    const result = await this.redisClient.set(lockKey, "1", "NX", "EX", ttl);
+    // ioredis: SET key value NX EX seconds
+    // Returns 'OK' if lock acquired, null if key already exists
+    const result = await this.redisClient.set(lockKey, "1", "EX", ttl, "NX");
 
     return result === "OK";
   }
