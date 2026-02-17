@@ -18,9 +18,9 @@ export const dbConfig: TypeOrmModuleOptions = {
   synchronize: false,
   maxQueryExecutionTime: 1000,
   extra: {
-    max: 500, // Increased from 10 to 100 to 500to handle high load (CRITICAL for production)
-    min: 50, // Increased from 2 to 20 to 50 to maintain pool size
-    connectionTimeoutMillis: 2000, // Reduced from 3000 for faster failure detection
+    max: 100, // Increased from 10 to 100 to 500to handle high load (CRITICAL for production)
+    min: 20, // Increased from 2 to 20 to 50 to maintain pool size
+    connectionTimeoutMillis: 3000, // Reduced from 3000 for faster failure detection
     idleTimeoutMillis: 30000,
     // Optimize for concurrent operations with aggressive timeouts
     statement_timeout: 5000, // Reduced from 5000 for faster query timeout
