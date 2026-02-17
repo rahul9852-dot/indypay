@@ -1,6 +1,5 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { CacheModule } from "@nestjs/cache-manager";
 import { CommissionService } from "./commission.service";
 import { CommissionsController } from "./commissions.controller";
 import { CommissionEntity } from "@/entities/commission.entity";
@@ -18,7 +17,7 @@ import { PaymentsModule } from "@/modules/payments/payments.module";
       UserCommissionMappingEntity,
       UsersEntity,
     ]),
-    CacheModule.register(),
+    // CacheModule.register(),
     AuthModule,
     forwardRef(() => PaymentsModule), // For circular dependency resolution
   ],
