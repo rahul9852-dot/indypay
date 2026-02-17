@@ -42,12 +42,7 @@ export class CommissionService {
     @InjectRepository(UsersEntity)
     private readonly userRepository: Repository<UsersEntity>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) {
-    // ✅ DIAGNOSTIC: Log cache manager type on initialization
-    this.logger.info(
-      `[COMMISSION] CacheManager injected: ${cacheManager?.constructor?.name || "UNKNOWN"}`,
-    );
-  }
+  ) {}
 
   /**
    * Get user's commission plan for payin/payout (with caching)
@@ -232,56 +227,23 @@ export class CommissionService {
     type: COMMISSION_TYPE,
   ): Promise<CommissionPlanCacheDTO> {
     const cacheKey = REDIS_KEYS.USER_COMMISSION_PLAN(userId, type);
-    // ✅ FIX: cache-manager-redis-yet expects TTL in MILLISECONDS, not seconds!
-    // auth.service uses 300 (seconds) but that might be wrong too
-    // Let's use milliseconds to be safe: 1 day = 86400 * 1000 = 86400000 ms
     const TTL = 86400 * 1000; // 1 day in milliseconds
 
-    // 1️⃣ TRY CACHE FIRST (simple read - no locks needed!)
-    const cacheReadStart = Date.now();
+    // 1️⃣ TRY CACHE FIRST
     try {
-      this.logger.info(
-        `[COMMISSION] 🔍 Attempting cache GET for key: ${cacheKey}`,
-      );
       const cached =
         await this.cacheManager.get<CommissionPlanCacheDTO>(cacheKey);
-      const cacheReadTime = Date.now() - cacheReadStart;
-
-      if (cached) {
-        this.logger.info(
-          `[COMMISSION] ✅ Cache GET succeeded in ${cacheReadTime}ms, found: ${!!cached}, slabs: ${cached.slabs?.length || 0}`,
-        );
-        if (cached.slabs?.length) {
-          this.logger.info(
-            `[COMMISSION] ✅✅ Cache HIT ${userId}:${type} with ${cached.slabs.length} slabs`,
-          );
-
-          return cached;
-        } else {
-          this.logger.warn(
-            `[COMMISSION] ⚠️ Cache HIT but slabs missing for ${userId}:${type}`,
-          );
-        }
-      } else {
-        this.logger.info(
-          `[COMMISSION] ❌ Cache GET returned null/undefined in ${cacheReadTime}ms`,
-        );
+      if (cached && cached.slabs?.length) {
+        return cached;
       }
     } catch (err: any) {
-      const cacheReadTime = Date.now() - cacheReadStart;
-      // Redis failed? No problem, just query DB
-      this.logger.error(
-        `[COMMISSION] ❌ Cache GET FAILED after ${cacheReadTime}ms, using DB: ${err.message}`,
-        err.stack,
+      // Redis failed? Fallback to DB
+      this.logger.warn(
+        `[COMMISSION] Cache read failed, using DB: ${err.message}`,
       );
     }
 
     // 2️⃣ CACHE MISS → QUERY DB
-    // Multiple requests hitting at once? That's fine! They'll all query DB,
-    // first one to finish populates cache, others will use it next time.
-    this.logger.warn(
-      `[COMMISSION] 🔴 Cache MISS → DB ${userId}:${type} - THIS WILL TIMEOUT IF CONNECTION POOL EXHAUSTED`,
-    );
 
     const mapping = await this.userCommissionMappingRepository.findOne({
       where: { userId, isActive: true },
@@ -333,38 +295,11 @@ export class CommissionService {
     };
 
     // 3️⃣ WRITE TO CACHE (best effort - don't block if it fails)
-    const cacheWriteStart = Date.now();
     try {
-      this.logger.info(
-        `[COMMISSION] 🔥 About to SET cache for key: ${cacheKey}, TTL: ${TTL}ms (${TTL / 1000 / 60 / 60} hours), slabs: ${dto.slabs.length}`,
-      );
       await this.cacheManager.set(cacheKey, dto, TTL);
-      const cacheWriteTime = Date.now() - cacheWriteStart;
-      this.logger.info(
-        `[COMMISSION] ✅✅ Cache SET succeeded in ${cacheWriteTime}ms for ${userId}:${type} with ${dto.slabs.length} slabs`,
-      );
-
-      // ✅ VERIFY: Immediately check if cache was set
-      const verifyStart = Date.now();
-      const verifyCache =
-        await this.cacheManager.get<CommissionPlanCacheDTO>(cacheKey);
-      const verifyTime = Date.now() - verifyStart;
-      if (verifyCache && verifyCache.slabs?.length) {
-        this.logger.info(
-          `[COMMISSION] ✅✅✅ Cache VERIFICATION: Key ${cacheKey} exists in Redis with ${verifyCache.slabs.length} slabs (verified in ${verifyTime}ms)`,
-        );
-      } else {
-        this.logger.error(
-          `[COMMISSION] ❌❌❌ Cache VERIFICATION FAILED: Key ${cacheKey} NOT found in Redis after set! This means cache is NOT working!`,
-        );
-      }
     } catch (err: any) {
-      const cacheWriteTime = Date.now() - cacheWriteStart;
       // Cache write failed? No problem, we still have the data
-      this.logger.error(
-        `[COMMISSION] ❌❌ Cache SET FAILED after ${cacheWriteTime}ms for ${userId}:${type}: ${err.message}`,
-        err.stack,
-      );
+      this.logger.warn(`[COMMISSION] Cache write failed: ${err.message}`);
     }
 
     return dto;

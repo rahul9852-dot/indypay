@@ -122,43 +122,66 @@ export abstract class BasePayinService {
     }
 
     // Wrap DB operations in a transaction
-    const result = await this.dataSource.transaction(async (manager) => {
-      // ✅ OPTIMIZED: Create entity with only userId (not full user object) for faster processing
-      const payinOrder = this.payInOrdersRepository.create({
-        userId: user.id, // Use userId directly instead of full user object
-        amount,
-        email,
-        name,
-        mobile,
-        commissionAmount,
-        gstAmount,
-        netPayableAmount,
-        commissionInPercentage,
-        gstInPercentage,
-        orderId,
-        txnRefId,
-        commissionId,
-        commissionSlabId,
-        chargeType,
-        chargeValue,
-        ...(paymentLink && { intent: paymentLink }),
-      });
-      const savedPayinOrder = await manager.save(payinOrder);
+    const transactionStart = Date.now();
+    let result;
+    try {
+      result = await this.dataSource.transaction(async (manager) => {
+        // ✅ OPTIMIZED: Create entity with only userId (not full user object) for faster processing
+        const payinOrder = this.payInOrdersRepository.create({
+          userId: user.id, // Use userId directly instead of full user object
+          amount,
+          email,
+          name,
+          mobile,
+          commissionAmount,
+          gstAmount,
+          netPayableAmount,
+          commissionInPercentage,
+          gstInPercentage,
+          orderId,
+          txnRefId,
+          commissionId,
+          commissionSlabId,
+          chargeType,
+          chargeValue,
+          ...(paymentLink && { intent: paymentLink }),
+        });
+        const orderSaveStart = Date.now();
+        const savedPayinOrder = await manager.save(payinOrder);
+        const orderSaveTime = Date.now() - orderSaveStart;
 
-      // ✅ OPTIMIZED: Create transaction with only IDs (not full objects)
-      const transaction = this.transactionsRepository.create({
-        userId: user.id, // Use userId directly
-        payInOrderId: savedPayinOrder.id, // Use payInOrderId directly
-        transactionType: PAYMENT_TYPE.PAYIN,
-      });
-      await manager.save(transaction);
+        // ✅ OPTIMIZED: Create transaction with only IDs (not full objects)
+        const transaction = this.transactionsRepository.create({
+          userId: user.id, // Use userId directly
+          payInOrderId: savedPayinOrder.id, // Use payInOrderId directly
+          transactionType: PAYMENT_TYPE.PAYIN,
+        });
+        const txnSaveStart = Date.now();
+        await manager.save(transaction);
+        const txnSaveTime = Date.now() - txnSaveStart;
 
-      return {
-        orderId,
-        intent: paymentLink,
-        message: "Payment Link Generated successfully",
-      };
-    });
+        this.logger.debug(
+          `[ORDER] Transaction completed - order save: ${orderSaveTime}ms, txn save: ${txnSaveTime}ms`,
+        );
+
+        return {
+          orderId,
+          intent: paymentLink,
+          message: "Payment Link Generated successfully",
+        };
+      });
+      const transactionTime = Date.now() - transactionStart;
+      this.logger.debug(
+        `[ORDER] Database transaction completed in ${transactionTime}ms for orderId: ${orderId}`,
+      );
+    } catch (error: any) {
+      const transactionTime = Date.now() - transactionStart;
+      this.logger.error(
+        `[ORDER] ❌ Database transaction FAILED after ${transactionTime}ms for orderId: ${orderId} - ${error.message}`,
+      );
+      // Re-throw to let caller handle it
+      throw error;
+    }
 
     // ✅ OPTIMIZED: Move logging outside transaction to reduce transaction duration
     this.logger.info(
