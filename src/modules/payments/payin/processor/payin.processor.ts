@@ -6,16 +6,16 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { CustomLogger } from "@/logger";
-import { PAYMENT_TYPE } from "@/enums/payment.enum";
+import { PAYMENT_TYPE, PAYMENT_STATUS } from "@/enums/payment.enum";
 import { SETTLEMENT_STATUS } from "@/enums/payment.enum";
+import { PAYMENT_METHOD } from "@/enums/payment-method.enum";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
 import { CommissionService } from "@/modules/commissions/commission.service";
 import { COMMISSION_TYPE, CHARGE_TYPE } from "@/enums/commission.enum";
 import { getCommissions } from "@/utils/commissions.utils";
 
-interface PayinEnrichmentJobData {
-  payinId: number; // Auto-increment ID
+interface PayinOrderJobData {
   orderId: string;
   userId: string;
   amount: number;
@@ -23,6 +23,7 @@ interface PayinEnrichmentJobData {
   name: string;
   mobile: string;
   paymentLink?: string;
+  txnRefId?: string;
 }
 
 @Processor("payin-orders")
@@ -40,97 +41,131 @@ export class PayinProcessor {
   ) {}
 
   /**
-   * 🔥 PHASE 2: Async enrichment worker
-   * Handles: commission calculation, transaction creation, order updates
-   * This removes all heavy DB work from API path
+   * 🔥 OPTIMIZED: Separate inserts (no transaction wrapper)
+   * Uses QueryRunner from pool for better concurrency
    */
-  @Process({ name: "process-payin", concurrency: 5 })
-  async handlePayinEnrichment(job: Job<PayinEnrichmentJobData>): Promise<void> {
+  @Process({ name: "create-payin-order", concurrency: 50 })
+  async handlePayinOrderCreation(job: Job<PayinOrderJobData>): Promise<void> {
     const startTime = Date.now();
-    const { payinId, orderId, userId, amount, paymentLink } = job.data;
+    const order = job.data;
+    const queryRunner = this.dataSource.createQueryRunner();
 
     try {
-      // 1️⃣ Calculate commission (async - no API blocking)
-      let commissionResult;
-      try {
-        commissionResult = await this.commissionService.calculateCommission(
-          userId,
-          amount,
-          COMMISSION_TYPE.PAYIN,
-        );
-      } catch (error: any) {
-        // Fallback to legacy calculation
-        this.logger.warn(
-          `Commission calc failed for ${orderId}, using legacy: ${error.message}`,
-        );
-        const user = await this.dataSource
-          .getRepository(UsersEntity)
-          .findOne({ where: { id: userId } });
-        const legacy = getCommissions({
-          amount,
-          commissionInPercentage: user?.commissionInPercentagePayin || 4.5,
-          gstInPercentage: user?.gstInPercentagePayin || 18,
-        });
-        commissionResult = {
-          commissionAmount: legacy.commissionAmount,
-          gstAmount: legacy.gstAmount,
-          netPayableAmount: legacy.netPayableAmount,
-          commissionId: null,
-          commissionSlabId: null,
-          chargeType: CHARGE_TYPE.PERCENTAGE,
-          chargeValue: user?.commissionInPercentagePayin || 4.5,
-          gstPercentage: user?.gstInPercentagePayin || 18,
-        };
-      }
+      await queryRunner.connect();
 
-      // 2️⃣ Create transaction and update order in single transaction
-      await this.dataSource.transaction(async (manager) => {
-        // Create transaction
-        const transaction = this.transactionsRepository.create({
+      // 1️⃣ INSERT order (separate insert, no transaction wrapper)
+      const insertResult = await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(PayInOrdersEntity)
+        .values({
+          orderId: order.orderId,
+          userId: order.userId,
+          amount: order.amount,
+          email: order.email,
+          name: order.name,
+          mobile: order.mobile,
+          status: PAYMENT_STATUS.PENDING,
+          paymentMethod: PAYMENT_METHOD.UPI,
+          ...(order.paymentLink && { intent: order.paymentLink }),
+          ...(order.txnRefId && { txnRefId: order.txnRefId }),
+        })
+        .execute();
+
+      const payinId = insertResult.identifiers[0].id;
+
+      // 2️⃣ Calculate commission (parallel, no DB blocking)
+      const commission = await this.calculateCommissionSafe(
+        order.userId,
+        order.amount,
+      );
+
+      // 3️⃣ INSERT transaction (separate insert)
+      const txn = await queryRunner.manager
+        .createQueryBuilder()
+        .insert()
+        .into(TransactionsEntity)
+        .values({
           id: getUlidId(ID_TYPE.TRANSACTIONS_KEY),
-          userId,
+          userId: order.userId,
           payInOrderId: payinId,
           transactionType: PAYMENT_TYPE.PAYIN,
-        });
-        const savedTxn = await manager.save(transaction);
+        })
+        .execute();
 
-        // Calculate commission percentage for backward compatibility
-        const commissionInPercentage =
-          commissionResult.chargeType === CHARGE_TYPE.PERCENTAGE
-            ? commissionResult.chargeValue
-            : (commissionResult.commissionAmount / amount) * 100;
+      const txnId = txn.identifiers[0].id;
 
-        // Update order with all enrichment data
-        await manager.update(
-          PayInOrdersEntity,
-          { id: payinId },
-          {
-            txnRefId: savedTxn.id,
-            commissionAmount: commissionResult.commissionAmount,
-            gstAmount: commissionResult.gstAmount,
-            netPayableAmount: commissionResult.netPayableAmount,
-            commissionInPercentage,
-            gstInPercentage: commissionResult.gstPercentage,
-            commissionId: commissionResult.commissionId || null,
-            commissionSlabId: commissionResult.commissionSlabId || null,
-            chargeType: commissionResult.chargeType || null,
-            chargeValue: commissionResult.chargeValue || null,
-            settlementStatus: SETTLEMENT_STATUS.NOT_INITIATED,
-            ...(paymentLink && { intent: paymentLink }),
-          },
-        );
-      });
+      // 4️⃣ UPDATE order (separate update)
+      const commissionInPercentage =
+        commission.chargeType === CHARGE_TYPE.PERCENTAGE
+          ? commission.chargeValue
+          : (commission.commissionAmount / order.amount) * 100;
+
+      await queryRunner.manager.update(
+        PayInOrdersEntity,
+        { id: payinId },
+        {
+          txnRefId: txnId,
+          commissionAmount: commission.commissionAmount,
+          gstAmount: commission.gstAmount,
+          netPayableAmount: commission.netPayableAmount,
+          commissionInPercentage,
+          gstInPercentage: commission.gstPercentage,
+          commissionId: commission.commissionId || null,
+          commissionSlabId: commission.commissionSlabId || null,
+          chargeType: commission.chargeType || null,
+          chargeValue: commission.chargeValue || null,
+          settlementStatus: SETTLEMENT_STATUS.NOT_INITIATED,
+        },
+      );
 
       const duration = Date.now() - startTime;
-      this.logger.debug(
-        `[ENRICH] ✅ Order ${orderId} enriched in ${duration}ms`,
-      );
+      this.logger.debug(`[FAST] ✅ ${order.orderId} in ${duration}ms`);
     } catch (error: any) {
       const duration = Date.now() - startTime;
       this.logger.error(
-        `[ENRICH] ❌ Failed to enrich order ${orderId} after ${duration}ms: ${error.message}`,
+        `[FAST] ❌ ${order.orderId} failed after ${duration}ms: ${error.message}`,
       );
-      throw error; // Let Bull retry
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Safe commission calculation with fallback
+   */
+  private async calculateCommissionSafe(
+    userId: string,
+    amount: number,
+  ): Promise<any> {
+    try {
+      return await this.commissionService.calculateCommission(
+        userId,
+        amount,
+        COMMISSION_TYPE.PAYIN,
+      );
+    } catch (error: any) {
+      // Fallback to legacy
+      const user = await this.dataSource
+        .getRepository(UsersEntity)
+        .findOne({ where: { id: userId } });
+      const legacy = getCommissions({
+        amount,
+        commissionInPercentage: user?.commissionInPercentagePayin || 4.5,
+        gstInPercentage: user?.gstInPercentagePayin || 18,
+      });
+
+      return {
+        commissionAmount: legacy.commissionAmount,
+        gstAmount: legacy.gstAmount,
+        netPayableAmount: legacy.netPayableAmount,
+        commissionId: null,
+        commissionSlabId: null,
+        chargeType: CHARGE_TYPE.PERCENTAGE,
+        chargeValue: user?.commissionInPercentagePayin || 4.5,
+        gstPercentage: user?.gstInPercentagePayin || 18,
+      };
     }
   }
 }
