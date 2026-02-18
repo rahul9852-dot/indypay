@@ -44,7 +44,7 @@ export class PayinProcessor {
    * Handles: commission calculation, transaction creation, order updates
    * This removes all heavy DB work from API path
    */
-  @Process({ name: "process-payin", concurrency: 100 })
+  @Process({ name: "process-payin", concurrency: 5 })
   async handlePayinEnrichment(job: Job<PayinEnrichmentJobData>): Promise<void> {
     const startTime = Date.now();
     const { payinId, orderId, userId, amount, paymentLink } = job.data;
