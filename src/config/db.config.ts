@@ -21,15 +21,15 @@ export const dbConfig: TypeOrmModuleOptions = {
     // Target: 200+ req/sec with high success rate
     // Current issue: 45 req/sec with only 29 successful (64% success)
     // Need larger pool to prevent connection timeouts
-    max: 600, // Increased significantly to handle bursts and prevent timeouts
-    min: 100, // Higher min to reduce connection acquisition time
+    max: 60, // Increased significantly to handle bursts and prevent timeouts
+    min: 10, // Higher min to reduce connection acquisition time
     connectionTimeoutMillis: 15000, // More time when pool is busy
     idleTimeoutMillis: 30000,
     statement_timeout: 5000, // Balanced - not too aggressive
     lock_timeout: 1000, // Reasonable lock timeout
     idle_in_transaction_session_timeout: 2000, // Kill idle transactions
-    acquireTimeoutMillis: 20000, // Much more time to acquire connection during high load
-    reapIntervalMillis: 100, // Faster cleanup for better connection reuse
+    // acquireTimeoutMillis: 20000, // Much more time to acquire connection during high load
+    // reapIntervalMillis: 100, // Faster cleanup for better connection reuse
   },
   logging: !isProduction,
   ...((isProduction || isStaging) && {
