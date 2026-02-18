@@ -10,6 +10,8 @@ import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
 import { CreatePayinTransactionFlaPayDto } from "../../dto/create-payin-payment.dto";
 import { ExternalPayinWebhookUtkarshDto } from "../../dto/external-webhook-payin.dto";
 import { BasePayinWebhookService } from "./base-payin-webhook.service";
@@ -48,6 +50,9 @@ export class UtkarshPayinService extends BasePayinWebhookService {
     @Optional()
     @Inject(forwardRef(() => CommissionService))
     commissionService?: CommissionService,
+    @Optional()
+    @InjectQueue("payin-orders")
+    payinQueue?: Queue,
   ) {
     super(
       payInOrdersRepository,
@@ -57,6 +62,7 @@ export class UtkarshPayinService extends BasePayinWebhookService {
       dataSource,
       cacheManager,
       commissionService,
+      payinQueue,
     );
   }
 
