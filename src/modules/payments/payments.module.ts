@@ -15,6 +15,7 @@ import { PayinProcessor } from "./payin/processor/payin.processor";
 import { OnikPayinService } from "./payin/integrations/onik-payin.service";
 import { GeoPayPayinService } from "./payin/integrations/geopay-payin.service";
 import { UtkarshPayinService } from "./payin/integrations/utkarsh-payin.service";
+import { appConfig } from "@/config/app.config";
 import { SESService } from "@/modules/aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
@@ -42,8 +43,18 @@ import { IntegrationsModule } from "@/modules/integrations/integrations.module";
 // import { PayinWalletEntity } from "@/entities/payin-wallet.entity";
 import { CommissionsModule } from "@/modules/commissions/commissions.module";
 
+const {
+  redisConfig: { redisHostUrl, redisPort },
+} = appConfig();
+
 @Module({
   imports: [
+    BullModule.forRoot({
+      redis: {
+        host: redisHostUrl,
+        port: redisPort,
+      },
+    }),
     TypeOrmModule.forFeature([
       TransactionsEntity,
       UsersEntity,

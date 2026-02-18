@@ -8,15 +8,11 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { PAYMENT_TYPE } from "@/enums/payment.enum";
-import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
-import { PAYMENT_METHOD } from "@/enums/payment-method.enum";
 import { getCommissions } from "@/utils/commissions.utils";
 import { CustomLogger } from "@/logger";
 import { LoggerPlaceHolder } from "@/logger";
 import { CommissionService } from "@/modules/commissions/commission.service";
 import { COMMISSION_TYPE, CHARGE_TYPE } from "@/enums/commission.enum";
-import { getUlidId } from "@/utils/helperFunctions.utils";
-import { ID_TYPE } from "@/enums";
 
 /**
  * Base service for payin integrations
@@ -27,7 +23,6 @@ export abstract class BasePayinService {
   protected readonly logger: CustomLogger;
 
   protected commissionService?: CommissionService;
-
   protected payinQueue?: Queue;
 
   constructor(
@@ -133,12 +128,9 @@ export abstract class BasePayinService {
       netPayableAmount = legacyCommission.netPayableAmount;
     }
 
-    // ✅ OPTIMIZED: Queue-based async processing for better scalability
-    // If queue is available, use it for async DB writes (decouples API from DB)
-    // Otherwise, fall back to synchronous writes (backward compatibility)
-    let useQueue = false;
+    // ✅ OPTIMIZED: Queue-based async processing - API responds immediately, DB writes happen async
+    // This prevents connection pool exhaustion and improves response times
     if (this.payinQueue) {
-      // Queue the DB write job - API responds immediately
       const queueStart = Date.now();
       try {
         await this.payinQueue.add(
@@ -163,103 +155,105 @@ export abstract class BasePayinService {
             paymentLink,
           },
           {
-            attempts: 3, // Retry up to 3 times on failure
+            attempts: 3,
             backoff: {
               type: "exponential",
-              delay: 2000, // Start with 2s delay
+              delay: 2000,
             },
-            removeOnComplete: 100, // Keep last 100 completed jobs
-            removeOnFail: 50, // Keep last 50 failed jobs
+            removeOnComplete: 100,
+            removeOnFail: 50,
           },
         );
         const queueTime = Date.now() - queueStart;
-        this.logger.debug(
-          `[ORDER] ✅ Queued order creation in ${queueTime}ms for orderId: ${orderId}`,
+        this.logger.info(
+          `[ORDER] ✅ Queued order creation in ${queueTime}ms for orderId: ${orderId} - API responding immediately`,
         );
-        useQueue = true; // Successfully queued
+
+        // ✅ OPTIMIZED: Move logging outside transaction to reduce transaction duration
+        this.logger.info(
+          `PAYIN CREATED: ${LoggerPlaceHolder.Json}`,
+          createPayinTransactionDto,
+        );
+
+        // Return immediately - DB write happens async via queue
+        return {
+          orderId,
+          intent: paymentLink,
+          message: "Payment Link Generated successfully",
+        };
       } catch (error: any) {
         const queueTime = Date.now() - queueStart;
         this.logger.error(
           `[ORDER] ❌ Failed to queue order after ${queueTime}ms for orderId: ${orderId} - ${error.message}. Falling back to sync write.`,
         );
-        // Will fall through to synchronous write
+        // Fall through to synchronous write
       }
+    } else {
+      this.logger.warn(
+        `[ORDER] ⚠️ Queue not available for orderId: ${orderId}, using synchronous write`,
+      );
     }
 
     // Fallback: Synchronous write (if queue unavailable or failed)
-    if (!useQueue) {
-      const transactionStart = Date.now();
-      let result;
-      try {
-        this.logger.debug(
-          `[ORDER] Starting synchronous database transaction for orderId: ${orderId}`,
-        );
-
-        result = await this.dataSource.transaction(async (manager) => {
-          const payinOrderId = getUlidId(ID_TYPE.PAYIN_KEY);
-          const transactionId = getUlidId(ID_TYPE.TRANSACTIONS_KEY);
-
-          await manager.query(
-            `INSERT INTO payin_orders (
-              id, "userId", amount, email, name, mobile, 
-              "commissionAmount", "gstAmount", "netPayableAmount", 
-              "commissionInPercentage", "gstInPercentage", 
-              "orderId", "txnRefId", "commissionId", "commissionSlabId", 
-              "chargeType", "chargeValue", status, "paymentMethod", 
-              intent, "settlementStatus", "isMisspelled", 
-              "createdAt", "updatedAt"
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW(), NOW())`,
-            [
-              payinOrderId,
-              user.id,
-              amount,
-              email,
-              name,
-              mobile,
-              commissionAmount,
-              gstAmount,
-              netPayableAmount,
-              commissionInPercentage,
-              gstInPercentage,
-              orderId,
-              txnRefId || null,
-              commissionId || null,
-              commissionSlabId || null,
-              chargeType || null,
-              chargeValue || null,
-              PAYMENT_STATUS.PENDING,
-              PAYMENT_METHOD.UPI,
-              paymentLink || null,
-              SETTLEMENT_STATUS.NOT_INITIATED,
-              false,
-            ],
-          );
-
-          await manager.query(
-            `INSERT INTO transactions (
-              id, "userId", "payInOrderId", "transactionType", 
-              "createdAt", "updatedAt"
-            ) VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-            [transactionId, user.id, payinOrderId, PAYMENT_TYPE.PAYIN],
-          );
-
-          return {
-            orderId,
-            intent: paymentLink,
-            message: "Payment Link Generated successfully",
-          };
+    const transactionStart = Date.now();
+    let result;
+    try {
+      result = await this.dataSource.transaction(async (manager) => {
+        // ✅ OPTIMIZED: Create entity with only userId (not full user object) for faster processing
+        const payinOrder = this.payInOrdersRepository.create({
+          userId: user.id, // Use userId directly instead of full user object
+          amount,
+          email,
+          name,
+          mobile,
+          commissionAmount,
+          gstAmount,
+          netPayableAmount,
+          commissionInPercentage,
+          gstInPercentage,
+          orderId,
+          txnRefId,
+          commissionId,
+          commissionSlabId,
+          chargeType,
+          chargeValue,
+          ...(paymentLink && { intent: paymentLink }),
         });
-        const transactionTime = Date.now() - transactionStart;
-        this.logger.info(
-          `[ORDER] ✅ Synchronous database transaction completed in ${transactionTime}ms for orderId: ${orderId}`,
+        const orderSaveStart = Date.now();
+        const savedPayinOrder = await manager.save(payinOrder);
+        const orderSaveTime = Date.now() - orderSaveStart;
+
+        // ✅ OPTIMIZED: Create transaction with only IDs (not full objects)
+        const transaction = this.transactionsRepository.create({
+          userId: user.id, // Use userId directly
+          payInOrderId: savedPayinOrder.id, // Use payInOrderId directly
+          transactionType: PAYMENT_TYPE.PAYIN,
+        });
+        const txnSaveStart = Date.now();
+        await manager.save(transaction);
+        const txnSaveTime = Date.now() - txnSaveStart;
+
+        this.logger.debug(
+          `[ORDER] Transaction completed - order save: ${orderSaveTime}ms, txn save: ${txnSaveTime}ms`,
         );
-      } catch (error: any) {
-        const transactionTime = Date.now() - transactionStart;
-        this.logger.error(
-          `[ORDER] ❌ Synchronous database transaction FAILED after ${transactionTime}ms for orderId: ${orderId} - ${error.message}`,
-        );
-        throw error;
-      }
+
+        return {
+          orderId,
+          intent: paymentLink,
+          message: "Payment Link Generated successfully",
+        };
+      });
+      const transactionTime = Date.now() - transactionStart;
+      this.logger.info(
+        `[ORDER] ✅ Synchronous database transaction completed in ${transactionTime}ms for orderId: ${orderId}`,
+      );
+    } catch (error: any) {
+      const transactionTime = Date.now() - transactionStart;
+      this.logger.error(
+        `[ORDER] ❌ Database transaction FAILED after ${transactionTime}ms for orderId: ${orderId} - ${error.message}`,
+      );
+      // Re-throw to let caller handle it
+      throw error;
     }
 
     // ✅ OPTIMIZED: Move logging outside transaction to reduce transaction duration
@@ -268,12 +262,7 @@ export abstract class BasePayinService {
       createPayinTransactionDto,
     );
 
-    // Return response immediately (DB write happens async via queue)
-    return {
-      orderId,
-      intent: paymentLink,
-      message: "Payment Link Generated successfully",
-    };
+    return result;
   }
 
   /**

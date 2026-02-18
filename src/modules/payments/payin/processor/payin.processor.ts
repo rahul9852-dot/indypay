@@ -6,10 +6,6 @@ import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { CustomLogger } from "@/logger";
 import { PAYMENT_TYPE } from "@/enums/payment.enum";
-import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
-import { PAYMENT_METHOD } from "@/enums/payment-method.enum";
-import { getUlidId } from "@/utils/helperFunctions.utils";
-import { ID_TYPE } from "@/enums";
 
 interface PayinOrderJobData {
   userId: string;
@@ -58,57 +54,39 @@ export class PayinProcessor {
         `[PAYIN-QUEUE] Processing order creation for orderId: ${orderId}`,
       );
 
-      // Use a transaction for atomicity
+      // Use a transaction for atomicity - using TypeORM (not raw SQL)
       await this.dataSource.transaction(async (manager) => {
-        // Generate IDs
-        const payinOrderId = getUlidId(ID_TYPE.PAYIN_KEY);
-        const transactionId = getUlidId(ID_TYPE.TRANSACTIONS_KEY);
+        // ✅ Use TypeORM to create and save entities
+        const payinOrder = this.payInOrdersRepository.create({
+          userId: job.data.userId,
+          amount: job.data.amount,
+          email: job.data.email,
+          name: job.data.name,
+          mobile: job.data.mobile,
+          commissionAmount: job.data.commissionAmount,
+          gstAmount: job.data.gstAmount,
+          netPayableAmount: job.data.netPayableAmount,
+          commissionInPercentage: job.data.commissionInPercentage,
+          gstInPercentage: job.data.gstInPercentage,
+          orderId: job.data.orderId,
+          txnRefId: job.data.txnRefId,
+          commissionId: job.data.commissionId,
+          commissionSlabId: job.data.commissionSlabId,
+          chargeType: job.data.chargeType,
+          chargeValue: job.data.chargeValue,
+          ...(job.data.paymentLink && { intent: job.data.paymentLink }),
+        });
 
-        // Insert payin order using raw SQL for performance
-        await manager.query(
-          `INSERT INTO payin_orders (
-            id, "userId", amount, email, name, mobile, 
-            "commissionAmount", "gstAmount", "netPayableAmount", 
-            "commissionInPercentage", "gstInPercentage", 
-            "orderId", "txnRefId", "commissionId", "commissionSlabId", 
-            "chargeType", "chargeValue", status, "paymentMethod", 
-            intent, "settlementStatus", "isMisspelled", 
-            "createdAt", "updatedAt"
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW(), NOW())`,
-          [
-            payinOrderId,
-            job.data.userId,
-            job.data.amount,
-            job.data.email,
-            job.data.name,
-            job.data.mobile,
-            job.data.commissionAmount,
-            job.data.gstAmount,
-            job.data.netPayableAmount,
-            job.data.commissionInPercentage,
-            job.data.gstInPercentage,
-            job.data.orderId,
-            job.data.txnRefId || null,
-            job.data.commissionId || null,
-            job.data.commissionSlabId || null,
-            job.data.chargeType || null,
-            job.data.chargeValue || null,
-            PAYMENT_STATUS.PENDING,
-            PAYMENT_METHOD.UPI,
-            job.data.paymentLink || null,
-            SETTLEMENT_STATUS.NOT_INITIATED,
-            false,
-          ],
-        );
+        const savedPayinOrder = await manager.save(payinOrder);
 
-        // Insert transaction
-        await manager.query(
-          `INSERT INTO transactions (
-            id, "userId", "payInOrderId", "transactionType", 
-            "createdAt", "updatedAt"
-          ) VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-          [transactionId, job.data.userId, payinOrderId, PAYMENT_TYPE.PAYIN],
-        );
+        // ✅ Use TypeORM to create and save transaction
+        const transaction = this.transactionsRepository.create({
+          userId: job.data.userId,
+          payInOrderId: savedPayinOrder.id,
+          transactionType: PAYMENT_TYPE.PAYIN,
+        });
+
+        await manager.save(transaction);
       });
 
       const duration = Date.now() - startTime;
