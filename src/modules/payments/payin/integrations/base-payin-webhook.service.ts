@@ -6,6 +6,8 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
 import { DataSource, QueryRunner, Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
@@ -44,12 +46,16 @@ export abstract class BasePayinWebhookService extends BasePayinService {
     @Optional()
     @Inject(forwardRef(() => CommissionService))
     commissionService?: CommissionService,
+    @Optional()
+    @InjectQueue("payin-orders")
+    payinQueue?: Queue,
   ) {
     super(
       payInOrdersRepository,
       transactionsRepository,
       dataSource,
       commissionService,
+      payinQueue,
     );
   }
 

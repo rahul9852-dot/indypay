@@ -54,47 +54,52 @@ export abstract class BasePayinService {
     const startTime = Date.now();
 
     // 🔥 ONLY QUEUE - processor will batch insert + enrich
-    if (this.payinQueue) {
-      try {
-        await this.payinQueue.add(
-          "create-payin-order",
-          {
-            orderId,
-            userId: user.id,
-            amount,
-            email,
-            name,
-            mobile,
-            paymentLink,
-            txnRefId,
-          },
-          {
-            attempts: 3,
-            backoff: { type: "exponential", delay: 2000 },
-            removeOnComplete: 100,
-            removeOnFail: 50,
-          },
-        );
-
-        const queueTime = Date.now() - startTime;
-        this.logger.debug(
-          `[ULTRA-FAST] ✅ Order ${orderId} queued in ${queueTime}ms`,
-        );
-
-        return {
-          orderId,
-          intent: paymentLink,
-          message: "Payment Link Generated successfully",
-        };
-      } catch (error: any) {
-        this.logger.error(
-          `[ULTRA-FAST] ❌ Queue failed for ${orderId}: ${error.message}`,
-        );
-        throw error;
-      }
+    if (!this.payinQueue) {
+      this.logger.error(
+        `[ULTRA-FAST] ❌ Payin queue not available for orderId: ${orderId}. Queue injection failed.`,
+      );
+      throw new Error(
+        "Payin queue not available. Please ensure BullModule is properly configured.",
+      );
     }
 
-    throw new Error("Payin queue not available");
+    try {
+      await this.payinQueue.add(
+        "create-payin-order",
+        {
+          orderId,
+          userId: user.id,
+          amount,
+          email,
+          name,
+          mobile,
+          paymentLink,
+          txnRefId,
+        },
+        {
+          attempts: 3,
+          backoff: { type: "exponential", delay: 2000 },
+          removeOnComplete: 100,
+          removeOnFail: 50,
+        },
+      );
+
+      const queueTime = Date.now() - startTime;
+      this.logger.debug(
+        `[ULTRA-FAST] ✅ Order ${orderId} queued in ${queueTime}ms`,
+      );
+
+      return {
+        orderId,
+        intent: paymentLink,
+        message: "Payment Link Generated successfully",
+      };
+    } catch (error: any) {
+      this.logger.error(
+        `[ULTRA-FAST] ❌ Queue failed for ${orderId}: ${error.message}`,
+      );
+      throw error;
+    }
   }
 
   /**
