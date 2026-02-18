@@ -4,7 +4,6 @@ import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { TransactionsEntity } from "@/entities/transaction.entity";
-import { UsersEntity } from "@/entities/user.entity";
 import { CustomLogger } from "@/logger";
 import { PAYMENT_TYPE, PAYMENT_STATUS } from "@/enums/payment.enum";
 import { SETTLEMENT_STATUS } from "@/enums/payment.enum";
@@ -13,7 +12,6 @@ import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
 import { CommissionService } from "@/modules/commissions/commission.service";
 import { COMMISSION_TYPE, CHARGE_TYPE } from "@/enums/commission.enum";
-import { getCommissions } from "@/utils/commissions.utils";
 
 interface PayinOrderJobData {
   orderId: string;
@@ -44,7 +42,7 @@ export class PayinProcessor {
    * 🔥 OPTIMIZED: Separate inserts (no transaction wrapper)
    * Uses QueryRunner from pool for better concurrency
    */
-  @Process({ name: "create-payin-order", concurrency: 50 })
+  @Process({ name: "create-payin-order", concurrency: 5 })
   async handlePayinOrderCreation(job: Job<PayinOrderJobData>): Promise<void> {
     const startTime = Date.now();
     const order = job.data;
@@ -75,9 +73,10 @@ export class PayinProcessor {
       const payinId = insertResult.identifiers[0].id;
 
       // 2️⃣ Calculate commission (parallel, no DB blocking)
-      const commission = await this.calculateCommissionSafe(
+      const commission = await this.commissionService.calculateCommission(
         order.userId,
         order.amount,
+        COMMISSION_TYPE.PAYIN,
       );
 
       // 3️⃣ INSERT transaction (separate insert)
@@ -129,43 +128,6 @@ export class PayinProcessor {
       throw error;
     } finally {
       await queryRunner.release();
-    }
-  }
-
-  /**
-   * Safe commission calculation with fallback
-   */
-  private async calculateCommissionSafe(
-    userId: string,
-    amount: number,
-  ): Promise<any> {
-    try {
-      return await this.commissionService.calculateCommission(
-        userId,
-        amount,
-        COMMISSION_TYPE.PAYIN,
-      );
-    } catch (error: any) {
-      // Fallback to legacy
-      const user = await this.dataSource
-        .getRepository(UsersEntity)
-        .findOne({ where: { id: userId } });
-      const legacy = getCommissions({
-        amount,
-        commissionInPercentage: user?.commissionInPercentagePayin || 4.5,
-        gstInPercentage: user?.gstInPercentagePayin || 18,
-      });
-
-      return {
-        commissionAmount: legacy.commissionAmount,
-        gstAmount: legacy.gstAmount,
-        netPayableAmount: legacy.netPayableAmount,
-        commissionId: null,
-        commissionSlabId: null,
-        chargeType: CHARGE_TYPE.PERCENTAGE,
-        chargeValue: user?.commissionInPercentagePayin || 4.5,
-        gstPercentage: user?.gstInPercentagePayin || 18,
-      };
     }
   }
 }
