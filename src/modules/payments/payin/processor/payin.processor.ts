@@ -48,49 +48,59 @@ export class PayinProcessor {
    * Process payin order creation jobs in batches
    * This reduces database load by batching multiple inserts together
    */
-  @Process("create-payin-order")
+  @Process({ name: "create-payin-order", concurrency: 200 }) // High concurrency for throughput
   async handlePayinOrderCreation(job: Job<PayinOrderJobData>): Promise<void> {
     const startTime = Date.now();
     const { orderId } = job.data;
 
     try {
-      this.logger.debug(
-        `[PAYIN-QUEUE] Processing order creation for orderId: ${orderId}`,
-      );
-
-      // Use a transaction for atomicity - using TypeORM (not raw SQL)
+      // ✅ OPTIMIZED: Use TypeORM with insert() for bulk performance (faster than save, still readable)
       await this.dataSource.transaction(async (manager) => {
-        // ✅ Use TypeORM to create and save entities
-        const payinOrder = this.payInOrdersRepository.create({
-          userId: job.data.userId,
-          amount: job.data.amount,
-          email: job.data.email,
-          name: job.data.name,
-          mobile: job.data.mobile,
-          commissionAmount: job.data.commissionAmount,
-          gstAmount: job.data.gstAmount,
-          netPayableAmount: job.data.netPayableAmount,
-          commissionInPercentage: job.data.commissionInPercentage,
-          gstInPercentage: job.data.gstInPercentage,
-          orderId: job.data.orderId,
-          txnRefId: job.data.txnRefId,
-          commissionId: job.data.commissionId,
-          commissionSlabId: job.data.commissionSlabId,
-          chargeType: job.data.chargeType,
-          chargeValue: job.data.chargeValue,
-          ...(job.data.paymentLink && { intent: job.data.paymentLink }),
-        });
+        // Use insert() which is faster than save() but still readable
+        const payinOrderInsertResult = await manager
+          .createQueryBuilder()
+          .insert()
+          .into(PayInOrdersEntity)
+          .values({
+            id: getUlidId(ID_TYPE.PAYIN_KEY),
+            userId: job.data.userId,
+            amount: job.data.amount,
+            email: job.data.email,
+            name: job.data.name,
+            mobile: job.data.mobile,
+            commissionAmount: job.data.commissionAmount,
+            gstAmount: job.data.gstAmount,
+            netPayableAmount: job.data.netPayableAmount,
+            commissionInPercentage: job.data.commissionInPercentage,
+            gstInPercentage: job.data.gstInPercentage,
+            orderId: job.data.orderId,
+            txnRefId: job.data.txnRefId || null,
+            commissionId: job.data.commissionId || null,
+            commissionSlabId: job.data.commissionSlabId || null,
+            chargeType: job.data.chargeType || null,
+            chargeValue: job.data.chargeValue || null,
+            status: PAYMENT_STATUS.PENDING,
+            paymentMethod: PAYMENT_METHOD.UPI,
+            intent: job.data.paymentLink || null,
+            settlementStatus: SETTLEMENT_STATUS.NOT_INITIATED,
+            isMisspelled: false,
+          })
+          .execute();
 
-        const savedPayinOrder = await manager.save(payinOrder);
+        const payinOrderId = payinOrderInsertResult.identifiers[0].id;
 
-        // ✅ Use TypeORM to create and save transaction
-        const transaction = this.transactionsRepository.create({
-          userId: job.data.userId,
-          payInOrderId: savedPayinOrder.id,
-          transactionType: PAYMENT_TYPE.PAYIN,
-        });
-
-        await manager.save(transaction);
+        // Insert transaction using insert() for consistency and speed
+        await manager
+          .createQueryBuilder()
+          .insert()
+          .into(TransactionsEntity)
+          .values({
+            id: getUlidId(ID_TYPE.TRANSACTIONS_KEY),
+            userId: job.data.userId,
+            payInOrderId: payinOrderId,
+            transactionType: PAYMENT_TYPE.PAYIN,
+          })
+          .execute();
       });
 
       const duration = Date.now() - startTime;
@@ -111,7 +121,7 @@ export class PayinProcessor {
    * Process multiple payin orders in a single batch
    * This is more efficient than processing one at a time
    */
-  @Process("create-payin-orders-batch")
+  @Process({ name: "create-payin-orders-batch", concurrency: 50 }) // Lower concurrency for batches
   async handlePayinOrdersBatch(
     job: Job<{ orders: PayinOrderJobData[] }>,
   ): Promise<void> {
