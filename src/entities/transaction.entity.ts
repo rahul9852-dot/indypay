@@ -28,7 +28,7 @@ export class TransactionsEntity {
   transactionType: string;
 
   @Column({ nullable: true })
-  payInOrderId: string;
+  payInOrderId: number;
 
   @JoinColumn({ name: "payInOrderId" })
   @OneToOne(() => PayInOrdersEntity, ({ transaction }) => transaction, {

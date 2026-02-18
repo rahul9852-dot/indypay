@@ -4,30 +4,24 @@ import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { TransactionsEntity } from "@/entities/transaction.entity";
+import { UsersEntity } from "@/entities/user.entity";
 import { CustomLogger } from "@/logger";
 import { PAYMENT_TYPE } from "@/enums/payment.enum";
-import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
-import { PAYMENT_METHOD } from "@/enums/payment-method.enum";
+import { SETTLEMENT_STATUS } from "@/enums/payment.enum";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
+import { CommissionService } from "@/modules/commissions/commission.service";
+import { COMMISSION_TYPE, CHARGE_TYPE } from "@/enums/commission.enum";
+import { getCommissions } from "@/utils/commissions.utils";
 
-interface PayinOrderJobData {
+interface PayinEnrichmentJobData {
+  payinId: number; // Auto-increment ID
+  orderId: string;
   userId: string;
   amount: number;
   email: string;
   name: string;
   mobile: string;
-  orderId: string;
-  commissionAmount: number;
-  gstAmount: number;
-  netPayableAmount: number;
-  commissionInPercentage: number;
-  gstInPercentage: number;
-  txnRefId?: string;
-  commissionId?: string;
-  commissionSlabId?: string;
-  chargeType?: string;
-  chargeValue?: number;
   paymentLink?: string;
 }
 
@@ -36,6 +30,7 @@ export class PayinProcessor {
   private readonly logger = new CustomLogger(PayinProcessor.name);
 
   constructor(
+    private readonly commissionService: CommissionService,
     @InjectRepository(PayInOrdersEntity)
     private readonly payInOrdersRepository: Repository<PayInOrdersEntity>,
     @InjectRepository(TransactionsEntity)
@@ -45,193 +40,97 @@ export class PayinProcessor {
   ) {}
 
   /**
-   * Process payin order creation jobs in batches
-   * This reduces database load by batching multiple inserts together
+   * 🔥 PHASE 2: Async enrichment worker
+   * Handles: commission calculation, transaction creation, order updates
+   * This removes all heavy DB work from API path
    */
-  @Process({ name: "create-payin-order", concurrency: 200 }) // High concurrency for throughput
-  async handlePayinOrderCreation(job: Job<PayinOrderJobData>): Promise<void> {
+  @Process({ name: "process-payin", concurrency: 100 })
+  async handlePayinEnrichment(job: Job<PayinEnrichmentJobData>): Promise<void> {
     const startTime = Date.now();
-    const { orderId } = job.data;
+    const { payinId, orderId, userId, amount, paymentLink } = job.data;
 
     try {
-      // ✅ OPTIMIZED: Use TypeORM with insert() for bulk performance (faster than save, still readable)
+      // 1️⃣ Calculate commission (async - no API blocking)
+      let commissionResult;
+      try {
+        commissionResult = await this.commissionService.calculateCommission(
+          userId,
+          amount,
+          COMMISSION_TYPE.PAYIN,
+        );
+      } catch (error: any) {
+        // Fallback to legacy calculation
+        this.logger.warn(
+          `Commission calc failed for ${orderId}, using legacy: ${error.message}`,
+        );
+        const user = await this.dataSource
+          .getRepository(UsersEntity)
+          .findOne({ where: { id: userId } });
+        const legacy = getCommissions({
+          amount,
+          commissionInPercentage: user?.commissionInPercentagePayin || 4.5,
+          gstInPercentage: user?.gstInPercentagePayin || 18,
+        });
+        commissionResult = {
+          commissionAmount: legacy.commissionAmount,
+          gstAmount: legacy.gstAmount,
+          netPayableAmount: legacy.netPayableAmount,
+          commissionId: null,
+          commissionSlabId: null,
+          chargeType: CHARGE_TYPE.PERCENTAGE,
+          chargeValue: user?.commissionInPercentagePayin || 4.5,
+          gstPercentage: user?.gstInPercentagePayin || 18,
+        };
+      }
+
+      // 2️⃣ Create transaction and update order in single transaction
       await this.dataSource.transaction(async (manager) => {
-        // Use insert() which is faster than save() but still readable
-        const payinOrderInsertResult = await manager
-          .createQueryBuilder()
-          .insert()
-          .into(PayInOrdersEntity)
-          .values({
-            id: getUlidId(ID_TYPE.PAYIN_KEY),
-            userId: job.data.userId,
-            amount: job.data.amount,
-            email: job.data.email,
-            name: job.data.name,
-            mobile: job.data.mobile,
-            commissionAmount: job.data.commissionAmount,
-            gstAmount: job.data.gstAmount,
-            netPayableAmount: job.data.netPayableAmount,
-            commissionInPercentage: job.data.commissionInPercentage,
-            gstInPercentage: job.data.gstInPercentage,
-            orderId: job.data.orderId,
-            txnRefId: job.data.txnRefId || null,
-            commissionId: job.data.commissionId || null,
-            commissionSlabId: job.data.commissionSlabId || null,
-            chargeType: job.data.chargeType || null,
-            chargeValue: job.data.chargeValue || null,
-            status: PAYMENT_STATUS.PENDING,
-            paymentMethod: PAYMENT_METHOD.UPI,
-            intent: job.data.paymentLink || null,
+        // Create transaction
+        const transaction = this.transactionsRepository.create({
+          id: getUlidId(ID_TYPE.TRANSACTIONS_KEY),
+          userId,
+          payInOrderId: payinId,
+          transactionType: PAYMENT_TYPE.PAYIN,
+        });
+        const savedTxn = await manager.save(transaction);
+
+        // Calculate commission percentage for backward compatibility
+        const commissionInPercentage =
+          commissionResult.chargeType === CHARGE_TYPE.PERCENTAGE
+            ? commissionResult.chargeValue
+            : (commissionResult.commissionAmount / amount) * 100;
+
+        // Update order with all enrichment data
+        await manager.update(
+          PayInOrdersEntity,
+          { id: payinId },
+          {
+            txnRefId: savedTxn.id,
+            commissionAmount: commissionResult.commissionAmount,
+            gstAmount: commissionResult.gstAmount,
+            netPayableAmount: commissionResult.netPayableAmount,
+            commissionInPercentage,
+            gstInPercentage: commissionResult.gstPercentage,
+            commissionId: commissionResult.commissionId || null,
+            commissionSlabId: commissionResult.commissionSlabId || null,
+            chargeType: commissionResult.chargeType || null,
+            chargeValue: commissionResult.chargeValue || null,
             settlementStatus: SETTLEMENT_STATUS.NOT_INITIATED,
-            isMisspelled: false,
-          })
-          .execute();
-
-        const payinOrderId = payinOrderInsertResult.identifiers[0].id;
-
-        // Insert transaction using insert() for consistency and speed
-        await manager
-          .createQueryBuilder()
-          .insert()
-          .into(TransactionsEntity)
-          .values({
-            id: getUlidId(ID_TYPE.TRANSACTIONS_KEY),
-            userId: job.data.userId,
-            payInOrderId: payinOrderId,
-            transactionType: PAYMENT_TYPE.PAYIN,
-          })
-          .execute();
+            ...(paymentLink && { intent: paymentLink }),
+          },
+        );
       });
 
       const duration = Date.now() - startTime;
       this.logger.debug(
-        `[PAYIN-QUEUE] ✅ Order created successfully in ${duration}ms for orderId: ${orderId}`,
+        `[ENRICH] ✅ Order ${orderId} enriched in ${duration}ms`,
       );
     } catch (error: any) {
       const duration = Date.now() - startTime;
       this.logger.error(
-        `[PAYIN-QUEUE] ❌ Failed to create order after ${duration}ms for orderId: ${orderId} - ${error.message}`,
+        `[ENRICH] ❌ Failed to enrich order ${orderId} after ${duration}ms: ${error.message}`,
       );
-      // Re-throw to let Bull handle retries
-      throw error;
-    }
-  }
-
-  /**
-   * Process multiple payin orders in a single batch
-   * This is more efficient than processing one at a time
-   */
-  @Process({ name: "create-payin-orders-batch", concurrency: 50 }) // Lower concurrency for batches
-  async handlePayinOrdersBatch(
-    job: Job<{ orders: PayinOrderJobData[] }>,
-  ): Promise<void> {
-    const { orders } = job.data;
-    const startTime = Date.now();
-
-    this.logger.debug(
-      `[PAYIN-QUEUE] Processing batch of ${orders.length} orders`,
-    );
-
-    try {
-      // Use a single transaction for all orders
-      await this.dataSource.transaction(async (manager) => {
-        // Prepare batch insert data
-        const payinOrderValues: any[] = [];
-        const transactionValues: any[] = [];
-        const payinOrderIds: string[] = [];
-
-        for (const orderData of orders) {
-          const payinOrderId = getUlidId(ID_TYPE.PAYIN_KEY);
-          const transactionId = getUlidId(ID_TYPE.TRANSACTIONS_KEY);
-          payinOrderIds.push(payinOrderId);
-
-          // Prepare payin order values
-          payinOrderValues.push([
-            payinOrderId,
-            orderData.userId,
-            orderData.amount,
-            orderData.email,
-            orderData.name,
-            orderData.mobile,
-            orderData.commissionAmount,
-            orderData.gstAmount,
-            orderData.netPayableAmount,
-            orderData.commissionInPercentage,
-            orderData.gstInPercentage,
-            orderData.orderId,
-            orderData.txnRefId || null,
-            orderData.commissionId || null,
-            orderData.commissionSlabId || null,
-            orderData.chargeType || null,
-            orderData.chargeValue || null,
-            PAYMENT_STATUS.PENDING,
-            PAYMENT_METHOD.UPI,
-            orderData.paymentLink || null,
-            SETTLEMENT_STATUS.NOT_INITIATED,
-            false,
-          ]);
-
-          // Prepare transaction values
-          transactionValues.push([
-            transactionId,
-            orderData.userId,
-            payinOrderId,
-            PAYMENT_TYPE.PAYIN,
-          ]);
-        }
-
-        // Batch insert payin orders
-        if (payinOrderValues.length > 0) {
-          const placeholders = payinOrderValues
-            .map(
-              (_, idx) =>
-                `($${idx * 22 + 1}, $${idx * 22 + 2}, $${idx * 22 + 3}, $${idx * 22 + 4}, $${idx * 22 + 5}, $${idx * 22 + 6}, $${idx * 22 + 7}, $${idx * 22 + 8}, $${idx * 22 + 9}, $${idx * 22 + 10}, $${idx * 22 + 11}, $${idx * 22 + 12}, $${idx * 22 + 13}, $${idx * 22 + 14}, $${idx * 22 + 15}, $${idx * 22 + 16}, $${idx * 22 + 17}, $${idx * 22 + 18}, $${idx * 22 + 19}, $${idx * 22 + 20}, $${idx * 22 + 21}, $${idx * 22 + 22}, NOW(), NOW())`,
-            )
-            .join(", ");
-
-          await manager.query(
-            `INSERT INTO payin_orders (
-              id, "userId", amount, email, name, mobile, 
-              "commissionAmount", "gstAmount", "netPayableAmount", 
-              "commissionInPercentage", "gstInPercentage", 
-              "orderId", "txnRefId", "commissionId", "commissionSlabId", 
-              "chargeType", "chargeValue", status, "paymentMethod", 
-              intent, "settlementStatus", "isMisspelled", 
-              "createdAt", "updatedAt"
-            ) VALUES ${placeholders}`,
-            payinOrderValues.flat(),
-          );
-        }
-
-        // Batch insert transactions
-        if (transactionValues.length > 0) {
-          const placeholders = transactionValues
-            .map(
-              (_, idx) =>
-                `($${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4}, NOW(), NOW())`,
-            )
-            .join(", ");
-
-          await manager.query(
-            `INSERT INTO transactions (
-              id, "userId", "payInOrderId", "transactionType", 
-              "createdAt", "updatedAt"
-            ) VALUES ${placeholders}`,
-            transactionValues.flat(),
-          );
-        }
-      });
-
-      const duration = Date.now() - startTime;
-      this.logger.info(
-        `[PAYIN-QUEUE] ✅ Batch of ${orders.length} orders created successfully in ${duration}ms (avg: ${(duration / orders.length).toFixed(2)}ms per order)`,
-      );
-    } catch (error: any) {
-      const duration = Date.now() - startTime;
-      this.logger.error(
-        `[PAYIN-QUEUE] ❌ Failed to create batch after ${duration}ms - ${error.message}`,
-      );
-      throw error;
+      throw error; // Let Bull retry
     }
   }
 }

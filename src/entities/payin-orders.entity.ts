@@ -1,5 +1,4 @@
 import {
-  BeforeInsert,
   Column,
   CreateDateColumn,
   Entity,
@@ -7,21 +6,19 @@ import {
   JoinColumn,
   ManyToOne,
   OneToOne,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
 import { UsersEntity } from "./user.entity";
 import { TransactionsEntity } from "./transaction.entity";
-import { getUlidId } from "@/utils/helperFunctions.utils";
-import { ID_TYPE } from "@/enums";
 import { PAYMENT_STATUS, SETTLEMENT_STATUS } from "@/enums/payment.enum";
 import { PAYMENT_METHOD } from "@/enums/payment-method.enum";
 
 @Entity("payin_orders")
-@Index(["userId", "createdAt"])
+// @Index(["userId", "createdAt"])
 export class PayInOrdersEntity {
-  @PrimaryColumn()
-  id: string;
+  @PrimaryGeneratedColumn("increment")
+  id: number;
 
   @Column({
     type: "decimal",
@@ -43,7 +40,7 @@ export class PayInOrdersEntity {
   @Column()
   mobile: string;
 
-  @Index()
+  // @Index()
   @Column({ enum: PAYMENT_STATUS, default: PAYMENT_STATUS.PENDING })
   status: string;
 
@@ -100,7 +97,7 @@ export class PayInOrdersEntity {
   @Column({ nullable: true })
   userVpa: string;
 
-  @Index()
+  // @Index()
   @Column()
   userId: string;
 
@@ -124,15 +121,15 @@ export class PayInOrdersEntity {
   @Column({ nullable: true, type: "jsonb" })
   checkoutData: any;
 
-  @Index()
+  // @Index()
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
   @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 
-  @BeforeInsert()
-  beforeInsertHook() {
-    this.id = getUlidId(ID_TYPE.PAYIN_KEY);
-  }
+  // @BeforeInsert()
+  // beforeInsertHook() {
+  //   this.id = getUlidId(ID_TYPE.PAYIN_KEY);
+  // }
 }
