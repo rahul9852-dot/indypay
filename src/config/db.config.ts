@@ -30,7 +30,7 @@ export const dbConfig: TypeOrmModuleOptions = {
     statement_timeout: 3000, // Fail queries faster to free connections
     lock_timeout: 300, // Fast lock timeout
     idle_in_transaction_session_timeout: 500, // Kill idle transactions fast
-    acquireTimeoutMillis: 5000, // Give more time to wait for connection when pool is busy
+    acquireTimeoutMillis: 10000, // ✅ CRITICAL: Increased to 10s - give more time when pool is busy
     reapIntervalMillis: 200, // Check for idle connections every 200ms (faster cleanup)
   },
   logging: !isProduction,
