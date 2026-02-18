@@ -66,16 +66,16 @@ export class PayInOrdersEntity {
   @Column({ type: "decimal", precision: 10, scale: 2, default: 4.5 })
   commissionInPercentage: number;
 
-  @Column({ type: "decimal", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   commissionAmount: number;
 
   @Column({ type: "decimal", precision: 10, scale: 2, default: 18 })
   gstInPercentage: number;
 
-  @Column({ type: "decimal", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   gstAmount: number;
 
-  @Column({ type: "decimal", precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   netPayableAmount: number;
 
   // New dynamic commission fields
