@@ -11,6 +11,7 @@ import { PayoutProcessorGeopay } from "./payout/processor/geopay.processor";
 import { PayoutProcessorDiasPay } from "./payout/processor/payments.processorv2";
 import { PayoutProcessorBuckBox } from "./payout/processor/buckbox.processor";
 import { PayoutProcessorRocky } from "./payout/processor/rockypayz.processor";
+import { PayinProcessor } from "./payin/processor/payin.processor";
 import { OnikPayinService } from "./payin/integrations/onik-payin.service";
 import { GeoPayPayinService } from "./payin/integrations/geopay-payin.service";
 import { UtkarshPayinService } from "./payin/integrations/utkarsh-payin.service";
@@ -67,6 +68,7 @@ import { CommissionsModule } from "@/modules/commissions/commissions.module";
       { name: "buckbox-payouts" },
       { name: "Geopay-payouts" },
       { name: "rocky-payouts" },
+      { name: "payin-orders" }, // Queue for async payin order creation
     ),
     CacheModule.register(),
     ThirdPartyAuthModule,
@@ -89,6 +91,7 @@ import { CommissionsModule } from "@/modules/commissions/commissions.module";
     CryptoService,
     DatabaseMonitorService,
     PayoutProcessorGeopay,
+    PayinProcessor, // Processor for async payin order creation
     // Payin integration services
     OnikPayinService,
     GeoPayPayinService,
