@@ -255,7 +255,7 @@ export class ChannelPartnersService {
 
   async getCollectionByIdCP(payinId: string, cpId: string) {
     return await this.payInOrdersRepository.findOne({
-      where: { id: payinId, user: { channelPartnerId: cpId } },
+      where: { id: Number(payinId), user: { channelPartnerId: cpId } },
       relations: {
         user: true,
       },

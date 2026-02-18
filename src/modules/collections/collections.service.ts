@@ -239,7 +239,7 @@ export class CollectionsService {
 
   async getCollectionsByPayinIdAdmin(payinId: string) {
     return this.payInOrdersRepository.findOne({
-      where: { id: payinId },
+      where: { id: Number(payinId) },
       relations: {
         user: true,
       },
@@ -352,7 +352,7 @@ export class CollectionsService {
 
   async getCollectionById(user: UsersEntity, payinId: string) {
     return await this.payInOrdersRepository.findOne({
-      where: { id: payinId, user: { id: user.id } },
+      where: { id: Number(payinId), user: { id: user.id } },
       relations: {
         user: true,
       },
