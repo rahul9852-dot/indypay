@@ -259,6 +259,9 @@ export class GetPaymentLinkDetailsResponseDto {
   email: string;
 
   @ApiResponseProperty()
+  name: string;
+
+  @ApiResponseProperty()
   mobile: string;
 
   @ApiResponseProperty()

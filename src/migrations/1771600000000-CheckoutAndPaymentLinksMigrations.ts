@@ -41,7 +41,6 @@ export class CheckoutAndPaymentLinksMigrations1771600000000
     );
     const dropPaymentLinkColumns = [
       "orderId",
-      "name",
       "txnRefId",
       "paymentMethod",
       "intent",
