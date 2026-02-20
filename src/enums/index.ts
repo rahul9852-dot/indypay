@@ -77,6 +77,7 @@ export enum ID_TYPE {
   API_CREDENTIALS = "apic",
   BUSINESS_DETAILS = "bsd",
   CHECKOUT = "chk",
+  CHECKOUT_PAGE = "chkp",
   COMMISSION = "comm",
   COMMISSION_SLAB = "cslb",
   CUSTOMER = "cst",

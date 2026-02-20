@@ -26,6 +26,9 @@ export class PaymentLinkEntity {
   @Column()
   email: string;
 
+  @Column({ type: "text", nullable: true })
+  name: string;
+
   @Column()
   mobile: string;
 

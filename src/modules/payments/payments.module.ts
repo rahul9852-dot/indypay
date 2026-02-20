@@ -37,6 +37,7 @@ import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { CheckoutEntity } from "@/entities/checkout.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { PaymentLinkEntity } from "@/entities/payment-link.entity";
+import { CheckoutPageEntity } from "@/entities/checkout-page.entity";
 import { ThirdPartyAuthModule } from "@/shared/third-party-auth/third-party-auth.module";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
@@ -73,6 +74,7 @@ const {
       UserLoginIpsEntity,
       CheckoutEntity,
       PaymentLinkEntity,
+      CheckoutPageEntity,
     ]),
     BullModule.registerQueue(
       { name: "payouts" },

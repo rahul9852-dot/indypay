@@ -4,6 +4,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Put,
   UseGuards,
   Get,
   Query,
@@ -33,6 +34,10 @@ import {
   CreateCheckoutDto,
   CreateCheckoutResponseDto,
 } from "./dto/create-payin-payment.dto";
+import {
+  CreateCheckoutPageDto,
+  UpdateCheckoutPageDto,
+} from "./dto/checkout-page.dto";
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
   CreatePayoutDto,
@@ -674,6 +679,55 @@ export class PaymentsController {
   @Get("payment-link/:linkId")
   async getPaymentLinkDetails(@Param("linkId") linkId: string) {
     return this.paymentsService.getPaymentLinkDetails(linkId);
+  }
+
+  // Custom checkout page config (must be before checkout/:checkoutId)
+  @ApiOperation({ summary: "List all custom checkout pages for current user" })
+  @ApiOkResponse({ description: "List of checkout page configs" })
+  @Get("checkout-pages")
+  async getAllCheckoutPages(@User() user: UsersEntity) {
+    return this.paymentsService.getAllCheckoutPages(user.id);
+  }
+
+  @ApiOperation({ summary: "Get one custom checkout page by id" })
+  @ApiOkResponse()
+  @Get("checkout-pages/:id")
+  async getCheckoutPageById(
+    @Param("id") id: string,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.getCheckoutPageById(id, user);
+  }
+
+  @ApiOperation({ summary: "Create a custom checkout page" })
+  @Post("checkout-pages")
+  async createCheckoutPage(
+    @Body() dto: CreateCheckoutPageDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createCheckoutPage(dto, user);
+  }
+
+  @ApiOperation({
+    summary: "Publish a draft checkout page",
+    description: "Sets status to PUBLISHED. Use after save draft.",
+  })
+  @Post("checkout-pages/:id/publish")
+  async publishCheckoutPage(
+    @Param("id") id: string,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.publishCheckoutPage(id, user);
+  }
+
+  @ApiOperation({ summary: "Update a custom checkout page" })
+  @Put("checkout-pages/:id")
+  async updateCheckoutPage(
+    @Param("id") id: string,
+    @Body() dto: UpdateCheckoutPageDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.updateCheckoutPage(id, dto, user);
   }
 
   @Public()

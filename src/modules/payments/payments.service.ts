@@ -51,6 +51,10 @@ import {
   CreatePaymentLinkDto,
   CreateCheckoutDto,
 } from "./dto/create-payin-payment.dto";
+import {
+  CreateCheckoutPageDto,
+  UpdateCheckoutPageDto,
+} from "./dto/checkout-page.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import {
   MessageResponseDto,
@@ -134,6 +138,11 @@ import { CheckoutEntity } from "@/entities/checkout.entity";
 import { generatePaymentLinkUtil } from "@/utils/payment-link.util";
 import { UtkarshCryptoService } from "@/utils/utkarsh-enc-decr.utils";
 import { PaymentLinkEntity } from "@/entities/payment-link.entity";
+import {
+  CheckoutPageEntity,
+  CheckoutAmountType,
+  CheckoutPageStatus,
+} from "@/entities/checkout-page.entity";
 
 const {
   beBaseUrl,
@@ -170,6 +179,8 @@ export class PaymentsService {
     private readonly checkoutRepository: Repository<CheckoutEntity>,
     @InjectRepository(PaymentLinkEntity)
     private readonly paymentLinkRepository: Repository<PaymentLinkEntity>,
+    @InjectRepository(CheckoutPageEntity)
+    private readonly checkoutPageRepository: Repository<CheckoutPageEntity>,
     @InjectQueue("payouts") private payoutQueue: Queue,
     @InjectQueue("tpipay-payouts") private payoutQueueTPI: Queue,
     @InjectQueue("Geopay-payouts") private payoutQueueGeo: Queue,
@@ -2648,7 +2659,7 @@ export class PaymentsService {
       }
     }
 
-    const [data, totalItems] = await this.payInOrdersRepository.findAndCount({
+    const [data, totalItems] = await this.paymentLinkRepository.findAndCount({
       where: query,
       relations: {
         user: true,
@@ -2656,12 +2667,13 @@ export class PaymentsService {
       select: {
         id: true,
         amount: true,
+        email: true,
+        mobile: true,
         status: true,
         createdAt: true,
-        txnRefId: true,
-        orderId: true,
-        intent: true,
-        name: true,
+        expiresAt: true,
+        notifyOnEmail: true,
+        notifyOnNumber: true,
         user: {
           id: true,
           fullName: true,
@@ -6974,6 +6986,7 @@ export class PaymentsService {
     const {
       amount,
       email,
+      name,
       mobile,
       expiresInMinutes,
       notifyOnEmail = false,
@@ -6987,6 +7000,7 @@ export class PaymentsService {
     // Prepare payment details to encrypt (amount, email, number, notify flags)
     const paymentDetails = {
       amount,
+      name,
       email,
       mobile,
       expiresAt: expiresAt.toISOString(),
@@ -7003,6 +7017,7 @@ export class PaymentsService {
       amount,
       email,
       mobile,
+      name,
       userId: user.id,
       encryptedData,
       expiresAt,
@@ -7148,5 +7163,100 @@ export class PaymentsService {
       notifyOnNumber: checkout.notifyOnNumber,
       createdAt: checkout.createdAt,
     };
+  }
+
+  /**
+   * List all custom checkout pages for the current user
+   */
+  async getAllCheckoutPages(userId: string): Promise<CheckoutPageEntity[]> {
+    return this.checkoutPageRepository.find({
+      where: { userId },
+      order: { createdAt: "DESC" },
+    });
+  }
+
+  /**
+   * Get a single custom checkout page by id (must belong to user)
+   */
+  async getCheckoutPageById(
+    id: string,
+    user: UsersEntity,
+  ): Promise<CheckoutPageEntity> {
+    const page = await this.checkoutPageRepository.findOne({
+      where: { id, userId: user.id },
+    });
+    if (!page) {
+      throw new NotFoundException("Checkout page not found");
+    }
+
+    return page;
+  }
+
+  /**
+   * Create a custom checkout page
+   */
+  async createCheckoutPage(
+    dto: CreateCheckoutPageDto,
+    user: UsersEntity,
+  ): Promise<CheckoutPageEntity> {
+    const amountType = dto.amountType ?? CheckoutAmountType.USER_ENTERED;
+    const page = this.checkoutPageRepository.create({
+      userId: user.id,
+      name: dto.name,
+      logoUrl: dto.logoUrl,
+      title: dto.title,
+      pageDescription: dto.pageDescription,
+      contactMobile: dto.contactMobile,
+      contactEmail: dto.contactEmail,
+      termsAndConditions: dto.termsAndConditions,
+      amountType,
+      fixedAmount:
+        amountType === CheckoutAmountType.FIXED
+          ? (dto.fixedAmount ?? null)
+          : null,
+      customFields: Array.isArray(dto.customFields) ? dto.customFields : [],
+      status: dto.status ?? CheckoutPageStatus.DRAFT,
+    });
+
+    return this.checkoutPageRepository.save(page);
+  }
+
+  /**
+   * Update a custom checkout page
+   */
+  async updateCheckoutPage(
+    id: string,
+    dto: UpdateCheckoutPageDto,
+    user: UsersEntity,
+  ): Promise<CheckoutPageEntity> {
+    const page = await this.getCheckoutPageById(id, user);
+    if (dto.amountType !== undefined) page.amountType = dto.amountType;
+    if (dto.fixedAmount !== undefined) page.fixedAmount = dto.fixedAmount;
+    if (dto.name !== undefined) page.name = dto.name;
+    if (dto.logoUrl !== undefined) page.logoUrl = dto.logoUrl;
+    if (dto.title !== undefined) page.title = dto.title;
+    if (dto.pageDescription !== undefined)
+      page.pageDescription = dto.pageDescription;
+    if (dto.contactMobile !== undefined) page.contactMobile = dto.contactMobile;
+    if (dto.contactEmail !== undefined) page.contactEmail = dto.contactEmail;
+    if (dto.termsAndConditions !== undefined)
+      page.termsAndConditions = dto.termsAndConditions;
+    if (dto.customFields !== undefined) page.customFields = dto.customFields;
+    if (dto.status !== undefined) page.status = dto.status;
+
+    return this.checkoutPageRepository.save(page);
+  }
+
+  /**
+   * Publish a draft checkout page (set status to PUBLISHED)
+   */
+  async publishCheckoutPage(
+    id: string,
+    user: UsersEntity,
+  ): Promise<CheckoutPageEntity> {
+    const page = await this.getCheckoutPageById(id, user);
+    page.status = CheckoutPageStatus.PUBLISHED;
+
+    return this.checkoutPageRepository.save(page);
   }
 }

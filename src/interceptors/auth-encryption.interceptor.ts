@@ -22,22 +22,20 @@ export class AuthEncryptionInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    const response = context.switchToHttp().getResponse();
     const route = request.url;
 
-    // Check if this route requires encryption/decryption
-    const requiresEncryption = this.encryptedRoutes.some((encryptedRoute) =>
+    // Check if this route requires decrypting the request body
+    const requiresDecryption = this.encryptedRoutes.some((encryptedRoute) =>
       route.includes(encryptedRoute),
     );
 
-    if (!requiresEncryption) {
+    if (!requiresDecryption) {
       return next.handle();
     }
 
-    // Decrypt request body if present
+    // Decrypt request body so credentials are not sent in plain text
     if (request.body && typeof request.body === "object") {
       try {
-        // Check if body has encrypted data field
         if (request.body.encryptedData) {
           const decryptedString = this.authEncryptionService.decrypt(
             request.body.encryptedData,
@@ -46,40 +44,16 @@ export class AuthEncryptionInterceptor implements NestInterceptor {
           request.body = decryptedData;
           this.logger.debug("Request body decrypted successfully");
         }
+        // If no encryptedData, body stays as-is (e.g. for non-encrypted clients during dev)
       } catch (error) {
         this.logger.error("Failed to decrypt request body:", error);
         throw new BadRequestException(
-          "Invalid encrypted data format. Please ensure data is properly encrypted.",
+          "Invalid encrypted data format. Please ensure login data is encrypted before sending.",
         );
       }
     }
 
-    // Store original json method to intercept response.json() calls
-    const originalJson = response.json.bind(response);
-    const { authEncryptionService } = this;
-    const { logger } = this;
-
-    // Override response.json to encrypt before sending
-    response.json = function (body: any) {
-      try {
-        // Encrypt the response body
-        const responseString = JSON.stringify(body);
-        const encryptedResponse = authEncryptionService.encrypt(responseString);
-
-        logger.debug("Response encrypted successfully");
-
-        // Call original json with encrypted data
-        return originalJson.call(this, {
-          encryptedData: encryptedResponse,
-        });
-      } catch (error) {
-        logger.error("Failed to encrypt response:", error);
-
-        // Fallback to original response if encryption fails
-        return originalJson.call(this, body);
-      }
-    };
-
+    // Response is left as plain JSON - no response encryption
     return next.handle();
   }
 }

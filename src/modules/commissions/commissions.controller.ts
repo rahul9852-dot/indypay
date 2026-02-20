@@ -48,32 +48,7 @@ export class CommissionsController {
     return this.commissionService.getUserCommissionMapping(userId);
   }
 
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
-  @ApiOperation({ summary: "Get commission plan by ID" })
-  @ApiOkResponse({ description: "Commission plan with slabs" })
-  @Get(":id")
-  async getCommissionById(@Param("id") id: string) {
-    return this.commissionService.getCommissionById(id);
-  }
-
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
-  @ApiOperation({ summary: "Update commission plan" })
-  @Put(":id")
-  async updateCommission(
-    @Param("id") id: string,
-    @Body() updateDto: UpdateCommissionDto,
-  ) {
-    return this.commissionService.updateCommission(id, updateDto);
-  }
-
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
-  @ApiOperation({ summary: "Delete commission plan" })
-  @Delete(":id")
-  async deleteCommission(@Param("id") id: string) {
-    return this.commissionService.deleteCommission(id);
-  }
-
-  // Commission Slab CRUD
+  // Commission Slab CRUD (must be before :id routes so slabs/:slabId is matched)
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
   @ApiOperation({ summary: "Add slab to commission plan" })
   @Post(":commissionId/slabs")
@@ -99,6 +74,31 @@ export class CommissionsController {
   @Delete("slabs/:slabId")
   async deleteSlab(@Param("slabId") slabId: string) {
     return this.commissionService.deleteSlab(slabId);
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
+  @ApiOperation({ summary: "Get commission plan by ID" })
+  @ApiOkResponse({ description: "Commission plan with slabs" })
+  @Get(":id")
+  async getCommissionById(@Param("id") id: string) {
+    return this.commissionService.getCommissionById(id);
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
+  @ApiOperation({ summary: "Update commission plan" })
+  @Put(":id")
+  async updateCommission(
+    @Param("id") id: string,
+    @Body() updateDto: UpdateCommissionDto,
+  ) {
+    return this.commissionService.updateCommission(id, updateDto);
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
+  @ApiOperation({ summary: "Delete commission plan" })
+  @Delete(":id")
+  async deleteCommission(@Param("id") id: string) {
+    return this.commissionService.deleteCommission(id);
   }
 
   // User Commission Assignment

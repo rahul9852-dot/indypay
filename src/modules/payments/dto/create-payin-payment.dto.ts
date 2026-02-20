@@ -194,6 +194,11 @@ export class CreatePaymentLinkDto {
   amount: number;
 
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty()
   @IsEmail()
   @IsNotEmpty()
   email: string;
