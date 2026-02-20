@@ -46,7 +46,7 @@ export class VerifyMobileGuard implements CanActivate {
       if (ignoreMobileVerification) {
         request[MOBILE_INFO_KEY] = payload;
       } else if (!ignoreMobileVerification && !payload.isVerified) {
-        throw new ForbiddenException("Mobile number is not verified");
+        throw new ForbiddenException("OTP not verified yet");
       }
 
       request[MOBILE_INFO_KEY] = payload;

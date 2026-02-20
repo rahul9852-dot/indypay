@@ -10,10 +10,11 @@ import {
 } from "@/constants/auth.constant";
 
 export const Mobile = createParamDecorator(
-  (_: unknown, ctx: ExecutionContext): IVerifyMobilePayload => {
+  (_: unknown, ctx: ExecutionContext): string => {
     const request = ctx.switchToHttp().getRequest();
+    const payload = request[MOBILE_INFO_KEY] as IVerifyMobilePayload;
 
-    return request[MOBILE_INFO_KEY].mobile;
+    return payload?.email ?? payload?.mobile ?? "";
   },
 );
 

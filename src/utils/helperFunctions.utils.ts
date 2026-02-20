@@ -60,12 +60,12 @@ export const convertExternalPaymentStatusToInternal = (status: string) => {
   }
 };
 
-export const generateLockAccountKey = (mobile: string) => {
-  return `lock_${mobile}`;
+export const generateLockAccountKey = (identifier: string) => {
+  return `lock_${identifier}`;
 };
 
-export const generateAttemptsKey = (mobile: string) => {
-  return `attempts_${mobile}`;
+export const generateAttemptsKey = (identifier: string) => {
+  return `attempts_${identifier}`;
 };
 
 export const formatTime = (date: Date) => {

@@ -1,15 +1,39 @@
 import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
-import { IsEnum, IsNotEmpty, IsString, Length } from "class-validator";
+import {
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Length,
+} from "class-validator";
 import { OTP_TYPE } from "@/enums/otp.enum";
 
 export class SendOtpDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  mobile: string;
+  mobile?: string;
 }
 
-export class VerifyOtpDto extends SendOtpDto {
+export class VerifyOtpDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  mobile?: string;
+
   @ApiProperty()
   @IsString()
   @IsNotEmpty()

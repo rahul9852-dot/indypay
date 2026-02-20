@@ -8,7 +8,7 @@ import {
   Delete,
   UseGuards,
 } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CommissionService } from "./commission.service";
 import { CreateCommissionDto } from "./dto/create-commission.dto";
 import { UpdateCommissionDto } from "./dto/update-commission.dto";
@@ -35,13 +35,22 @@ export class CommissionsController {
 
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
   @ApiOperation({ summary: "Get all commission plans" })
+  @ApiOkResponse({ description: "List of all commission plans with slabs" })
   @Get()
   async getAllCommissions() {
     return this.commissionService.getAllCommissions();
   }
 
   @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
+  @ApiOperation({ summary: "Get user's commission mapping" })
+  @Get("users/:userId")
+  async getUserCommission(@Param("userId") userId: string) {
+    return this.commissionService.getUserCommissionMapping(userId);
+  }
+
+  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
   @ApiOperation({ summary: "Get commission plan by ID" })
+  @ApiOkResponse({ description: "Commission plan with slabs" })
   @Get(":id")
   async getCommissionById(@Param("id") id: string) {
     return this.commissionService.getCommissionById(id);
@@ -101,12 +110,5 @@ export class CommissionsController {
     @Body() assignDto: AssignCommissionToUserDto,
   ) {
     return this.commissionService.assignCommissionToUser(userId, assignDto);
-  }
-
-  @Role(USERS_ROLE.ADMIN, USERS_ROLE.OPS)
-  @ApiOperation({ summary: "Get user's commission plan" })
-  @Get("users/:userId")
-  async getUserCommission(@Param("userId") userId: string) {
-    return this.commissionService.getUserCommissionMapping(userId);
   }
 }

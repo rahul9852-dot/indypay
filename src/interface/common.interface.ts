@@ -11,7 +11,8 @@ export interface IAccessTokenPayload {
 export type IRefreshTokenPayload = IAccessTokenPayload;
 
 export interface IVerifyMobilePayload {
-  mobile: string;
+  mobile?: string;
+  email?: string;
   isVerified: boolean;
 }
 

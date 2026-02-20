@@ -47,6 +47,10 @@ import {
   ExternalPayinWebhookTPIDto,
   ExternalPayinWebhookUtkarshDto,
 } from "./dto/external-webhook-payin.dto";
+import {
+  CreatePaymentLinkDto,
+  CreateCheckoutDto,
+} from "./dto/create-payin-payment.dto";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import {
   MessageResponseDto,
@@ -129,6 +133,7 @@ import customerUniqueGenerate from "@/utils/customer-unique.utils";
 import { CheckoutEntity } from "@/entities/checkout.entity";
 import { generatePaymentLinkUtil } from "@/utils/payment-link.util";
 import { UtkarshCryptoService } from "@/utils/utkarsh-enc-decr.utils";
+import { PaymentLinkEntity } from "@/entities/payment-link.entity";
 
 const {
   beBaseUrl,
@@ -163,6 +168,8 @@ export class PaymentsService {
     private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
     @InjectRepository(CheckoutEntity)
     private readonly checkoutRepository: Repository<CheckoutEntity>,
+    @InjectRepository(PaymentLinkEntity)
+    private readonly paymentLinkRepository: Repository<PaymentLinkEntity>,
     @InjectQueue("payouts") private payoutQueue: Queue,
     @InjectQueue("tpipay-payouts") private payoutQueueTPI: Queue,
     @InjectQueue("Geopay-payouts") private payoutQueueGeo: Queue,
@@ -6949,6 +6956,197 @@ export class PaymentsService {
   ) {
     return {
       message: "Payment Link Generated successfully",
+    };
+  }
+
+  /**
+   * Create a payment link with encrypted details and expiry time
+   */
+  async createPaymentLink(
+    createPaymentLinkDto: CreatePaymentLinkDto,
+    user: UsersEntity,
+  ) {
+    if (!user?.id) {
+      throw new BadRequestException(
+        "User context required. Please log in and try again.",
+      );
+    }
+    const {
+      amount,
+      email,
+      mobile,
+      expiresInMinutes,
+      notifyOnEmail = false,
+      notifyOnNumber = false,
+    } = createPaymentLinkDto;
+
+    // Calculate expiry time
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
+
+    // Prepare payment details to encrypt (amount, email, number, notify flags)
+    const paymentDetails = {
+      amount,
+      email,
+      mobile,
+      expiresAt: expiresAt.toISOString(),
+      notifyOnEmail,
+      notifyOnNumber,
+    };
+
+    // Encrypt the payment details
+    const encryptedData = this.encryptionAlgoService.encrypt(
+      JSON.stringify(paymentDetails),
+    );
+
+    const paymentLink = this.paymentLinkRepository.create({
+      amount,
+      email,
+      mobile,
+      userId: user.id,
+      encryptedData,
+      expiresAt,
+      notifyOnEmail,
+      notifyOnNumber,
+      status: PAYMENT_STATUS.PENDING,
+    });
+
+    const savedLink = await this.paymentLinkRepository.save(paymentLink);
+
+    const paymentLinkUrl = `${beBaseUrl}/api/v1/payments/payment-link/${savedLink.id}`;
+
+    this.logger.info(
+      `Payment link created: ${LoggerPlaceHolder.Json}`,
+      savedLink.id,
+    );
+
+    return {
+      linkId: savedLink.id,
+      paymentLinkUrl,
+      expiresAt: expiresAt.toISOString(),
+      message: "Payment link created successfully",
+    };
+  }
+
+  /**
+   * Get payment link details by linkId (decrypts and returns details)
+   */
+  async getPaymentLinkDetails(linkId: string) {
+    const paymentLink = await this.paymentLinkRepository.findOne({
+      where: { id: linkId },
+    });
+
+    if (!paymentLink) {
+      throw new NotFoundException("Payment link not found");
+    }
+
+    // Check if link has expired
+    const now = new Date();
+    if (now > paymentLink.expiresAt) {
+      throw new BadRequestException("Payment link has expired");
+    }
+
+    // Decrypt the payment details
+    let paymentDetails: any;
+    try {
+      const decryptedData = this.encryptionAlgoService.decrypt(
+        paymentLink.encryptedData,
+      );
+      paymentDetails = JSON.parse(decryptedData);
+    } catch (error) {
+      this.logger.error(
+        `Failed to decrypt payment link data: ${LoggerPlaceHolder.Json}`,
+        error,
+      );
+      throw new BadRequestException("Failed to decrypt payment link data");
+    }
+
+    // Check if the decrypted expiry time has passed
+    const decryptedExpiresAt = new Date(paymentDetails.expiresAt);
+    if (now > decryptedExpiresAt) {
+      throw new BadRequestException("Payment link has expired");
+    }
+
+    return {
+      linkId: paymentLink.id,
+      amount: paymentDetails.amount,
+      email: paymentDetails.email,
+      mobile: paymentDetails.mobile,
+      expiresAt: paymentDetails.expiresAt,
+      isExpired: false,
+      notifyOnEmail: !!paymentDetails.notifyOnEmail,
+      notifyOnNumber: !!paymentDetails.notifyOnNumber,
+    };
+  }
+
+  /**
+   * Create a checkout session
+   */
+  async createCheckout(
+    createCheckoutDto: CreateCheckoutDto,
+    user: UsersEntity,
+  ) {
+    const {
+      amount,
+      email,
+      mobile,
+      notifyOnEmail = false,
+      notifyOnNumber = false,
+    } = createCheckoutDto;
+
+    const clientTxnId = getUlidId(ID_TYPE.CHECKOUT);
+
+    // Create checkout entity
+    const checkout = this.checkoutRepository.create({
+      payerEmail: email,
+      payerMobile: mobile,
+      amount: amount.toString(),
+      clientTxnId,
+      notifyOnEmail,
+      notifyOnNumber,
+      status: PAYMENT_STATUS.PENDING,
+    });
+
+    const savedCheckout = await this.checkoutRepository.save(checkout);
+
+    // Generate checkout URL
+    const checkoutUrl = `${beBaseUrl}/api/v1/payments/checkout/${savedCheckout.id}`;
+
+    this.logger.info(
+      `Checkout created: ${LoggerPlaceHolder.Json}`,
+      savedCheckout.id,
+    );
+
+    return {
+      checkoutId: savedCheckout.id,
+      checkoutUrl,
+      message: "Checkout created successfully",
+    };
+  }
+
+  /**
+   * Get checkout details by checkoutId
+   */
+  async getCheckoutDetails(checkoutId: string) {
+    const checkout = await this.checkoutRepository.findOne({
+      where: { id: checkoutId },
+    });
+
+    if (!checkout) {
+      throw new NotFoundException("Checkout not found");
+    }
+
+    return {
+      checkoutId: checkout.id,
+      payerEmail: checkout.payerEmail,
+      payerMobile: checkout.payerMobile,
+      payerAddress: checkout.payerAddress,
+      amount: checkout.amount,
+      clientTxnId: checkout.clientTxnId,
+      status: checkout.status,
+      notifyOnEmail: checkout.notifyOnEmail,
+      notifyOnNumber: checkout.notifyOnNumber,
+      createdAt: checkout.createdAt,
     };
   }
 }

@@ -38,6 +38,12 @@ export class CheckoutEntity {
   @Column({ type: "text", unique: true })
   clientTxnId: string;
 
+  @Column({ type: "boolean", default: false })
+  notifyOnEmail: boolean;
+
+  @Column({ type: "boolean", default: false })
+  notifyOnNumber: boolean;
+
   @Index()
   @Column({ enum: PAYMENT_STATUS, default: PAYMENT_STATUS.PENDING })
   status: string;

@@ -4,6 +4,7 @@ export const ERROR_MESSAGES = {
   INTERNAL_SERVER_ERROR: "Internal server error!",
   UNAUTHORIZE: "Access Denied: Unauthorized",
   BAD_REQUEST: "Bad request. Please try again.",
+  PAYMENT_LINK_EXPIRED: "Payment link has expired",
   accountStatusMsg: (status: ACCOUNT_STATUS) => {
     let msgStr: string;
 

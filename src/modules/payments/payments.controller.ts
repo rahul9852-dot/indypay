@@ -27,6 +27,11 @@ import {
   PayinStatusDto,
   CreatePayinTransactionFlaPayDto,
   CreatePayinTransactionGeoPayDTO,
+  CreatePaymentLinkDto,
+  CreatePaymentLinkResponseDto,
+  GetPaymentLinkDetailsResponseDto,
+  CreateCheckoutDto,
+  CreateCheckoutResponseDto,
 } from "./dto/create-payin-payment.dto";
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import {
@@ -648,5 +653,46 @@ export class PaymentsController {
         error: error.message,
       };
     }
+  }
+
+  @ApiOperation({ summary: "Create payment link with encrypted details" })
+  @ApiCreatedResponse({ type: CreatePaymentLinkResponseDto })
+  @Post("payment-link/create")
+  async createPaymentLink(
+    @Body() createPaymentLinkDto: CreatePaymentLinkDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createPaymentLink(createPaymentLinkDto, user);
+  }
+
+  @Public()
+  @ApiOperation({
+    summary:
+      "Get payment link details by linkId (decrypts and returns details)",
+  })
+  @ApiOkResponse({ type: GetPaymentLinkDetailsResponseDto })
+  @Get("payment-link/:linkId")
+  async getPaymentLinkDetails(@Param("linkId") linkId: string) {
+    return this.paymentsService.getPaymentLinkDetails(linkId);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Create checkout session" })
+  @UseGuards(ApiKeyGuard)
+  @ApiCreatedResponse({ type: CreateCheckoutResponseDto })
+  @Post("checkout/create")
+  async createCheckout(
+    @Body() createCheckoutDto: CreateCheckoutDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.createCheckout(createCheckoutDto, user);
+  }
+
+  @Public()
+  @ApiOperation({ summary: "Get checkout details by checkoutId" })
+  @ApiOkResponse()
+  @Get("checkout/:checkoutId")
+  async getCheckoutDetails(@Param("checkoutId") checkoutId: string) {
+    return this.paymentsService.getCheckoutDetails(checkoutId);
   }
 }

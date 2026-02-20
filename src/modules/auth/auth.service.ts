@@ -138,7 +138,7 @@ export class AuthService {
 
   async login(loginUserDto: LoginUserDto, req: Request, res: Response) {
     const isLocked = await this.cacheManager.get<number>(
-      generateLockAccountKey(loginUserDto.mobile),
+      generateLockAccountKey(loginUserDto.email),
     );
     if (isLocked) {
       throw new BadRequestException(
@@ -150,7 +150,7 @@ export class AuthService {
 
     const user = await this.usersRepository.findOne({
       where: {
-        mobile: loginUserDto.mobile,
+        email: loginUserDto.email,
       },
       select: {
         id: true,
@@ -166,7 +166,7 @@ export class AuthService {
 
     if (!user) {
       throw new BadRequestException(
-        new MessageResponseDto("Incorrect mobile number or password"),
+        new MessageResponseDto("Incorrect email or password"),
       );
     }
 
@@ -176,10 +176,10 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      const attemptsLeft = await this.handleFailedLogin(loginUserDto.mobile);
+      const attemptsLeft = await this.handleFailedLogin(loginUserDto.email);
       throw new BadRequestException(
         new MessageResponseDto(
-          `Incorrect mobile number or password. ${attemptsLeft} attempts left.`,
+          `Incorrect email or password. ${attemptsLeft} attempts left.`,
         ),
       );
     }
@@ -196,7 +196,7 @@ export class AuthService {
       );
     }
 
-    await this.cacheManager.del(generateAttemptsKey(loginUserDto.mobile));
+    await this.cacheManager.del(generateAttemptsKey(loginUserDto.email));
 
     const currentIp = getCurrentUserIp(req);
 
@@ -225,14 +225,16 @@ export class AuthService {
     if (user.twoFactorEnabled) {
       const twoFactorToken = await this.generate2FAToken(user);
 
-      // Send OTP via SMS
-      const otpSent = await this.snsService.sendSMS(
-        user.mobile,
-        `Your two-factor authentication code is: ${twoFactorToken}`,
+      // Send OTP via email
+      const emailBody = `<p>Your two-factor authentication code is: <strong>${twoFactorToken}</strong></p><p>This code expires in 5 minutes.</p>`;
+      const emailSent = await this.sesService.sendEmail(
+        "Your Rupeeflow 2FA code",
+        emailBody,
+        user.email,
       );
-      if (!otpSent) {
+      if (!emailSent?.success) {
         throw new BadRequestException(
-          new MessageResponseDto("Failed to send SMS"),
+          new MessageResponseDto("Failed to send 2FA code to your email"),
         );
       }
 
@@ -277,8 +279,7 @@ export class AuthService {
         });
 
         return res.json({
-          message:
-            "Please enter the verification code sent to your mobile number",
+          message: "Please enter the verification code sent to your email",
           ...(!isProduction && { code: twoFactorToken }),
         });
       } catch (error) {
@@ -693,21 +694,19 @@ export class AuthService {
     return new MessageResponseDto("User registered successfully");
   }
 
-  async forgotPassword(mobile: string, forgotPasswordDto: ForgotPasswordDto) {
+  async forgotPassword(contact: string, forgotPasswordDto: ForgotPasswordDto) {
     if (forgotPasswordDto.password !== forgotPasswordDto.confirmPassword) {
       throw new BadRequestException(
         new MessageResponseDto("Passwords do not match"),
       );
     }
 
+    const isEmail = contact.includes("@");
     const existingUser = await this.usersRepository.findOne({
-      where: {
-        mobile,
-        accountStatus: ACCOUNT_STATUS.ACTIVE,
-      },
-      select: {
-        password: true,
-      },
+      where: isEmail
+        ? { email: contact, accountStatus: ACCOUNT_STATUS.ACTIVE }
+        : { mobile: contact, accountStatus: ACCOUNT_STATUS.ACTIVE },
+      select: { password: true },
     });
 
     if (!existingUser) {
@@ -726,54 +725,76 @@ export class AuthService {
       password: hashedPassword,
     });
 
-    await this.usersRepository.update({ mobile }, updatedUser);
+    await this.usersRepository.update(
+      isEmail ? { email: contact } : { mobile: contact },
+      updatedUser,
+    );
 
     return new MessageResponseDto("Password changed successfully");
   }
 
-  async sendForgotPasswordOtp({ mobile }: SendOtpDto, res: Response) {
+  async sendForgotPasswordOtp({ email, mobile }: SendOtpDto, res: Response) {
+    if (!email && !mobile) {
+      throw new BadRequestException(
+        new MessageResponseDto("Please provide email or mobile number"),
+      );
+    }
+
+    const identifier = email ?? mobile!;
+    const isEmailFlow = !!email;
+
     const user = await this.usersRepository.findOne({
-      where: {
-        mobile,
-      },
+      where: isEmailFlow ? { email } : { mobile },
     });
 
     if (!user) {
-      throw new ConflictException(
-        new MessageResponseDto("User doesn't exists"),
-      );
+      throw new ConflictException(new MessageResponseDto("User doesn't exist"));
     }
 
-    const otpKey = REDIS_KEYS.FORGET_PASSWORD_KEY(mobile);
+    const otpKey = REDIS_KEYS.FORGET_PASSWORD_KEY(identifier);
+    const otp = generateOtp();
 
-    const mobileOtp = generateOtp();
-
-    const formattedPhone = mobile.startsWith("+") ? mobile : `+91${mobile}`;
-
-    const smsSent = await this.snsService.sendSMS(
-      formattedPhone,
-      `Your Rupeeflow OTP to reset your password is: ${mobileOtp}`,
-    );
-    if (!smsSent) {
-      throw new BadRequestException(
-        new MessageResponseDto("Failed to send mobile OTP"),
+    if (isEmailFlow) {
+      const emailBody = `<p>Your Rupeeflow OTP to reset your password is: <strong>${otp}</strong></p><p>This code expires in 15 minutes.</p>`;
+      const emailSent = await this.sesService.sendEmail(
+        "Reset your Rupeeflow password",
+        emailBody,
+        user.email,
       );
+      if (!emailSent?.success) {
+        throw new BadRequestException(
+          new MessageResponseDto("Failed to send OTP to your email"),
+        );
+      }
+    } else {
+      const formattedPhone = mobile!.startsWith("+") ? mobile! : `+91${mobile}`;
+      const smsSent = await this.snsService.sendSMS(
+        formattedPhone,
+        `Your Rupeeflow OTP to reset your password is: ${otp}`,
+      );
+      if (!smsSent) {
+        throw new BadRequestException(
+          new MessageResponseDto("Failed to send mobile OTP"),
+        );
+      }
     }
 
-    const payload: IVerifyMobilePayload = { mobile, isVerified: false };
+    const payload: IVerifyMobilePayload = isEmailFlow
+      ? { email: identifier, isVerified: false }
+      : { mobile: identifier, isVerified: false };
     const token = this.generateAccessToken(payload, { expiresIn: "15m" });
 
     await this.cacheManager.set(
       otpKey,
-      { mobileOtp, mobile, createdAt: Date.now() },
+      { otp, identifier, createdAt: Date.now() },
       1000 * 60 * 15,
     );
 
     return res
       .cookie(COOKIE_KEYS.MOBILE_INFO_KEY, token, mobileVerifyCookieOptions)
       .json({
-        mobile,
-        ...(!isProduction && { otp: mobileOtp }),
+        ...(isEmailFlow ? { email } : { mobile }),
+        ...(!isProduction && { otp }),
       });
   }
 
@@ -892,31 +913,40 @@ export class AuthService {
       });
   }
 
-  async verifyForgotPasswordOtp({ mobile, otp }: VerifyOtpDto, res: Response) {
-    const otpKey = REDIS_KEYS.FORGET_PASSWORD_KEY(mobile);
+  async verifyForgotPasswordOtp(
+    { email, mobile, otp }: VerifyOtpDto,
+    res: Response,
+  ) {
+    const identifier = email ?? mobile;
+    if (!identifier) {
+      throw new BadRequestException(
+        new MessageResponseDto("Please provide email or mobile number"),
+      );
+    }
 
+    const otpKey = REDIS_KEYS.FORGET_PASSWORD_KEY(identifier);
     const storedData = await this.cacheManager.get<{
-      mobileOtp: string;
-      mobile: string;
+      otp: string;
+      identifier: string;
       createdAt: number;
     }>(otpKey);
 
     if (!storedData) {
       throw new BadRequestException(
-        new MessageResponseDto("OTPs have expired. Please request new OTPs"),
+        new MessageResponseDto("OTP has expired. Please request a new OTP"),
       );
     }
 
-    if (storedData.mobileOtp !== otp) {
+    if (storedData.otp !== otp) {
       throw new BadRequestException(new MessageResponseDto("Invalid OTP"));
     }
 
     await this.cacheManager.del(otpKey);
 
-    const payload: IVerifyMobilePayload = {
-      mobile: storedData.mobile,
-      isVerified: true,
-    };
+    const isEmail = storedData.identifier.includes("@");
+    const payload: IVerifyMobilePayload = isEmail
+      ? { email: storedData.identifier, isVerified: true }
+      : { mobile: storedData.identifier, isVerified: true };
 
     const token = this.generateAccessToken(payload);
 
@@ -1559,16 +1589,17 @@ export class AuthService {
     });
   }
 
-  private async handleFailedLogin(mobile: string): Promise<number> {
+  private async handleFailedLogin(identifier: string): Promise<number> {
     const attempts =
-      (await this.cacheManager.get<number>(generateAttemptsKey(mobile))) || 0;
+      (await this.cacheManager.get<number>(generateAttemptsKey(identifier))) ||
+      0;
     const newAttempts = attempts + 1;
     const attemptsLeft = MAX_ATTEMPTS - newAttempts;
 
     if (newAttempts >= MAX_ATTEMPTS) {
       const lockEndTime = new Date(Date.now() + LOCK_TIME_MS);
       await this.cacheManager.set(
-        generateLockAccountKey(mobile),
+        generateLockAccountKey(identifier),
         lockEndTime.getTime(),
         LOCK_TIME_MS,
       );
@@ -1579,7 +1610,7 @@ export class AuthService {
       );
     } else {
       await this.cacheManager.set(
-        generateAttemptsKey(mobile),
+        generateAttemptsKey(identifier),
         newAttempts,
         LOCK_TIME_MS,
       );
