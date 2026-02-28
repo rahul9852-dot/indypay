@@ -33,12 +33,13 @@ export const dbConfig: TypeOrmModuleOptions = {
     // acquireTimeoutMillis: 20000, // Much more time to acquire connection during high load
     // reapIntervalMillis: 100, // Faster cleanup for better connection reuse
   },
-  logging: !isProduction,
-  ...((isProduction || isStaging) &&
-    {
-      // commented ssl for pgbouncer
-      // ssl: {
-      //   rejectUnauthorized: false,
-      // },
-    }),
+  ssl: false,
+  // logging: !isProduction,
+  // ...((isProduction || isStaging) &&
+  //   {
+  // commented ssl for pgbouncer
+  // ssl: {
+  //   rejectUnauthorized: false,
+  // },
+  // }),
 };
