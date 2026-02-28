@@ -4,7 +4,6 @@ import { appConfig } from "./app.config";
 const {
   database: { host, port, name, password, username },
   isProduction,
-  isStaging,
 } = appConfig();
 
 export const migrationConfig: DataSourceOptions = {
@@ -20,11 +19,9 @@ export const migrationConfig: DataSourceOptions = {
   synchronize: false,
   migrationsRun: false,
   logging: !isProduction,
-  ...((isProduction || isStaging) && {
-    ssl: {
-      rejectUnauthorized: false,
-    },
-  }),
+  // Disable SSL when using PgBouncer (server does not support SSL connections).
+  // Re-enable if connecting directly to PostgreSQL with SSL (e.g. managed DB).
+  ssl: false,
 };
 
 const dataSource = new DataSource(migrationConfig);
