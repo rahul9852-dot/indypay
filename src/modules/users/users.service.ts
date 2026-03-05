@@ -91,14 +91,51 @@ export class UsersService {
     const { email, name, businessType, organizationName, mobileNumber } =
       contactUserDto;
 
-    await this.sesService.sendContactEmail(
-      "Contact User",
-      `<p><strong>Name:</strong> ${name}</p>
-      <p><strong>Business Type:</strong> ${businessType}</p>
-      <p><strong>Organization Name:</strong> ${organizationName}</p>
-      <p><strong>Mobile Number:</strong> ${mobileNumber}</p>`,
-      email,
-    );
+    const message = `
+      <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f9f9f9;">
+          <div style="max-width: 600px; margin: 20px auto; padding: 24px; background-color: #ffffff; border-radius: 10px; border: 1px solid #e5e7eb;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <div style="font-size: 24px; font-weight: 700; color: #111827;">Rupeeflow</div>
+              <p style="margin: 8px 0 0; color: #6b7280; font-size: 14px;">New contact request from website</p>
+            </div>
+
+            <p style="margin: 0 0 16px;">You have received a new enquiry with the following details:</p>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px;">
+              <tbody>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600; width: 40%; color: #374151;">Name</td>
+                  <td style="padding: 8px 0; color: #111827;">${name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600; color: #374151;">Business Type</td>
+                  <td style="padding: 8px 0; color: #111827;">${businessType}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600; color: #374151;">Organization Name</td>
+                  <td style="padding: 8px 0; color: #111827;">${organizationName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600; color: #374151;">Mobile Number</td>
+                  <td style="padding: 8px 0; color: #111827;">${mobileNumber}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; font-weight: 600; color: #374151;">Email</td>
+                  <td style="padding: 8px 0; color: #111827;">${email}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <p style="margin: 0; font-size: 13px; color: #6b7280;">
+              You can reply directly to this email to get in touch with the user.
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    await this.sesService.sendContactEmail("Contact User", message, email);
 
     await axios.post(googleSheetScriptUrl, {
       email,
