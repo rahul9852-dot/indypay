@@ -11,6 +11,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { ILike, Repository } from "typeorm";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
+import axios from "axios";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AddBusinessDetailsDto } from "./dto/add-business-details.dto";
 import { WebhookUrlDto } from "./dto/webhook.dto";
@@ -25,6 +26,7 @@ import { DeleteWhitelistIpsDto } from "./dto/whitelist-ips.dto";
 import { UserListQuery } from "./dto/user-list.dto";
 import { UpdateCountDto } from "./dto/count.dto";
 import { AddCredentialForFlakPayDto } from "./dto/add-credentials.dto";
+import { ContactUserDto } from "./dto/contact-user.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import { IAccessTokenPayload } from "@/interface/common.interface";
@@ -53,6 +55,9 @@ import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { SESService } from "@/modules/aws/ses.service";
 import { SNSService } from "@/modules/aws/sns.service";
+import { appConfig } from "@/config/app.config";
+
+const { googleSheetScriptUrl } = appConfig();
 
 @Injectable()
 export class UsersService {
@@ -81,6 +86,19 @@ export class UsersService {
     private readonly sesService: SESService,
     private readonly snsService: SNSService,
   ) {}
+
+  async contactUser(contactUserDto: ContactUserDto) {
+    const { email, message } = contactUserDto;
+
+    await this.sesService.sendContactEmail("Contact User", message, email);
+
+    await axios.post(googleSheetScriptUrl, {
+      email,
+      message,
+    });
+
+    return new MessageResponseDto("Message sent successfully");
+  }
 
   async getUserIps(
     userId: string,

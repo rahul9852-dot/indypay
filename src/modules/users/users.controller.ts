@@ -39,6 +39,7 @@ import {
 import { UserListQuery, UserListResponseDto } from "./dto/user-list.dto";
 import { AddCredentialForFlakPayDto } from "./dto/add-credentials.dto";
 import { AddAddressAdminDto, AddAddressDto } from "./dto/add-address.dto";
+import { ContactUserDto } from "./dto/contact-user.dto";
 import { User } from "@/decorators/user.decorator";
 import { MessageResponseDto, PaginationDto } from "@/dtos/common.dto";
 import {
@@ -54,6 +55,7 @@ import { USERS_ROLE } from "@/enums";
 import { AuthGuard } from "@/guard/auth.guard";
 import { ChangeRoleGuard } from "@/guard/change-role.guard";
 import { ChangeAccountStatusGuard } from "@/guard/change-account-status.guard";
+import { Public } from "@/decorators/public.decorator";
 
 @ApiTags("Users")
 @Controller({
@@ -62,6 +64,12 @@ import { ChangeAccountStatusGuard } from "@/guard/change-account-status.guard";
 })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Public()
+  @Post("contact")
+  async contactUser(@Body() contactUserDto: ContactUserDto) {
+    return this.usersService.contactUser(contactUserDto);
+  }
 
   @Get("user-ip/:userId")
   @Role(USERS_ROLE.OWNER, USERS_ROLE.ADMIN)

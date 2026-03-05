@@ -19,6 +19,7 @@ export const appConfig = registerAs("appConfig", () => ({
   loginSignupEncryptionKey: getOsEnv("LOGIN_SIGNUP_ENCRYPTION_KEY"),
   loginSignupEncryptionIV: getOsEnv("LOGIN_SIGNUP_ENCRYPTION_IV"),
   allowCookiesDomain: getOsEnv("ALLOW_COOKIES_DOMAIN"),
+  googleSheetScriptUrl: getOsEnv("GOOGLE_SHEET_SCRIPT_URL"),
   database: {
     host: getOsEnv("DB_HOST"),
     port: getOsEnv("DB_PORT"),
