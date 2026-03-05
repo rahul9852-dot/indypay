@@ -88,13 +88,24 @@ export class UsersService {
   ) {}
 
   async contactUser(contactUserDto: ContactUserDto) {
-    const { email, message } = contactUserDto;
+    const { email, name, businessType, organizationName, mobileNumber } =
+      contactUserDto;
 
-    await this.sesService.sendContactEmail("Contact User", message, email);
+    await this.sesService.sendContactEmail(
+      "Contact User",
+      `<p><strong>Name:</strong> ${name}</p>
+      <p><strong>Business Type:</strong> ${businessType}</p>
+      <p><strong>Organization Name:</strong> ${organizationName}</p>
+      <p><strong>Mobile Number:</strong> ${mobileNumber}</p>`,
+      email,
+    );
 
     await axios.post(googleSheetScriptUrl, {
       email,
-      message,
+      name,
+      businessType,
+      organizationName,
+      mobileNumber,
     });
 
     return new MessageResponseDto("Message sent successfully");

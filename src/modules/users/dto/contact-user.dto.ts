@@ -5,10 +5,25 @@ export class ContactUserDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  message: string;
+  email: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  email: string;
+  name: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  businessType: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  organizationName: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  mobileNumber: string;
 }
