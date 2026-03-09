@@ -100,8 +100,8 @@ async function bootstrap() {
 
   // Set up Swagger
   const config = new DocumentBuilder()
-    .setTitle("Paybolt API")
-    .setDescription("The Paybolt API description")
+    .setTitle("Rupeeflow API")
+    .setDescription("The Rupeeflow API description")
     .setVersion("1.0")
     .addBearerAuth()
     .build();
@@ -133,7 +133,7 @@ async function bootstrap() {
   // Start server
   await app.listen(port, () => {
     logger.info(`Server is running on port: ${LoggerPlaceHolder.String}`, port);
-    !isProduction &&
+    isProduction &&
       // eslint-disable-next-line no-console
       console.log(
         `Swagger docs is running on port: http://localhost:${port}/docs`,
