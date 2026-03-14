@@ -20,6 +20,7 @@ import {
   Res,
   UseGuards,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { WebhookUrlDto } from "./dto/webhook.dto";
 import { UsersService } from "./users.service";
 import { AddBusinessDetailsDto } from "./dto/add-business-details.dto";
@@ -65,6 +66,9 @@ import { Public } from "@/decorators/public.decorator";
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // 5 contact submissions/min — each call fires an SES email; this stops
+  // automated spam campaigns from burning through the SES sending quota (S-2).
+  @Throttle({ contact: { limit: 5, ttl: 60_000 } })
   @Public()
   @Post("contact")
   async contactUser(@Body() contactUserDto: ContactUserDto) {

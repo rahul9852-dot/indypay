@@ -17,6 +17,7 @@ import {
 } from "@nestjs/swagger";
 import { Request, Response } from "express";
 import { UseInterceptors } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { SendOtpDto, SendOtpResDto, VerifyOtpDto } from "./dto/send-otp.dto";
 import { Verify2FADto } from "./dto/verify-2fa.dto";
 import { AuthService } from "./auth.service";
@@ -75,6 +76,9 @@ export class AuthController {
     return this.authService.update2FAStatusAdmin(body.userId, body.isEnabled);
   }
 
+  // 10 verify attempts/min — brute-forcing a 6-digit space needs ~1000 tries;
+  // this makes exhausting it within the 5-min OTP window practically impossible.
+  @Throttle({ otp: { limit: 10, ttl: 60_000 } })
   @Public()
   @ApiOperation({
     summary: "Verify 2FA code and complete login",
@@ -118,6 +122,10 @@ export class AuthController {
     }
   }
 
+  // 10 login attempts/min per IP — complements the per-email account lock (S-11)
+  // by adding IP-level protection; a credential-stuffing script is blocked here
+  // before it can rotate through many email addresses.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Public()
   @UseInterceptors(AuthEncryptionInterceptor)
   @ApiOperation({
@@ -142,6 +150,9 @@ export class AuthController {
     }
   }
 
+  // 5 OTP sends/min — each call triggers an SMS/email; cap prevents an attacker
+  // from using the endpoint as a paid messaging relay (S-2).
+  @Throttle({ otp: { limit: 5, ttl: 60_000 } })
   @Public()
   @ApiOperation({
     summary: "Register merchant - Step 1: Send OTPs",
@@ -208,6 +219,8 @@ export class AuthController {
     return this.authService.forgotPassword(mobile, forgotPasswordDto);
   }
 
+  // Same OTP cost rationale as send-signup-otp — same 5/min cap (S-2).
+  @Throttle({ otp: { limit: 5, ttl: 60_000 } })
   @Public()
   @ApiOperation({
     summary: "Forgot password - Step 1: Send OTP",

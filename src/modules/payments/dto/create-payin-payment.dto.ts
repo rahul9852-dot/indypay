@@ -41,67 +41,6 @@ export class CreatePayinTransactionAnviNeoDto {
   mobile: string;
 }
 
-export class CreatePayinTransactionIsmartDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  orderId: string;
-
-  @ApiProperty()
-  @IsNumber({
-    maxDecimalPlaces: 2,
-  })
-  @IsPositive()
-  amount: number;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiProperty()
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
-
-  @ApiProperty()
-  @IsNumberString()
-  @IsNotEmpty()
-  @Length(10, 10)
-  mobile: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  @IsOptional()
-  vpa?: string;
-}
-
-export class CreatePayinTransactionPayNProDto {
-  @ApiProperty()
-  @IsNumber({
-    maxDecimalPlaces: 2,
-  })
-  @IsPositive()
-  amount: number;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiProperty()
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
-
-  @ApiProperty()
-  @IsNumberString()
-  @IsNotEmpty()
-  @Length(10, 10)
-  mobile: string;
-}
-
 export class PayinStatusDto {
   @ApiProperty()
   @IsString()
@@ -121,68 +60,6 @@ export class CreatePayinPaymentResponseDto {
 
   @ApiResponseProperty()
   qr: string;
-}
-
-// flakpay
-
-export class CreatePayinTransactionFlaPayDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  orderId: string;
-
-  @ApiProperty()
-  @IsNumber({
-    maxDecimalPlaces: 2,
-  })
-  @IsPositive()
-  amount: number;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiProperty()
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
-
-  @ApiProperty()
-  @IsNumberString()
-  @IsNotEmpty()
-  @Length(10, 10)
-  mobile: string;
-}
-
-export class CreatePayinTransactionGeoPayDTO {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  orderId: string;
-
-  @ApiProperty()
-  @IsNumber({
-    maxDecimalPlaces: 2,
-  })
-  @IsPositive()
-  amount: number;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiProperty()
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
-
-  @ApiProperty()
-  @IsNumberString()
-  @IsNotEmpty()
-  @Length(10, 10)
-  mobile: string;
 }
 
 export class CreatePaymentLinkDto {

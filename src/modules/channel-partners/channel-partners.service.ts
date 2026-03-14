@@ -26,17 +26,9 @@ import { getPagination } from "@/utils/pagination.utils";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { SettlementsEntity } from "@/entities/settlements.entity";
-import { AxiosService } from "@/shared/axios/axios.service";
-import { appConfig } from "@/config/app.config";
-import { IExternalPayoutStatusResponseIsmart } from "@/interface/external-api.interface";
-import { ISMART_PAY } from "@/constants/external-api.constant";
-import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
-import { getIsmartPayPgConfig } from "@/utils/pg-config.utils";
 import { PayOutOrdersEntity } from "@/entities/payout-orders.entity";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
 import { PAYMENT_METHOD } from "@/enums/payment-method.enum";
-
-const { externalPaymentConfig } = appConfig();
 
 @Injectable()
 export class ChannelPartnersService {
@@ -881,50 +873,9 @@ export class ChannelPartnersService {
       );
     }
 
-    if (settlement.status === PAYMENT_STATUS.SUCCESS) {
-      return {
-        settlementId,
-        status: settlement.status,
-        amount: settlement.amountAfterDeduction,
-      };
-    }
-
-    const axiosServiceIsmart = new AxiosService(
-      ISMART_PAY.BASE_URL,
-      getIsmartPayPgConfig({
-        clientId: externalPaymentConfig.ismart.clientId,
-        clientSecret: externalPaymentConfig.ismart.clientSecret,
-      }),
-    );
-
-    // call third party api
-    const response =
-      await axiosServiceIsmart.getRequest<IExternalPayoutStatusResponseIsmart>(
-        `${ISMART_PAY.PAYOUT_STATUS}/${settlement.transferId}`,
-      );
-
-    if (!response.status) {
-      throw new BadRequestException(new MessageResponseDto(response.message));
-    }
-
-    const status = convertExternalPaymentStatusToInternal(response.status_code);
-
-    const settlementRaw = this.settlementsRepository.create({
-      id: settlement.id,
-      status,
-      ...(status === PAYMENT_STATUS.SUCCESS && {
-        successAt: new Date(),
-      }),
-      ...(status === PAYMENT_STATUS.FAILED && {
-        failureAt: new Date(),
-      }),
-    });
-
-    await this.settlementsRepository.save(settlementRaw);
-
     return {
       settlementId,
-      status,
+      status: settlement.status,
       amount: settlement.amountAfterDeduction,
     };
   }

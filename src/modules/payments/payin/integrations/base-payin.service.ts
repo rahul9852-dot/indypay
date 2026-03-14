@@ -3,7 +3,7 @@ import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { DataSource, Repository } from "typeorm";
-import { CreatePayinTransactionFlaPayDto } from "../../dto/create-payin-payment.dto";
+import { CreatePayinTransactionAnviNeoDto } from "../../dto/create-payin-payment.dto";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { UsersEntity } from "@/entities/user.entity";
@@ -45,7 +45,7 @@ export abstract class BasePayinService {
    * NO DB insert, NO commission, NO transaction - ALL handled async by batch processor
    */
   protected async createPayinOrderAndTransaction(
-    createPayinTransactionDto: CreatePayinTransactionFlaPayDto,
+    createPayinTransactionDto: CreatePayinTransactionAnviNeoDto,
     user: UsersEntity,
     paymentLink?: string,
     txnRefId?: string,
@@ -106,7 +106,7 @@ export abstract class BasePayinService {
    * Abstract method - each integration must implement this
    */
   abstract createPayin(
-    createPayinTransactionDto: CreatePayinTransactionFlaPayDto,
+    createPayinTransactionDto: CreatePayinTransactionAnviNeoDto,
     user: UsersEntity,
   ): Promise<any>;
 }

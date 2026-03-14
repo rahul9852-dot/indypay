@@ -17,7 +17,6 @@ export const appConfig = registerAs("appConfig", () => ({
   authKey: getOsEnv("AUTH_KEY"),
   encryptionIV: getOsEnv("AUTH_IV"),
   loginSignupEncryptionKey: getOsEnv("LOGIN_SIGNUP_ENCRYPTION_KEY"),
-  loginSignupEncryptionIV: getOsEnv("LOGIN_SIGNUP_ENCRYPTION_IV"),
   allowCookiesDomain: getOsEnv("ALLOW_COOKIES_DOMAIN"),
   googleSheetScriptUrl: getOsEnv("GOOGLE_SHEET_SCRIPT_URL"),
   database: {
@@ -49,58 +48,6 @@ export const appConfig = registerAs("appConfig", () => ({
     secretBites: +getOsEnv("SECRET_BITES") || 20,
   },
 
-  externalPaymentConfig: {
-    ismart: {
-      clientId: getOsEnv("ISMART_PAYMENT_CLIENT_ID"),
-      clientSecret: getOsEnv("ISMART_PAYMENT_CLIENT_SECRET"),
-      webhookIps: getOsEnv("ISMART_PAYMENT_WEBHOOK_IPS").split(","),
-    },
-    flakPay: {
-      clientId: getOsEnv("FLAKPAY_PAYMENT_CLIENT_ID"),
-      clientSecret: getOsEnv("FLAKPAY_PAYMENT_CLIENT_SECRET"),
-      webhookIps: getOsEnv("FLAKPAY_PAYMENT_WEBHOOK_IPS").split(","),
-    },
-    diaspay: {
-      token: getOsEnv("TOKEN"),
-      uuid: getOsEnv("UUID"),
-    },
-    ertech: {
-      encryptionKey: getOsEnv("ERTITECH_ENCRYPTION_KEY"),
-      email: getOsEnv("ERTITECH_EMAIL"),
-      password: getOsEnv("ERTITECH_PASSWORD"),
-      merchantId: getOsEnv("ERTITECH_MERCHANT_ID"),
-      webhookIps: getOsEnv("ERTITECH_WEBHOOK_IPS").split(","),
-    },
-    paynpro: {
-      payin: {
-        clientId: getOsEnv("PAYNPRO_PAYIN_PAYMENT_CLIENT_ID"),
-        clientSecret: getOsEnv("PAYNPRO_PAYIN_PAYMENT_CLIENT_SECRET"),
-        encryptionSalt: getOsEnv("PAYNPRO_PAYIN_PAYMENT_ENCRYPTION_SALT"),
-        aesSecretKey: getOsEnv("PAYNPRO_PAYIN_PAYMENT_AES_SECRET_KEY"),
-      },
-      payout: {
-        clientId: getOsEnv("PAYNPRO_PAYOUT_PAYMENT_CLIENT_ID"),
-        clientSecret: getOsEnv("PAYNPRO_PAYOUT_PAYMENT_CLIENT_SECRET"),
-        signature: getOsEnv("PAYNPRO_PAYOUT_PAYMENT_SIGNATURE"),
-      },
-      webhookIps: getOsEnv("PAYNPRO_PAYMENT_WEBHOOK_IPS").split(","),
-    },
-    kdsPayout: {
-      kdsClientId: getOsEnv("KDS_CLIENT_ID"),
-      kdsClientSecret: getOsEnv("KDS_CLIENT_SECRET"),
-      kdsIp: getOsEnv("KDS_IP").split(","),
-    },
-    buckbox: {
-      apiToken: getOsEnv("BUCKBOX_API_TOKEN"),
-      apiKey: getOsEnv("BUCKBOX_API_KEY"),
-      webhookIps: getOsEnv("BUCKBOX_WEBHOOK_IPS").split(","),
-    },
-    rocky: {
-      apiKey: getOsEnv("ROCKY_API_KEY"),
-      mid: getOsEnv("ROCKY_MID"),
-      webhookIps: getOsEnv("ROCKY_IP").split(","),
-    },
-  },
   transactionConfig: {
     commissionInPercentagePayIn:
       +getOsEnv("PAYIN_COMMISSION_IN_PERCENTAGE") || 4.5,
@@ -136,53 +83,5 @@ export const appConfig = registerAs("appConfig", () => ({
     region: getOsEnv("AWS_REGION"),
     snsTopicArn: getOsEnv("AWS_SNS_TOPIC_ARN"),
     s3BucketName: getOsEnv("AWS_S3_BUCKET_NAME"),
-  },
-  sabpaisa: {
-    clientCode: getOsEnv("CLIENT_CODE"),
-    transUserName: getOsEnv("TRANSUSER_NAME"),
-    transUserPassword: getOsEnv("TRANS_USER_PASSWORD"),
-    mcc: getOsEnv("MCC"),
-    Class: getOsEnv("CLASS"),
-    role: getOsEnv("S_ROLE"),
-  },
-  utkarsh: {
-    vpa: getOsEnv("UPI_ID"),
-    webhookIps: getOsEnv("UTKARSH").split(","),
-    utkarshMid: getOsEnv("UTKARSH_MID"),
-    utkarshTerminalId: getOsEnv("UTKARSH_TERMINAL_ID"),
-    utkarshAuthIV: getOsEnv("UTKARSH_AUTH_IV"),
-    utkarshAuthKey: getOsEnv("UTKARSH_AUTH_KEY"),
-  },
-  payboltCreds: {
-    clientId: getOsEnv("PAYBOLT_CLIENT_ID"),
-    clientSecret: getOsEnv("PAYBOLT_CLIENT_SECRET"),
-    webhookIps: getOsEnv("PAYBOLT_WEBHOOK_IPS").split(","),
-  },
-  tpipay: {
-    apiToken: getOsEnv("TPI_API_TOKEN"),
-    callbackUrl: getOsEnv("TPI_CALLBACK_URL"),
-    webhookIps: getOsEnv("TPI_WEBHOOK_IPS").split(","),
-    redirectUrl: getOsEnv("TPI_REDIRECT_URL"),
-    userEmail: getOsEnv("TPI_USER_EMAIL"),
-  },
-
-  geopay: {
-    secretKey: getOsEnv("GEOPAY_SECRET_KEY"),
-    agentId: getOsEnv("GEOPAY_AGENT_ID"),
-    agentname: getOsEnv("GEOPAY_AGENT_NAME"),
-    webhookips: getOsEnv("GEOPAY_IP").split(","),
-  },
-  onik: {
-    apiToken: getOsEnv("ONIK_API_KEY"),
-    webhookIps: getOsEnv("ONIK_IPs").split(","),
-  },
-  nxt: {
-    clientId: getOsEnv("NXT_CLIENT_ID"),
-    secretKey: getOsEnv("NXT_SECRET_KEY"),
-    webhookIps: getOsEnv("NXT_IP").split(","),
-  },
-  fyntra: {
-    apiToken: getOsEnv("FYNTRA_API_KEY"),
-    webhookIps: getOsEnv("FYNTRA_IPs").split(","),
   },
 }));

@@ -1,11 +1,9 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
-  DataSource,
   ILike,
   Repository,
   Between,
@@ -13,56 +11,23 @@ import {
   MoreThanOrEqual,
   LessThanOrEqual,
 } from "typeorm";
-import { InitiateSettlementAdminDto } from "./dto/initate-settlement-admin.dto";
 import { GetSettlementListDto } from "./dto/get-settlement-list.dto";
 import { MessageResponseDto, PaginationWithDateDto } from "@/dtos/common.dto";
 import { UsersEntity } from "@/entities/user.entity";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
-import { AxiosService } from "@/shared/axios/axios.service";
-import { appConfig } from "@/config/app.config";
 import { SettlementsEntity } from "@/entities/settlements.entity";
-import {
-  BUCKBOX,
-  ERTITECH,
-  ISMART_PAY,
-} from "@/constants/external-api.constant";
-import { BanksService } from "@/modules/banks/banks.service";
 import { WalletEntity } from "@/entities/wallet.entity";
-import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
-import {
-  ACCOUNT_STATUS,
-  ONBOARDING_STATUS,
-  SETTLEMENT_TYPE,
-  USERS_ROLE,
-} from "@/enums";
+import { ACCOUNT_STATUS, ONBOARDING_STATUS, USERS_ROLE } from "@/enums";
 import { getPagination } from "@/utils/pagination.utils";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { PAYMENT_STATUS } from "@/enums/payment.enum";
 import { todayEndDate, todayStartDate } from "@/utils/date.utils";
-import {
-  getCommissions,
-  getPayoutCommissions,
-} from "@/utils/commissions.utils";
-import {
-  IExternalPayoutStatusResponseIsmart,
-  IExternalEritecPayoutFundResponse,
-  IExternalBuckboxPayoutFundResponse,
-} from "@/interface/external-api.interface";
-
+import { getCommissions } from "@/utils/commissions.utils";
 import { EmailService } from "@/shared/services/email.service";
 import { InvoiceService } from "@/shared/services/invoice.service";
 import { UserAddressEntity } from "@/entities/user-address.entity";
-import {
-  // getFlakPayPgConfig,
-  getIsmartPayPgConfig,
-  getEritechPgConfig,
-} from "@/utils/pg-config.utils";
-import { decryptData } from "@/utils/encode-decode.utils";
-import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { WalletTopupEntity } from "@/entities/wallet-topup.entity";
-import { ThirdPartyAuthService } from "@/shared/third-party-auth/third-party-auth.service";
 
-const { externalPaymentConfig } = appConfig();
 @Injectable()
 export class SettlementsService {
   private readonly logger = new CustomLogger(SettlementsService.name);
@@ -78,16 +43,11 @@ export class SettlementsService {
     private readonly payinRepository: Repository<PayInOrdersEntity>,
     @InjectRepository(UserAddressEntity)
     private readonly addressRepository: Repository<UserAddressEntity>,
-    @InjectRepository(ApiCredentialsEntity)
-    private readonly apiCredentialsRepository: Repository<ApiCredentialsEntity>,
     @InjectRepository(WalletTopupEntity)
     private readonly walletTopupRepository: Repository<WalletTopupEntity>,
 
-    private readonly bankService: BanksService,
-    private readonly dataSource: DataSource,
     private readonly emailService: EmailService,
     private readonly invoiceService: InvoiceService,
-    private readonly thirdPartyAuthService: ThirdPartyAuthService,
   ) {}
 
   async createWalletForMerchants() {
@@ -957,31 +917,6 @@ export class SettlementsService {
   //   }
   // }
 
-  private async getFlakPayCredentials(userId: string) {
-    const credentials = await this.apiCredentialsRepository.findOne({
-      where: { user: { id: userId } },
-      relations: { user: true },
-    });
-
-    if (!credentials) {
-      throw new BadRequestException("Credentials not found");
-    }
-
-    const decryptedCredentials = await decryptData(credentials.credentials);
-    const { clientId, clientSecret } = JSON.parse(decryptedCredentials);
-
-    if (
-      !clientId ||
-      !clientSecret ||
-      typeof clientId !== "string" ||
-      typeof clientSecret !== "string"
-    ) {
-      throw new BadRequestException("Invalid credentials");
-    }
-
-    return { clientId, clientSecret };
-  }
-
   // async initiateSettlementFalkPay(
   //   {
   //     amount: collectionAmount,
@@ -1180,538 +1115,6 @@ export class SettlementsService {
   //   }
   // }
 
-  async initiateSettlementEritech(
-    {
-      amount: collectionAmount,
-      bankId,
-      remarks,
-      userId,
-      transferMode,
-    }: InitiateSettlementAdminDto,
-    settledBy: UsersEntity,
-  ) {
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-      relations: {
-        address: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    // const { clientId, clientSecret } = externalPaymentConfig.flakPay;
-
-    // const axiosServiceFlakPay = new AxiosService(
-    //   FALKPAY.BASE_URL,
-    //   getFlakPayPgConfig({
-    //     clientId,
-    //     clientSecret,
-    //   }),
-    // );
-
-    const token = await this.thirdPartyAuthService.getEritechToken();
-
-    const axiosErtech = new AxiosService(
-      ERTITECH.BASE_URL,
-      getEritechPgConfig({
-        token,
-        merchantId: externalPaymentConfig.ertech.merchantId,
-      }),
-    );
-
-    if (!user.address) {
-      throw new NotFoundException(
-        new MessageResponseDto("User address not found"),
-      );
-    }
-
-    const banks = await this.bankService.getAllBanks(userId);
-
-    const targetBank = banks.find((bank) => bank.id === bankId);
-
-    if (!targetBank) {
-      throw new NotFoundException(new MessageResponseDto("Bank not found"));
-    }
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    try {
-      // Start transaction
-      await queryRunner.connect();
-      await queryRunner.startTransaction();
-
-      const wallet = await this.walletRepository.findOne({
-        where: {
-          user: {
-            id: userId,
-          },
-        },
-        relations: {
-          user: true,
-        },
-      });
-
-      if (!wallet) {
-        throw new NotFoundException(
-          new MessageResponseDto("User wallet not found"),
-        );
-      }
-
-      if (+wallet.totalCollections < +collectionAmount) {
-        throw new BadRequestException(
-          new MessageResponseDto(
-            `Amount is greater than Total Collections amount: ${wallet.totalCollections}`,
-          ),
-        );
-      }
-
-      const {
-        totalServiceChange,
-        netPayableAmount: collectionAfterPayinDeduction,
-      } = getPayoutCommissions({
-        amount: +collectionAmount,
-        commissionInPercentage: +wallet.user.commissionInPercentagePayin, // PAYIN Commission
-        gstInPercentage: +wallet.user.gstInPercentagePayin,
-      });
-
-      const newWallet = this.walletRepository.create({
-        id: wallet.id,
-        totalCollections: +wallet.totalCollections - +collectionAmount,
-      });
-
-      await queryRunner.manager.save(newWallet);
-
-      const settlement = this.settlementsRepository.create({
-        collectionAmount: +collectionAmount,
-        serviceCharge: totalServiceChange,
-        amountAfterDeduction: collectionAfterPayinDeduction,
-        settlementType: SETTLEMENT_TYPE.MANUAL,
-        transferMode,
-        user,
-        settledBy,
-        remarks,
-        bankDetails: targetBank,
-      });
-
-      const savedSettlement = await queryRunner.manager.save(settlement);
-
-      this.logger.info(
-        `SETTLEMENT - initiateSettlements - Sending Settlements Amount: ${collectionAfterPayinDeduction} for Collection Amount: ${collectionAmount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
-        targetBank,
-      );
-
-      // const payload: IExternalPayoutRequestEritech = {
-      //   orderId: savedSettlement.id,
-      //   transferMode,
-      //   beneDetails: {
-      //     beneAccountNo: targetBank.accountNumber,
-      //     beneBankName: targetBank.bankName,
-      //     beneIfsc: targetBank.bankIFSC,
-      //     beneName: targetBank.name,
-      //   },
-      // };
-
-      // this.logger.info(
-      //   `SETTLEMENT - initiateSettlements - Calling PAYOUT: ${FALKPAY.BASE_URL}${FALKPAY.PAYOUT.LIVE} with payload: ${LoggerPlaceHolder.Json}`,
-      //   payload,
-      // );
-
-      const ertechPayload = {
-        paymentDetails: {
-          txnPaymode: transferMode,
-          txnAmount: +collectionAfterPayinDeduction.toFixed(2),
-          beneIfscCode: targetBank.bankIFSC,
-          beneAccNum: targetBank.accountNumber,
-          beneName: targetBank.name,
-          custUniqRef: savedSettlement.id.split("_").join(""),
-          beneMobileNo: user.mobile,
-          preferredBank: "ind",
-        },
-      };
-
-      this.logger.info(
-        `Eritech settlement before encryption Payload: ${LoggerPlaceHolder.Json}`,
-        ertechPayload,
-      );
-
-      const encryptedPayload =
-        await this.thirdPartyAuthService.getEncryptedPayload(
-          ertechPayload,
-          token,
-        );
-
-      this.logger.info(
-        `Eritech settlement Payload: ${LoggerPlaceHolder.Json}`,
-        encryptedPayload,
-      );
-
-      const ertechSettlementResponse =
-        await axiosErtech.postRequest<IExternalEritecPayoutFundResponse>(
-          ERTITECH.PAYOUT.FUND,
-          encryptedPayload,
-        );
-
-      this.logger.info(
-        `SETTLEMENT - initiateSettlements - External Payout Response: ${LoggerPlaceHolder.Json}`,
-        ertechSettlementResponse,
-      );
-
-      if (!ertechSettlementResponse.success) {
-        throw new Error(ertechSettlementResponse.message);
-      }
-
-      const ertechDecryptedResponse =
-        await this.thirdPartyAuthService.getDecryptedPayload(
-          ertechSettlementResponse.data.encryptedResponseData,
-          token,
-        );
-
-      this.logger.info(
-        `Ertitech Response: ${LoggerPlaceHolder.Json}`,
-        ertechDecryptedResponse,
-      );
-
-      const status = convertExternalPaymentStatusToInternal(
-        ertechDecryptedResponse.txn_status.transactionStatus.toUpperCase(),
-      );
-
-      await queryRunner.manager.update(
-        SettlementsEntity,
-        { id: savedSettlement.id },
-        {
-          transferId: ertechDecryptedResponse.custUniqRef,
-          utr: ertechDecryptedResponse.utrNo,
-          status,
-        },
-      );
-
-      if (status === PAYMENT_STATUS.FAILED) {
-        // update wallet
-        await this.walletRepository.save(
-          this.walletRepository.create({
-            id: wallet.id,
-            totalCollections: +wallet.totalCollections + +collectionAmount,
-          }),
-        );
-      }
-
-      await queryRunner.commitTransaction();
-
-      // await this.sendSettlementInvoice(savedSettlement.id, "Initiated");
-      if (status === PAYMENT_STATUS.SUCCESS) {
-        // await this.sendSettlementInvoice(savedSettlement.id, "Completed");
-      }
-
-      return {
-        orderId: savedSettlement.id,
-        collectionAmount: savedSettlement.collectionAmount,
-        serviceCharge: savedSettlement.serviceCharge,
-        amountAfterDeduction: savedSettlement.amountAfterDeduction,
-        transferId: ertechDecryptedResponse.custUniqRef,
-        utr: ertechDecryptedResponse.utrNo,
-        status,
-      };
-    } catch (err) {
-      this.logger.error(
-        `SETTLEMENT - initiateSettlements - error: ${LoggerPlaceHolder.Json}`,
-        err,
-      );
-      await queryRunner.rollbackTransaction();
-
-      throw new BadRequestException(err.message);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async initiateSettlementBuckBox(
-    {
-      amount: collectionAmount,
-      bankId,
-      remarks,
-      userId,
-      transferMode,
-    }: InitiateSettlementAdminDto,
-    settledBy: UsersEntity,
-  ) {
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-      relations: {
-        address: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException(new MessageResponseDto("User not found"));
-    }
-
-    const axiosServiceBuckBox = new AxiosService(BUCKBOX.BASE_URL, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${externalPaymentConfig.buckbox.apiToken}`,
-        "Api-Key": externalPaymentConfig.buckbox.apiKey,
-      },
-    });
-
-    if (!user.address) {
-      throw new NotFoundException(
-        new MessageResponseDto("User address not found"),
-      );
-    }
-
-    const banks = await this.bankService.getAllBanks(userId);
-
-    const targetBank = banks.find((bank) => bank.id === bankId);
-
-    if (!targetBank) {
-      throw new NotFoundException(new MessageResponseDto("Bank not found"));
-    }
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    try {
-      // Start transaction
-      await queryRunner.connect();
-      await queryRunner.startTransaction();
-
-      const wallet = await this.walletRepository.findOne({
-        where: {
-          user: {
-            id: userId,
-          },
-        },
-        relations: {
-          user: true,
-        },
-      });
-
-      if (!wallet) {
-        throw new NotFoundException(
-          new MessageResponseDto("User wallet not found"),
-        );
-      }
-
-      if (+wallet.totalCollections < +collectionAmount) {
-        throw new BadRequestException(
-          new MessageResponseDto(
-            `Amount is greater than Total Collections amount: ${wallet.totalCollections}`,
-          ),
-        );
-      }
-
-      const {
-        totalServiceChange,
-        netPayableAmount: collectionAfterPayinDeduction,
-      } = getPayoutCommissions({
-        amount: +collectionAmount,
-        commissionInPercentage: +wallet.user.commissionInPercentagePayin, // PAYIN Commission
-        gstInPercentage: +wallet.user.gstInPercentagePayin,
-      });
-
-      const newWallet = this.walletRepository.create({
-        id: wallet.id,
-        totalCollections: +wallet.totalCollections - +collectionAmount,
-      });
-
-      await queryRunner.manager.save(newWallet);
-
-      const settlement = this.settlementsRepository.create({
-        collectionAmount: +collectionAmount,
-        serviceCharge: totalServiceChange,
-        amountAfterDeduction: collectionAfterPayinDeduction,
-        settlementType: SETTLEMENT_TYPE.MANUAL,
-        transferMode,
-        user,
-        settledBy,
-        remarks,
-        bankDetails: targetBank,
-      });
-
-      const savedSettlement = await queryRunner.manager.save(settlement);
-
-      this.logger.info(
-        `SETTLEMENT - initiateSettlements - Sending Settlements Amount: ${collectionAfterPayinDeduction} for Collection Amount: ${collectionAmount} to USER ${user.fullName} (${user.id}) & Bank Details: ${LoggerPlaceHolder.Json}`,
-        targetBank,
-      );
-
-      const buckboxPayload = {
-        product_id: "RU4HJHIE",
-        external_order_id: savedSettlement.id,
-        amount: collectionAmount,
-        payment_mode: "IMPS",
-        bene_name: targetBank.name,
-        bene_account_number: targetBank.accountNumber,
-        bene_mobile: `+91${user.mobile}`,
-        bene_ifsc: targetBank.bankIFSC,
-        purpose: remarks,
-        bank_name: targetBank.bankName,
-        branch_name: "Mumbai",
-        bene_address: "Mumbai",
-      };
-
-      const buckboxSettlementResponse =
-        await axiosServiceBuckBox.postRequest<IExternalBuckboxPayoutFundResponse>(
-          BUCKBOX.PAYOUT.LIVE,
-          buckboxPayload,
-        );
-
-      this.logger.info(
-        `SETTLEMENT - initiateSettlements - External Payout Response: ${LoggerPlaceHolder.Json}`,
-        buckboxSettlementResponse,
-      );
-
-      if (!buckboxSettlementResponse) {
-        this.logger.error(
-          `Buck Box API error ${LoggerPlaceHolder.Json}`,
-          buckboxSettlementResponse,
-        );
-        throw new Error("Something went wrong");
-      }
-
-      const status = convertExternalPaymentStatusToInternal(
-        buckboxSettlementResponse.data.status.toUpperCase(),
-      );
-
-      await queryRunner.manager.update(
-        SettlementsEntity,
-        { id: savedSettlement.id },
-        {
-          transferId: buckboxSettlementResponse.data.transaction_id,
-          // utr: ertechDecryptedResponse.utrNo,
-          status,
-        },
-      );
-
-      if (status === PAYMENT_STATUS.FAILED) {
-        // update wallet
-        await this.walletRepository.save(
-          this.walletRepository.create({
-            id: wallet.id,
-            totalCollections: +wallet.totalCollections + +collectionAmount,
-          }),
-        );
-      }
-
-      await queryRunner.commitTransaction();
-
-      // await this.sendSettlementInvoice(savedSettlement.id, "Initiated");
-      if (status === PAYMENT_STATUS.SUCCESS) {
-        // await this.sendSettlementInvoice(savedSettlement.id, "Completed");
-      }
-
-      return {
-        orderId: savedSettlement.id,
-        collectionAmount: savedSettlement.collectionAmount,
-        serviceCharge: savedSettlement.serviceCharge,
-        amountAfterDeduction: savedSettlement.amountAfterDeduction,
-        transferId: buckboxSettlementResponse.data.transaction_id,
-        // utr: ertechDecryptedResponse.utrNo,
-        status,
-      };
-    } catch (err) {
-      this.logger.error(
-        `SETTLEMENT - initiateSettlements - error: ${LoggerPlaceHolder.Json}`,
-        err.message,
-      );
-      await queryRunner.rollbackTransaction();
-
-      throw new BadRequestException(err.message);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async externalWebhookPayoutBuckBox(
-    webhookData: any,
-  ): Promise<MessageResponseDto> {
-    this.logger.info(
-      `Buckbox Webhook Data: ${LoggerPlaceHolder.Json}`,
-      webhookData,
-    );
-
-    const { id, payment_status, utr_number, external_order_id } = webhookData;
-
-    const internalStatus = convertExternalPaymentStatusToInternal(
-      payment_status.toUpperCase(),
-    );
-    const settlementOrder = await this.settlementsRepository.findOne({
-      where: {
-        id: external_order_id,
-      },
-      relations: ["user"],
-    });
-
-    this.logger.info(
-      `PAYOUT WEBHOOK - For OrderId: ${external_order_id} :`,
-      settlementOrder,
-    );
-
-    if (!settlementOrder) {
-      throw new NotFoundException(
-        new MessageResponseDto("Payout order not found"),
-      );
-    }
-
-    if (settlementOrder.status === internalStatus) {
-      return new MessageResponseDto(
-        `Duplicate Webhook for PAYOUT/SETTLEMENT : ${external_order_id}`,
-      );
-    }
-
-    if (internalStatus === PAYMENT_STATUS.SUCCESS) {
-      const payOutOrderRaw = this.settlementsRepository.create({
-        id: settlementOrder.id,
-        status: internalStatus,
-        successAt: new Date(),
-        transferId: id,
-        utr: utr_number,
-      });
-
-      this.logger.info(
-        `PAYOUT - Buckbox Webhook - ${settlementOrder.id} - Webhook received successfully: ${LoggerPlaceHolder.Json}`,
-        payOutOrderRaw,
-      );
-
-      await this.settlementsRepository.save(payOutOrderRaw);
-    }
-
-    if (internalStatus === PAYMENT_STATUS.FAILED) {
-      const payOutOrderRaw = this.settlementsRepository.create({
-        id: settlementOrder.id,
-        status: internalStatus,
-        failureAt: new Date(),
-        transferId: id,
-        utr: utr_number,
-      });
-
-      await this.settlementsRepository.save(payOutOrderRaw);
-
-      const wallet = await this.walletRepository.findOne({
-        where: {
-          user: {
-            id: settlementOrder.user.id,
-          },
-        },
-        relations: {
-          user: true,
-        },
-      });
-
-      if (wallet) {
-        await this.walletRepository.save(
-          this.walletRepository.create({
-            id: wallet.id,
-            availablePayoutBalance:
-              +wallet.availablePayoutBalance +
-              +settlementOrder.collectionAmount,
-          }),
-        );
-      }
-    }
-
-    return new MessageResponseDto("Payout status updated successfully.");
-  }
-
   async getPendingSettlements({
     limit = 10,
     page = 1,
@@ -1862,52 +1265,11 @@ export class SettlementsService {
       );
     }
 
-    if (settlement.status === PAYMENT_STATUS.SUCCESS) {
-      return {
-        settlementId,
-        status: settlement.status,
-        collectionAmount: settlement.collectionAmount,
-        serviceCharge: settlement.serviceCharge,
-        amount: settlement.amountAfterDeduction,
-      };
-    }
-
-    const axiosServiceIsmart = new AxiosService(
-      ISMART_PAY.BASE_URL,
-      getIsmartPayPgConfig({
-        clientId: externalPaymentConfig.ismart.clientId,
-        clientSecret: externalPaymentConfig.ismart.clientSecret,
-      }),
-    );
-
-    // call third party api
-    const response =
-      await axiosServiceIsmart.getRequest<IExternalPayoutStatusResponseIsmart>(
-        `${ISMART_PAY.PAYOUT_STATUS}/${settlement.transferId}`,
-      );
-
-    if (!response.status) {
-      throw new BadRequestException(new MessageResponseDto(response.message));
-    }
-
-    const status = convertExternalPaymentStatusToInternal(response.status_code);
-
-    const settlementRaw = this.settlementsRepository.create({
-      id: settlement.id,
-      status,
-      ...(status === PAYMENT_STATUS.SUCCESS && {
-        successAt: new Date(),
-      }),
-      ...(status === PAYMENT_STATUS.FAILED && {
-        failureAt: new Date(),
-      }),
-    });
-
-    await this.settlementsRepository.save(settlementRaw);
-
     return {
       settlementId,
-      status,
+      status: settlement.status,
+      collectionAmount: settlement.collectionAmount,
+      serviceCharge: settlement.serviceCharge,
       amount: settlement.amountAfterDeduction,
     };
   }

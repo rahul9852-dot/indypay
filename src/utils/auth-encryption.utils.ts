@@ -5,15 +5,17 @@ import { appConfig } from "@/config/app.config";
 
 @Injectable()
 export class AuthEncryptionService {
-  private readonly algorithm = "aes-256-cbc";
-  private readonly key: Buffer;
-  private readonly iv: Buffer;
+  private readonly algorithm = "aes-256-gcm";
+  private readonly GCM_IV_LENGTH = 12;
+  private readonly GCM_AUTH_TAG_LENGTH = 16;
+  // KeyObject is directly in the CipherKey union type — no structural mismatch
+  // with TypeScript 5.5's stricter Uint8Array<ArrayBufferLike> vs ArrayBuffer checks.
+  private readonly key: crypto.KeyObject;
   private readonly logger = new Logger(AuthEncryptionService.name);
 
   constructor() {
-    const { loginSignupEncryptionKey, loginSignupEncryptionIV } = appConfig();
+    const { loginSignupEncryptionKey } = appConfig();
 
-    // Trim whitespace and ensure key is exactly 32 bytes (256 bits) for AES-256
     const keyString = (loginSignupEncryptionKey || "").trim();
     if (!keyString) {
       throw new Error(
@@ -22,68 +24,88 @@ export class AuthEncryptionService {
     }
     if (keyString.length !== 32) {
       throw new Error(
-        `LOGIN_SIGNUP_ENCRYPTION_KEY must be exactly 32 characters (32 bytes), but got ${keyString.length} characters. Current value length: ${keyString.length}`,
+        `LOGIN_SIGNUP_ENCRYPTION_KEY must be exactly 32 characters (32 bytes), but got ${keyString.length} characters.`,
       );
     }
-    this.key = Buffer.from(keyString, "utf8");
-
-    // Trim whitespace and ensure IV is exactly 16 bytes for AES
-    const ivString = (loginSignupEncryptionIV || "").trim();
-    if (!ivString) {
-      throw new Error(
-        "LOGIN_SIGNUP_ENCRYPTION_IV environment variable is not set or is empty. Please set it to exactly 16 characters.",
-      );
-    }
-    if (ivString.length !== 16) {
-      throw new Error(
-        `LOGIN_SIGNUP_ENCRYPTION_IV must be exactly 16 characters (16 bytes), but got ${ivString.length} characters. Current value length: ${ivString.length}`,
-      );
-    }
-    this.iv = Buffer.from(ivString, "utf8");
+    // createSecretKey wraps the raw bytes in a KeyObject — the recommended
+    // modern Node.js API for symmetric keys and the only type accepted by
+    // all four createCipheriv overloads without TypeScript 5.5 type conflicts.
+    this.key = crypto.createSecretKey(keyString, "utf8");
   }
 
   /**
-   * Encrypts data for login/signup endpoints
+   * Encrypts data for login/signup endpoints.
+   * Output format (base64): [ IV (12 bytes) | authTag (16 bytes) | ciphertext ]
    * @param text - Plain text to encrypt
    * @returns Base64 encoded encrypted string
    */
   encrypt(text: string): string {
-    try {
-      const cipher = crypto.createCipheriv(
-        this.algorithm,
-        this.key as any,
-        this.iv as any,
-      );
-      let encrypted = cipher.update(text, "utf8");
-      encrypted = Buffer.concat([encrypted, cipher.final()] as any);
+    if (!text) {
+      throw new Error("Input text must be a non-empty string.");
+    }
 
-      return encrypted.toString("base64");
+    try {
+      // TypeScript 5.5 made Uint8Array generic. Buffer has ArrayBufferLike
+      // backing while crypto APIs expect ArrayBuffer. Uint8Array.from()
+      // always allocates a fresh ArrayBuffer — resolving the type mismatch
+      // without any unsafe `as any` cast.
+      const iv = Uint8Array.from(crypto.randomBytes(this.GCM_IV_LENGTH));
+      const cipher = crypto.createCipheriv(this.algorithm, this.key, iv);
+
+      const encrypted = Buffer.concat([
+        Uint8Array.from(cipher.update(text, "utf8")),
+        Uint8Array.from(cipher.final()),
+      ]);
+
+      const authTag = Uint8Array.from(cipher.getAuthTag());
+
+      return Buffer.concat([iv, authTag, Uint8Array.from(encrypted)]).toString(
+        "base64",
+      );
     } catch (error) {
-      this.logger.error("Encryption error:", error);
+      this.logger.error("Encryption failed");
       throw new Error("Failed to encrypt data");
     }
   }
 
   /**
-   * Decrypts data from login/signup endpoints
+   * Decrypts data from login/signup endpoints.
+   * Expected input format (base64): [ IV (12 bytes) | authTag (16 bytes) | ciphertext ]
    * @param encryptedText - Base64 encoded encrypted string
    * @returns Decrypted plain text
    */
   decrypt(encryptedText: string): string {
+    if (!encryptedText) {
+      throw new Error("Encrypted text must be a non-empty string.");
+    }
+
     try {
-      const decipher = crypto.createDecipheriv(
-        this.algorithm,
-        this.key as any,
-        this.iv as any,
+      const raw = Buffer.from(encryptedText, "base64");
+
+      // Slice and immediately convert to Uint8Array<ArrayBuffer> so every
+      // subsequent crypto call receives the correct type in TS 5.5.
+      const iv = Uint8Array.from(raw.subarray(0, this.GCM_IV_LENGTH));
+      const authTag = Uint8Array.from(
+        raw.subarray(
+          this.GCM_IV_LENGTH,
+          this.GCM_IV_LENGTH + this.GCM_AUTH_TAG_LENGTH,
+        ),
       );
-      let decrypted = decipher.update(
-        Buffer.from(encryptedText, "base64") as any,
+      const encrypted = Uint8Array.from(
+        raw.subarray(this.GCM_IV_LENGTH + this.GCM_AUTH_TAG_LENGTH),
       );
-      decrypted = Buffer.concat([decrypted, decipher.final()] as any);
+
+      const decipher = crypto.createDecipheriv(this.algorithm, this.key, iv);
+      decipher.setAuthTag(authTag);
+
+      const decrypted = Buffer.concat([
+        Uint8Array.from(decipher.update(encrypted)),
+        Uint8Array.from(decipher.final()),
+      ]);
 
       return decrypted.toString("utf8");
     } catch (error) {
-      this.logger.error("Decryption error:", error);
+      this.logger.error("Decryption failed");
       throw new Error("Failed to decrypt data. Invalid encrypted format.");
     }
   }

@@ -1,7 +1,6 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { SettlementsService } from "./settlements.service";
-import { InitiateSettlementAdminDto } from "./dto/initate-settlement-admin.dto";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
 import {
@@ -66,21 +65,6 @@ export class SettlementsController {
   //     user,
   //   );
   // }
-
-  @ApiOperation({
-    summary: "Initiate settlement payout - Admin, Ops, Owner",
-  })
-  @Role(USERS_ROLE.OPS, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
-  @Post("initiate")
-  async initiateSettlementPayout(
-    @Body() initiateSettlementAdminDto: InitiateSettlementAdminDto,
-    @User() user: UsersEntity,
-  ) {
-    return this.settlementsService.initiateSettlementBuckBox(
-      initiateSettlementAdminDto,
-      user,
-    );
-  }
 
   @ApiOperation({
     summary: "Check settlement status",

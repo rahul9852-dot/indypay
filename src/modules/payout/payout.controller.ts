@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Controller, Get, Param, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { PayoutService } from "./payout.service";
 import { User } from "@/decorators/user.decorator";
@@ -10,7 +10,6 @@ import {
 } from "@/dtos/common.dto";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
-import { PayoutStatusDto } from "@/modules/payments/dto/create-payout-payment.dto";
 
 @ApiTags("Payout")
 @Controller("payout")
@@ -67,15 +66,6 @@ export class PayoutController {
     @Query() query: PaginationWithDateDto,
   ) {
     return this.payoutService.getAllPayoutsMerchant(query, user.id);
-  }
-
-  @ApiOperation({ summary: "Check payout status" })
-  @Post("status")
-  async checkPayoutStatus(
-    @Body() body: PayoutStatusDto,
-    @User() user: UsersEntity,
-  ) {
-    return this.payoutService.checkPayOutStatusDashboardFlakPay(body, user);
   }
 
   @ApiOperation({ summary: "Get By OrderId" })

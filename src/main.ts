@@ -10,12 +10,6 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
-import {
-  webhookBodyParserUtkarsh,
-  WEBHOOK_ROUTES_UTK,
-  WEBHOOK_ROUTES,
-  webhookBodyParserNxt,
-} from "./utils/webhook.middleware";
 import { ResponseHandlerInterceptor } from "@/interceptors/response-handler.interceptor";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 import { appConfig } from "@/config/app.config";
@@ -35,20 +29,19 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const { httpAdapter } = app.get(HttpAdapterHost);
 
+  // ✅ ADD THIS — tells Express to trust X-Forwarded-For from Caddy
+  // Without this: req.ip = ::1 (wrong) for every user
+  // With this:    req.ip = real client IP ✓
+  app.set("trust proxy", 1);
+
   // Add cookie parser
   app.use(cookieParser());
 
-  WEBHOOK_ROUTES_UTK.forEach((route) => {
-    app.use(route, webhookBodyParserUtkarsh);
-  });
-
-  WEBHOOK_ROUTES.forEach((route) => {
-    app.use(route, webhookBodyParserNxt);
-  });
-
-  // Apply standard body parsing globally
-  app.use(json({ limit: "10mb" }));
-  app.use(urlencoded({ extended: true, limit: "10mb" }));
+  // A-7: Reduced from 10 MB to 512 KB. A typical payin/payout request is
+  // < 1 KB; a 10 MB limit lets an attacker flood the server with large JSON
+  // payloads that each consume CPU for parsing and heap memory per request.
+  app.use(json({ limit: "512kb" }));
+  app.use(urlencoded({ extended: true, limit: "512kb" }));
 
   // Fix the path to point to the project root's public folder instead of dist
   const publicPath = path.join(process.cwd(), "public");
@@ -139,6 +132,12 @@ async function bootstrap() {
     //     `Swagger docs is running on port: http://localhost:${port}/docs`,
     //   );
   });
+  // ✅ ADD THIS — signals PM2 that app is ready (enables zero-downtime reload)
+  // Without this: PM2 guesses after 3 seconds — can cause 502s during deploy
+  // With this:    PM2 waits until app fully boots before switching traffic
+  if (process.send) {
+    process.send("ready");
+  }
 }
 
 bootstrap();

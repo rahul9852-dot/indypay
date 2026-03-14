@@ -5,28 +5,8 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { Request } from "express";
-import { appConfig } from "@/config/app.config";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
 
-// import { CustomLogger, LoggerPlaceHolder } from "@/logger";
-
-const {
-  externalPaymentConfig: {
-    flakPay,
-    ismart,
-    paynpro,
-    ertech,
-    kdsPayout,
-    buckbox,
-    rocky,
-  },
-  utkarsh: { webhookIps: utkarshWebhookIps },
-  payboltCreds: { webhookIps: payboltWebhookIps },
-  tpipay: { webhookIps: tpiWebhookIps },
-  geopay,
-  onik,
-  nxt,
-} = appConfig();
 @Injectable()
 export class WebhookGuard implements CanActivate {
   logger = new CustomLogger(WebhookGuard.name);
@@ -42,21 +22,9 @@ export class WebhookGuard implements CanActivate {
       requestBody: request.body,
     });
 
-    const webhookIps = [
-      ...flakPay.webhookIps,
-      ...ismart.webhookIps,
-      ...paynpro.webhookIps,
-      ...ertech.webhookIps,
-      ...utkarshWebhookIps,
-      ...payboltWebhookIps,
-      ...tpiWebhookIps,
-      ...geopay.webhookips,
-      ...kdsPayout.kdsIp,
-      ...buckbox.webhookIps,
-      ...onik.webhookIps,
-      ...rocky.webhookIps,
-      ...nxt.webhookIps,
-    ];
+    // Populate this list when new payment gateways are integrated.
+    // Each gateway should supply its own IP allowlist via environment variables.
+    const webhookIps: string[] = [];
 
     if (!webhookIps.includes(requestIp)) {
       throw new ForbiddenException("Invalid IP address");

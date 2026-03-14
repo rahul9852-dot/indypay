@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { JwtService } from "@nestjs/jwt";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from "path";
 
@@ -42,6 +43,32 @@ import { CacheMonitorModule } from "@/shared/cache-monitor/cache-monitor.module"
       load: [appConfig],
       envFilePath: ".env",
     }),
+    // S-2: Rate limiting applied globally. Three named tiers let individual
+    // endpoints override with stricter limits via @Throttle() without losing
+    // the base protection on every other route.
+    ThrottlerModule.forRoot([
+      {
+        // General API protection — 120 req/min per IP across all routes.
+        name: "default",
+        ttl: 60_000,
+        limit: 120,
+      },
+      {
+        // OTP tier — send-signup-otp and send-forgot-password-otp both trigger
+        // SMS/email sends that cost money; 5/min makes abuse economically
+        // unattractive without blocking real users.
+        name: "otp",
+        ttl: 60_000,
+        limit: 5,
+      },
+      {
+        // Contact tier — POST /users/contact fires SES emails; 5/min stops
+        // automated spam campaigns without affecting legitimate enquiries.
+        name: "contact",
+        ttl: 60_000,
+        limit: 5,
+      },
+    ]),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, "..", "src/modules/payments/templates"),
       serveRoot: "/templates",
@@ -73,6 +100,12 @@ import { CacheMonitorModule } from "@/shared/cache-monitor/cache-monitor.module"
   providers: [
     JwtService,
 
+    // ThrottlerGuard must be first so rate-limit rejections happen before
+    // auth/role guards run — avoids leaking auth errors on flooded endpoints.
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: PaginationGuard,
