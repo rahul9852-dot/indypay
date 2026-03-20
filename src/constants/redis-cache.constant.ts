@@ -41,4 +41,7 @@ export const REDIS_KEYS = {
   // D-3 fix: tracks successfully processed webhooks for 24 hours so PG retries
   // are rejected at the Redis layer without touching the database at all.
   WEBHOOK_PROCESSED: (orderId: string) => `webhook:processed:${orderId}`,
+  // KYC: cache a verified PAN result for 24 h to avoid re-calling Karza for
+  // the same PAN within the same session / accidental re-submit.
+  KYC_PAN_VERIFIED: (pan: string) => `kyc:pan:verified:${pan.toUpperCase()}`,
 };

@@ -1,13 +1,25 @@
-import { Controller, Get, Post, Body, Res, Param, Query } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Res,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+} from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Response } from "express";
 import { KycService } from "./kyc.service";
+import { PanVerifyDto } from "./verification/dto/pan-verify.dto";
 import { KycStatusResDto } from "./dto/kyc-status.dto";
 import { DocumentUploadDto } from "./dto/document-upload.dto";
 import { KycSubmissionDto } from "./dto/kyc.dto";
 import { User } from "@/decorators/user.decorator";
 import { IAccessTokenPayload } from "@/interface/common.interface";
 import { IgnoreKyc } from "@/decorators/ignore-kyc.decorator";
+import { IgnoreBusinessDetails } from "@/decorators/ignore-business-details.decorator";
 import { UsersEntity } from "@/entities/user.entity";
 import { Role } from "@/decorators/role.decorator";
 import { USERS_ROLE } from "@/enums";
@@ -75,5 +87,29 @@ export class KycController {
   @IgnoreKyc()
   async getPendingKycUsers(@Query() query: PaginationDto) {
     return this.kycService.getPendingKycUsers(query);
+  }
+
+  @Post("verify/pan")
+  @HttpCode(HttpStatus.OK)
+  @IgnoreBusinessDetails()
+  @ApiOperation({ summary: "Verify PAN card via Karza" })
+  @ApiOkResponse({
+    description: "PAN verified successfully",
+    schema: {
+      example: {
+        verified: true,
+        name: "RAHUL KUMAR",
+        dob: "1999-01-31",
+        gender: "male",
+        aadhaarLinked: true,
+        message: "PAN verified successfully.",
+      },
+    },
+  })
+  async verifyPan(
+    @User() user: IAccessTokenPayload,
+    @Body() dto: PanVerifyDto,
+  ) {
+    return this.kycService.verifyPan(user.id, dto);
   }
 }

@@ -84,4 +84,11 @@ export const appConfig = registerAs("appConfig", () => ({
     snsTopicArn: getOsEnv("AWS_SNS_TOPIC_ARN"),
     s3BucketName: getOsEnv("AWS_S3_BUCKET_NAME"),
   },
+  karza: {
+    // Required: set KARZA_API_KEY in .env — never commit the real key.
+    // For sandbox use the test key; for production use the live key.
+    apiKey: getOsEnv("KARZA_API_KEY"),
+    // Optional: defaults to sandbox. Override with production URL in prod .env.
+    baseUrl: getOsEnvOptional("KARZA_BASE_URL") ?? "https://testapi.karza.in",
+  },
 }));

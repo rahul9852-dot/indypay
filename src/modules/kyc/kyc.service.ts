@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -12,6 +13,12 @@ import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { KycSubmissionDto } from "./dto/kyc.dto";
 import { DocumentUploadDto } from "./dto/document-upload.dto";
+import { PanVerifyDto } from "./verification/dto/pan-verify.dto";
+import {
+  IKycVerificationProvider,
+  KYC_PROVIDER_TOKEN,
+} from "./verification/providers/kyc-provider.interface";
+import { KycVerificationEntity } from "@/entities/kyc-verification.entity";
 import { UsersEntity } from "@/entities/user.entity";
 import { UserKycEntity } from "@/entities/user-kyc.entity";
 import { IAccessTokenPayload } from "@/interface/common.interface";
@@ -30,6 +37,8 @@ import { getPagination } from "@/utils/pagination.utils";
 import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import { SESService } from "@/modules/aws/ses.service";
 import { SNSService } from "@/modules/aws/sns.service";
+
+const PAN_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 const {
   jwtConfig: {
@@ -51,9 +60,13 @@ export class KycService {
     private readonly userBusinessRepository: Repository<UserBusinessDetailsEntity>,
     @InjectRepository(UserKycEntity)
     private readonly userKycRepository: Repository<UserKycEntity>,
+    @InjectRepository(KycVerificationEntity)
+    private readonly kycVerificationRepository: Repository<KycVerificationEntity>,
     private readonly jwtService: JwtService,
     private readonly s3Service: S3Service,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @Inject(KYC_PROVIDER_TOKEN)
+    private readonly kycProvider: IKycVerificationProvider,
     private readonly sesService: SESService,
     private readonly snsService: SNSService,
   ) {}
@@ -269,6 +282,101 @@ export class KycService {
     }
 
     return kyc.media;
+  }
+
+  async verifyPan(userId: string, dto: PanVerifyDto) {
+    const pan = dto.pan.toUpperCase();
+    const cacheKey = REDIS_KEYS.KYC_PAN_VERIFIED(pan);
+
+    const cached = await this.cacheManager.get<object>(cacheKey);
+    if (cached) return cached;
+
+    let result: Awaited<ReturnType<IKycVerificationProvider["verifyPan"]>>;
+    try {
+      result = await this.kycProvider.verifyPan({ pan, consent: dto.consent });
+    } catch (err: any) {
+      await this.writeVerificationAudit({
+        userId,
+        pan,
+        verified: false,
+        providerRequestId: null,
+        providerStatusCode: null,
+        rawResponse: { error: err?.message ?? "provider_error" },
+      });
+      throw new InternalServerErrorException(
+        "KYC verification service is temporarily unavailable. Please try again.",
+      );
+    }
+
+    await this.writeVerificationAudit({
+      userId,
+      pan,
+      verified: result.verified,
+      providerRequestId: result.providerRequestId,
+      providerStatusCode: result.providerStatusCode,
+      rawResponse: result.rawResponse,
+    });
+
+    if (!result.verified) {
+      throw new BadRequestException(
+        result.providerStatusCode === 105
+          ? "Consent is required for KYC verification."
+          : "PAN verification failed. Please check the PAN number and try again.",
+      );
+    }
+
+    const response = {
+      verified: true,
+      message: "PAN verified successfully.",
+      pan: result.pan,
+      name: result.name,
+      firstName: result.firstName,
+      middleName: result.middleName || null,
+      lastName: result.lastName,
+      gender: result.gender,
+      dob: result.dob,
+      mobile: result.mobile || null,
+      email: result.email || null,
+      panStatus: result.panStatus || null,
+      panIssueDate: result.panIssueDate || null,
+      fatherName: result.fatherName || null,
+      isSoleProprietor: result.isSoleProprietor ?? null,
+      isDirector: result.isDirector ?? null,
+      isSalaried: result.isSalaried ?? null,
+      aadhaarLinked: result.aadhaarLinked ?? null,
+      aadhaarMatch: result.aadhaarMatch ?? null,
+      address: result.address ?? null,
+    };
+
+    await this.cacheManager.set(cacheKey, response, PAN_CACHE_TTL_MS);
+
+    return response;
+  }
+
+  private async writeVerificationAudit(data: {
+    userId: string;
+    pan: string;
+    verified: boolean;
+    providerRequestId: string | null;
+    providerStatusCode: number | null;
+    rawResponse: Record<string, any>;
+  }): Promise<void> {
+    try {
+      await this.kycVerificationRepository.save(
+        this.kycVerificationRepository.create({
+          userId: data.userId,
+          verificationType: "PAN",
+          input: data.pan,
+          provider: "karza",
+          providerRequestId: data.providerRequestId,
+          providerStatusCode: data.providerStatusCode,
+          verified: data.verified,
+          responseData: data.rawResponse,
+        }),
+      );
+    } catch (err: any) {
+      // Swallow — audit failure must not break the user-facing response.
+    }
   }
 
   async getPendingKycUsers({

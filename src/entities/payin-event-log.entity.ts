@@ -25,10 +25,10 @@ import {
  */
 export enum PayinEventTrigger {
   // PG webhook triggered the change
-  ADMIN = "ADMIN", 
+  ADMIN = "ADMIN",
   // Admin manually updated via dashboard
-  SYSTEM = "SYSTEM", 
-  WEBHOOK = "WEBHOOK" // Internal cron / reconciliation job
+  SYSTEM = "SYSTEM",
+  WEBHOOK = "WEBHOOK", // Internal cron / reconciliation job
 }
 
 @Entity("payin_event_log")

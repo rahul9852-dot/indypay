@@ -3,6 +3,9 @@ import { JwtModule } from "@nestjs/jwt";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { KycController } from "./kyc.controller";
 import { KycService } from "./kyc.service";
+import { KarzaProvider } from "./verification/providers/karza/karza.provider";
+import { KYC_PROVIDER_TOKEN } from "./verification/providers/kyc-provider.interface";
+import { KycVerificationEntity } from "@/entities/kyc-verification.entity";
 import { AuthModule } from "@/modules/auth/auth.module";
 import { appConfig } from "@/config/app.config";
 import { UsersEntity } from "@/entities/user.entity";
@@ -26,6 +29,7 @@ const {
       UserMediaEntity,
       UserBusinessDetailsEntity,
       UserKycEntity,
+      KycVerificationEntity,
     ]),
     JwtModule.register({
       secret: accessTokenSecret,
@@ -33,7 +37,17 @@ const {
     AwsModule,
     AuthModule,
   ],
-  providers: [KycService, SESService, SNSService],
+  providers: [
+    KycService,
+    SESService,
+    SNSService,
+    // Provider adapter — swap KarzaProvider for any other bureau
+    // (Signzy, IDfy, etc.) without touching KycService or controller.
+    {
+      provide: KYC_PROVIDER_TOKEN,
+      useClass: KarzaProvider,
+    },
+  ],
   controllers: [KycController],
   exports: [KycService],
 })
