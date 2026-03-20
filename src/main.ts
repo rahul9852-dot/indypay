@@ -29,6 +29,15 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const { httpAdapter } = app.get(HttpAdapterHost);
 
+  // A-8 fix: Graceful shutdown.
+  // Without this, SIGTERM (PM2 reload / container restart) abruptly kills the
+  // process — in-flight HTTP requests are dropped, Bull job processors are
+  // killed mid-execution, and active QueryRunners may leave DB rows locked.
+  // enableShutdownHooks() makes NestJS listen for SIGTERM/SIGINT and call
+  // onApplicationShutdown() on every provider that implements it, giving Bull
+  // time to finish the current job and TypeORM time to release connections.
+  app.enableShutdownHooks();
+
   // ✅ ADD THIS — tells Express to trust X-Forwarded-For from Caddy
   // Without this: req.ip = ::1 (wrong) for every user
   // With this:    req.ip = real client IP ✓

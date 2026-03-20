@@ -1,27 +1,28 @@
-import { Process, Processor } from "@nestjs/bull";
+import {
+  Process,
+  Processor,
+  OnQueueFailed,
+  OnQueueStalled,
+} from "@nestjs/bull";
 import { Job } from "bull";
-import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import { InjectDataSource } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { CustomLogger } from "@/logger";
-import { PAYMENT_TYPE, PAYMENT_STATUS } from "@/enums/payment.enum";
-import { SETTLEMENT_STATUS } from "@/enums/payment.enum";
-import { PAYMENT_METHOD } from "@/enums/payment-method.enum";
+import { PAYMENT_TYPE, SETTLEMENT_STATUS } from "@/enums/payment.enum";
 import { getUlidId } from "@/utils/helperFunctions.utils";
 import { ID_TYPE } from "@/enums";
 import { CommissionService } from "@/modules/commissions/commission.service";
 import { COMMISSION_TYPE, CHARGE_TYPE } from "@/enums/commission.enum";
 
-interface PayinOrderJobData {
+// Job data for commission + transaction enrichment.
+// The payin order itself is already in the DB before this job is queued.
+interface PayinEnrichJobData {
   orderId: string;
   userId: string;
   amount: number;
-  email: string;
-  name: string;
-  mobile: string;
-  paymentLink?: string;
-  txnRefId?: string;
+  payinOrderId: number; // PK of the already-inserted PayInOrdersEntity
 }
 
 @Processor("payin-orders")
@@ -30,79 +31,61 @@ export class PayinProcessor {
 
   constructor(
     private readonly commissionService: CommissionService,
-    @InjectRepository(PayInOrdersEntity)
-    private readonly payInOrdersRepository: Repository<PayInOrdersEntity>,
-    @InjectRepository(TransactionsEntity)
-    private readonly transactionsRepository: Repository<TransactionsEntity>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
 
   /**
-   * 🔥 OPTIMIZED: Separate inserts (no transaction wrapper)
-   * Uses QueryRunner from pool for better concurrency
+   * Enriches a payin order that was already inserted synchronously during the HTTP
+   * request. This job handles the async work: commission calculation, transaction
+   * record creation, and updating the order with the computed values.
+   *
+   * Separating insert (sync, in-request) from enrichment (async, queued) ensures
+   * the unique constraint fires before the response goes out, making the payin API
+   * idempotent against merchant retries.
    */
-  @Process({ name: "create-payin-order", concurrency: 5 })
-  async handlePayinOrderCreation(job: Job<PayinOrderJobData>): Promise<void> {
+  @Process({ name: "enrich-payin-order", concurrency: 5 })
+  async handlePayinOrderEnrichment(
+    job: Job<PayinEnrichJobData>,
+  ): Promise<void> {
     const startTime = Date.now();
-    const order = job.data;
+    const { orderId, userId, amount, payinOrderId } = job.data;
     const queryRunner = this.dataSource.createQueryRunner();
 
     try {
       await queryRunner.connect();
 
-      // 1️⃣ INSERT order (separate insert, no transaction wrapper)
-      const insertResult = await queryRunner.manager
-        .createQueryBuilder()
-        .insert()
-        .into(PayInOrdersEntity)
-        .values({
-          orderId: order.orderId,
-          userId: order.userId,
-          amount: order.amount,
-          email: order.email,
-          name: order.name,
-          mobile: order.mobile,
-          status: PAYMENT_STATUS.PENDING,
-          paymentMethod: PAYMENT_METHOD.UPI,
-          ...(order.paymentLink && { intent: order.paymentLink }),
-          ...(order.txnRefId && { txnRefId: order.txnRefId }),
-        })
-        .execute();
-
-      const payinId = insertResult.identifiers[0].id;
-
-      // 2️⃣ Calculate commission (parallel, no DB blocking)
+      // 1️⃣ Calculate commission
       const commission = await this.commissionService.calculateCommission(
-        order.userId,
-        order.amount,
+        userId,
+        amount,
         COMMISSION_TYPE.PAYIN,
       );
 
-      // 3️⃣ INSERT transaction (separate insert)
+      // 2️⃣ INSERT transaction record
       const txn = await queryRunner.manager
         .createQueryBuilder()
         .insert()
         .into(TransactionsEntity)
         .values({
           id: getUlidId(ID_TYPE.TRANSACTIONS_KEY),
-          userId: order.userId,
-          payInOrderId: payinId,
+          userId,
+          payInOrderId: payinOrderId,
           transactionType: PAYMENT_TYPE.PAYIN,
         })
         .execute();
 
       const txnId = txn.identifiers[0].id;
 
-      // 4️⃣ UPDATE order (separate update)
+      // 3️⃣ UPDATE order with commission data and transaction reference
       const commissionInPercentage =
         commission.chargeType === CHARGE_TYPE.PERCENTAGE
           ? commission.chargeValue
-          : (commission.commissionAmount / order.amount) * 100;
+          : (commission.commissionAmount / amount) * 100;
 
       await queryRunner.manager.update(
         PayInOrdersEntity,
-        { id: payinId },
+        { id: payinOrderId },
         {
           txnRefId: txnId,
           commissionAmount: commission.commissionAmount,
@@ -119,15 +102,68 @@ export class PayinProcessor {
       );
 
       const duration = Date.now() - startTime;
-      this.logger.debug(`[FAST] ✅ ${order.orderId} in ${duration}ms`);
+      this.logger.debug(`[ENRICH] ✅ ${orderId} enriched in ${duration}ms`);
     } catch (error: any) {
       const duration = Date.now() - startTime;
       this.logger.error(
-        `[FAST] ❌ ${order.orderId} failed after ${duration}ms: ${error.message}`,
+        `[ENRICH] ❌ ${orderId} enrichment failed after ${duration}ms: ${error.message}`,
       );
       throw error;
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * A-2 fix: Dead Letter Queue handler.
+   *
+   * Bull retries a job up to `attempts` times. On every failure this hook fires.
+   * We only act on the FINAL failure (attemptsMade >= maxAttempts) — earlier
+   * failures are expected transient errors that will be retried.
+   *
+   * On final failure the payin order exists in DB (D-1 fix) but has NULL
+   * commission fields and NULL txnRefId. A CRITICAL log ensures this surfaces
+   * in any log-based alerting (CloudWatch Alarms, Grafana Loki, PagerDuty).
+   *
+   * Future: write to a `failed_jobs` table so ops can trigger manual re-enrichment
+   * without needing to dig through Redis or logs.
+   */
+  @OnQueueFailed()
+  async handleJobFailed(
+    job: Job<PayinEnrichJobData>,
+    error: Error,
+  ): Promise<void> {
+    const maxAttempts = job.opts.attempts ?? 3;
+    const isFinalFailure = job.attemptsMade >= maxAttempts;
+
+    if (isFinalFailure) {
+      this.logger.error(
+        `[DLQ] FINAL FAILURE — enrich-payin-order exhausted all ${maxAttempts} attempts. ` +
+          `orderId=${job.data.orderId} userId=${job.data.userId} amount=${job.data.amount} ` +
+          `payinOrderId=${job.data.payinOrderId}. ` +
+          `Order exists in DB but commission fields are NULL and txnRefId is unset. ` +
+          `Manual re-enrichment required. Error: ${error.message}`,
+      );
+    } else {
+      this.logger.warn(
+        `[ENRICH] Attempt ${job.attemptsMade}/${maxAttempts} failed for orderId=${job.data.orderId}: ${error.message}. Retrying...`,
+      );
+    }
+  }
+
+  /**
+   * A-2 fix: Stalled job handler.
+   *
+   * A job becomes "stalled" when the processor crashes mid-execution (OOM kill,
+   * PM2 restart, uncaught exception outside try/catch). Bull detects this after
+   * the lock expires and re-queues the job. We log it so stalls are visible —
+   * repeated stalls on the same job indicate a deterministic crash loop.
+   */
+  @OnQueueStalled()
+  async handleJobStalled(job: Job<PayinEnrichJobData>): Promise<void> {
+    this.logger.warn(
+      `[DLQ] STALLED JOB detected — orderId=${job.data.orderId} will be re-queued by Bull. ` +
+        `If this repeats, the enrichment logic is causing a crash loop.`,
+    );
   }
 }

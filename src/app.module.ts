@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
@@ -10,6 +10,8 @@ import { join } from "path";
 import { AuthGuard } from "./guard/auth.guard";
 import { RolesGuard } from "./guard/roles.guard";
 import { PaginationGuard } from "./guard/pagination.guard";
+import { BusinessDetailsGuard } from "./guard/business-details.guard";
+import { KycGuard } from "./guard/kyc.guard";
 import { AppController } from "./app.controller";
 import { migrationConfig } from "./config/migration.config";
 import { PayoutModule } from "./modules/payout/payout.module";
@@ -18,6 +20,7 @@ import { WalletsModule } from "./modules/wallets/wallets.module";
 import { CustomerModule } from "./modules/customers/customer.module";
 import { ItemModule } from "./modules/items/item.module";
 import { ReportsModule } from "./modules/reports/reports.module";
+import { TraceIdMiddleware } from "./middleware/trace-id.middleware";
 import { appConfig } from "@/config/app.config";
 import { dbConfig } from "@/config/db.config";
 import { AuthModule } from "@/modules/auth/auth.module";
@@ -118,19 +121,28 @@ import { CacheMonitorModule } from "@/shared/cache-monitor/cache-monitor.module"
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
+    // A-6 fix: BusinessDetailsGuard and KycGuard re-enabled.
+    // Guard execution order matters — each guard runs in declaration order.
+    // Auth must verify identity before these guards can read user.onboardingStatus.
+    // BusinessDetails must be satisfied before KYC can be checked (prerequisite ordering).
+    {
+      provide: APP_GUARD,
+      useClass: BusinessDetailsGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: KycGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: DisabledEndpointInterceptor,
     },
-
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: BusinessDetailsGuard,
-    // },
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: KycGuard,
-    // },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  // A-9 fix: Apply TraceIdMiddleware to every route so every request gets
+  // a unique trace ID attached to req.traceId and echoed in X-Request-ID.
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(TraceIdMiddleware).forRoutes("*");
+  }
+}

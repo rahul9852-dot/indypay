@@ -30,3 +30,12 @@ export const pendingSignUpCookieOptions: CookieOptions = {
   ...cookieOptions,
   maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
 };
+
+// S-5 fix: use sameSite: "strict" for the 2FA verify-token cookie so it is never
+// sent on any cross-site navigation, preventing an attacker from completing the
+// 2FA challenge from a third-party origin.
+export const verifyTokenCookieOptions: CookieOptions = {
+  ...cookieOptions,
+  sameSite: "strict",
+  maxAge: 300000, // 5 minutes
+};

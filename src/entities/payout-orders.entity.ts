@@ -2,6 +2,7 @@ import {
   BeforeInsert,
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -95,8 +96,9 @@ export class PayOutOrdersEntity {
   @Column()
   userId: string;
 
+  // D-9 fix: RESTRICT prevents accidental user deletion from wiping financial records.
   @ManyToOne(() => UsersEntity, ({ payOutOrders }) => payOutOrders, {
-    onDelete: "CASCADE",
+    onDelete: "RESTRICT",
   })
   @JoinColumn({ name: "userId" })
   user: UsersEntity;
@@ -118,6 +120,10 @@ export class PayOutOrdersEntity {
 
   @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
+
+  // D-9 fix: soft delete — financial records are never hard-deleted.
+  @DeleteDateColumn({ type: "timestamptz", nullable: true })
+  deletedAt: Date;
 
   @BeforeInsert()
   beforeInsertHook() {

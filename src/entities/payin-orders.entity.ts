@@ -1,6 +1,7 @@
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -101,8 +102,9 @@ export class PayInOrdersEntity {
   @Column()
   userId: string;
 
+  // D-9 fix: RESTRICT prevents accidental user deletion from wiping financial records.
   @ManyToOne(() => UsersEntity, ({ payInOrders }) => payInOrders, {
-    onDelete: "CASCADE",
+    onDelete: "RESTRICT",
   })
   @JoinColumn({ name: "userId" })
   user: UsersEntity;
@@ -127,6 +129,12 @@ export class PayInOrdersEntity {
 
   @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
+
+  // D-9 fix: soft delete so financial records are never hard-deleted.
+  // TypeORM automatically adds WHERE deleted_at IS NULL to all queries.
+  // RBI requires transaction records to be retained for 5-10 years.
+  @DeleteDateColumn({ type: "timestamptz", nullable: true })
+  deletedAt: Date;
 
   // @BeforeInsert()
   // beforeInsertHook() {

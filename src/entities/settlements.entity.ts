@@ -2,6 +2,7 @@ import {
   BeforeInsert,
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -69,8 +70,9 @@ export class SettlementsEntity {
   @Column()
   userId: string;
 
+  // D-9 fix: RESTRICT prevents accidental user deletion from wiping settlement records.
   @ManyToOne(() => UsersEntity, ({ settlements }) => settlements, {
-    onDelete: "CASCADE",
+    onDelete: "RESTRICT",
   })
   @JoinColumn({ name: "userId" })
   user: UsersEntity;
@@ -104,6 +106,10 @@ export class SettlementsEntity {
 
   @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
+
+  // D-9 fix: soft delete — settlement records are never hard-deleted.
+  @DeleteDateColumn({ type: "timestamptz", nullable: true })
+  deletedAt: Date;
 
   @BeforeInsert()
   beforeInsertHook() {

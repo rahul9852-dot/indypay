@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { Request } from "express";
 import { CustomLogger, LoggerPlaceHolder } from "@/logger";
+import { getCurrentUserIp } from "@/utils/request.utils";
 
 @Injectable()
 export class WebhookGuard implements CanActivate {
@@ -15,7 +16,10 @@ export class WebhookGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
 
-    const requestIp = this.parseIp(request);
+    // S-3 fix: use req.ip resolved by Express trust-proxy (trust proxy = 1 in
+    // main.ts). This uses the rightmost XFF IP set by our load balancer — the
+    // real client IP — rather than the leftmost value which an attacker controls.
+    const requestIp = getCurrentUserIp(request);
 
     this.logger.info(`WEBHOOK REQUEST : ${LoggerPlaceHolder.Json}`, {
       requestIp,
@@ -31,20 +35,5 @@ export class WebhookGuard implements CanActivate {
     }
 
     return true;
-  }
-
-  private parseIp(req: Request) {
-    const xForwardedFor = req.headers["x-forwarded-for"];
-    if (
-      xForwardedFor &&
-      Array.isArray(xForwardedFor) &&
-      xForwardedFor.length > 0
-    ) {
-      return xForwardedFor[0];
-    } else if (xForwardedFor && typeof xForwardedFor === "string") {
-      return xForwardedFor;
-    }
-
-    return req.socket?.remoteAddress || req.ip;
   }
 }

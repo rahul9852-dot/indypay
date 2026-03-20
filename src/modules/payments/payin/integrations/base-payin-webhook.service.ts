@@ -13,6 +13,7 @@ import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
 import axios from "axios";
 import { BasePayinService } from "./base-payin.service";
+import type { MerchantWebhookJobData } from "../../merchant-webhook.processor";
 import { PayInOrdersEntity } from "@/entities/payin-orders.entity";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import { WalletEntity } from "@/entities/wallet.entity";
@@ -23,6 +24,10 @@ import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import { convertExternalPaymentStatusToInternal } from "@/utils/helperFunctions.utils";
 import { LoggerPlaceHolder } from "@/logger";
 import { CommissionService } from "@/modules/commissions/commission.service";
+import {
+  PayinEventLogEntity,
+  PayinEventTrigger,
+} from "@/entities/payin-event-log.entity";
 
 /**
  * Base service for handling payin webhooks
@@ -49,6 +54,9 @@ export abstract class BasePayinWebhookService extends BasePayinService {
     @Optional()
     @InjectQueue("payin-orders")
     payinQueue?: Queue,
+    @Optional()
+    @InjectQueue("merchant-webhooks")
+    protected readonly merchantWebhookQueue?: Queue,
   ) {
     super(
       payInOrdersRepository,
@@ -60,46 +68,31 @@ export abstract class BasePayinWebhookService extends BasePayinService {
   }
 
   /**
-   * Find payin order by txnRefId or orderId
-   * Override this if your integration uses different fields
-   * Optimized with caching to reduce database load
+   * Find payin order by txnRefId or orderId.
+   * Uses Redis as a lookup signal — on a cache hit, returns the cached entity
+   * directly instead of re-querying the DB (fixes the previous pattern that
+   * hit the DB even on cache hits, defeating the purpose of caching).
+   *
+   * NOTE: Do NOT use this inside processWebhookSafely — that method fetches
+   * the order with a FOR UPDATE lock inside its own transaction.
    */
   protected async findPayinOrder(
     txnRefId?: string,
     orderId?: string,
   ): Promise<PayInOrdersEntity | null> {
-    // Try cache first to reduce database load
     if (orderId) {
       const cacheKey = `payin_order:orderId:${orderId}`;
       const cached = await this.cacheManager.get<PayInOrdersEntity>(cacheKey);
-      if (cached) {
-        // Cache hit - still need to fetch with relations for fresh data
-        // But cache helps reduce load for duplicate webhook checks
-        const order = await this.payInOrdersRepository.findOne({
-          where: { orderId },
-          relations: ["user"],
-        });
-        if (order) {
-          return order;
-        }
-      }
+      if (cached) return cached;
     }
 
     if (txnRefId) {
       const cacheKey = `payin_order:txnRefId:${txnRefId}`;
       const cached = await this.cacheManager.get<PayInOrdersEntity>(cacheKey);
-      if (cached) {
-        const order = await this.payInOrdersRepository.findOne({
-          where: { txnRefId },
-          relations: ["user"],
-        });
-        if (order) {
-          return order;
-        }
-      }
+      if (cached) return cached;
     }
 
-    // Database query - cache result for future lookups
+    // Cache miss — query the DB and cache the result for 5 minutes.
     let order: PayInOrdersEntity | null = null;
 
     if (txnRefId) {
@@ -112,7 +105,7 @@ export abstract class BasePayinWebhookService extends BasePayinService {
           `payin_order:txnRefId:${txnRefId}`,
           order,
           300,
-        ); // 5 min cache
+        );
 
         return order;
       }
@@ -128,7 +121,7 @@ export abstract class BasePayinWebhookService extends BasePayinService {
           `payin_order:orderId:${orderId}`,
           order,
           300,
-        ); // 5 min cache
+        );
 
         return order;
       }
@@ -420,8 +413,15 @@ export abstract class BasePayinWebhookService extends BasePayinService {
   // }
 
   /**
-   * Send webhook to user's webhook URL
-   * Optimized with timeout to prevent hanging requests
+   * O-9 fix: Reliable merchant webhook delivery with automatic retries.
+   *
+   * If the "merchant-webhooks" Bull queue is registered (production), the payload
+   * is enqueued and delivery is retried up to 3 times with exponential backoff
+   * (60s → 120s → 240s). This guarantees merchants receive payment notifications
+   * even when their server is temporarily down.
+   *
+   * If the queue is not available (tests / legacy contexts), falls back to a
+   * single direct HTTP call — identical to the previous behaviour.
    */
   protected async sendUserWebhook(
     user: UsersEntity,
@@ -439,26 +439,41 @@ export abstract class BasePayinWebhookService extends BasePayinService {
       return;
     }
 
+    // O-9 fix: queue-based delivery with retries.
+    if (this.merchantWebhookQueue) {
+      const jobData: MerchantWebhookJobData = {
+        url: user.payInWebhookUrl,
+        payload,
+      };
+      await this.merchantWebhookQueue.add("deliver-webhook", jobData, {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 60_000 },
+        removeOnComplete: true,
+        removeOnFail: false, // keep failed jobs for inspection
+      });
+      this.logger.info(
+        `[MERCHANT-WEBHOOK] Queued for delivery → ${user.payInWebhookUrl} orderId=${payload.orderId}`,
+      );
+
+      return;
+    }
+
+    // Fallback: direct call (used in tests / when queue not registered).
     this.logger.info(
       `PAYIN - Going to call user PAYIN WEBHOOK (${user.payInWebhookUrl}) with payload: ${LoggerPlaceHolder.Json}`,
       payload,
     );
 
     try {
-      // Add timeout to prevent hanging requests (5 seconds max)
       const { data } = await axios.post(user.payInWebhookUrl, payload, {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: 5000, // 5 second timeout
-        validateStatus: (status) => status < 500, // Don't throw on 4xx
+        headers: { "Content-Type": "application/json" },
+        timeout: 5000,
+        validateStatus: (status) => status < 500,
       });
-
       this.logger.info(
         `PAYIN - User webhook (${user.payInWebhookUrl}) sent successfully RES: ${JSON.stringify(data)}`,
       );
     } catch (err: any) {
-      // Don't throw - webhook failures shouldn't fail the main transaction
       if (err.code === "ECONNABORTED") {
         this.logger.warn(
           `PAYIN - User webhook timeout after 5s: ${user.payInWebhookUrl}`,
@@ -469,6 +484,128 @@ export abstract class BasePayinWebhookService extends BasePayinService {
           err,
         );
       }
+    }
+  }
+
+  /**
+   * D-3 fix: Atomic webhook deduplication — two-layer guard.
+   *
+   * Layer 1 (Redis): If this orderId was processed in the last 24 hours, reject
+   * immediately without touching the DB. Handles all PG retries cheaply.
+   *
+   * Layer 2 (DB FOR UPDATE): If two webhooks arrive simultaneously (before either
+   * has been processed), only one acquires the Postgres row lock. The other waits.
+   * When the second gets the lock, the order is already in a terminal state
+   * (SUCCESS/FAILED) and it exits without processing — preventing double wallet
+   * credits entirely.
+   *
+   * Usage in each PG webhook handler:
+   *
+   *   const processed = await this.processWebhookSafely(orderId, async (qr, order) => {
+   *     await this.updatePayinOrderStatus(qr, order, status, updateData);
+   *     await this.safeUpdateWalletBalance(qr, order.user.id, wallet => { ... });
+   *     await this.sendUserWebhook(order.user, payload);
+   *   });
+   *   if (!processed) return { message: "duplicate" };
+   *
+   * @returns true  — webhook was processed.
+   * @returns false — duplicate; caller must ACK the PG (return 200) without processing.
+   * @throws NotFoundException when orderId does not exist in DB.
+   */
+  protected async processWebhookSafely(
+    orderId: string,
+    processor: (
+      queryRunner: QueryRunner,
+      order: PayInOrdersEntity,
+    ) => Promise<void>,
+  ): Promise<boolean> {
+    // Layer 1: Redis fast path.
+    const processedKey = REDIS_KEYS.WEBHOOK_PROCESSED(orderId);
+    if (await this.cacheManager.get(processedKey)) {
+      this.logger.warn(
+        `[WEBHOOK][DEDUP] orderId ${orderId} — already processed (Redis), skipping`,
+      );
+
+      return false;
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Layer 2: DB row lock.
+      // SELECT FOR UPDATE blocks any concurrent webhook on the same orderId until
+      // this transaction commits or rolls back. Only one webhook wins the race;
+      // the loser sees a terminal status and exits cleanly.
+      const order = await queryRunner.manager.findOne(PayInOrdersEntity, {
+        where: { orderId },
+        relations: ["user"],
+        lock: { mode: "pessimistic_write" },
+      });
+
+      if (!order) {
+        await queryRunner.rollbackTransaction();
+        throw new NotFoundException(`Payin order not found: ${orderId}`);
+      }
+
+      // Terminal states mean a previous webhook already processed this payment.
+      const isTerminal =
+        order.status === PAYMENT_STATUS.SUCCESS ||
+        order.status === PAYMENT_STATUS.FAILED;
+
+      if (isTerminal) {
+        await queryRunner.rollbackTransaction();
+        this.logger.warn(
+          `[WEBHOOK][DEDUP] orderId ${orderId} already in terminal status ${order.status} — skipping`,
+        );
+
+        return false;
+      }
+
+      // Capture current status before processor changes it.
+      const previousStatus = order.status;
+
+      // Safe to process — we hold the exclusive row lock.
+      await processor(queryRunner, order);
+
+      // O-7 fix: Write an immutable event log entry inside the same transaction.
+      // If the transaction rolls back, the log entry rolls back too — no orphan logs.
+      // Re-read the order to get the status after processor ran.
+      const updatedOrder = await queryRunner.manager.findOne(
+        PayInOrdersEntity,
+        {
+          where: { orderId },
+          select: { status: true },
+        },
+      );
+      const newStatus = updatedOrder?.status ?? previousStatus;
+
+      if (newStatus !== previousStatus) {
+        const eventLog = queryRunner.manager.create(PayinEventLogEntity, {
+          orderId,
+          previousStatus,
+          newStatus,
+          triggeredBy: PayinEventTrigger.WEBHOOK,
+        });
+        await queryRunner.manager.save(PayinEventLogEntity, eventLog);
+      }
+
+      await queryRunner.commitTransaction();
+
+      // Set Redis marker so all future PG retries skip the DB entirely.
+      await this.cacheManager.set(
+        processedKey,
+        "1",
+        60 * 60 * 24, // 24 hours
+      );
+
+      return true;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
   }
 

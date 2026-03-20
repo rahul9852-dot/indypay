@@ -7,6 +7,7 @@ import { CacheModule } from "@nestjs/cache-manager";
 import { PaymentsService } from "./payments.service";
 import { PaymentsController } from "./payments.controller";
 import { PayinProcessor } from "./payin/processor/payin.processor";
+import { MerchantWebhookProcessor } from "./merchant-webhook.processor";
 import { appConfig } from "@/config/app.config";
 import { SESService } from "@/modules/aws/ses.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
@@ -34,6 +35,7 @@ import { CryptoService } from "@/utils/encryption-algo.utils";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 import { IntegrationsModule } from "@/modules/integrations/integrations.module";
 import { CommissionsModule } from "@/modules/commissions/commissions.module";
+import { PayinEventLogEntity } from "@/entities/payin-event-log.entity";
 
 const {
   redisConfig: { redisHostUrl, redisPort },
@@ -64,8 +66,13 @@ const {
       CheckoutEntity,
       PaymentLinkEntity,
       CheckoutPageEntity,
+      PayinEventLogEntity,
     ]),
-    BullModule.registerQueue({ name: "payouts" }, { name: "payin-orders" }),
+    BullModule.registerQueue(
+      { name: "payouts" },
+      { name: "payin-orders" },
+      { name: "merchant-webhooks" },
+    ),
     CacheModule.register(),
     forwardRef(() => IntegrationsModule),
     forwardRef(() => CommissionsModule),
@@ -82,6 +89,7 @@ const {
     CryptoService,
     DatabaseMonitorService,
     PayinProcessor,
+    MerchantWebhookProcessor,
   ],
   controllers: [PaymentsController],
   exports: [PaymentsService],

@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import {
@@ -28,6 +29,7 @@ import {
   cookieOptions,
   mobileVerifyCookieOptions,
   refreshCookieOptions,
+  verifyTokenCookieOptions,
 } from "@/utils/cookies.utils";
 import { ACCOUNT_STATUS, COOKIE_KEYS, OAUTH_PROVIDER } from "@/enums";
 import {
@@ -46,6 +48,7 @@ import {
 } from "@/utils/helperFunctions.utils";
 import {
   MAX_ATTEMPTS,
+  MAX_2FA_ATTEMPTS,
   REDIS_KEYS,
   LOCK_TIME_MS,
 } from "@/constants/redis-cache.constant";
@@ -84,6 +87,12 @@ interface IVerifyTokenPayload {
   pending2FA: boolean;
 }
 
+// S-5 fix: hash OTP with SHA-256 before storing in Redis so that Redis access
+// does not expose live OTP values. The plaintext OTP is only ever held in memory
+// long enough to send via email; the stored value is non-reversible.
+const hash2FAToken = (token: string): string =>
+  createHash("sha256").update(token).digest("hex");
+
 @Injectable()
 export class AuthService {
   private readonly logger = new CustomLogger(AuthService.name);
@@ -111,27 +120,8 @@ export class AuthService {
     const token = generateOtp(6);
     const redisKey = REDIS_KEYS.TWO_FACTOR_TOKEN(user.id);
 
-    // console.log('==========================================');
-    // console.log('Generating 2FA Token');
-    // console.log('Token:', token);
-    // console.log('User ID:', user.id);
-    // console.log('Redis Key:', redisKey);
-    // console.log('==========================================');
-
-    // Store token in Redis
-    // Store with TTL of 5 minutes (300 seconds)
-    await this.cacheManager.set(
-      redisKey,
-      token,
-      300, // 5 minutes
-    );
-
-    // Verify storage
-    const storedToken = await this.cacheManager.get<string>(redisKey);
-    // console.log('Token Storage Verification:');
-    // console.log('Stored Token:', storedToken);
-    // console.log('Storage Successful:', token === storedToken);
-    // console.log('==========================================');
+    // S-5 fix: store SHA-256 hash of the OTP so plaintext is never at rest in Redis.
+    await this.cacheManager.set(redisKey, hash2FAToken(token), 300);
 
     return token;
   }
@@ -249,15 +239,14 @@ export class AuthService {
         };
 
         await Promise.all([
-          // Store 2FA token
+          // generate2FAToken() already stored the hash with a 5-minute TTL;
+          // only set the remaining session keys here.
           this.cacheManager.set(
-            REDIS_KEYS.TWO_FACTOR_TOKEN(user.id),
-            twoFactorToken,
+            REDIS_KEYS.TWO_FACTOR_PENDING(user.id),
+            true,
+            300,
           ),
-          // Store pending flag
-          this.cacheManager.set(REDIS_KEYS.TWO_FACTOR_PENDING(user.id), true),
-          // Store user data
-          this.cacheManager.set(REDIS_KEYS.USER_KEY(user.id), userData),
+          this.cacheManager.set(REDIS_KEYS.USER_KEY(user.id), userData, 300),
         ]);
 
         // Generate a verification token with user data
@@ -273,10 +262,13 @@ export class AuthService {
           secret: twoFactorSecret,
         });
 
-        res.cookie(COOKIE_KEYS.VERIFY_TOKEN, verifyToken, {
-          ...cookieOptions,
-          maxAge: 300000, // 5 minutes
-        });
+        // S-5 fix: verifyTokenCookieOptions uses sameSite: "strict" to prevent
+        // the 2FA cookie from being sent on any cross-site navigation.
+        res.cookie(
+          COOKIE_KEYS.VERIFY_TOKEN,
+          verifyToken,
+          verifyTokenCookieOptions,
+        );
 
         return res.json({
           message: "Please enter the verification code sent to your email",
@@ -390,7 +382,9 @@ export class AuthService {
     }
 
     if (user.authProvider !== OAUTH_PROVIDER.GOOGLE) {
-      throw new BadRequestException("Please login with password");
+      throw new BadRequestException(
+        "An account with this email already exists. Please login with your password.",
+      );
     }
 
     // 📍 Save login IP (reuse logic)
@@ -434,6 +428,7 @@ export class AuthService {
 
     return res.json({
       message: "Google login successful",
+      onboardingStatus: user.onboardingStatus,
     });
   }
 
@@ -466,29 +461,35 @@ export class AuthService {
       // 3. Get and verify stored OTP first
       const userId = decodedToken.id;
 
-      // Check all Redis keys
-      // let it be for debugging puropse.
-      const [storedToken] = await Promise.all([
-        this.cacheManager.get<string>(REDIS_KEYS.TWO_FACTOR_TOKEN(userId)),
-        this.cacheManager.get<boolean>(REDIS_KEYS.TWO_FACTOR_PENDING(userId)),
-        this.cacheManager.get(REDIS_KEYS.USER_KEY(userId)),
-      ]);
+      // S-5 fix: enforce a per-user attempt cap to prevent brute-force of the
+      // 6-digit OTP space (10^6 values, 5-minute window).
+      const attemptsKey = REDIS_KEYS.TWO_FACTOR_ATTEMPTS(userId);
+      const attempts = (await this.cacheManager.get<number>(attemptsKey)) ?? 0;
+      if (attempts >= MAX_2FA_ATTEMPTS) {
+        // Invalidate the 2FA session so this code can never be used again.
+        await Promise.all([
+          this.cacheManager.del(REDIS_KEYS.TWO_FACTOR_TOKEN(userId)),
+          this.cacheManager.del(REDIS_KEYS.TWO_FACTOR_PENDING(userId)),
+          this.cacheManager.del(attemptsKey),
+        ]);
+        throw new BadRequestException(
+          "Too many incorrect attempts. Please login again.",
+        );
+      }
 
-      // console.log('Redis State:');
-      // console.log('2FA Token Key:', REDIS_KEYS.TWO_FACTOR_TOKEN(userId));
-      // console.log('2FA Pending Key:', REDIS_KEYS.TWO_FACTOR_PENDING(userId));
-      // console.log('User Data Key:', REDIS_KEYS.USER_KEY(userId));
-      // console.log('Stored Token:', storedToken);
-      // console.log('Is Pending:', isPending);
-      // console.log('Has User Data:', !!userData);
-      // console.log('Provided Token:', token);
-      // console.log('Tokens Match:', token === storedToken);
+      const storedToken = await this.cacheManager.get<string>(
+        REDIS_KEYS.TWO_FACTOR_TOKEN(userId),
+      );
 
       if (!storedToken) {
         throw new BadRequestException("Verification code expired");
       }
 
-      if (token !== storedToken) {
+      // S-5 fix: compare SHA-256(provided_token) against the stored hash so the
+      // plaintext OTP is never compared or logged in cleartext.
+      if (hash2FAToken(token) !== storedToken) {
+        // Increment attempt counter with the same TTL as the OTP window.
+        await this.cacheManager.set(attemptsKey, attempts + 1, 300);
         throw new BadRequestException("Invalid verification code");
       }
 
@@ -514,11 +515,12 @@ export class AuthService {
         throw new BadRequestException("Role mismatch");
       }
 
-      // 5. Clean up 2FA session
+      // 5. Clean up 2FA session (including the attempt counter)
       await Promise.all([
         this.cacheManager.del(REDIS_KEYS.TWO_FACTOR_TOKEN(decodedToken.id)),
         this.cacheManager.del(REDIS_KEYS.TWO_FACTOR_PENDING(decodedToken.id)),
         this.cacheManager.del(REDIS_KEYS.USER_KEY(decodedToken.id)),
+        this.cacheManager.del(REDIS_KEYS.TWO_FACTOR_ATTEMPTS(decodedToken.id)),
       ]);
 
       // get current user request IP

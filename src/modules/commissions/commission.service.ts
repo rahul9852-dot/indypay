@@ -426,6 +426,57 @@ export class CommissionService {
     }
   }
 
+  /**
+   * D-6 fix: when a commission plan or one of its slabs changes, bust the
+   * cache for every user who is mapped to that plan. Without this, merchants
+   * continue to be charged the old rate for up to 24 hours.
+   *
+   * Only invalidates the specific type (payin/payout) that is affected,
+   * leaving the other type's cache untouched.
+   */
+  private async invalidateCommissionPlanCaches(
+    commissionId: string,
+  ): Promise<void> {
+    const mappings = await this.userCommissionMappingRepository.find({
+      where: [
+        { payinCommissionId: commissionId, isActive: true },
+        { payoutCommissionId: commissionId, isActive: true },
+      ],
+      select: {
+        userId: true,
+        payinCommissionId: true,
+        payoutCommissionId: true,
+      },
+    });
+
+    if (!mappings.length) return;
+
+    await Promise.all(
+      mappings.flatMap((m) => {
+        const invalidations: Promise<void>[] = [];
+        if (m.payinCommissionId === commissionId) {
+          invalidations.push(
+            this.invalidateUserCommissionCache(m.userId, COMMISSION_TYPE.PAYIN),
+          );
+        }
+        if (m.payoutCommissionId === commissionId) {
+          invalidations.push(
+            this.invalidateUserCommissionCache(
+              m.userId,
+              COMMISSION_TYPE.PAYOUT,
+            ),
+          );
+        }
+
+        return invalidations;
+      }),
+    );
+
+    this.logger.debug(
+      `[COMMISSION] Cache busted for ${mappings.length} user(s) mapped to commission ${commissionId}`,
+    );
+  }
+
   // ========== CRUD Operations ==========
 
   async createCommission(createDto: any): Promise<CommissionEntity> {
@@ -469,11 +520,9 @@ export class CommissionService {
     Object.assign(commission, updateDto);
     const updated = await this.commissionRepository.save(commission);
 
-    // Invalidate cache for all users with this commission
-    // Note: This is a simple implementation. For production, you might want to track which users use this commission.
-    this.logger.warn(
-      `Commission ${id} updated. Consider invalidating user caches manually.`,
-    );
+    // D-6 fix: bust cache for every user mapped to this plan so they
+    // immediately pick up the new rate on their next transaction.
+    await this.invalidateCommissionPlanCaches(id);
 
     return updated;
   }
@@ -512,7 +561,12 @@ export class CommissionService {
       isActive: true,
     });
 
-    return await this.commissionSlabRepository.save(slab);
+    const saved = await this.commissionSlabRepository.save(slab);
+
+    // D-6 fix: adding a slab changes which rate tier applies — bust all mapped user caches.
+    await this.invalidateCommissionPlanCaches(commissionId);
+
+    return saved;
   }
 
   async updateSlab(
@@ -527,9 +581,16 @@ export class CommissionService {
       throw new NotFoundException(`Commission slab not found: ${slabId}`);
     }
 
+    // Capture before Object.assign may overwrite it
+    const { commissionId } = slab;
     Object.assign(slab, updateSlabDto);
 
-    return await this.commissionSlabRepository.save(slab);
+    const updated = await this.commissionSlabRepository.save(slab);
+
+    // D-6 fix: slab rate/range changed — bust cache for all users on this plan.
+    await this.invalidateCommissionPlanCaches(commissionId);
+
+    return updated;
   }
 
   async deleteSlab(slabId: string): Promise<void> {
@@ -541,7 +602,11 @@ export class CommissionService {
       throw new NotFoundException(`Commission slab not found: ${slabId}`);
     }
 
+    const { commissionId } = slab;
     await this.commissionSlabRepository.remove(slab);
+
+    // D-6 fix: slab removed — bust cache so users don't get charged the deleted tier.
+    await this.invalidateCommissionPlanCaches(commissionId);
   }
 
   async assignCommissionToUser(

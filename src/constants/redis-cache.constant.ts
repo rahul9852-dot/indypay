@@ -1,9 +1,13 @@
 export const MAX_ATTEMPTS = 3;
 export const LOCK_TIME_MS = 30 * 60 * 1000; // 30 minutes
 
+// S-5 fix: cap 2FA verify attempts to prevent brute-force of the 6-digit OTP space.
+export const MAX_2FA_ATTEMPTS = 5;
+
 export const REDIS_KEYS = {
   TWO_FACTOR_TOKEN: (userId: string) => `2fa:${userId}:code`,
   TWO_FACTOR_PENDING: (userId: string) => `2fa:${userId}:pending`,
+  TWO_FACTOR_ATTEMPTS: (userId: string) => `2fa:${userId}:attempts`,
   API_KEY: (clientId: string) => `api_key_entity_${clientId}`,
   USER_KEY: (userId: string) => `user_entity_${userId}`,
   SSO_TOKEN: (clientId: string) => `sso_token_entity_${clientId}`,
@@ -34,4 +38,7 @@ export const REDIS_KEYS = {
   STATS_ADMIN_DAILY: (date: string) => `stats:admin:daily:${date}`,
   STATS_MERCHANT_DAILY: (userId: string, date: string) =>
     `stats:merchant:daily:${userId}:${date}`,
+  // D-3 fix: tracks successfully processed webhooks for 24 hours so PG retries
+  // are rejected at the Redis layer without touching the database at all.
+  WEBHOOK_PROCESSED: (orderId: string) => `webhook:processed:${orderId}`,
 };

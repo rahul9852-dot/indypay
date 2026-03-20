@@ -3,6 +3,8 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { CacheModule } from "@nestjs/cache-manager";
 import { IntegrationMappingService } from "./integration-mapping.service";
 import { IntegrationPayinRouterService } from "./integration-payin-router.service";
+import { PGAdapterRegistry } from "./pg-adapter.registry";
+import { CircuitBreakerService } from "./circuit-breaker.service";
 import { IntegrationsController } from "./integrations.controller";
 import { UserIntegrationMappingEntity } from "@/entities/user-integration-mapping.entity";
 import { IntegrationEntity } from "@/entities/integration.entity";
@@ -21,8 +23,18 @@ import { AuthModule } from "@/modules/auth/auth.module";
     AuthModule,
     forwardRef(() => PaymentsModule),
   ],
-  providers: [IntegrationMappingService, IntegrationPayinRouterService],
+  providers: [
+    IntegrationMappingService,
+    IntegrationPayinRouterService,
+    PGAdapterRegistry,
+    CircuitBreakerService,
+  ],
   controllers: [IntegrationsController],
-  exports: [IntegrationMappingService, IntegrationPayinRouterService],
+  exports: [
+    IntegrationMappingService,
+    IntegrationPayinRouterService,
+    PGAdapterRegistry,
+    CircuitBreakerService,
+  ],
 })
 export class IntegrationsModule {}

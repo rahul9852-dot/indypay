@@ -279,58 +279,66 @@ export class PaymentsService {
     user: UsersEntity,
     batchId: string,
   ) {
-    return Promise.all(
-      payouts.map(async (payment) => {
-        // Calculate dynamic commission for this payout
-        const commissionResult = calculateDynamicCommission({
-          amount: +payment.amount,
-          userCommissionRate: +user.commissionInPercentagePayout,
-          userGstRate: +user.gstInPercentagePayout,
-        });
+    // D-7 fix: use sequential loop instead of Promise.all.
+    // All saves share the same queryRunner/connection. With Promise.all, if one
+    // save fails the catch block calls rollbackTransaction() while the remaining
+    // concurrent promises still hold references to the same queryRunner and attempt
+    // further saves — producing unhandled rejections and potentially crashing Node.
+    // Sequential iteration stops immediately on the first failure, giving the
+    // outer try/catch a clean, single error to handle before rollback.
+    const savedOrders: PayOutOrdersEntity[] = [];
 
-        this.logger.info(
-          `PAYOUT - createPayoutOrders - Dynamic commission result: ${LoggerPlaceHolder.Json}`,
-          {
-            originalAmount: payment.amount,
-            netPayableAmount: commissionResult.netPayableAmount,
-          },
-        );
+    for (const payment of payouts) {
+      // Calculate dynamic commission for this payout
+      const commissionResult = calculateDynamicCommission({
+        amount: +payment.amount,
+        userCommissionRate: +user.commissionInPercentagePayout,
+        userGstRate: +user.gstInPercentagePayout,
+      });
 
-        const payoutOrder = this.payOutOrdersRepository.create({
-          amount: +payment.amount,
-          amountBeforeDeduction: +commissionResult.netPayableAmount,
-          transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
-          orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
-          batchId,
-          user,
-          commissionInPercentage:
-            +payment.amount <= 1000 ? 7 : +user.commissionInPercentagePayout,
-          gstInPercentage: +user.gstInPercentagePayout,
-          name: payment.beneficiaryName,
-          bankAccountNumber: payment.accountNumber,
-          beneficiaryMobile: payment.beneficiaryMobile,
-          bankIfsc: payment.ifscCode,
-          bankName: payment.bankName,
-          remarks: payment.remarks,
-          purpose: payment.purpose,
-          payoutId: payment.payoutId,
-        });
+      this.logger.info(
+        `PAYOUT - createPayoutOrders - Dynamic commission result: ${LoggerPlaceHolder.Json}`,
+        {
+          originalAmount: payment.amount,
+          netPayableAmount: commissionResult.netPayableAmount,
+        },
+      );
 
-        const savedPayoutOrder = await queryRunner.manager.save(payoutOrder);
+      const payoutOrder = this.payOutOrdersRepository.create({
+        amount: +payment.amount,
+        amountBeforeDeduction: +commissionResult.netPayableAmount,
+        transferMode: payment.paymentMode || PAYOUT_PAYMENT_MODE.IMPS,
+        orderId: getUlidId(ID_TYPE.MERCHANT_PAYOUT),
+        batchId,
+        user,
+        commissionInPercentage:
+          +payment.amount <= 1000 ? 7 : +user.commissionInPercentagePayout,
+        gstInPercentage: +user.gstInPercentagePayout,
+        name: payment.beneficiaryName,
+        bankAccountNumber: payment.accountNumber,
+        beneficiaryMobile: payment.beneficiaryMobile,
+        bankIfsc: payment.ifscCode,
+        bankName: payment.bankName,
+        remarks: payment.remarks,
+        purpose: payment.purpose,
+        payoutId: payment.payoutId,
+      });
 
-        // 3. create transaction
-        const transaction = this.transactionsRepository.create({
-          user,
-          payOutOrder: savedPayoutOrder,
-          transactionType: PAYMENT_TYPE.PAYOUT,
-        });
+      const savedPayoutOrder = await queryRunner.manager.save(payoutOrder);
 
-        // 4. save transaction
-        await queryRunner.manager.save(transaction);
+      // create transaction
+      const transaction = this.transactionsRepository.create({
+        user,
+        payOutOrder: savedPayoutOrder,
+        transactionType: PAYMENT_TYPE.PAYOUT,
+      });
 
-        return savedPayoutOrder;
-      }),
-    );
+      await queryRunner.manager.save(transaction);
+
+      savedOrders.push(savedPayoutOrder);
+    }
+
+    return savedOrders;
   }
 
   async checkPayInStatusTransaction(
