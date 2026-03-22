@@ -28,6 +28,7 @@ import {
 import {
   CreatePaymentLinkDto,
   CreateCheckoutDto,
+  PaymentLinkExpiryPreset,
 } from "./dto/create-payin-payment.dto";
 import {
   CreateCheckoutPageDto,
@@ -529,12 +530,24 @@ export class PaymentsService {
     };
   }
 
-  async getTransactionsDetails(
+  /**
+   * List payment links for the dashboard.
+   *
+   * Root-cause fix: the previous implementation queried paymentLinkRepository
+   * using search fields (orderId, txnRefId) that only exist on PayInOrdersEntity,
+   * causing silent empty results or TypeORM runtime errors on any search.
+   *
+   * Correct searchable fields on payment_links:
+   *   name (customer), email (customer), mobile (customer)
+   * Admin sees all merchants; merchant sees only their own links.
+   * isExpired is computed at query time — no cron needed.
+   */
+  async getPaymentLinks(
     user: UsersEntity,
     {
       limit = 10,
       page = 1,
-      sort = "id",
+      sort = "createdAt",
       order = "DESC",
       search = "",
       startDate,
@@ -542,178 +555,106 @@ export class PaymentsService {
       status,
     }: PaginationWithDateAndStatusDto,
   ) {
-    const whereQuery:
-      | FindOptionsWhere<PayInOrdersEntity>
-      | FindOptionsWhere<PayInOrdersEntity>[] = {};
+    const isAdmin = [USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role);
 
-    // Date Filter
+    // Whitelist sort columns to prevent injection via the sort param.
+    const ALLOWED_SORT: (keyof PaymentLinkEntity)[] = [
+      "createdAt",
+      "amount",
+      "status",
+      "expiresAt",
+    ];
+    const safeSort: keyof PaymentLinkEntity = ALLOWED_SORT.includes(
+      sort as keyof PaymentLinkEntity,
+    )
+      ? (sort as keyof PaymentLinkEntity)
+      : "createdAt";
+
+    // ── Date filter ────────────────────────────────────────────────────────
+    const dateFilter: FindOptionsWhere<PaymentLinkEntity> = {};
     if (startDate && endDate) {
-      whereQuery.createdAt = Between(new Date(startDate), new Date(endDate));
+      dateFilter.createdAt = Between(new Date(startDate), new Date(endDate));
     } else if (startDate) {
-      whereQuery.createdAt = MoreThanOrEqual(new Date(startDate));
+      dateFilter.createdAt = MoreThanOrEqual(new Date(startDate));
     } else if (endDate) {
-      whereQuery.createdAt = LessThanOrEqual(new Date(endDate));
+      dateFilter.createdAt = LessThanOrEqual(new Date(endDate));
     }
-    const query = [];
 
     const internalStatus = status
       ? convertExternalPaymentStatusToInternal(status.toUpperCase())
       : undefined;
 
-    if ([USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role)) {
-      if (search) {
-        const orderIdSearch = {
-          orderId: ILike(`%${search}%`),
-          ...(internalStatus && { status: internalStatus }),
-        };
+    // ── Build WHERE clauses ────────────────────────────────────────────────
+    // base = ownership + status + date; then expand for search terms.
+    const base: FindOptionsWhere<PaymentLinkEntity> = {
+      ...(!isAdmin && { userId: user.id }),
+      ...(internalStatus && { status: internalStatus }),
+      ...dateFilter,
+    };
 
-        const txnRefSearch = {
-          txnRefId: ILike(`%${search}%`),
-          ...(internalStatus && { status: internalStatus }),
-        };
+    const where: FindOptionsWhere<PaymentLinkEntity>[] = search
+      ? [
+          { ...base, name: ILike(`%${search}%`) },
+          { ...base, email: ILike(`%${search}%`) },
+          { ...base, mobile: ILike(`%${search}%`) },
+        ]
+      : [base];
 
-        const userIdSearch = {
-          user: {
-            id: ILike(`%${search}%`),
-          },
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        const nameSearch = {
-          user: {
-            fullName: ILike(`%${search}%`),
-          },
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        const emailSearch = {
-          user: {
-            email: ILike(`%${search}%`),
-          },
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        const mobileSearch = {
-          user: {
-            mobile: ILike(`%${search}%`),
-          },
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        query.push(orderIdSearch);
-        query.push(txnRefSearch);
-        query.push(nameSearch);
-        query.push(emailSearch);
-        query.push(mobileSearch);
-        query.push(userIdSearch);
-      }
-    } else {
-      if (search) {
-        const userIdSearch = {
-          user: {
-            id: user.id,
-          },
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        const orderIdSearch = {
-          user: {
-            id: user.id,
-          },
-          orderId: ILike(`%${search}%`),
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        const txnRefSearch = {
-          user: {
-            id: user.id,
-          },
-          txnRefId: ILike(`%${search}%`),
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        const nameSearch = {
-          user: {
-            id: user.id,
-            fullName: ILike(`%${search}%`),
-          },
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        const emailSearch = {
-          user: {
-            id: user.id,
-            email: ILike(`%${search}%`),
-          },
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        const mobileSearch = {
-          user: {
-            id: user.id,
-            mobile: ILike(`%${search}%`),
-          },
-          ...(internalStatus && { status: internalStatus }),
-        };
-
-        query.push(userIdSearch);
-        query.push(orderIdSearch);
-        query.push(txnRefSearch);
-        query.push(nameSearch);
-        query.push(emailSearch);
-        query.push(mobileSearch);
-      } else {
-        query.push({
-          user: {
-            id: user.id,
-          },
-          ...(internalStatus && { status: internalStatus }),
-        });
-      }
-    }
-
-    if (internalStatus) {
-      if (!query.length) {
-        query.push({ status: internalStatus });
-      }
-    }
-
+    // ── Query ──────────────────────────────────────────────────────────────
     const [data, totalItems] = await this.paymentLinkRepository.findAndCount({
-      where: query,
-      relations: {
-        user: true,
-      },
+      where,
+      relations: { user: true },
       select: {
         id: true,
         amount: true,
         email: true,
         name: true,
         mobile: true,
+        note: true,
         status: true,
-        createdAt: true,
+        allowPartialPayment: true,
+        minimumPartialAmount: true,
+        viewCount: true,
         expiresAt: true,
+        paidAt: true,
         notifyOnEmail: true,
         notifyOnNumber: true,
-        user: {
-          id: true,
-          fullName: true,
-        },
+        createdAt: true,
+        user: { id: true, fullName: true },
       },
       skip: (page - 1) * limit,
       take: limit,
-      order: { [sort]: order },
+      order: { [safeSort]: order },
     });
 
-    const pagination = getPagination({
-      totalItems,
-      page,
-      limit,
+    const now = new Date();
+
+    // ── Enrich each record with computed fields ────────────────────────────
+    const enriched = data.map((link) => {
+      const linkUrl = this.buildPaymentLinkUrl(link.id);
+      const isExpired =
+        link.expiresAt != null &&
+        link.expiresAt < now &&
+        link.status === PAYMENT_STATUS.PENDING;
+
+      return {
+        ...link,
+        amount: +link.amount,
+        minimumPartialAmount:
+          link.minimumPartialAmount != null ? +link.minimumPartialAmount : null,
+        isExpired,
+        paymentLinkUrl: linkUrl,
+        whatsappShareUrl: this.buildWhatsappShareUrl({
+          amount: +link.amount,
+          linkUrl,
+          note: link.note,
+        }),
+      };
     });
 
-    return {
-      data,
-      pagination,
-    };
+    const pagination = getPagination({ totalItems, page, limit });
+
+    return { data: enriched, pagination };
   }
 
   async getMisspelledPayinTransactions({
@@ -1073,46 +1014,97 @@ export class PaymentsService {
     }
   }
 
+  // ─── Payment Link helpers ─────────────────────────────────────────────────
+
+  /** Resolve a merchant-facing preset to an absolute expiry Date (or null). */
+  private resolveExpiresAt(preset: PaymentLinkExpiryPreset): Date | null {
+    if (preset === PaymentLinkExpiryPreset.NEVER) return null;
+
+    const minutesMap: Record<string, number> = {
+      [PaymentLinkExpiryPreset.ONE_HOUR]: 60,
+      [PaymentLinkExpiryPreset.TWENTY_FOUR_HOURS]: 24 * 60,
+      [PaymentLinkExpiryPreset.SEVEN_DAYS]: 7 * 24 * 60,
+    };
+
+    const minutes = minutesMap[preset];
+
+    return new Date(Date.now() + minutes * 60_000);
+  }
+
+  /** Canonical public URL for a given link ID. */
+  private buildPaymentLinkUrl(linkId: string): string {
+    return `${beBaseUrl}/api/v1/payments/payment-link/${linkId}`;
+  }
+
   /**
-   * Create a payment link with encrypted details and expiry time
+   * Pre-built WhatsApp URL — merchant taps one button and the message is
+   * already filled.  Format matches what 80% of Indian SMB merchants expect.
    */
-  async createPaymentLink(
-    createPaymentLinkDto: CreatePaymentLinkDto,
-    user: UsersEntity,
-  ) {
+  buildWhatsappShareUrl(params: {
+    amount: number;
+    linkUrl: string;
+    note?: string | null;
+  }): string {
+    const rupees = new Intl.NumberFormat("en-IN").format(params.amount);
+    let text = `Hi, please pay ₹${rupees} here: ${params.linkUrl}`;
+    if (params.note) text += `\n\nNote: ${params.note}`;
+
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
+  }
+
+  /**
+   * Create a payment link with encrypted details and expiry.
+   * expiryPreset replaces the raw expiresInMinutes field — merchants choose
+   * from 1h / 24h / 7d / never instead of typing a raw number.
+   */
+  async createPaymentLink(dto: CreatePaymentLinkDto, user: UsersEntity) {
     if (!user?.id) {
       throw new BadRequestException(
         "User context required. Please log in and try again.",
       );
     }
+
     const {
       amount,
       email,
       name,
       mobile,
-      expiresInMinutes,
+      expiryPreset,
+      note = null,
+      allowPartialPayment = false,
+      minimumPartialAmount = null,
       notifyOnEmail = false,
       notifyOnNumber = false,
-    } = createPaymentLinkDto;
+    } = dto;
 
-    // Calculate expiry time
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
+    // Guard: minimumPartialAmount must be less than the full amount.
+    if (
+      allowPartialPayment &&
+      minimumPartialAmount != null &&
+      minimumPartialAmount >= amount
+    ) {
+      throw new BadRequestException(
+        "minimumPartialAmount must be less than the payment amount.",
+      );
+    }
 
-    // Prepare payment details to encrypt (amount, email, number, notify flags)
-    const paymentDetails = {
-      amount,
-      name,
-      email,
-      mobile,
-      expiresAt: expiresAt.toISOString(),
-      notifyOnEmail,
-      notifyOnNumber,
-    };
+    const expiresAt = this.resolveExpiresAt(expiryPreset);
 
-    // Encrypt the payment details
+    // AES-encrypted snapshot served to the unauthenticated customer endpoint.
+    // Prevents field tampering if the linkId leaks.
     const encryptedData = this.encryptionAlgoService.encrypt(
-      JSON.stringify(paymentDetails),
+      JSON.stringify({
+        amount,
+        name,
+        email,
+        mobile,
+        note,
+        allowPartialPayment,
+        minimumPartialAmount,
+        expiresAt: expiresAt?.toISOString() ?? null,
+        notifyOnEmail,
+        notifyOnNumber,
+      }),
     );
 
     const paymentLink = this.paymentLinkRepository.create({
@@ -1120,6 +1112,9 @@ export class PaymentsService {
       email,
       mobile,
       name,
+      note,
+      allowPartialPayment,
+      minimumPartialAmount,
       userId: user.id,
       encryptedData,
       expiresAt,
@@ -1130,7 +1125,7 @@ export class PaymentsService {
 
     const savedLink = await this.paymentLinkRepository.save(paymentLink);
 
-    const paymentLinkUrl = `${beBaseUrl}/api/v1/payments/payment-link/${savedLink.id}`;
+    const paymentLinkUrl = this.buildPaymentLinkUrl(savedLink.id);
 
     this.logger.info(
       `Payment link created: ${LoggerPlaceHolder.Json}`,
@@ -1140,13 +1135,26 @@ export class PaymentsService {
     return {
       linkId: savedLink.id,
       paymentLinkUrl,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: expiresAt?.toISOString() ?? null,
+      whatsappShareUrl: this.buildWhatsappShareUrl({
+        amount,
+        linkUrl: paymentLinkUrl,
+        note,
+      }),
       message: "Payment link created successfully",
     };
   }
 
   /**
-   * Get payment link details by linkId (decrypts and returns details)
+   * Public endpoint — customer opens the payment link URL.
+   *
+   * Changes vs the old implementation:
+   *  • Increments viewCount atomically (analytics).
+   *  • Returns isExpired: true instead of throwing — lets the frontend render
+   *    a proper "This link has expired" page rather than an error JSON.
+   *  • Returns note, allowPartialPayment, minimumPartialAmount.
+   *  • Validates against both the DB expiresAt and the encrypted snapshot to
+   *    prevent clock-skew or DB-edit tampering.
    */
   async getPaymentLinkDetails(linkId: string) {
     const paymentLink = await this.paymentLinkRepository.findOne({
@@ -1157,44 +1165,117 @@ export class PaymentsService {
       throw new NotFoundException("Payment link not found");
     }
 
-    // Check if link has expired
+    // Increment view counter without blocking the response.
+    this.paymentLinkRepository
+      .increment({ id: linkId }, "viewCount", 1)
+      .catch((err) =>
+        this.logger.error(
+          `Failed to increment viewCount for link ${linkId}: ${err?.message}`,
+        ),
+      );
+
     const now = new Date();
-    if (now > paymentLink.expiresAt) {
-      throw new BadRequestException("Payment link has expired");
+
+    // Expired check against the DB column (fast path).
+    if (paymentLink.expiresAt != null && now > paymentLink.expiresAt) {
+      return {
+        linkId: paymentLink.id,
+        isExpired: true,
+        expiresAt: paymentLink.expiresAt.toISOString(),
+        amount: +paymentLink.amount,
+        name: paymentLink.name ?? null,
+        viewCount: paymentLink.viewCount + 1,
+      };
     }
 
-    // Decrypt the payment details
-    let paymentDetails: any;
+    // Already paid — tell the frontend so it can show a "Payment complete" page.
+    if (paymentLink.status === PAYMENT_STATUS.SUCCESS) {
+      return {
+        linkId: paymentLink.id,
+        isPaid: true,
+        paidAt: paymentLink.paidAt?.toISOString() ?? null,
+        amount: +paymentLink.amount,
+        name: paymentLink.name ?? null,
+      };
+    }
+
+    // Decrypt and validate the tamper-proof snapshot.
+    let snapshot: any;
     try {
-      const decryptedData = this.encryptionAlgoService.decrypt(
-        paymentLink.encryptedData,
-      );
-      paymentDetails = JSON.parse(decryptedData);
+      const raw = this.encryptionAlgoService.decrypt(paymentLink.encryptedData);
+      snapshot = JSON.parse(raw);
     } catch (error) {
       this.logger.error(
-        `Failed to decrypt payment link data: ${LoggerPlaceHolder.Json}`,
+        `Failed to decrypt payment link ${linkId}: ${LoggerPlaceHolder.Json}`,
         error,
       );
-      throw new BadRequestException("Failed to decrypt payment link data");
+      throw new BadRequestException(
+        "Payment link data could not be read. Please contact support.",
+      );
     }
 
-    // Check if the decrypted expiry time has passed
-    const decryptedExpiresAt = new Date(paymentDetails.expiresAt);
-    if (now > decryptedExpiresAt) {
-      throw new BadRequestException("Payment link has expired");
+    // Secondary expiry check against the encrypted snapshot.
+    if (snapshot.expiresAt != null && now > new Date(snapshot.expiresAt)) {
+      return {
+        linkId: paymentLink.id,
+        isExpired: true,
+        expiresAt: snapshot.expiresAt,
+        amount: +snapshot.amount,
+        name: snapshot.name ?? null,
+      };
     }
 
     return {
       linkId: paymentLink.id,
-      amount: paymentDetails.amount,
-      email: paymentDetails.email,
-      name: paymentDetails.name ?? paymentLink.name ?? null,
-      mobile: paymentDetails.mobile,
-      expiresAt: paymentDetails.expiresAt,
+      amount: +snapshot.amount,
+      email: snapshot.email,
+      name: snapshot.name ?? paymentLink.name ?? null,
+      mobile: snapshot.mobile,
+      note: snapshot.note ?? null,
+      allowPartialPayment: !!snapshot.allowPartialPayment,
+      minimumPartialAmount: snapshot.minimumPartialAmount ?? null,
+      expiresAt: snapshot.expiresAt ?? null,
       isExpired: false,
-      notifyOnEmail: !!paymentDetails.notifyOnEmail,
-      notifyOnNumber: !!paymentDetails.notifyOnNumber,
+      isPaid: false,
+      notifyOnEmail: !!snapshot.notifyOnEmail,
+      notifyOnNumber: !!snapshot.notifyOnNumber,
+      viewCount: paymentLink.viewCount + 1,
     };
+  }
+
+  /**
+   * Fetch a single payment link that belongs to the requesting user.
+   * Used by the WhatsApp share endpoint to guard against IDOR.
+   */
+  async getOwnPaymentLink(linkId: string, userId: string) {
+    const link = await this.paymentLinkRepository.findOne({
+      where: { id: linkId, userId },
+      select: {
+        id: true,
+        amount: true,
+        note: true,
+        expiresAt: true,
+        status: true,
+      },
+    });
+
+    if (!link) {
+      throw new NotFoundException("Payment link not found");
+    }
+
+    return link;
+  }
+
+  /**
+   * Mark a payment link as paid.
+   * Call this from the webhook handler after a successful payin that
+   * originated from a payment link (pass paymentLinkId on the payin order).
+   */
+  async markLinkAsPaid(linkId: string, paidAt: Date = new Date()) {
+    await this.paymentLinkRepository.update(
+      { id: linkId, status: PAYMENT_STATUS.PENDING },
+      { status: PAYMENT_STATUS.SUCCESS, paidAt },
+    );
   }
 
   /**

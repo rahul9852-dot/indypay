@@ -13,6 +13,12 @@ import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Response } from "express";
 import { KycService } from "./kyc.service";
 import { PanVerifyDto } from "./verification/dto/pan-verify.dto";
+import {
+  AadhaarGenerateOtpDto,
+  AadhaarVerifyOtpDto,
+} from "./verification/dto/aadhaar-verify.dto";
+import { GstVerifyDto } from "./verification/dto/gst-verify.dto";
+import { BankVerifyDto } from "./verification/dto/bank-verify.dto";
 import { KycStatusResDto } from "./dto/kyc-status.dto";
 import { DocumentUploadDto } from "./dto/document-upload.dto";
 import { KycSubmissionDto } from "./dto/kyc.dto";
@@ -111,5 +117,120 @@ export class KycController {
     @Body() dto: PanVerifyDto,
   ) {
     return this.kycService.verifyPan(user.id, dto);
+  }
+
+  // ─── Aadhaar OTP eKYC ────────────────────────────────────────────────────
+
+  @Post("verify/aadhaar/generate-otp")
+  @HttpCode(HttpStatus.OK)
+  @IgnoreBusinessDetails()
+  @ApiOperation({
+    summary: "Generate Aadhaar OTP via Karza — sends OTP to registered mobile",
+  })
+  @ApiOkResponse({
+    description: "OTP dispatched to Aadhaar-linked mobile",
+    schema: {
+      example: {
+        success: true,
+        message: "OTP sent to your Aadhaar-linked mobile number.",
+        requestId: "kzra_xxxxxxxxxxxxxxxx",
+      },
+    },
+  })
+  async generateAadhaarOtp(
+    @User() user: IAccessTokenPayload,
+    @Body() dto: AadhaarGenerateOtpDto,
+  ) {
+    return this.kycService.generateAadhaarOtp(user.id, dto);
+  }
+
+  @Post("verify/aadhaar/verify-otp")
+  @HttpCode(HttpStatus.OK)
+  @IgnoreBusinessDetails()
+  @ApiOperation({
+    summary: "Verify Aadhaar OTP via Karza — returns name, DOB, address",
+  })
+  @ApiOkResponse({
+    description: "Aadhaar verified successfully",
+    schema: {
+      example: {
+        verified: true,
+        message: "Aadhaar verified successfully.",
+        name: "RAHUL KUMAR",
+        dob: "1999-01-31",
+        gender: "M",
+        mobileLinked: true,
+        address: {
+          house: "123",
+          street: "MG Road",
+          district: "Hyderabad",
+          state: "Telangana",
+          pinCode: "500001",
+        },
+      },
+    },
+  })
+  async verifyAadhaarOtp(
+    @User() user: IAccessTokenPayload,
+    @Body() dto: AadhaarVerifyOtpDto,
+  ) {
+    return this.kycService.verifyAadhaarOtp(user.id, dto);
+  }
+
+  // ─── GST Verification ─────────────────────────────────────────────────────
+
+  @Post("verify/gst")
+  @HttpCode(HttpStatus.OK)
+  @IgnoreBusinessDetails()
+  @ApiOperation({ summary: "Verify GSTIN via Karza" })
+  @ApiOkResponse({
+    description: "GSTIN verified successfully",
+    schema: {
+      example: {
+        verified: true,
+        message: "GSTIN verified successfully.",
+        gstin: "29AABCT1332L1ZD",
+        tradeName: "ABC TRADERS",
+        legalName: "ABC PRIVATE LIMITED",
+        gstinStatus: "Active",
+        registrationDate: "2018-07-01",
+        businessType: "Private Limited Company",
+        principalPlaceOfBusiness: "Bangalore, Karnataka",
+      },
+    },
+  })
+  async verifyGst(
+    @User() user: IAccessTokenPayload,
+    @Body() dto: GstVerifyDto,
+  ) {
+    return this.kycService.verifyGst(user.id, dto);
+  }
+
+  // ─── Bank Account Verification (Penny Drop) ──────────────────────────────
+
+  @Post("verify/bank")
+  @HttpCode(HttpStatus.OK)
+  @IgnoreBusinessDetails()
+  @ApiOperation({
+    summary:
+      "Verify bank account via penny drop (Karza) — confirms account ownership",
+  })
+  @ApiOkResponse({
+    description: "Bank account verified",
+    schema: {
+      example: {
+        verified: true,
+        match: true,
+        message: "Bank account verified successfully.",
+        beneficiaryName: "RAHUL KUMAR",
+        bankTransactionStatus: "SUCCESS",
+      },
+    },
+  })
+  async verifyBank(
+    @User() user: IAccessTokenPayload,
+    @Body() dto: BankVerifyDto,
+  ) {
+    return this.kycService.verifyBank(user.id, dto);
   }
 }

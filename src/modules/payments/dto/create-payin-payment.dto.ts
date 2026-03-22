@@ -1,7 +1,12 @@
-import { ApiProperty, ApiResponseProperty } from "@nestjs/swagger";
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  ApiResponseProperty,
+} from "@nestjs/swagger";
 import {
   IsBoolean,
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsNumberString,
@@ -9,7 +14,12 @@ import {
   IsPositive,
   IsString,
   Length,
+  MaxLength,
+  Min,
+  ValidateIf,
 } from "class-validator";
+
+// ─── Pay-in (API) ─────────────────────────────────────────────────────────────
 
 export class CreatePayinTransactionAnviNeoDto {
   @ApiProperty()
@@ -18,9 +28,7 @@ export class CreatePayinTransactionAnviNeoDto {
   orderId: string;
 
   @ApiProperty()
-  @IsNumber({
-    maxDecimalPlaces: 2,
-  })
+  @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   amount: number;
 
@@ -62,54 +70,103 @@ export class CreatePayinPaymentResponseDto {
   qr: string;
 }
 
+// ─── Payment Link expiry presets ─────────────────────────────────────────────
+
+/**
+ * Human-friendly expiry options a merchant selects in the dashboard.
+ * NEVER → expiresAt is stored as NULL (link does not expire).
+ */
+export enum PaymentLinkExpiryPreset {
+  NEVER = "never",
+  ONE_HOUR = "1h",
+  SEVEN_DAYS = "7d",
+  TWENTY_FOUR_HOURS = "24h"
+}
+
+// ─── Create Payment Link ──────────────────────────────────────────────────────
+
 export class CreatePaymentLinkDto {
-  @ApiProperty()
-  @IsNumber({
-    maxDecimalPlaces: 2,
-  })
+  @ApiProperty({ example: 5000 })
+  @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   amount: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: "Rahul Kumar" })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: "rahul@example.com" })
   @IsEmail()
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: "9876543210" })
   @IsNumberString()
   @IsNotEmpty()
   @Length(10, 10)
   mobile: string;
 
   @ApiProperty({
-    description: "Expiry time in minutes from now",
-    example: 30,
+    enum: PaymentLinkExpiryPreset,
+    description:
+      "Expiry window — 1h, 24h, 7d, or never. " +
+      "Choosing 'never' means the link never expires.",
+    example: PaymentLinkExpiryPreset.TWENTY_FOUR_HOURS,
   })
-  @IsNumber()
-  @IsPositive()
-  expiresInMinutes: number;
+  @IsEnum(PaymentLinkExpiryPreset)
+  expiryPreset: PaymentLinkExpiryPreset;
 
-  @ApiProperty({
-    description: "Whether to notify on this email",
+  @ApiPropertyOptional({
+    description: "Optional note visible on the payment page and PDF receipt. ",
+    example: "Invoice #1042 for October rice supply",
+    maxLength: 500,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "When true, the customer may pay any amount ≥ minimumPartialAmount " +
+      "(advance + balance flow). Common for B2B textile / construction merchants.",
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  allowPartialPayment?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Minimum partial payment accepted (in ₹). " +
+      "Required when allowPartialPayment is true. Must be less than amount.",
+    example: 1000,
+  })
+  @ValidateIf((o) => o.allowPartialPayment === true)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
+  @Min(1)
+  minimumPartialAmount?: number;
+
+  @ApiPropertyOptional({
+    description: "Send payment confirmation to this email address.",
     default: false,
   })
   @IsOptional()
   @IsBoolean()
   notifyOnEmail?: boolean;
 
-  @ApiProperty({
-    description: "Whether to notify on this number",
+  @ApiPropertyOptional({
+    description: "Send payment confirmation SMS to this mobile number.",
     default: false,
   })
   @IsOptional()
   @IsBoolean()
   notifyOnNumber?: boolean;
 }
+
+// ─── Response DTOs ────────────────────────────────────────────────────────────
 
 export class CreatePaymentLinkResponseDto {
   @ApiResponseProperty()
@@ -118,8 +175,13 @@ export class CreatePaymentLinkResponseDto {
   @ApiResponseProperty()
   paymentLinkUrl: string;
 
+  /** null when expiryPreset = "never". */
   @ApiResponseProperty()
-  expiresAt: string;
+  expiresAt: string | null;
+
+  /** Pre-built WhatsApp share URL with the payment link and amount pre-filled. */
+  @ApiResponseProperty()
+  whatsappShareUrl: string;
 
   @ApiResponseProperty()
   message: string;
@@ -142,7 +204,16 @@ export class GetPaymentLinkDetailsResponseDto {
   mobile: string;
 
   @ApiResponseProperty()
-  expiresAt: string;
+  note: string | null;
+
+  @ApiResponseProperty()
+  allowPartialPayment: boolean;
+
+  @ApiResponseProperty()
+  minimumPartialAmount: number | null;
+
+  @ApiResponseProperty()
+  expiresAt: string | null;
 
   @ApiResponseProperty()
   isExpired: boolean;
@@ -152,13 +223,24 @@ export class GetPaymentLinkDetailsResponseDto {
 
   @ApiResponseProperty()
   notifyOnNumber: boolean;
+
+  @ApiResponseProperty()
+  viewCount: number;
 }
+
+export class WhatsappShareResponseDto {
+  @ApiResponseProperty()
+  whatsappShareUrl: string;
+
+  @ApiResponseProperty()
+  message: string;
+}
+
+// ─── Checkout ─────────────────────────────────────────────────────────────────
 
 export class CreateCheckoutDto {
   @ApiProperty()
-  @IsNumber({
-    maxDecimalPlaces: 2,
-  })
+  @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   amount: number;
 
@@ -173,18 +255,12 @@ export class CreateCheckoutDto {
   @Length(10, 10)
   mobile: string;
 
-  @ApiProperty({
-    description: "Whether to notify on this email",
-    default: false,
-  })
+  @ApiPropertyOptional({ default: false })
   @IsOptional()
   @IsBoolean()
   notifyOnEmail?: boolean;
 
-  @ApiProperty({
-    description: "Whether to notify on this number",
-    default: false,
-  })
+  @ApiPropertyOptional({ default: false })
   @IsOptional()
   @IsBoolean()
   notifyOnNumber?: boolean;

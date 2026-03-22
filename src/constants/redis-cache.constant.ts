@@ -44,4 +44,10 @@ export const REDIS_KEYS = {
   // KYC: cache a verified PAN result for 24 h to avoid re-calling Karza for
   // the same PAN within the same session / accidental re-submit.
   KYC_PAN_VERIFIED: (pan: string) => `kyc:pan:verified:${pan.toUpperCase()}`,
+  // KYC: cache verified GST result for 24 h.
+  KYC_GST_VERIFIED: (gstin: string) =>
+    `kyc:gst:verified:${gstin.toUpperCase()}`,
+  // KYC: cache verified bank result for 24 h.
+  KYC_BANK_VERIFIED: (accountNumber: string, ifsc: string) =>
+    `kyc:bank:verified:${accountNumber}:${ifsc.toUpperCase()}`,
 };

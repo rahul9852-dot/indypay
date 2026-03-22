@@ -15,6 +15,12 @@ import { KycSubmissionDto } from "./dto/kyc.dto";
 import { DocumentUploadDto } from "./dto/document-upload.dto";
 import { PanVerifyDto } from "./verification/dto/pan-verify.dto";
 import {
+  AadhaarGenerateOtpDto,
+  AadhaarVerifyOtpDto,
+} from "./verification/dto/aadhaar-verify.dto";
+import { GstVerifyDto } from "./verification/dto/gst-verify.dto";
+import { BankVerifyDto } from "./verification/dto/bank-verify.dto";
+import {
   IKycVerificationProvider,
   KYC_PROVIDER_TOKEN,
 } from "./verification/providers/kyc-provider.interface";
@@ -39,6 +45,9 @@ import { SESService } from "@/modules/aws/ses.service";
 import { SNSService } from "@/modules/aws/sns.service";
 
 const PAN_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Karza status codes reused across multiple verification types.
+const KARZA_AADHAAR_STATUS = { CONSENT_MISSING: 105 } as const;
 
 const {
   jwtConfig: {
@@ -297,7 +306,8 @@ export class KycService {
     } catch (err: any) {
       await this.writeVerificationAudit({
         userId,
-        pan,
+        verificationType: "PAN",
+        input: pan,
         verified: false,
         providerRequestId: null,
         providerStatusCode: null,
@@ -310,7 +320,8 @@ export class KycService {
 
     await this.writeVerificationAudit({
       userId,
-      pan,
+      verificationType: "PAN",
+      input: pan,
       verified: result.verified,
       providerRequestId: result.providerRequestId,
       providerStatusCode: result.providerStatusCode,
@@ -355,7 +366,8 @@ export class KycService {
 
   private async writeVerificationAudit(data: {
     userId: string;
-    pan: string;
+    verificationType: string;
+    input: string;
     verified: boolean;
     providerRequestId: string | null;
     providerStatusCode: number | null;
@@ -365,8 +377,8 @@ export class KycService {
       await this.kycVerificationRepository.save(
         this.kycVerificationRepository.create({
           userId: data.userId,
-          verificationType: "PAN",
-          input: data.pan,
+          verificationType: data.verificationType,
+          input: data.input,
           provider: "karza",
           providerRequestId: data.providerRequestId,
           providerStatusCode: data.providerStatusCode,
@@ -377,6 +389,238 @@ export class KycService {
     } catch (err: any) {
       // Swallow — audit failure must not break the user-facing response.
     }
+  }
+
+  // ─── Aadhaar OTP eKYC ────────────────────────────────────────────────────
+
+  async generateAadhaarOtp(userId: string, dto: AadhaarGenerateOtpDto) {
+    let result: Awaited<
+      ReturnType<IKycVerificationProvider["generateAadhaarOtp"]>
+    >;
+
+    try {
+      result = await this.kycProvider.generateAadhaarOtp({
+        aadhaarNumber: dto.aadhaarNumber,
+        consent: dto.consent,
+      });
+    } catch (err: any) {
+      await this.writeVerificationAudit({
+        userId,
+        verificationType: "AADHAAR_OTP_GENERATE",
+        input: `XXXX-XXXX-${dto.aadhaarNumber.slice(-4)}`,
+        verified: false,
+        providerRequestId: null,
+        providerStatusCode: null,
+        rawResponse: { error: err?.message ?? "provider_error" },
+      });
+      throw new InternalServerErrorException(
+        "KYC verification service is temporarily unavailable. Please try again.",
+      );
+    }
+
+    await this.writeVerificationAudit({
+      userId,
+      verificationType: "AADHAAR_OTP_GENERATE",
+      input: `XXXX-XXXX-${dto.aadhaarNumber.slice(-4)}`,
+      verified: result.success,
+      providerRequestId: result.requestId,
+      providerStatusCode: result.providerStatusCode,
+      rawResponse: result.rawResponse,
+    });
+
+    if (!result.success) {
+      throw new BadRequestException(
+        result.providerStatusCode === KARZA_AADHAAR_STATUS.CONSENT_MISSING
+          ? "Consent is required for Aadhaar OTP generation."
+          : "Failed to send OTP. Please check the Aadhaar number and try again.",
+      );
+    }
+
+    return {
+      success: true,
+      message: "OTP sent to your Aadhaar-linked mobile number.",
+      requestId: result.requestId,
+    };
+  }
+
+  async verifyAadhaarOtp(userId: string, dto: AadhaarVerifyOtpDto) {
+    let result: Awaited<
+      ReturnType<IKycVerificationProvider["verifyAadhaarOtp"]>
+    >;
+
+    try {
+      result = await this.kycProvider.verifyAadhaarOtp({
+        otp: dto.otp,
+        requestId: dto.requestId,
+      });
+    } catch (err: any) {
+      await this.writeVerificationAudit({
+        userId,
+        verificationType: "AADHAAR_OTP_VERIFY",
+        input: dto.requestId,
+        verified: false,
+        providerRequestId: null,
+        providerStatusCode: null,
+        rawResponse: { error: err?.message ?? "provider_error" },
+      });
+      throw new InternalServerErrorException(
+        "KYC verification service is temporarily unavailable. Please try again.",
+      );
+    }
+
+    await this.writeVerificationAudit({
+      userId,
+      verificationType: "AADHAAR_OTP_VERIFY",
+      input: dto.requestId,
+      verified: result.verified,
+      providerRequestId: result.providerRequestId,
+      providerStatusCode: result.providerStatusCode,
+      rawResponse: result.rawResponse,
+    });
+
+    if (!result.verified) {
+      throw new BadRequestException(
+        "Aadhaar OTP verification failed. Please check the OTP and try again.",
+      );
+    }
+
+    return {
+      verified: true,
+      message: "Aadhaar verified successfully.",
+      name: result.name,
+      dob: result.dob,
+      gender: result.gender,
+      mobileLinked: result.mobileLinked ?? null,
+      address: result.address ?? null,
+    };
+  }
+
+  // ─── GST Verification ─────────────────────────────────────────────────────
+
+  async verifyGst(userId: string, dto: GstVerifyDto) {
+    const gstin = dto.gstin.toUpperCase();
+    const cacheKey = REDIS_KEYS.KYC_GST_VERIFIED(gstin);
+
+    const cached = await this.cacheManager.get<object>(cacheKey);
+    if (cached) return cached;
+
+    let result: Awaited<ReturnType<IKycVerificationProvider["verifyGst"]>>;
+
+    try {
+      result = await this.kycProvider.verifyGst({
+        gstin,
+        consent: dto.consent,
+      });
+    } catch (err: any) {
+      await this.writeVerificationAudit({
+        userId,
+        verificationType: "GST",
+        input: gstin,
+        verified: false,
+        providerRequestId: null,
+        providerStatusCode: null,
+        rawResponse: { error: err?.message ?? "provider_error" },
+      });
+      throw new InternalServerErrorException(
+        "KYC verification service is temporarily unavailable. Please try again.",
+      );
+    }
+
+    await this.writeVerificationAudit({
+      userId,
+      verificationType: "GST",
+      input: gstin,
+      verified: result.verified,
+      providerRequestId: result.providerRequestId,
+      providerStatusCode: result.providerStatusCode,
+      rawResponse: result.rawResponse,
+    });
+
+    if (!result.verified) {
+      throw new BadRequestException(
+        result.providerStatusCode === 105
+          ? "Consent is required for GST verification."
+          : "GST verification failed. Please check the GSTIN and try again.",
+      );
+    }
+
+    const response = {
+      verified: true,
+      message: "GSTIN verified successfully.",
+      gstin: result.gstin,
+      tradeName: result.tradeName,
+      legalName: result.legalName,
+      gstinStatus: result.gstinStatus,
+      registrationDate: result.registrationDate,
+      businessType: result.businessType,
+      principalPlaceOfBusiness: result.principalPlaceOfBusiness ?? null,
+    };
+
+    await this.cacheManager.set(cacheKey, response, PAN_CACHE_TTL_MS);
+
+    return response;
+  }
+
+  // ─── Bank Account Verification (Penny Drop) ──────────────────────────────
+
+  async verifyBank(userId: string, dto: BankVerifyDto) {
+    const cacheKey = REDIS_KEYS.KYC_BANK_VERIFIED(dto.accountNumber, dto.ifsc);
+
+    const cached = await this.cacheManager.get<object>(cacheKey);
+    if (cached) return cached;
+
+    let result: Awaited<ReturnType<IKycVerificationProvider["verifyBank"]>>;
+
+    try {
+      result = await this.kycProvider.verifyBank({
+        accountNumber: dto.accountNumber,
+        ifsc: dto.ifsc.toUpperCase(),
+        consent: dto.consent,
+      });
+    } catch (err: any) {
+      await this.writeVerificationAudit({
+        userId,
+        verificationType: "BANK",
+        input: `XXXX${dto.accountNumber.slice(-4)}:${dto.ifsc}`,
+        verified: false,
+        providerRequestId: null,
+        providerStatusCode: null,
+        rawResponse: { error: err?.message ?? "provider_error" },
+      });
+      throw new InternalServerErrorException(
+        "KYC verification service is temporarily unavailable. Please try again.",
+      );
+    }
+
+    await this.writeVerificationAudit({
+      userId,
+      verificationType: "BANK",
+      input: `XXXX${dto.accountNumber.slice(-4)}:${dto.ifsc}`,
+      verified: result.verified,
+      providerRequestId: result.providerRequestId,
+      providerStatusCode: result.providerStatusCode,
+      rawResponse: result.rawResponse,
+    });
+
+    if (!result.verified) {
+      throw new BadRequestException(
+        "Bank account verification failed. Please check the account number and IFSC.",
+      );
+    }
+
+    const response = {
+      verified: true,
+      match: result.match,
+      message: result.match
+        ? "Bank account verified successfully."
+        : "Bank account found but name does not match KYC records.",
+      beneficiaryName: result.beneficiaryName ?? null,
+      bankTransactionStatus: result.bankTransactionStatus ?? null,
+    };
+
+    await this.cacheManager.set(cacheKey, response, PAN_CACHE_TTL_MS);
+
+    return response;
   }
 
   async getPendingKycUsers({

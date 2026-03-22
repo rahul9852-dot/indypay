@@ -26,6 +26,7 @@ import {
   CreatePaymentLinkDto,
   CreatePaymentLinkResponseDto,
   GetPaymentLinkDetailsResponseDto,
+  WhatsappShareResponseDto,
   CreateCheckoutDto,
   CreateCheckoutResponseDto,
 } from "./dto/create-payin-payment.dto";
@@ -142,15 +143,15 @@ export class PaymentsController {
     return this.paymentsService.createPayoutFlakPayBulk(createPayoutDto, user);
   }
 
-  @ApiOperation({ summary: "Get all collection list" })
+  @ApiOperation({ summary: "List payment links for the dashboard" })
   @ApiOkResponse({ type: GetTransactionsDetailsResponseDto })
   @Get("payment-link")
   @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
-  async getTransactionsForDashboard(
+  async getPaymentLinks(
     @User() user: UsersEntity,
     @Query() paginationDto: PaginationWithDateAndStatusDto,
   ) {
-    return this.paymentsService.getTransactionsDetails(user, paginationDto);
+    return this.paymentsService.getPaymentLinks(user, paginationDto);
   }
 
   @Public()
@@ -327,12 +328,40 @@ export class PaymentsController {
   @Public()
   @ApiOperation({
     summary:
-      "Get payment link details by linkId (decrypts and returns details)",
+      "Get payment link details by linkId (decrypts and returns details). " +
+      "Increments view count. Returns isExpired/isPaid flags instead of throwing.",
   })
   @ApiOkResponse({ type: GetPaymentLinkDetailsResponseDto })
   @Get("payment-link/:linkId")
   async getPaymentLinkDetails(@Param("linkId") linkId: string) {
     return this.paymentsService.getPaymentLinkDetails(linkId);
+  }
+
+  @ApiOperation({
+    summary:
+      "Get a pre-built WhatsApp share URL for a payment link. " +
+      "One tap opens WhatsApp with amount and link pre-filled — no copy-paste needed.",
+  })
+  @ApiOkResponse({ type: WhatsappShareResponseDto })
+  @Get("payment-link/:linkId/whatsapp-share")
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  async getWhatsappShareUrl(
+    @Param("linkId") linkId: string,
+    @User() user: UsersEntity,
+  ) {
+    const link = await this.paymentsService.getOwnPaymentLink(linkId, user.id);
+    const linkUrl = `${process.env.BE_BASE_URL ?? ""}/api/v1/payments/payment-link/${linkId}`;
+    const whatsappShareUrl = this.paymentsService.buildWhatsappShareUrl({
+      amount: +link.amount,
+      linkUrl,
+      note: link.note,
+    });
+
+    return {
+      whatsappShareUrl,
+      message:
+        "Open this URL on mobile to share the payment link via WhatsApp.",
+    };
   }
 
   // Custom checkout page config (must be before checkout/:checkoutId)
