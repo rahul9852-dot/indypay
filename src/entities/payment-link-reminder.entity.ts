@@ -11,13 +11,13 @@ import { ID_TYPE } from "@/enums";
 
 export enum ReminderChannel {
   SMS = "SMS",
-  WHATSAPP = "WHATSAPP"
+  WHATSAPP = "WHATSAPP",
 }
 
 export enum ReminderStatus {
   DELIVERED = "DELIVERED",
   FAILED = "FAILED",
-  SENT = "SENT"
+  SENT = "SENT",
 }
 
 @Entity("payment_link_reminders")

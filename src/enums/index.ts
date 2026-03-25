@@ -110,16 +110,16 @@ export enum ID_TYPE {
   UMS_USER_ROLE = "umur",
   USER = "usr",
   USER_ADDRESS = "uad",
-  WALLET = "wlt",
-  WALLET_TOPUP = "wtop",
   USER_API_KEY = "apik",
-  USER_WHITELIST_IP = "uwip",
   USER_BANK_DETAILS_KEY = "ubank",
-  USER_LOGIN_IP = "ip",
+  USER_COMMISSION_MAPPING = "ucm",
   USER_INTEGRATION_MAPPING = "uim",
   USER_KYC = "ukyc",
+  USER_LOGIN_IP = "ip",
   USER_MULTI_FACTOR_AUTH = "umfa",
-  USER_COMMISSION_MAPPING = "ucm",
+  USER_WHITELIST_IP = "uwip",
+  WALLET = "wlt",
+  WALLET_TOPUP = "wtop"
 }
 
 export enum ONBOARDING_STATUS {

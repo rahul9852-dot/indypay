@@ -12,7 +12,7 @@ import { ID_TYPE } from "@/enums";
 export enum PaymentLinkEventAction {
   ABANDONED = "ABANDONED",
   OPENED = "OPENED",
-  PAID = "PAID"
+  PAID = "PAID",
 }
 
 @Entity("payment_link_events")

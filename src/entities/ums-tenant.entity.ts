@@ -13,7 +13,7 @@ import { ID_TYPE } from "@/enums";
 export enum UmsTenantType {
   AGGREGATOR = "AGGREGATOR",
   PARTNER = "PARTNER",
-  RESELLER = "RESELLER"
+  RESELLER = "RESELLER",
 }
 
 export enum UmsTenantStatus {
@@ -27,7 +27,7 @@ export enum UmsKybStatus {
   PENDING = "PENDING",
   REJECTED = "REJECTED",
   SUBMITTED = "SUBMITTED",
-  VERIFIED = "VERIFIED"
+  VERIFIED = "VERIFIED",
 }
 
 /**

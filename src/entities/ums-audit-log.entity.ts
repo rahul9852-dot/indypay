@@ -12,7 +12,7 @@ import { ID_TYPE } from "@/enums";
 export enum UmsAuditStatus {
   BLOCKED = "BLOCKED",
   FAILURE = "FAILURE",
-  SUCCESS = "SUCCESS"
+  SUCCESS = "SUCCESS",
 }
 
 /**

@@ -21,17 +21,17 @@ export enum UmsPermissionCode {
   INTERNATIONAL_TRANSFER = "transfer:international",
   KYC_APPROVE = "kyc:approve",
   KYC_VIEW = "kyc:view",
-  TXN_INITIATE = "txn:initiate",
+  REFUND_INITIATE = "refund:initiate",
   ROLE_MANAGEMENT = "role:manage",
   SAR_FILING = "sar:file",
   SETTLEMENT_REPORTS = "settlement:reports",
-  REFUND_INITIATE = "refund:initiate",
-  USER_PII_FULL = "user:pii:full",
-  TXN_VIEW_ALL = "txn:view:all",
-  USER_PII_MASKED = "user:pii:masked",
   SYSTEM_CONFIG = "system:config",
-  TXN_VOID = "txn:void",
+  TXN_INITIATE = "txn:initiate",
+  TXN_VIEW_ALL = "txn:view:all",
   TXN_VIEW_OWN = "txn:view:own",
+  TXN_VOID = "txn:void",
+  USER_PII_FULL = "user:pii:full",
+  USER_PII_MASKED = "user:pii:masked"
 }
 
 @Entity("ums_permissions")

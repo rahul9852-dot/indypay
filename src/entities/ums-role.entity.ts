@@ -13,14 +13,14 @@ import { ID_TYPE } from "@/enums";
 export enum UmsRoleTier {
   CONSUMER = "C",
   EXTERNAL = "B",
-  INTERNAL = "A"
+  INTERNAL = "A",
 }
 
 export enum UmsRiskLevel {
   CRITICAL = "CRITICAL",
   HIGH = "HIGH",
   LOW = "LOW",
-  MEDIUM = "MEDIUM"
+  MEDIUM = "MEDIUM",
 }
 
 /** All 17 system role codes (14 from spec + 3 KYC-tier variants) */
@@ -39,12 +39,12 @@ export enum UmsRoleCode {
   KYC_TIER2 = "C3_KYC_TIER2",
   KYC_TIER3 = "C4_KYC_TIER3",
   MERCHANT = "B3_MERCHANT",
-  RESELLER = "B2_RESELLER",
   // Tier B - External Business
   PARTNER = "B1_PARTNER",
+  RESELLER = "B2_RESELLER",
   RISK_ANALYST = "L2_RISK_ANALYST",
   // Tier A - Internal Operations
-  SUPER_ADMIN = "L1_SUPER_ADMIN"
+  SUPER_ADMIN = "L1_SUPER_ADMIN",
 }
 
 @Entity("ums_roles")

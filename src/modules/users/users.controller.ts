@@ -235,6 +235,7 @@ export class UsersController {
 
   @ApiOperation({ summary: "Get user profile" })
   @IgnoreKyc()
+  @IgnoreBusinessDetails()
   @ApiOkResponse({
     type: UserProfileResDto,
   })
