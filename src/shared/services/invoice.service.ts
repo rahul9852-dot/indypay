@@ -863,8 +863,15 @@ export class InvoiceService {
   async generateInvoiceToCustomer(data: {
     amount: number;
     subTotal: number;
-    gst: number;
+    /** Pre-computed CGST total for the invoice (intra-state). */
+    cgstAmount: number;
+    /** Pre-computed SGST total for the invoice (intra-state). */
+    sgstAmount: number;
+    /** Pre-computed IGST total for the invoice (inter-state). */
+    igstAmount: number;
     isInterState: boolean;
+    /** Merchant's GSTIN to print on the PDF. */
+    merchantGstin?: string | null;
     invoiceNumber: string;
     userName: string;
     status: string;
@@ -901,32 +908,28 @@ export class InvoiceService {
         this.logger.warn("Could not load logo image, proceeding without it");
       }
 
-      const items = data.items.map((item) => {
-        const total = item.item.price * item.quantity;
+      // Use stored rate snapshot + per-item tax breakdown
+      const items = data.items.map((item) => ({
+        ...item,
+        // rate is the price-at-invoice-time stored on the line item
+        total: item.totalAmount ?? item.rate * item.quantity,
+      }));
 
-        return {
-          ...item,
-          total,
-        };
-      });
-
-      const gstAmount = (data.subTotal * data.gst) / 100;
-      const halfGst = data.gst / 2;
-      const cgstAmount = gstAmount / 2;
-      const sgstAmount = gstAmount / 2;
-      const igstAmount = gstAmount; // Full GST for inter-state
+      const totalTaxAmount = data.isInterState
+        ? data.igstAmount
+        : data.cgstAmount + data.sgstAmount;
       const amountInWords = this.numberToWords(data.amount);
 
       const modifiedData = {
         ...data,
         items,
-        gstAmount,
-        halfGst,
-        cgstAmount,
-        sgstAmount,
-        igstAmount,
+        gstAmount: totalTaxAmount,
+        cgstAmount: data.cgstAmount,
+        sgstAmount: data.sgstAmount,
+        igstAmount: data.igstAmount,
         amountInWords,
         isInterState: data.isInterState,
+        merchantGstin: data.merchantGstin ?? null,
         dateTime: formatDateTime(data.dateTime),
       };
 

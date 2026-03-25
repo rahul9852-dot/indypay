@@ -87,6 +87,10 @@ export class PaymentLinkEntity {
   @Column({ type: "boolean", default: false })
   notifyOnNumber: boolean;
 
+  /** When true, a reminder is sent automatically 24h after last open if still unpaid. */
+  @Column({ type: "boolean", default: false })
+  autoReminderEnabled: boolean;
+
   // ─── Ownership ───────────────────────────────────────────────────────────
 
   @Index()

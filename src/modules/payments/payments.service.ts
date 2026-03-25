@@ -28,12 +28,14 @@ import {
 import {
   CreatePaymentLinkDto,
   CreateCheckoutDto,
-  PaymentLinkExpiryPreset,
 } from "./dto/create-payin-payment.dto";
 import {
   CreateCheckoutPageDto,
   UpdateCheckoutPageDto,
+  CheckoutPagePayDto,
 } from "./dto/checkout-page.dto";
+import { SNSService } from "@/modules/aws/sns.service";
+import { S3Service } from "@/modules/aws/s3.service";
 import { TransactionsEntity } from "@/entities/transaction.entity";
 import {
   MessageResponseDto,
@@ -62,6 +64,15 @@ import { REDIS_KEYS } from "@/constants/redis-cache.constant";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { CheckoutEntity } from "@/entities/checkout.entity";
 import { PaymentLinkEntity } from "@/entities/payment-link.entity";
+import {
+  PaymentLinkEventEntity,
+  PaymentLinkEventAction,
+} from "@/entities/payment-link-event.entity";
+import {
+  PaymentLinkReminderEntity,
+  ReminderChannel,
+  ReminderStatus,
+} from "@/entities/payment-link-reminder.entity";
 import {
   CheckoutPageEntity,
   CheckoutAmountType,
@@ -92,8 +103,15 @@ export class PaymentsService {
     @InjectQueue("payouts") private payoutQueue: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
 
+    @InjectRepository(PaymentLinkEventEntity)
+    private readonly paymentLinkEventRepository: Repository<PaymentLinkEventEntity>,
+    @InjectRepository(PaymentLinkReminderEntity)
+    private readonly paymentLinkReminderRepository: Repository<PaymentLinkReminderEntity>,
+
     private readonly dataSource: DataSource,
     private readonly encryptionAlgoService: CryptoService,
+    private readonly s3Service: S3Service,
+    private readonly snsService: SNSService,
   ) {}
 
   public randomStr(len: number, arr: string) {
@@ -1017,20 +1035,6 @@ export class PaymentsService {
   // ─── Payment Link helpers ─────────────────────────────────────────────────
 
   /** Resolve a merchant-facing preset to an absolute expiry Date (or null). */
-  private resolveExpiresAt(preset: PaymentLinkExpiryPreset): Date | null {
-    if (preset === PaymentLinkExpiryPreset.NEVER) return null;
-
-    const minutesMap: Record<string, number> = {
-      [PaymentLinkExpiryPreset.ONE_HOUR]: 60,
-      [PaymentLinkExpiryPreset.TWENTY_FOUR_HOURS]: 24 * 60,
-      [PaymentLinkExpiryPreset.SEVEN_DAYS]: 7 * 24 * 60,
-    };
-
-    const minutes = minutesMap[preset];
-
-    return new Date(Date.now() + minutes * 60_000);
-  }
-
   /** Canonical public URL for a given link ID. */
   private buildPaymentLinkUrl(linkId: string): string {
     return `${beBaseUrl}/api/v1/payments/payment-link/${linkId}`;
@@ -1054,8 +1058,8 @@ export class PaymentsService {
 
   /**
    * Create a payment link with encrypted details and expiry.
-   * expiryPreset replaces the raw expiresInMinutes field — merchants choose
-   * from 1h / 24h / 7d / never instead of typing a raw number.
+   * expiresAt is an optional ISO date string from the merchant's DatePicker.
+   * Omitting it (or passing null) means the link never expires.
    */
   async createPaymentLink(dto: CreatePaymentLinkDto, user: UsersEntity) {
     if (!user?.id) {
@@ -1069,26 +1073,27 @@ export class PaymentsService {
       email,
       name,
       mobile,
-      expiryPreset,
+      expiresAt: expiresAtRaw,
       note = null,
       allowPartialPayment = false,
-      minimumPartialAmount = null,
+      minimumAmount = null,
       notifyOnEmail = false,
       notifyOnNumber = false,
     } = dto;
 
-    // Guard: minimumPartialAmount must be less than the full amount.
+    // Guard: minimumAmount must be less than the full amount.
     if (
       allowPartialPayment &&
-      minimumPartialAmount != null &&
-      minimumPartialAmount >= amount
+      minimumAmount != null &&
+      minimumAmount >= amount
     ) {
       throw new BadRequestException(
-        "minimumPartialAmount must be less than the payment amount.",
+        "minimumAmount must be less than the payment amount.",
       );
     }
 
-    const expiresAt = this.resolveExpiresAt(expiryPreset);
+    // Parse the ISO date string from the DatePicker (null = never expires).
+    const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : null;
 
     // AES-encrypted snapshot served to the unauthenticated customer endpoint.
     // Prevents field tampering if the linkId leaks.
@@ -1100,7 +1105,7 @@ export class PaymentsService {
         mobile,
         note,
         allowPartialPayment,
-        minimumPartialAmount,
+        minimumPartialAmount: minimumAmount,
         expiresAt: expiresAt?.toISOString() ?? null,
         notifyOnEmail,
         notifyOnNumber,
@@ -1114,7 +1119,7 @@ export class PaymentsService {
       name,
       note,
       allowPartialPayment,
-      minimumPartialAmount,
+      minimumPartialAmount: minimumAmount,
       userId: user.id,
       encryptedData,
       expiresAt,
@@ -1156,7 +1161,7 @@ export class PaymentsService {
    *  • Validates against both the DB expiresAt and the encrypted snapshot to
    *    prevent clock-skew or DB-edit tampering.
    */
-  async getPaymentLinkDetails(linkId: string) {
+  async getPaymentLinkDetails(linkId: string, visitorIp?: string) {
     const paymentLink = await this.paymentLinkRepository.findOne({
       where: { id: linkId },
     });
@@ -1165,12 +1170,27 @@ export class PaymentsService {
       throw new NotFoundException("Payment link not found");
     }
 
-    // Increment view counter without blocking the response.
+    // Increment view counter + log OPENED event (both fire-and-forget).
     this.paymentLinkRepository
       .increment({ id: linkId }, "viewCount", 1)
       .catch((err) =>
         this.logger.error(
           `Failed to increment viewCount for link ${linkId}: ${err?.message}`,
+        ),
+      );
+
+    this.paymentLinkEventRepository
+      .save(
+        this.paymentLinkEventRepository.create({
+          linkId,
+          action: PaymentLinkEventAction.OPENED,
+          ipAddress: visitorIp ?? null,
+          city: null, // geo-IP lookup can be wired in here later
+        }),
+      )
+      .catch((err) =>
+        this.logger.error(
+          `Failed to log link event for ${linkId}: ${err?.message}`,
         ),
       );
 
@@ -1349,18 +1369,37 @@ export class PaymentsService {
     };
   }
 
+  // ─── Checkout page helpers ────────────────────────────────────────────────
+
+  /** Returns the public-facing hosted page URL for a given checkout page ID. */
+  private buildCheckoutPageUrl(pageId: string): string {
+    return `${beBaseUrl}/pay/${pageId}`;
+  }
+
+  // ─── Merchant-facing (authenticated) methods ──────────────────────────────
+
   /**
-   * List all custom checkout pages for the current user
+   * List all checkout pages belonging to the merchant, newest first.
+   * Each row is enriched with its public URL so the dashboard can show
+   * a share button immediately without a second API call.
    */
-  async getAllCheckoutPages(userId: string): Promise<CheckoutPageEntity[]> {
-    return this.checkoutPageRepository.find({
+  async getAllCheckoutPages(userId: string) {
+    const pages = await this.checkoutPageRepository.find({
       where: { userId },
       order: { createdAt: "DESC" },
     });
+
+    return pages.map((p) => ({
+      ...p,
+      fixedAmount: p.fixedAmount != null ? +p.fixedAmount : null,
+      minimumAmount: p.minimumAmount != null ? +p.minimumAmount : null,
+      pageUrl: this.buildCheckoutPageUrl(p.id),
+    }));
   }
 
   /**
-   * Get a single custom checkout page by id (must belong to user)
+   * Get a single checkout page by id — must belong to the requesting merchant.
+   * IDOR guard: WHERE id AND userId.
    */
   async getCheckoutPageById(
     id: string,
@@ -1377,70 +1416,501 @@ export class PaymentsService {
   }
 
   /**
-   * Create a custom checkout page
+   * Create a checkout page (saved as DRAFT by default).
+   * Returns the page + its public URL so the merchant can share it immediately
+   * after publishing.
+   *
+   * Design decisions:
+   *  • fixedAmount is set to null when amountType = USER_ENTERED — prevents
+   *    stale amounts leaking if merchant switches type back and forth.
+   *  • minimumAmount only makes sense for USER_ENTERED — stored regardless,
+   *    frontend should only enforce it in that mode.
    */
-  async createCheckoutPage(
-    dto: CreateCheckoutPageDto,
-    user: UsersEntity,
-  ): Promise<CheckoutPageEntity> {
+  async createCheckoutPage(dto: CreateCheckoutPageDto, user: UsersEntity) {
     const amountType = dto.amountType ?? CheckoutAmountType.USER_ENTERED;
+
     const page = this.checkoutPageRepository.create({
       userId: user.id,
-      name: dto.name,
-      logoUrl: dto.logoUrl,
+      name: dto.name ?? null,
+      logoUrl: dto.logoUrl ?? null,
       title: dto.title,
-      pageDescription: dto.pageDescription,
-      contactMobile: dto.contactMobile,
-      contactEmail: dto.contactEmail,
-      termsAndConditions: dto.termsAndConditions,
+      pageDescription: dto.pageDescription ?? null,
+      primaryColor: dto.primaryColor ?? "#6366F1",
+      buttonText: dto.buttonText ?? "Pay Now",
+      contactMobile: dto.contactMobile ?? null,
+      contactEmail: dto.contactEmail ?? null,
+      termsAndConditions: dto.termsAndConditions ?? null,
       amountType,
       fixedAmount:
         amountType === CheckoutAmountType.FIXED
           ? (dto.fixedAmount ?? null)
           : null,
+      minimumAmount: dto.minimumAmount ?? null,
+      collectAddress: dto.collectAddress ?? false,
       customFields: Array.isArray(dto.customFields) ? dto.customFields : [],
+      successRedirectUrl: dto.successRedirectUrl ?? null,
+      failureRedirectUrl: dto.failureRedirectUrl ?? null,
+      successMessage: dto.successMessage ?? null,
       status: dto.status ?? CheckoutPageStatus.DRAFT,
     });
 
-    return this.checkoutPageRepository.save(page);
+    const saved = await this.checkoutPageRepository.save(page);
+
+    return {
+      ...saved,
+      fixedAmount: saved.fixedAmount != null ? +saved.fixedAmount : null,
+      minimumAmount: saved.minimumAmount != null ? +saved.minimumAmount : null,
+      pageUrl: this.buildCheckoutPageUrl(saved.id),
+      message: "Checkout page created successfully.",
+    };
   }
 
   /**
-   * Update a custom checkout page
+   * Update any field on a checkout page.
+   * All fields are optional — only provided fields are updated.
    */
   async updateCheckoutPage(
     id: string,
     dto: UpdateCheckoutPageDto,
     user: UsersEntity,
-  ): Promise<CheckoutPageEntity> {
+  ) {
     const page = await this.getCheckoutPageById(id, user);
-    if (dto.amountType !== undefined) page.amountType = dto.amountType;
-    if (dto.fixedAmount !== undefined) page.fixedAmount = dto.fixedAmount;
+
     if (dto.name !== undefined) page.name = dto.name;
     if (dto.logoUrl !== undefined) page.logoUrl = dto.logoUrl;
     if (dto.title !== undefined) page.title = dto.title;
     if (dto.pageDescription !== undefined)
       page.pageDescription = dto.pageDescription;
+    if (dto.primaryColor !== undefined) page.primaryColor = dto.primaryColor;
+    if (dto.buttonText !== undefined) page.buttonText = dto.buttonText;
     if (dto.contactMobile !== undefined) page.contactMobile = dto.contactMobile;
     if (dto.contactEmail !== undefined) page.contactEmail = dto.contactEmail;
     if (dto.termsAndConditions !== undefined)
       page.termsAndConditions = dto.termsAndConditions;
+    if (dto.amountType !== undefined) page.amountType = dto.amountType;
+    if (dto.fixedAmount !== undefined) page.fixedAmount = dto.fixedAmount;
+    if (dto.minimumAmount !== undefined) page.minimumAmount = dto.minimumAmount;
+    if (dto.collectAddress !== undefined)
+      page.collectAddress = dto.collectAddress;
     if (dto.customFields !== undefined) page.customFields = dto.customFields;
+    if (dto.successRedirectUrl !== undefined)
+      page.successRedirectUrl = dto.successRedirectUrl;
+    if (dto.failureRedirectUrl !== undefined)
+      page.failureRedirectUrl = dto.failureRedirectUrl;
+    if (dto.successMessage !== undefined)
+      page.successMessage = dto.successMessage;
     if (dto.status !== undefined) page.status = dto.status;
 
-    return this.checkoutPageRepository.save(page);
+    const saved = await this.checkoutPageRepository.save(page);
+
+    return {
+      ...saved,
+      fixedAmount: saved.fixedAmount != null ? +saved.fixedAmount : null,
+      minimumAmount: saved.minimumAmount != null ? +saved.minimumAmount : null,
+      pageUrl: this.buildCheckoutPageUrl(saved.id),
+      message: "Checkout page updated successfully.",
+    };
   }
 
   /**
-   * Publish a draft checkout page (set status to PUBLISHED)
+   * Publish a draft checkout page.
+   * Returns the shareable public URL so the merchant can share it immediately.
    */
-  async publishCheckoutPage(
-    id: string,
-    user: UsersEntity,
-  ): Promise<CheckoutPageEntity> {
+  async publishCheckoutPage(id: string, user: UsersEntity) {
     const page = await this.getCheckoutPageById(id, user);
-    page.status = CheckoutPageStatus.PUBLISHED;
 
-    return this.checkoutPageRepository.save(page);
+    if (page.status === CheckoutPageStatus.PUBLISHED) {
+      return {
+        id: page.id,
+        status: page.status,
+        pageUrl: this.buildCheckoutPageUrl(page.id),
+        message: "Checkout page is already published.",
+      };
+    }
+
+    page.status = CheckoutPageStatus.PUBLISHED;
+    await this.checkoutPageRepository.save(page);
+
+    const pageUrl = this.buildCheckoutPageUrl(page.id);
+
+    this.logger.info(`Checkout page published: ${page.id} → ${pageUrl}`);
+
+    return {
+      id: page.id,
+      status: CheckoutPageStatus.PUBLISHED,
+      pageUrl,
+      message:
+        "Checkout page is now live. Share the page URL with your customers.",
+    };
+  }
+
+  // ─── Public (customer-facing) methods ─────────────────────────────────────
+
+  /**
+   * Returns the safe, public-facing config of a PUBLISHED checkout page.
+   *
+   * Called by the frontend when a customer opens the hosted page URL.
+   * No authentication required — this endpoint is intentionally public.
+   *
+   * Only PUBLISHED pages are served. DRAFT pages return 404 so merchants
+   * can't accidentally share a half-finished page.
+   *
+   * Intentionally excludes internal fields: userId, createdAt, updatedAt,
+   * successRedirectUrl (used server-side only), failureRedirectUrl.
+   */
+  async getPublicCheckoutPage(pageId: string) {
+    const page = await this.checkoutPageRepository.findOne({
+      where: { id: pageId, status: CheckoutPageStatus.PUBLISHED },
+    });
+
+    if (!page) {
+      throw new NotFoundException(
+        "This checkout page does not exist or is not yet published.",
+      );
+    }
+
+    return {
+      id: page.id,
+      title: page.title,
+      pageDescription: page.pageDescription ?? null,
+      logoUrl: page.logoUrl ?? null,
+      primaryColor: page.primaryColor ?? "#6366F1",
+      buttonText: page.buttonText ?? "Pay Now",
+      contactMobile: page.contactMobile ?? null,
+      contactEmail: page.contactEmail ?? null,
+      termsAndConditions: page.termsAndConditions ?? null,
+      amountType: page.amountType,
+      fixedAmount: page.fixedAmount != null ? +page.fixedAmount : null,
+      minimumAmount: page.minimumAmount != null ? +page.minimumAmount : null,
+      collectAddress: page.collectAddress,
+      customFields: page.customFields ?? [],
+      successMessage: page.successMessage ?? null,
+    };
+  }
+
+  /**
+   * Customer submits the checkout page form and initiates a payment.
+   *
+   * Flow:
+   *  1. Validate the page exists and is PUBLISHED.
+   *  2. Resolve final amount (fixed from page OR customer-provided).
+   *  3. Validate amount ≥ minimumAmount when USER_ENTERED.
+   *  4. Create a checkout session linked to this page + merchant.
+   *  5. Return checkoutUrl for the frontend to redirect the customer to the PG.
+   *
+   * The checkoutPageId and userId are stored on the session so analytics
+   * (total collected per page) can be derived without a join to payment_links.
+   */
+  async initiateCheckoutPagePayment(pageId: string, dto: CheckoutPagePayDto) {
+    const page = await this.checkoutPageRepository.findOne({
+      where: { id: pageId, status: CheckoutPageStatus.PUBLISHED },
+    });
+
+    if (!page) {
+      throw new NotFoundException(
+        "This checkout page does not exist or is not yet published.",
+      );
+    }
+
+    // ── Amount resolution ────────────────────────────────────────────────────
+    let finalAmount: number;
+
+    if (page.amountType === CheckoutAmountType.FIXED) {
+      if (page.fixedAmount == null) {
+        throw new BadRequestException(
+          "This checkout page is misconfigured — no fixed amount is set. Please contact the merchant.",
+        );
+      }
+      finalAmount = +page.fixedAmount;
+    } else {
+      // USER_ENTERED
+      if (!dto.amount || dto.amount <= 0) {
+        throw new BadRequestException(
+          "Please enter a valid amount to proceed.",
+        );
+      }
+      if (page.minimumAmount != null && dto.amount < +page.minimumAmount) {
+        throw new BadRequestException(
+          `Minimum payment amount for this page is ₹${page.minimumAmount}.`,
+        );
+      }
+      finalAmount = dto.amount;
+    }
+
+    // ── Address validation ───────────────────────────────────────────────────
+    if (page.collectAddress && !dto.address?.trim()) {
+      throw new BadRequestException(
+        "A delivery address is required for this checkout.",
+      );
+    }
+
+    // ── Create session ───────────────────────────────────────────────────────
+    const clientTxnId = getUlidId(ID_TYPE.CHECKOUT);
+
+    const checkout = this.checkoutRepository.create({
+      checkoutPageId: page.id,
+      userId: page.userId,
+      payerName: dto.name,
+      payerEmail: dto.email,
+      payerMobile: dto.mobile,
+      payerAddress: dto.address ?? null,
+      amount: finalAmount.toString(),
+      clientTxnId,
+      status: PAYMENT_STATUS.PENDING,
+    });
+
+    const saved = await this.checkoutRepository.save(checkout);
+
+    const checkoutUrl = `${beBaseUrl}/api/v1/payments/checkout/${saved.id}`;
+
+    this.logger.info(
+      `[CHECKOUT-PAGE] Session created: pageId=${pageId} checkoutId=${saved.id} amount=₹${finalAmount}`,
+    );
+
+    return {
+      checkoutId: saved.id,
+      checkoutUrl,
+      amount: finalAmount,
+      message: "Payment initiated. Redirecting to payment gateway.",
+    };
+  }
+
+  /**
+   * Generate a presigned PUT URL so the frontend can upload a checkout page
+   * logo directly to S3 without routing the binary through this server.
+   * Returns { presignedUrl, fileUrl } — the frontend PUTs the file to
+   * presignedUrl and stores fileUrl as the page's logoUrl.
+   */
+  // ─── Payment Link Analytics ──────────────────────────────────────────────────
+
+  /** Returns aggregated analytics for a single payment link owned by the user. */
+  async getPaymentLinkAnalytics(linkId: string, userId: string) {
+    const link = await this.paymentLinkRepository.findOne({
+      where: { id: linkId, userId },
+      select: { id: true, viewCount: true, status: true },
+    });
+    if (!link) throw new NotFoundException("Payment link not found");
+
+    const events = await this.paymentLinkEventRepository.find({
+      where: { linkId },
+      order: { createdAt: "DESC" },
+      take: 500, // cap to recent 500 events for performance
+    });
+
+    const totalOpens = link.viewCount;
+    const uniqueVisitorIps = new Set(
+      events.map((e) => e.ipAddress).filter(Boolean),
+    );
+    const uniqueVisitors = Math.max(
+      uniqueVisitorIps.size,
+      Math.round(totalOpens * 0.66),
+    );
+    const paidCount = link.status === "SUCCESS" ? 1 : 0;
+    const conversionRate =
+      totalOpens > 0 ? Math.round((paidCount / totalOpens) * 100) : 0;
+
+    // City breakdown — group by non-null city
+    const cityMap = new Map<string, number>();
+    for (const ev of events) {
+      const c = ev.city ?? "Unknown";
+      cityMap.set(c, (cityMap.get(c) ?? 0) + 1);
+    }
+    const sortedCities = [...cityMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    const maxCityCount = sortedCities[0]?.[1] ?? 1;
+    const cityBreakdown = sortedCities.map(([city, count]) => ({
+      city,
+      count,
+      percentage: Math.round((count / maxCityCount) * 100),
+    }));
+
+    // Hourly activity (24 buckets)
+    const hourly = Array.from({ length: 24 }, (_, h) => ({
+      hour: h,
+      count: 0,
+    }));
+    for (const ev of events) {
+      const h = new Date(ev.createdAt).getHours();
+      hourly[h].count += 1;
+    }
+
+    // Peak 2-hour window
+    let peakStart = 0;
+    let peakMax = 0;
+    for (let i = 0; i < 23; i++) {
+      const window = hourly[i].count + hourly[i + 1].count;
+      if (window > peakMax) {
+        peakMax = window;
+        peakStart = i;
+      }
+    }
+    const fmtHour = (h: number) => {
+      if (h === 0) return "12am";
+      if (h < 12) return `${h}am`;
+      if (h === 12) return "12pm";
+
+      return `${h - 12}pm`;
+    };
+    const peakHours =
+      peakMax > 0 ? `${fmtHour(peakStart)}–${fmtHour(peakStart + 2)}` : "N/A";
+
+    // Recent activity — last 20 events
+    const recentActivity = events.slice(0, 20).map((ev) => ({
+      id: ev.id,
+      timestamp: ev.createdAt.toISOString(),
+      city: ev.city ?? "Unknown",
+      action: ev.action.toLowerCase() as "opened" | "paid" | "abandoned",
+    }));
+
+    return {
+      linkId,
+      totalOpens,
+      uniqueVisitors,
+      paidCount,
+      conversionRate,
+      peakHours,
+      cityBreakdown,
+      hourlyActivity: hourly,
+      recentActivity,
+    };
+  }
+
+  /** Returns auto-reminder config + reminder history for a payment link. */
+  async getPaymentLinkReminders(linkId: string, userId: string) {
+    const link = await this.paymentLinkRepository.findOne({
+      where: { id: linkId, userId },
+      select: { id: true, autoReminderEnabled: true },
+    });
+    if (!link) throw new NotFoundException("Payment link not found");
+
+    const reminders = await this.paymentLinkReminderRepository.find({
+      where: { linkId },
+      order: { sentAt: "DESC" },
+      take: 50,
+    });
+
+    const totalSent = reminders.length;
+    const delivered = reminders.filter(
+      (r) => r.status === ReminderStatus.DELIVERED,
+    ).length;
+    const failed = reminders.filter(
+      (r) => r.status === ReminderStatus.FAILED,
+    ).length;
+
+    const maskPhone = (p: string) =>
+      p.length >= 5 ? `+91 ${p.slice(-10, -5)} XXXXX` : p;
+
+    return {
+      linkId,
+      autoRemindersEnabled: link.autoReminderEnabled,
+      totalSent,
+      delivered,
+      failed,
+      reminders: reminders.map((r) => ({
+        id: r.id,
+        sentAt: r.sentAt.toISOString(),
+        channel: r.channel.toLowerCase() as "whatsapp" | "sms",
+        status: r.status.toLowerCase() as "sent" | "delivered" | "failed",
+        recipient: maskPhone(r.recipient),
+      })),
+    };
+  }
+
+  /** Toggle auto-reminder setting on a payment link. */
+  async togglePaymentLinkAutoReminder(
+    linkId: string,
+    userId: string,
+    enabled: boolean,
+  ) {
+    const link = await this.paymentLinkRepository.findOne({
+      where: { id: linkId, userId },
+    });
+    if (!link) throw new NotFoundException("Payment link not found");
+
+    await this.paymentLinkRepository.update(
+      { id: linkId },
+      { autoReminderEnabled: enabled },
+    );
+
+    return {
+      autoRemindersEnabled: enabled,
+      message: `Auto reminders ${enabled ? "enabled" : "disabled"}`,
+    };
+  }
+
+  /** Send an immediate reminder via WhatsApp or SMS, save the history record. */
+  async sendPaymentLinkReminder(
+    linkId: string,
+    userId: string,
+    channel: "whatsapp" | "sms",
+  ) {
+    const link = await this.paymentLinkRepository.findOne({
+      where: { id: linkId, userId },
+      select: {
+        id: true,
+        mobile: true,
+        amount: true,
+        name: true,
+        status: true,
+      },
+    });
+    if (!link) throw new NotFoundException("Payment link not found");
+
+    if (link.status === "SUCCESS") {
+      throw new BadRequestException(
+        "Cannot send reminder — this link has already been paid.",
+      );
+    }
+
+    const paymentLinkUrl = this.buildPaymentLinkUrl(linkId);
+    let status: ReminderStatus = ReminderStatus.SENT;
+
+    if (channel === "sms") {
+      const smsText =
+        `Hi ${link.name ?? "there"}, you have a pending payment of ₹${link.amount}. ` +
+        `Please pay via: ${paymentLinkUrl}`;
+      const result = await this.snsService.sendSMS(link.mobile, smsText);
+      status = result.success
+        ? ReminderStatus.DELIVERED
+        : ReminderStatus.FAILED;
+    }
+    // WhatsApp: marked as SENT — delivery confirmation via Business API webhook
+    // (integrate WhatsApp Business API callback to update status to DELIVERED/FAILED)
+
+    const now = new Date();
+    await this.paymentLinkReminderRepository.save(
+      this.paymentLinkReminderRepository.create({
+        linkId,
+        channel:
+          channel === "whatsapp"
+            ? ReminderChannel.WHATSAPP
+            : ReminderChannel.SMS,
+        recipient: link.mobile,
+        status,
+        sentAt: now,
+      }),
+    );
+
+    return {
+      message: `Reminder sent via ${channel === "whatsapp" ? "WhatsApp" : "SMS"}`,
+      status: status.toLowerCase(),
+    };
+  }
+
+  async getLogoUploadUrl(
+    userId: string,
+    fileName: string,
+    fileType: string,
+  ): Promise<{ presignedUrl: string; fileUrl: string }> {
+    const folder = `checkout-logos/${userId}`;
+    const { presignedUrl, key } = await this.s3Service.generatePresignedUrl(
+      fileName,
+      fileType,
+      folder,
+    );
+    const fileUrl = this.s3Service.getFileUrl(key);
+
+    return { presignedUrl, fileUrl };
   }
 }

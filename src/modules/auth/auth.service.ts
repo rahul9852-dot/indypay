@@ -505,7 +505,7 @@ export class AuthService {
         },
       });
 
-      // this.logger.log("User found in database");
+      // this.logger.info("User found in database");
 
       if (!user) {
         throw new BadRequestException("User not found");

@@ -99,29 +99,37 @@ export enum ID_TYPE {
   PG_CONFIG = "conf",
   SETTLEMENT_PAYOUT = "stl",
   TRANSACTIONS_KEY = "txn",
+  UMS_AUDIT_LOG = "umal",
+  UMS_PERMISSION = "umsp",
+  // ─── UMS ──────────────────────────────────────────────────────────────────
+  UMS_ROLE = "umsr",
+  UMS_ROLE_PERMISSION = "umrp",
+  UMS_SESSION = "umss",
+  UMS_TENANT = "umst",
+  UMS_TENANT_USER = "umtu",
+  UMS_USER_ROLE = "umur",
   USER = "usr",
   USER_ADDRESS = "uad",
-  USER_API_KEY = "apik",
-  USER_BANK_DETAILS_KEY = "ubank",
-  USER_COMMISSION_MAPPING = "ucm",
-  USER_INTEGRATION_MAPPING = "uim",
-  USER_KYC = "ukyc",
-  USER_LOGIN_IP = "ip",
-  USER_MULTI_FACTOR_AUTH = "umfa",
-  USER_WHITELIST_IP = "uwip",
   WALLET = "wlt",
   WALLET_TOPUP = "wtop",
+  USER_API_KEY = "apik",
+  USER_WHITELIST_IP = "uwip",
+  USER_BANK_DETAILS_KEY = "ubank",
+  USER_LOGIN_IP = "ip",
+  USER_INTEGRATION_MAPPING = "uim",
+  USER_KYC = "ukyc",
+  USER_MULTI_FACTOR_AUTH = "umfa",
+  USER_COMMISSION_MAPPING = "ucm",
 }
 
 export enum ONBOARDING_STATUS {
   NOT_STARTED = 0,
-  SIGN_UP = 1, // signs up user with verified mobile and email
-  KYC_PENDING = 2, // kyc document submitted - almost there page
-  KYC_ON_HOLD = 3, // kyc on hold by admin - almost there page
-  KYC_REJECTED = 4, // kyc rejected by admin - almost there page
-  KYC_VERIFIED = 5, // final: kyc verified - almost there page
-  FILLED_BUSINESS_DETAILS = 6, // fix: need to remove
-  MOBILE_EMAIL_VERIFIED = 7, // fix: need to remove
+  SIGN_UP = 1, // registered; mobile + email verified
+  KYC_PENDING = 2, // KYC documents submitted, awaiting review
+  KYC_ON_HOLD = 3, // KYC placed on hold by admin
+  KYC_REJECTED = 4, // KYC rejected by admin
+  KYC_VERIFIED = 5, // KYC approved; merchant may fill business details
+  FILLED_BUSINESS_DETAILS = 6, // business details saved; full platform access granted
 }
 
 export enum BUSINESS_INDUSTRIES {
@@ -200,6 +208,10 @@ export enum INVOICE_STATUS {
   DRAFT = 1,
   SENT = 2,
   FAILED = 3,
+  VIEWED = 4,
+  PAID = 5,
+  OVERDUE = 6,
+  CANCELLED = 7,
 }
 
 export enum SETTLEMENT_TYPE {

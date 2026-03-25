@@ -5,8 +5,8 @@ import {
 } from "@nestjs/swagger";
 import {
   IsBoolean,
+  IsDateString,
   IsEmail,
-  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsNumberString,
@@ -70,19 +70,6 @@ export class CreatePayinPaymentResponseDto {
   qr: string;
 }
 
-// ─── Payment Link expiry presets ─────────────────────────────────────────────
-
-/**
- * Human-friendly expiry options a merchant selects in the dashboard.
- * NEVER → expiresAt is stored as NULL (link does not expire).
- */
-export enum PaymentLinkExpiryPreset {
-  NEVER = "never",
-  ONE_HOUR = "1h",
-  SEVEN_DAYS = "7d",
-  TWENTY_FOUR_HOURS = "24h"
-}
-
 // ─── Create Payment Link ──────────────────────────────────────────────────────
 
 export class CreatePaymentLinkDto {
@@ -107,18 +94,18 @@ export class CreatePaymentLinkDto {
   @Length(10, 10)
   mobile: string;
 
-  @ApiProperty({
-    enum: PaymentLinkExpiryPreset,
+  @ApiPropertyOptional({
     description:
-      "Expiry window — 1h, 24h, 7d, or never. " +
-      "Choosing 'never' means the link never expires.",
-    example: PaymentLinkExpiryPreset.TWENTY_FOUR_HOURS,
+      "ISO 8601 date-time string for when the link expires. " +
+      "Omit or set to null for a link that never expires.",
+    example: "2026-04-01T18:30:00.000Z",
   })
-  @IsEnum(PaymentLinkExpiryPreset)
-  expiryPreset: PaymentLinkExpiryPreset;
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
 
   @ApiPropertyOptional({
-    description: "Optional note visible on the payment page and PDF receipt. ",
+    description: "Optional note visible on the payment page and PDF receipt.",
     example: "Invoice #1042 for October rice supply",
     maxLength: 500,
   })
@@ -129,7 +116,7 @@ export class CreatePaymentLinkDto {
 
   @ApiPropertyOptional({
     description:
-      "When true, the customer may pay any amount ≥ minimumPartialAmount " +
+      "When true, the customer may pay any amount ≥ minimumAmount " +
       "(advance + balance flow). Common for B2B textile / construction merchants.",
     default: false,
   })
@@ -140,14 +127,15 @@ export class CreatePaymentLinkDto {
   @ApiPropertyOptional({
     description:
       "Minimum partial payment accepted (in ₹). " +
-      "Required when allowPartialPayment is true. Must be less than amount.",
+      "Only applies when allowPartialPayment is true. Must be less than amount.",
     example: 1000,
   })
-  @ValidateIf((o) => o.allowPartialPayment === true)
+  @IsOptional()
+  @ValidateIf((o) => o.allowPartialPayment === true && o.minimumAmount != null)
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
   @Min(1)
-  minimumPartialAmount?: number;
+  minimumAmount?: number;
 
   @ApiPropertyOptional({
     description: "Send payment confirmation to this email address.",
@@ -234,6 +222,20 @@ export class WhatsappShareResponseDto {
 
   @ApiResponseProperty()
   message: string;
+}
+
+// ─── Payment Link Analytics ────────────────────────────────────────────────────
+
+export class SendReminderDto {
+  @ApiProperty({ enum: ["whatsapp", "sms"] })
+  @IsString()
+  channel: "whatsapp" | "sms";
+}
+
+export class ToggleAutoReminderDto {
+  @ApiProperty()
+  @IsBoolean()
+  enabled: boolean;
 }
 
 // ─── Checkout ─────────────────────────────────────────────────────────────────

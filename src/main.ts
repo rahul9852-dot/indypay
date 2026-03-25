@@ -46,11 +46,12 @@ async function bootstrap() {
   // Add cookie parser
   app.use(cookieParser());
 
-  // A-7: Reduced from 10 MB to 512 KB. A typical payin/payout request is
-  // < 1 KB; a 10 MB limit lets an attacker flood the server with large JSON
-  // payloads that each consume CPU for parsing and heap memory per request.
-  app.use(json({ limit: "512kb" }));
-  app.use(urlencoded({ extended: true, limit: "512kb" }));
+  // 5 MB covers base64-encoded logos sent by checkout-page create/update.
+  // A 2 MB image encodes to ~2.7 MB in base64; 5 MB gives comfortable headroom.
+  // All other endpoints send < 1 KB — the ValidationPipe rejects malformed
+  // payloads before they reach the DB, so the larger limit is low-risk here.
+  app.use(json({ limit: "5mb" }));
+  app.use(urlencoded({ extended: true, limit: "5mb" }));
 
   // Fix the path to point to the project root's public folder instead of dist
   const publicPath = path.join(process.cwd(), "public");
@@ -61,7 +62,17 @@ async function bootstrap() {
 
   // Enable cors
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow server-to-server requests (no Origin header)
+      if (!origin) return callback(null, true);
+      // Allow explicitly whitelisted origins
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      // In development also allow any localhost port (e.g. :3000, :3001)
+      if (!isProduction && /^http:\/\/localhost(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+      callback(null, false);
+    },
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",

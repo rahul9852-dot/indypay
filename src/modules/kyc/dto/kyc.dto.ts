@@ -35,145 +35,164 @@ export class DocumentDto {
 }
 
 export class DocumentsDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => DocumentDto)
-  bankStatement: DocumentDto;
+  bankStatement?: DocumentDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => DocumentDto)
-  addressProof: DocumentDto;
+  addressProof?: DocumentDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => DocumentDto)
-  companyPan: DocumentDto;
+  companyPan?: DocumentDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => DocumentDto)
-  companyCheque: DocumentDto;
+  companyCheque?: DocumentDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => DocumentDto)
-  moa: DocumentDto;
+  moa?: DocumentDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => DocumentDto)
-  aoa: DocumentDto;
+  aoa?: DocumentDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => DocumentDto)
-  coi: DocumentDto;
+  coi?: DocumentDto;
 }
+
 export class PersonalInfoDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  personalPanNumber: string;
+  personalPanNumber?: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsEmail()
-  @IsNotEmpty()
-  email: string;
+  email?: string;
 
-  @ApiProperty({ enum: DESIGNATION })
+  @ApiProperty({ enum: DESIGNATION, required: false })
+  @IsOptional()
   @IsEnum(DESIGNATION)
-  @IsNotEmpty()
-  designation: string;
+  designation?: string;
 }
 
 export class BusinessStructureDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  businessName: string;
+  businessName?: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  registeredBusinessNumber: string;
+  registeredBusinessNumber?: string;
 
-  @ApiProperty({ enum: BUSINESS_ENTITY_TYPE })
+  @ApiProperty({ enum: BUSINESS_ENTITY_TYPE, required: false })
+  @IsOptional()
   @IsEnum(BUSINESS_ENTITY_TYPE)
   @Type(() => Number)
   @IsPositive()
-  typeOfBusiness: number;
+  typeOfBusiness?: number;
 
-  @ApiProperty({ enum: BUSINESS_INDUSTRIES })
+  @ApiProperty({ enum: BUSINESS_INDUSTRIES, required: false })
+  @IsOptional()
   @IsEnum(BUSINESS_INDUSTRIES)
-  @IsPositive()
-  industryName: string;
+  industryName?: string;
 
-  @ApiProperty({ enum: TURNOVER_TYPE })
+  @ApiProperty({ enum: TURNOVER_TYPE, required: false })
+  @IsOptional()
   @IsEnum(TURNOVER_TYPE)
-  @IsPositive()
-  turnover: number;
+  turnover?: number;
 }
 
 export class DirectorInfoDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  name: string;
+  name?: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  din: string;
+  din?: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  pan: string;
+  pan?: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  aadharNumber: string;
+  aadharNumber?: string;
 
-  @ApiProperty({ type: DocumentDto })
+  @ApiProperty({ type: DocumentDto, required: false })
   @IsOptional()
   panCardDoc?: DocumentDto;
 
-  @ApiProperty({ type: DocumentDto })
+  @ApiProperty({ type: DocumentDto, required: false })
   @IsOptional()
   aadharCardDoc?: DocumentDto;
 }
 
 export class KybInfoDto {
-  @ApiProperty({ type: [DirectorInfoDto] })
+  @ApiProperty({ type: [DirectorInfoDto], required: false })
+  @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => DirectorInfoDto)
-  directors: DirectorInfoDto[];
+  directors?: DirectorInfoDto[];
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  websiteUrl: string;
+  websiteUrl?: string;
 }
+
 export class KycSubmissionDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => PersonalInfoDto)
   @IsObject()
-  personalInfo: PersonalInfoDto;
+  personalInfo?: PersonalInfoDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => BusinessStructureDto)
   @IsObject()
-  businessStructure: BusinessStructureDto;
+  businessStructure?: BusinessStructureDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => KybInfoDto)
   @IsObject()
-  kybInfo: KybInfoDto;
+  kybInfo?: KybInfoDto;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @ValidateNested()
   @Type(() => DocumentsDto)
   @IsObject()
-  documents: DocumentsDto;
+  documents?: DocumentsDto;
 }

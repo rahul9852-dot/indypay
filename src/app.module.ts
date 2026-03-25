@@ -38,6 +38,7 @@ import { ChannelPartnersModule } from "@/modules/channel-partners/channel-partne
 import { AnalyticsModule } from "@/modules/analytics/analytics.module";
 import { DisabledEndpointInterceptor } from "@/interceptors/disabled-endpoint.interceptor";
 import { CacheMonitorModule } from "@/shared/cache-monitor/cache-monitor.module";
+import { UmsModule } from "@/modules/ums/ums.module";
 
 @Module({
   imports: [
@@ -98,6 +99,7 @@ import { CacheMonitorModule } from "@/shared/cache-monitor/cache-monitor.module"
     ReportsModule,
     AnalyticsModule,
     CacheMonitorModule,
+    UmsModule,
   ],
   controllers: [AppController],
   providers: [

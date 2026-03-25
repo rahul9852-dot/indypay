@@ -16,6 +16,19 @@ export class CheckoutEntity {
   @PrimaryColumn()
   id: string;
 
+  /**
+   * The checkout page this session was initiated from.
+   * null when created directly via the API (not through a hosted page).
+   */
+  @Index()
+  @Column({ type: "varchar", nullable: true })
+  checkoutPageId: string | null;
+
+  /** The merchant who owns this checkout session. */
+  @Index()
+  @Column({ type: "varchar", nullable: true })
+  userId: string | null;
+
   @Column({ type: "text", nullable: true })
   payerName: string;
 

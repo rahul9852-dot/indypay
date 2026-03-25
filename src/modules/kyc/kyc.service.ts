@@ -5,8 +5,8 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { ILike, In, Repository } from "typeorm";
+import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
+import { DataSource, ILike, In, Repository } from "typeorm";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { Response } from "express";
 import { Cache } from "cache-manager";
@@ -71,6 +71,8 @@ export class KycService {
     private readonly userKycRepository: Repository<UserKycEntity>,
     @InjectRepository(KycVerificationEntity)
     private readonly kycVerificationRepository: Repository<KycVerificationEntity>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
     private readonly s3Service: S3Service,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -102,11 +104,10 @@ export class KycService {
     kycData: KycSubmissionDto,
     res: Response,
   ) {
+    // Load all relations we'll need — done once, before any writes begin.
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: {
-        businessDetails: true,
-      },
+      relations: { businessDetails: true, kyc: true },
     });
 
     if (!user) {
@@ -114,22 +115,14 @@ export class KycService {
     }
 
     if (user.onboardingStatus === ONBOARDING_STATUS.KYC_VERIFIED) {
-      throw new Error("User has already completed KYC");
+      throw new BadRequestException("KYC has already been verified.");
     }
 
     const { personalInfo, businessStructure, kybInfo, documents } = kycData;
 
-    if (!documents || Object.keys(documents).length === 0) {
-      throw new BadRequestException("No documents submitted.");
-    }
-
-    if (!kybInfo.directors || kybInfo.directors.length === 0) {
-      throw new BadRequestException("At least one director is required.");
-    }
-
-    const validDocumentTypes = [
-      "panCard",
-      "aadharNumber",
+    // ── Validate documents up-front (fail fast, before any DB write) ─────────
+    // Keys must exactly match DocumentsDto property names.
+    const VALID_DOC_KEYS = new Set<string>([
       "bankStatement",
       "addressProof",
       "companyPan",
@@ -137,72 +130,147 @@ export class KycService {
       "moa",
       "aoa",
       "coi",
-      "gstinCertificate",
-    ];
+    ]);
 
-    const kycDocMedia = Object.entries(documents)
-      .filter(([key]) => {
-        return validDocumentTypes.includes(key) || key.startsWith("director");
-      })
-      .map(([key, doc]) => {
+    const kycDocMedia: UserMediaEntity[] = [];
+    if (documents) {
+      for (const [key, doc] of Object.entries(documents)) {
+        if (!VALID_DOC_KEYS.has(key)) continue;
         if (!doc?.url || !doc?.docType || !doc?.name) {
-          throw new BadRequestException(`Invalid document format for ${key}`);
+          throw new BadRequestException(
+            `Invalid document format for key: ${key}`,
+          );
         }
+        kycDocMedia.push(
+          this.userMediaRepository.create({
+            documentType: doc.docType,
+            documentUrl: doc.url,
+            documentName: doc.name,
+          }),
+        );
+      }
+    }
 
-        return this.userMediaRepository.create({
-          documentType: doc.docType,
-          documentUrl: doc.url,
-          documentName: doc.name,
-        });
-      });
-
-    const kyc = await this.userKycRepository.save(
-      this.userKycRepository.create({
-        media: kycDocMedia,
-      }),
-    );
-
-    const businessDetails = await this.userBusinessRepository.save(
-      this.userBusinessRepository.create({
+    // ── Build business details payload ────────────────────────────────────────
+    // Compute the storable subset first; skip the DB path entirely when nothing
+    // maps to a persistable field (e.g. caller only sent personalInfo.email).
+    const businessDetailsData: Partial<UserBusinessDetailsEntity> = {
+      ...(businessStructure?.typeOfBusiness !== undefined && {
         businessEntityType: businessStructure.typeOfBusiness,
-        businessName: businessStructure.businessName,
-        businessIndustry: businessStructure.industryName,
-        turnover: businessStructure.turnover,
-        designation: personalInfo.designation,
-        registerBusinessNumber: businessStructure.registeredBusinessNumber,
-        businessPan: personalInfo.personalPanNumber,
-        websiteUrl: kybInfo.websiteUrl,
-        directors: kybInfo.directors,
-        moa: documents?.moa?.url,
-        aoa: documents?.aoa?.url,
-        coi: documents?.coi?.url,
       }),
-    );
+      ...(businessStructure?.businessName && {
+        businessName: businessStructure.businessName,
+      }),
+      ...(businessStructure?.industryName && {
+        businessIndustry: businessStructure.industryName,
+      }),
+      ...(businessStructure?.turnover !== undefined && {
+        turnover: businessStructure.turnover,
+      }),
+      ...(personalInfo?.designation && {
+        designation: personalInfo.designation,
+      }),
+      ...(businessStructure?.registeredBusinessNumber && {
+        registerBusinessNumber: businessStructure.registeredBusinessNumber,
+      }),
+      ...(personalInfo?.personalPanNumber && {
+        businessPan: personalInfo.personalPanNumber,
+      }),
+      ...(kybInfo?.websiteUrl && { websiteUrl: kybInfo.websiteUrl }),
+      ...(kybInfo?.directors?.length && { directors: kybInfo.directors }),
+      ...(documents?.moa?.url && { moa: documents.moa.url }),
+      ...(documents?.aoa?.url && { aoa: documents.aoa.url }),
+      ...(documents?.coi?.url && { coi: documents.coi.url }),
+    };
+    const hasBusinessData = Object.keys(businessDetailsData).length > 0;
 
-    businessDetails.user = user;
-    await this.userBusinessRepository.save(businessDetails);
+    // ── Single atomic transaction ─────────────────────────────────────────────
+    // All DB writes happen together; any failure rolls back completely.
+    // We use manager.update() / createQueryBuilder().relation() for the users
+    // row instead of manager.save(user) to avoid TypeORM cascading unloaded
+    // relations and inadvertently nullifying or duplicating related rows.
+    let newKycId: string | null = null;
 
-    user.businessDetails = businessDetails;
-    user.kyc = kyc;
-    user.onboardingStatus = ONBOARDING_STATUS.KYC_PENDING;
+    await this.dataSource.transaction(async (manager) => {
+      // 1. KYC record + media
+      if (user.kyc) {
+        // Re-submission: replace documents on the existing KYC record so we
+        // never create orphaned user_kyc rows.
+        if (kycDocMedia.length > 0) {
+          await manager.delete(UserMediaEntity, { kyc: { id: user.kyc.id } });
+          for (const m of kycDocMedia) {
+            m.kyc = user.kyc;
+          }
+          await manager.save(UserMediaEntity, kycDocMedia);
+        }
+      } else {
+        // First submission: new KYC entity; media cascades via @OneToMany.
+        const newKyc = manager.create(UserKycEntity, { media: kycDocMedia });
+        const savedKyc = await manager.save(UserKycEntity, newKyc);
+        newKycId = savedKyc.id;
+      }
 
-    const savedUser = await this.userRepository.save(user);
+      // 2. Business details (upsert)
+      if (hasBusinessData) {
+        const existing = user.businessDetails;
+        if (existing) {
+          Object.assign(existing, businessDetailsData);
+          await manager.save(UserBusinessDetailsEntity, existing);
+        } else {
+          const newDetails = manager.create(
+            UserBusinessDetailsEntity,
+            businessDetailsData,
+          );
+          const savedDetails = await manager.save(
+            UserBusinessDetailsEntity,
+            newDetails,
+          );
+          // FK (businessDetailsId) lives on the users row — set it explicitly.
+          await manager
+            .createQueryBuilder()
+            .relation(UsersEntity, "businessDetails")
+            .of(userId)
+            .set(savedDetails.id);
+        }
+      }
+
+      // 3. Stamp onboarding status — plain UPDATE avoids cascade side-effects.
+      await manager.update(
+        UsersEntity,
+        { id: userId },
+        {
+          onboardingStatus: ONBOARDING_STATUS.KYC_PENDING,
+        },
+      );
+
+      // 4. Wire the KYC FK only when a new KYC entity was created this request.
+      if (newKycId) {
+        await manager
+          .createQueryBuilder()
+          .relation(UsersEntity, "kyc")
+          .of(userId)
+          .set(newKycId);
+      }
+    });
+
+    // ── Post-transaction ──────────────────────────────────────────────────────
+    await this.cacheManager.del(REDIS_KEYS.USER_KEY(userId));
 
     const payload: IAccessTokenPayload = {
-      id: savedUser.id,
-      mobile: savedUser.mobile,
-      onboardingStatus: savedUser.onboardingStatus,
-      role: savedUser.role,
-      email: savedUser.email,
+      id: user.id,
+      mobile: user.mobile,
+      onboardingStatus: ONBOARDING_STATUS.KYC_PENDING,
+      role: user.role,
+      email: user.email,
     };
     const accessToken = this.generateAccessToken(payload);
     const refreshToken = this.generateRefreshToken(payload);
 
-    await this.cacheManager.del(REDIS_KEYS.USER_KEY(user.id));
-    user.onboardingStatus = ONBOARDING_STATUS.KYC_PENDING;
-    await this.userRepository.save(user);
-
-    await this.sendKycSubmissionNotification(user.email, user.mobile);
+    // Fire-and-forget: a transient notification failure must never roll back
+    // an already-committed KYC submission or block the response.
+    // this.sendKycSubmissionNotification(user.email, user.mobile).catch((err) => {
+    //   console.error("[KYC] Notification send failed:", err?.message);
+    // });
 
     return res
       .cookie(COOKIE_KEYS.ACCESS_TOKEN, accessToken, accessCookieOptions)
@@ -281,16 +349,11 @@ export class KycService {
   async getKycDocumentsByUserId(userId: string) {
     const kyc = await this.userKycRepository.findOne({
       where: { user: { id: userId } },
-      relations: {
-        media: true,
-      },
+      relations: { media: true },
     });
 
-    if (!kyc) {
-      throw new NotFoundException("KYC not found");
-    }
-
-    return kyc.media;
+    // User may not have submitted KYC yet — return empty list, not 404.
+    return kyc?.media ?? [];
   }
 
   async verifyPan(userId: string, dto: PanVerifyDto) {

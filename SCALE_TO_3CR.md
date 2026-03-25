@@ -856,7 +856,7 @@ async handleWebhook(body: any, pgRef: string, orderId: string) {
   // 1. Deduplication check — fix D-3
   const isDuplicate = await this.idempotencyService.isWebhookDuplicate(orderId, pgRef);
   if (isDuplicate) {
-    this.logger.log(`Duplicate webhook ignored: ${orderId}/${pgRef}`);
+    this.logger.info(`Duplicate webhook ignored: ${orderId}/${pgRef}`);
     return { received: true };  // ACK to PG, don't process again
   }
 

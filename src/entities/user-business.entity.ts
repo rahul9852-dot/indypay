@@ -26,22 +26,22 @@ export class UserBusinessDetailsEntity {
   @Column({ nullable: true })
   businessPan: string;
 
-  @Column({ enum: BUSINESS_ENTITY_TYPE })
+  @Column({ enum: BUSINESS_ENTITY_TYPE, nullable: true })
   businessEntityType: number;
 
-  @Column()
+  @Column({ nullable: true })
   businessName: string;
 
-  @Column()
+  @Column({ nullable: true })
   registerBusinessNumber: string;
 
-  @Column({ enum: DESIGNATION })
+  @Column({ enum: DESIGNATION, nullable: true })
   designation: string;
 
-  @Column({ enum: TURNOVER_TYPE })
+  @Column({ enum: TURNOVER_TYPE, nullable: true })
   turnover: number;
 
-  @Column({ enum: BUSINESS_INDUSTRIES })
+  @Column({ enum: BUSINESS_INDUSTRIES, nullable: true })
   businessIndustry: string;
 
   @Column({ nullable: true })

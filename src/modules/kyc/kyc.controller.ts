@@ -33,6 +33,7 @@ import { PaginationDto } from "@/dtos/common.dto";
 
 @ApiTags("KYC")
 @IgnoreKyc()
+@IgnoreBusinessDetails()
 @Controller("kyc")
 export class KycController {
   constructor(private readonly kycService: KycService) {}
@@ -40,7 +41,6 @@ export class KycController {
   @Get("status")
   @ApiOperation({ summary: "Get KYC Status" })
   @ApiOkResponse({ type: KycStatusResDto })
-  @IgnoreKyc()
   async getKycStatus(@User() user: IAccessTokenPayload) {
     return this.kycService.getKycStatus(user);
   }
@@ -50,7 +50,6 @@ export class KycController {
     summary:
       "Submit complete KYC information including personal, business and documents",
   })
-  @IgnoreKyc()
   async submitFullKyc(
     @User() user: UsersEntity,
     @Body() kycData: KycSubmissionDto,
@@ -72,7 +71,6 @@ export class KycController {
   @Role(USERS_ROLE.MERCHANT)
   @ApiOperation({ summary: "Get KYC Documents" })
   @ApiOkResponse({ type: DocumentUploadDto, isArray: true })
-  @IgnoreKyc()
   async getKycDocuments(@User() user: IAccessTokenPayload) {
     return this.kycService.getKycDocumentsByUserId(user.id);
   }
@@ -97,7 +95,6 @@ export class KycController {
 
   @Post("verify/pan")
   @HttpCode(HttpStatus.OK)
-  @IgnoreBusinessDetails()
   @ApiOperation({ summary: "Verify PAN card via Karza" })
   @ApiOkResponse({
     description: "PAN verified successfully",
@@ -123,7 +120,6 @@ export class KycController {
 
   @Post("verify/aadhaar/generate-otp")
   @HttpCode(HttpStatus.OK)
-  @IgnoreBusinessDetails()
   @ApiOperation({
     summary: "Generate Aadhaar OTP via Karza — sends OTP to registered mobile",
   })
@@ -146,7 +142,6 @@ export class KycController {
 
   @Post("verify/aadhaar/verify-otp")
   @HttpCode(HttpStatus.OK)
-  @IgnoreBusinessDetails()
   @ApiOperation({
     summary: "Verify Aadhaar OTP via Karza — returns name, DOB, address",
   })
@@ -181,7 +176,6 @@ export class KycController {
 
   @Post("verify/gst")
   @HttpCode(HttpStatus.OK)
-  @IgnoreBusinessDetails()
   @ApiOperation({ summary: "Verify GSTIN via Karza" })
   @ApiOkResponse({
     description: "GSTIN verified successfully",
@@ -210,7 +204,6 @@ export class KycController {
 
   @Post("verify/bank")
   @HttpCode(HttpStatus.OK)
-  @IgnoreBusinessDetails()
   @ApiOperation({
     summary:
       "Verify bank account via penny drop (Karza) — confirms account ownership",

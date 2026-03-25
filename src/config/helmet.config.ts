@@ -4,6 +4,10 @@ import { appConfig } from "./app.config";
 const { beBaseUrl } = appConfig();
 
 export const helmetConfigs: Readonly<HelmetOptions> = {
+  // API server — allow cross-origin reads for CORS-enabled endpoints.
+  // Helmet 6+ defaults to `same-origin` which blocks credentialed XHR responses
+  // from other origins even when `Access-Control-Allow-Origin` is set.
+  crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],

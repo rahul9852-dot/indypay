@@ -5,12 +5,15 @@ import {
   HttpStatus,
   Post,
   Put,
+  Patch,
   UseGuards,
   Get,
   Query,
   Param,
   BadRequestException,
+  Req,
 } from "@nestjs/common";
+import { Request } from "express";
 import {
   ApiCreatedResponse,
   ApiExcludeEndpoint,
@@ -33,7 +36,16 @@ import {
 import {
   CreateCheckoutPageDto,
   UpdateCheckoutPageDto,
+  CheckoutPagePayDto,
+  CheckoutPageResponseDto,
+  PublicCheckoutPageDto,
+  CheckoutPagePayResponseDto,
+  LogoUploadDto,
 } from "./dto/checkout-page.dto";
+import {
+  SendReminderDto,
+  ToggleAutoReminderDto,
+} from "./dto/create-payin-payment.dto";
 import { GetTransactionsDetailsResponseDto } from "./dto/collection.dto";
 import { CreatePayoutDto } from "./dto/create-payout-payment.dto";
 import { User } from "@/decorators/user.decorator";
@@ -333,8 +345,72 @@ export class PaymentsController {
   })
   @ApiOkResponse({ type: GetPaymentLinkDetailsResponseDto })
   @Get("payment-link/:linkId")
-  async getPaymentLinkDetails(@Param("linkId") linkId: string) {
-    return this.paymentsService.getPaymentLinkDetails(linkId);
+  async getPaymentLinkDetails(
+    @Param("linkId") linkId: string,
+    @Req() req: Request,
+  ) {
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ??
+      req.ip ??
+      undefined;
+
+    return this.paymentsService.getPaymentLinkDetails(linkId, ip);
+  }
+
+  // ─── Payment Link Analytics & Reminders ──────────────────────────────────
+
+  @ApiOperation({
+    summary: "Get analytics for a payment link (opens, cities, conversion)",
+  })
+  @Get("payment-link/:linkId/analytics")
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  async getPaymentLinkAnalytics(
+    @Param("linkId") linkId: string,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.getPaymentLinkAnalytics(linkId, user.id);
+  }
+
+  @ApiOperation({
+    summary: "Get reminders config + history for a payment link",
+  })
+  @Get("payment-link/:linkId/reminders")
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  async getPaymentLinkReminders(
+    @Param("linkId") linkId: string,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.getPaymentLinkReminders(linkId, user.id);
+  }
+
+  @ApiOperation({ summary: "Toggle auto-reminders on/off for a payment link" })
+  @Patch("payment-link/:linkId/reminders/auto")
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  async togglePaymentLinkAutoReminder(
+    @Param("linkId") linkId: string,
+    @Body() dto: ToggleAutoReminderDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.togglePaymentLinkAutoReminder(
+      linkId,
+      user.id,
+      dto.enabled,
+    );
+  }
+
+  @ApiOperation({ summary: "Send an immediate reminder via WhatsApp or SMS" })
+  @Post("payment-link/:linkId/reminders/send")
+  @Role(USERS_ROLE.MERCHANT, USERS_ROLE.ADMIN, USERS_ROLE.OWNER)
+  async sendPaymentLinkReminder(
+    @Param("linkId") linkId: string,
+    @Body() dto: SendReminderDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.sendPaymentLinkReminder(
+      linkId,
+      user.id,
+      dto.channel,
+    );
   }
 
   @ApiOperation({
@@ -364,25 +440,43 @@ export class PaymentsController {
     };
   }
 
-  // Custom checkout page config (must be before checkout/:checkoutId)
-  @ApiOperation({ summary: "List all custom checkout pages for current user" })
-  @ApiOkResponse({ description: "List of checkout page configs" })
+  // ─── Checkout Pages — Merchant (authenticated) ───────────────────────────
+  // NOTE: specific paths (/checkout-pages/logo-upload-url, /:id/publish, /:id/pay)
+  // must be declared BEFORE the generic /:id catch-all to avoid route shadowing.
+
+  @ApiOperation({
+    summary: "Get a presigned S3 URL to upload a checkout page logo",
+    description:
+      "Returns a presigned PUT URL (expires in 1 hour) and the permanent fileUrl. " +
+      "PUT the logo binary directly to presignedUrl, then pass fileUrl as logoUrl " +
+      "when creating / updating the checkout page.",
+  })
+  @Post("checkout-pages/logo-upload-url")
+  async getLogoUploadUrl(
+    @Body() dto: LogoUploadDto,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.getLogoUploadUrl(
+      user.id,
+      dto.fileName,
+      dto.fileType,
+    );
+  }
+
+  @ApiOperation({
+    summary: "List all checkout pages for the current merchant",
+    description:
+      "Returns each page enriched with its shareable `pageUrl` " +
+      "so the dashboard can show a share button without a second call.",
+  })
+  @ApiOkResponse({ description: "Array of checkout pages with pageUrl" })
   @Get("checkout-pages")
   async getAllCheckoutPages(@User() user: UsersEntity) {
     return this.paymentsService.getAllCheckoutPages(user.id);
   }
 
-  @ApiOperation({ summary: "Get one custom checkout page by id" })
-  @ApiOkResponse()
-  @Get("checkout-pages/:id")
-  async getCheckoutPageById(
-    @Param("id") id: string,
-    @User() user: UsersEntity,
-  ) {
-    return this.paymentsService.getCheckoutPageById(id, user);
-  }
-
-  @ApiOperation({ summary: "Create a custom checkout page" })
+  @ApiOperation({ summary: "Create a checkout page (saved as DRAFT)" })
+  @ApiCreatedResponse({ type: CheckoutPageResponseDto })
   @Post("checkout-pages")
   async createCheckoutPage(
     @Body() dto: CreateCheckoutPageDto,
@@ -392,9 +486,12 @@ export class PaymentsController {
   }
 
   @ApiOperation({
-    summary: "Publish a draft checkout page",
-    description: "Sets status to PUBLISHED. Use after save draft.",
+    summary: "Publish a draft checkout page — makes it live for customers",
+    description:
+      "Sets status to PUBLISHED and returns the shareable `pageUrl`. " +
+      "Safe to call on an already-published page — idempotent.",
   })
+  @ApiCreatedResponse({ type: CheckoutPageResponseDto })
   @Post("checkout-pages/:id/publish")
   async publishCheckoutPage(
     @Param("id") id: string,
@@ -403,7 +500,17 @@ export class PaymentsController {
     return this.paymentsService.publishCheckoutPage(id, user);
   }
 
-  @ApiOperation({ summary: "Update a custom checkout page" })
+  @ApiOperation({ summary: "Get one checkout page by id (merchant only)" })
+  @ApiOkResponse()
+  @Get("checkout-pages/:id")
+  async getCheckoutPageById(
+    @Param("id") id: string,
+    @User() user: UsersEntity,
+  ) {
+    return this.paymentsService.getCheckoutPageById(id, user);
+  }
+
+  @ApiOperation({ summary: "Update a checkout page" })
   @Put("checkout-pages/:id")
   async updateCheckoutPage(
     @Param("id") id: string,
@@ -411,6 +518,40 @@ export class PaymentsController {
     @User() user: UsersEntity,
   ) {
     return this.paymentsService.updateCheckoutPage(id, dto, user);
+  }
+
+  // ─── Checkout Pages — Public (customer-facing, no auth) ──────────────────
+
+  @Public()
+  @ApiOperation({
+    summary: "Get a published checkout page config (public — no auth required)",
+    description:
+      "Called by the frontend when a customer opens a hosted checkout page URL. " +
+      "Returns only PUBLISHED pages. Returns 404 for draft or non-existent pages. " +
+      "Intentionally excludes internal fields (userId, redirect URLs).",
+  })
+  @ApiOkResponse({ type: PublicCheckoutPageDto })
+  @Get("checkout-pages/:id/public")
+  async getPublicCheckoutPage(@Param("id") id: string) {
+    return this.paymentsService.getPublicCheckoutPage(id);
+  }
+
+  @Public()
+  @ApiOperation({
+    summary: "Customer submits checkout page form and initiates payment",
+    description:
+      "Called when a customer fills the hosted checkout page and clicks Pay. " +
+      "Validates amount against page config, creates a checkout session, " +
+      "and returns the payment gateway URL to redirect the customer to.",
+  })
+  @ApiCreatedResponse({ type: CheckoutPagePayResponseDto })
+  @HttpCode(HttpStatus.CREATED)
+  @Post("checkout-pages/:id/pay")
+  async initiateCheckoutPagePayment(
+    @Param("id") id: string,
+    @Body() dto: CheckoutPagePayDto,
+  ) {
+    return this.paymentsService.initiateCheckoutPagePayment(id, dto);
   }
 
   @Public()

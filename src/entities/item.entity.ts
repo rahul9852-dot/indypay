@@ -30,6 +30,13 @@ export class ItemEntity {
   @Column()
   hsnCode: string;
 
+  /**
+   * GST rate slab for this item.
+   * Valid values: 0, 5, 12, 18, 28 (as per Indian GST schedules).
+   */
+  @Column({ type: "int", default: 18 })
+  gstRate: number;
+
   @Column()
   merchantId: string;
 

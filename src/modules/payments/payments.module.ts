@@ -25,12 +25,15 @@ import { UserAddressEntity } from "@/entities/user-address.entity";
 import { WalletEntity } from "@/entities/wallet.entity";
 import { SettlementsEntity } from "@/entities/settlements.entity";
 import { SNSService } from "@/modules/aws/sns.service";
+import { S3Service } from "@/modules/aws/s3.service";
 import { PayoutService } from "@/modules/payout/payout.service";
 import { ApiCredentialsEntity } from "@/entities/api-credentials.entity";
 import { CheckoutEntity } from "@/entities/checkout.entity";
 import { UserLoginIpsEntity } from "@/entities/user-login-ip.entity";
 import { PaymentLinkEntity } from "@/entities/payment-link.entity";
 import { CheckoutPageEntity } from "@/entities/checkout-page.entity";
+import { PaymentLinkEventEntity } from "@/entities/payment-link-event.entity";
+import { PaymentLinkReminderEntity } from "@/entities/payment-link-reminder.entity";
 import { CryptoService } from "@/utils/encryption-algo.utils";
 import { DatabaseMonitorService } from "@/utils/db-monitor.utils";
 import { IntegrationsModule } from "@/modules/integrations/integrations.module";
@@ -67,6 +70,8 @@ const {
       PaymentLinkEntity,
       CheckoutPageEntity,
       PayinEventLogEntity,
+      PaymentLinkEventEntity,
+      PaymentLinkReminderEntity,
     ]),
     BullModule.registerQueue(
       { name: "payouts" },
@@ -85,6 +90,7 @@ const {
     JwtService,
     SNSService,
     SESService,
+    S3Service,
     PayoutService,
     CryptoService,
     DatabaseMonitorService,
