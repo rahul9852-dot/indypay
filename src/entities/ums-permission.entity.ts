@@ -31,7 +31,7 @@ export enum UmsPermissionCode {
   TXN_VIEW_OWN = "txn:view:own",
   TXN_VOID = "txn:void",
   USER_PII_FULL = "user:pii:full",
-  USER_PII_MASKED = "user:pii:masked"
+  USER_PII_MASKED = "user:pii:masked",
 }
 
 @Entity("ums_permissions")

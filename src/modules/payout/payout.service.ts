@@ -239,6 +239,10 @@ export class PayoutService {
       relations: { channelPartner: true },
     });
 
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found`);
+    }
+
     if (
       cpId &&
       ![USERS_ROLE.ADMIN, USERS_ROLE.OWNER].includes(user.role) &&
