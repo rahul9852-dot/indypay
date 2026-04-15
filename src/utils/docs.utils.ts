@@ -8,8 +8,8 @@ export const generateDummyPaymentUrl = async ({
   const QRCode = await require("qrcode");
 
   return await upiqr({
-    payeeName: "Paybolt Test",
-    payeeVPA: "pg-test@paybolt",
+    payeeName: "Rupeeflow Test",
+    payeeVPA: "pg-test@rupeeflow",
     amount,
     QRCode,
   });

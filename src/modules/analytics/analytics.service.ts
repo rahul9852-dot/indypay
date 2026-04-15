@@ -108,7 +108,10 @@ export class AnalyticsService {
         orderSuccess: calculatePercentage(success.count, totalInitiated.count),
         decline: calculatePercentage(pending.count, totalInitiated.count),
         bankDecline: calculatePercentage(failed.count, totalInitiated.count),
-        payboltDecline: calculatePercentage(failed.count, totalInitiated.count),
+        rupeeflowDecline: calculatePercentage(
+          failed.count,
+          totalInitiated.count,
+        ),
         upi: calculatePercentage(
           parseFloat(upiMetrics?.volume || "0"),
           success.volume,
@@ -779,7 +782,7 @@ export class AnalyticsService {
         successPercentage: metrics.rates.transactionSuccess,
         declinePercentage: metrics.rates.decline,
         bankDeclinePercentage: metrics.rates.bankDecline,
-        payboltDeclinePercentage: metrics.rates.payboltDecline,
+        rupeeflowDeclinePercentage: metrics.rates.rupeeflowDecline,
       },
       paymentMode: {
         upiPercentage: metrics.rates.upi,
@@ -899,7 +902,7 @@ export class AnalyticsService {
         successPercentage: metrics.rates.transactionSuccess,
         declinePercentage: metrics.rates.decline,
         bankDeclinePercentage: metrics.rates.bankDecline,
-        payboltDeclinePercentage: metrics.rates.payboltDecline,
+        rupeeflowDeclinePercentage: metrics.rates.rupeeflowDecline,
       },
       paymentMode: {
         upiPercentage: metrics.rates.upi,

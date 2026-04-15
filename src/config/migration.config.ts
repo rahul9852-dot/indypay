@@ -19,9 +19,7 @@ export const migrationConfig: DataSourceOptions = {
   synchronize: false,
   migrationsRun: false,
   logging: !isProduction,
-  // Disable SSL when using PgBouncer (server does not support SSL connections).
-  // Re-enable if connecting directly to PostgreSQL with SSL (e.g. managed DB).
-  ssl: false,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 };
 
 const dataSource = new DataSource(migrationConfig);

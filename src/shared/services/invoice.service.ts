@@ -802,7 +802,7 @@ export class InvoiceService {
       // Use process.cwd() to get the project root directory
       const logoPath = path.join(
         process.cwd(),
-        "src/assets/images/paybolt-icon.png",
+        "src/assets/images/rupeeflow-icon.png",
       );
 
       let logoBase64 = "";
