@@ -17,7 +17,7 @@ export const dbConfig: TypeOrmModuleOptions = {
   entities: [__dirname + "/../**/*.entity{.ts,.js}"],
   synchronize: false,
   maxQueryExecutionTime: 1000,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  ssl: false,
   extra: {
     // Target: 200+ req/sec with high success rate
     // Current issue: 45 req/sec with only 29 successful (64% success)
