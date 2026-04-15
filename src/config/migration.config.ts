@@ -19,7 +19,7 @@ export const migrationConfig: DataSourceOptions = {
   synchronize: false,
   migrationsRun: false,
   logging: !isProduction,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  ssl: false,
 };
 
 const dataSource = new DataSource(migrationConfig);
