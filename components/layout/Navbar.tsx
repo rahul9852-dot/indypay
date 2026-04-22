@@ -1,317 +1,813 @@
 'use client';
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  motion,
-  AnimatePresence,
-  useScroll,
-  useMotionValueEvent,
-} from "framer-motion";
 
 /* ─── nav data ─────────────────────────────────────────────────────────── */
-const NAV = [
-  {
-    label: "Products",
-    icon: "💳",
-    children: [
-      { label: "Accept Payments", desc: "UPI, cards, wallets & more" },
-      { label: "Send Money",      desc: "Instant bank transfers" },
-      { label: "Payment Links",   desc: "Share & collect anywhere" },
-      { label: "QR & POS",        desc: "In-store terminal solutions" },
-    ],
-  },
-  {
-    label: "Solutions",
-    icon: "🏗️",
-    children: [
-      { label: "Education",   desc: "Cashless campus fees" },
-      { label: "Retail",      desc: "Omnichannel checkout" },
-      { label: "Hospitality", desc: "Hotel & restaurant billing" },
-      { label: "BFSI",        desc: "Collections & disbursals" },
-      { label: "Logistics",   desc: "COD & vendor settlement" },
-      { label: "Healthcare",  desc: "Patient-first billing" },
-    ],
-  },
-  {
-    label: "Platform",
-    icon: "⚡",
-    children: [
-      { label: "Open API",            desc: "REST, SDKs & webhooks" },
-      { label: "Embedded Finance",    desc: "BaaS without a licence" },
-      { label: "Financial Inclusion", desc: "Reach the next 400M" },
-    ],
-  },
-  { label: "Developers", icon: "🛠️", children: [] },
-  {
-    label: "About",
-    icon: "🏢",
-    children: [
-      { label: "Company",  desc: "Our story & mission" },
-      { label: "Careers",  desc: "Join the team" },
-      { label: "Blog",     desc: "Insights & updates" },
-      { label: "Partners", desc: "Grow with us" },
-    ],
-  },
+type BusinessMenuItem = { label: string; href: string; desc?: string };
+
+const BUSINESS_MENU = {
+  acceptPayments: [
+    { label: "Omni Channel", href: "/business/omni-channel", desc: "Accept payments across online and offline touchpoints." },
+    { label: "In Store", href: "/business/in-store", desc: "POS and QR payments for your physical store." },
+    { label: "Online", href: "/business/online", desc: "Payment gateway for website and app checkouts." },
+    { label: "Pay Later", href: "/business/pay-later", desc: "Offer EMI / BNPL to improve conversions." },
+    { label: "Global Collections", href: "/business/global-collections", desc: "Collect international payments with ease." },
+  ] satisfies BusinessMenuItem[],
+  makePayments: [
+    { label: "Payouts", href: "/business/payouts", desc: "Bulk payouts to vendors, partners, and customers." },
+    { label: "Utility Bill Payments", href: "/business/payouts#utility-bill-payments", desc: "Pay utilities quickly from one place." },
+    { label: "Cards", href: "/business/payouts#cards", desc: "Issue and manage cards for teams and expenses." },
+    { label: "Expense Management", href: "/business/payouts#expense-management", desc: "Track and control spend across departments." },
+    { label: "Tax Management", href: "/business/payouts#tax-management", desc: "Simplify payments and tracking for taxes." },
+  ] satisfies BusinessMenuItem[],
+  manageYourBusiness: [
+    { label: "Business Dashboard", href: "/business/dashboard", desc: "One view for payments, settlements, and performance." },
+    { label: "Business Khata", href: "/business/dashboard#business-khata", desc: "Manage ledgers and customer credit cycles." },
+    { label: "Business Loans", href: "/business/dashboard#business-loans", desc: "Access working capital tailored to your business." },
+    { label: "Business Insights", href: "/business/dashboard#business-insights", desc: "Actionable analytics to grow revenue." },
+    { label: "Loyalty", href: "/business/dashboard#loyalty", desc: "Engage and retain customers with rewards." },
+    { label: "Risk & AML", href: "/business/dashboard#risk-aml", desc: "Fraud checks, monitoring, and compliance tools." },
+    { label: "Reconciliation & Settlement", href: "/business/dashboard#reconciliation-settlement", desc: "Automate reconciliation and track settlements." },
+    { label: "Cards", href: "/business/payouts#cards", desc: "Corporate cards to manage spend efficiently." },
+  ] satisfies BusinessMenuItem[],
+};
+
+type MenuItem = { label: string; href: string; desc?: string };
+
+function isHashHref(href: string) {
+  return href === "#" || href.startsWith("#");
+}
+
+function MenuIcon({ name }: { name: string }) {
+  switch (name) {
+    case "no-code":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 18l6-6-6-6M8 6l-6 6 6 6" />
+        </svg>
+      );
+    case "pay later":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8 7V3m8 4V3m-9 8h10m4 3a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      );
+    case "invoicepay":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      );
+    case "nowpay":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      );
+    case "government business":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10l9-6 9 6v2H3v-2zM5 12v8m4-8v8m6-8v8m4-8v8M4 20h16" />
+        </svg>
+      );
+    case "schoolpay":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m-7-4l7 4 7-4" />
+        </svg>
+      );
+    case "hotelpay":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 11h16a2 2 0 012 2v6H2v-6a2 2 0 012-2zm2-7h6a3 3 0 013 3v4H6V4z"
+          />
+        </svg>
+      );
+    case "healthcarepay":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 3h4a2 2 0 012 2v1H8V5a2 2 0 012-2z" />
+        </svg>
+      );
+    case "bfsipay":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10l9-6 9 6v2H3v-2zM6 12v8m4-8v8m4-8v8m4-8v8M4 20h16" />
+        </svg>
+      );
+    case "societypay":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 20v-6a2 2 0 012-2h4a2 2 0 012 2v6" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 10l6-5 6 5v10H6V10z" />
+        </svg>
+      );
+    case "Platform":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      );
+    case "Payments in a Box":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10m0 0l-8-4V7"
+          />
+        </svg>
+      );
+    case "Embedded Finance":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4z" />
+        </svg>
+      );
+    case "CMS":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10M4 18h6" />
+        </svg>
+      );
+    case "Card in a Box":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18v10H3V7z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 11h18" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 15h4" />
+        </svg>
+      );
+    case "Financial Inclusion":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 20a8 8 0 0116 0"
+          />
+        </svg>
+      );
+    case "Cash Management Services":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12h6l3-9 6 18 3-9h3" />
+        </svg>
+      );
+    case "About IndyPay":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      );
+    case "Challenge Yourself":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l3 7h7l-5.5 4 2.5 7-7-4.5L5 20l2.5-7L2 9h7l3-7z" />
+        </svg>
+      );
+    case "Culture":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20H2v-2a3 3 0 015.356-1.857" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12a4 4 0 100-8 4 4 0 000 8z" />
+        </svg>
+      );
+    case "Partner with Us":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V9a3 3 0 013-3h2a3 3 0 013 3v2" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 13h10l-1 8H8l-1-8z" />
+        </svg>
+      );
+    case "Media Centre":
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l6 6v8a2 2 0 01-2 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 4v6h6" />
+        </svg>
+      );
+    default:
+      return (
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      );
+  }
+}
+
+const SOLUTIONS_MENU = {
+  quickStarts: [
+    { label: "no-code", href: "#", desc: "Start collecting payments without any integration." },
+    { label: "pay later", href: "/business/pay-later", desc: "Offer EMI and deferred payment options." },
+    { label: "invoicepay", href: "/solutions/invoices", desc: "Send invoices with built-in payment links." },
+    { label: "nowpay", href: "/solutions/nowpay", desc: "Create instant links and get paid fast." },
+  ] satisfies MenuItem[],
+  industries: [
+    { label: "government business", href: "/solutions/government-business", desc: "Compliant collections for public services." },
+    { label: "schoolpay", href: "/solutions/schoolpay", desc: "Fees, admissions, and digital receipts." },
+    { label: "hotelpay", href: "/solutions/hotelpay", desc: "Bookings, deposits, and add-on payments." },
+    { label: "healthcarepay", href: "/solutions/healthcarepay", desc: "OPD/IPD billing and payment reminders." },
+    { label: "societypay", href: "/solutions/societypay", desc: "Maintenance collections and member dues." },
+    { label: "bfsipay", href: "/solutions/bfsipay", desc: "Payments tailored for BFSI workflows." },
+  ] satisfies MenuItem[],
+  more: [{ label: "indypay vyaapaar", href: "#", desc: "Commerce tools for growing businesses." }] satisfies MenuItem[],
+};
+
+type PlatformMenuItem = { label: string; href: string; desc: string; accent: string };
+
+const PLATFORM_MENU: PlatformMenuItem[] = [
+  { label: "Platform", href: "/platform", desc: "A unified stack to launch, manage, and scale payments.", accent: "from-[#7B4DB5] to-[#3B5FD4]" },
+  { label: "Payments in a Box", href: "/platform/payments-in-a-box", desc: "All the essentials you need to go live quickly.", accent: "from-[#7B4DB5] to-[#3B5FD4]" },
+  { label: "Embedded Finance", href: "/platform/embedded-finance", desc: "Build financial products directly into your user flows.", accent: "from-[#7B4DB5] to-[#3B5FD4]" },
+  { label: "Cash Management Services", href: "/platform/cash-management-services", desc: "360-degree fund flow management for businesses.", accent: "from-[#7B4DB5] to-[#3B5FD4]" },
+  { label: "CMS", href: "/platform/cms", desc: "Configure products, pricing, and content without code.", accent: "from-[#7B4DB5] to-[#3B5FD4]" },
+  { label: "Card in a Box", href: "/platform/card-in-a-box", desc: "Issue cards and control spend with policy and limits.", accent: "from-[#7B4DB5] to-[#3B5FD4]" },
+  { label: "Financial Inclusion", href: "/platform/financial-inclusion", desc: "Reach underserved users with accessible payment rails.", accent: "from-[#7B4DB5] to-[#3B5FD4]" },
 ];
 
-/* ─── Floating Navbar ───────────────────────────────────────────────────── */
+const ABOUT_MENU = [
+  { label: "About IndyPay", href: "/about", desc: "Who we are, what we build, and why it matters." },
+  { label: "Challenge Yourself", href: "/about/challenge-yourself", desc: "Careers, growth, and ownership mindset." },
+  { label: "Culture", href: "/about/culture", desc: "How we work—principles, practices, and people." },
+  { label: "Partner with Us", href: "/about/partner-with-us", desc: "Build together with APIs, programs, and support." },
+  { label: "Media Centre", href: "/about/media-centre", desc: "News, updates, brand kit, and announcements." },
+];
+
+const INTERNATIONAL_MENU = [
+  { label: "Global Payments", href: "#" },
+  { label: "Cross-Border Solutions", href: "#" },
+];
+
+const NAV = [
+  { label: "Business", hasDropdown: true },
+  { label: "Solutions", hasDropdown: true },
+  { label: "Platform", hasDropdown: true },
+  { label: "Developer Hub", hasDropdown: false },
+  { label: "About Us", hasDropdown: true },
+  { label: "International", hasDropdown: true },
+];
+
+/* ─── Simple Navbar ───────────────────────────────────────────────────── */
 export default function Navbar() {
-  const [visible, setVisible]         = useState(true);
-  const [atTop, setAtTop]             = useState(true);
-  const [activeMenu, setActiveMenu]   = useState<string | null>(null);
-  const [mobileOpen, setMobileOpen]   = useState(false);
-  const [hovered, setHovered]         = useState<string | null>(null);
-  const closeTimer                    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastScrollY                   = useRef(0);
-  const { scrollY }                   = useScroll();
-
-  useMotionValueEvent(scrollY, "change", (y) => {
-    setAtTop(y < 10);
-    setVisible(y < lastScrollY.current || y < 80);
-    lastScrollY.current = y;
-  });
-
-  const openMenu  = (label: string) => { if (closeTimer.current) clearTimeout(closeTimer.current); setActiveMenu(label); };
-  const closeMenu = () => { closeTimer.current = setTimeout(() => setActiveMenu(null), 120); };
-
-  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   return (
     <>
-      {/* ── Floating pill navbar ───────────────────────────────────────── */}
-      <motion.header
-        initial={{ y: -100, opacity: 0 }}
-        animate={{ y: visible ? 0 : -110, opacity: visible ? 1 : 0 }}
-        transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
-        className="fixed top-4 inset-x-0 z-50 flex justify-center px-4 pointer-events-none"
-      >
-        <div
-          className={`pointer-events-auto w-full max-w-6xl rounded-2xl transition-all duration-300 ${
-            atTop
-              ? "bg-transparent border border-white/10"
-              : "bg-white/90 backdrop-blur-xl border border-slate-200/80 shadow-xl shadow-slate-900/10"
-          }`}
-        >
-          <nav className="flex items-center justify-between px-5 h-14">
+      {/* ── Simple navbar ───────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 bg-white border-b border-slate-200">
+        <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="shrink-0">
+            <Image
+              src="/images/indypay-logo.png"
+              alt="IndyPay"
+              width={110}
+              height={36}
+              className="object-contain"
+              priority
+            />
+          </Link>
 
-            {/* Logo — white pill badge on dark hero, plain on light nav */}
-            <Link href="/" className="shrink-0 flex items-center">
-              <span
-                className={`transition-all duration-300 ${
-                  atTop
-                    ? "bg-white rounded-xl px-2.5 py-1 shadow-md"
-                    : ""
-                }`}
+          {/* Desktop Navigation */}
+          <ul className="hidden lg:flex items-center gap-8">
+            {NAV.map((item) => (
+              <li 
+                key={item.label}
+                className="relative"
+                onMouseEnter={() => item.hasDropdown && setActiveDropdown(item.label)}
+                onMouseLeave={() => setActiveDropdown(null)}
               >
-                <Image
-                  src="/images/indypay-logo.png"
-                  alt="IndyPay"
-                  width={110}
-                  height={36}
-                  className="object-contain block"
-                  priority
-                />
-              </span>
-            </Link>
+                <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors py-6">
+                  {item.label}
+                  {item.hasDropdown && (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  )}
+                </button>
 
-            {/* Desktop links */}
-            <ul className="hidden lg:flex items-center">
-              {NAV.map((item) => (
-                <li
-                  key={item.label}
-                  className="relative"
-                  onMouseEnter={() => openMenu(item.label)}
-                  onMouseLeave={closeMenu}
-                >
-                  <button
-                    onMouseEnter={() => setHovered(item.label)}
-                    onMouseLeave={() => setHovered(null)}
-                    className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-xl transition-colors ${
-                      atTop
-                        ? "text-white/90 hover:text-white"
-                        : "text-slate-600 hover:text-[#1E2A7A]"
-                    }`}
-                  >
-                    {/* Animated background pill on hover */}
-                    {hovered === item.label && (
-                      <motion.span
-                        layoutId="nav-hovered"
-                        className={`absolute inset-0 rounded-xl ${atTop ? "bg-white/10" : "bg-[#3B5FD4]/8"}`}
-                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      />
-                    )}
-                    <span className="relative z-10">{item.label}</span>
-                    {item.children.length > 0 && (
-                      <motion.svg
-                        animate={{ rotate: activeMenu === item.label ? 180 : 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="relative z-10 w-3.5 h-3.5 opacity-50"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                      </motion.svg>
-                    )}
-                  </button>
-
-                  {/* Dropdown */}
-                  <AnimatePresence>
-                    {activeMenu === item.label && item.children.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.97 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 6, scale: 0.97 }}
-                        transition={{ duration: 0.18, ease: "easeOut" }}
-                        onMouseEnter={() => openMenu(item.label)}
-                        onMouseLeave={closeMenu}
-                        className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 overflow-hidden"
-                      >
-                        {/* Top gradient accent */}
-                        <div className="h-0.5 bg-linear-to-r from-[#3B5FD4] via-[#6BA3E8] to-[#7B4DB5] mb-2" />
-                        {item.children.map((child, ci) => (
-                          <motion.a
-                            key={child.label}
-                            href="#"
-                            initial={{ opacity: 0, x: -6 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: ci * 0.04 }}
-                            className="flex items-start gap-3 px-4 py-2.5 hover:bg-slate-50 group transition-colors"
+                {/* Business Dropdown */}
+                {item.label === "Business" && activeDropdown === "Business" && (
+                  <div className="absolute top-full left-0 pt-2 w-[750px]">
+                    <div className="bg-white rounded-lg shadow-2xl border border-slate-200 p-5">
+                      <div className="grid grid-cols-4 gap-x-6 gap-y-3">
+                        {/* Accept Payments Section */}
+                        <div className="col-span-4 mb-0.5">
+                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Accept Payments</h3>
+                        </div>
+                        {BUSINESS_MENU.acceptPayments.map((subItem) => (
+                          <a 
+                            key={subItem.label}
+                            href={subItem.href} 
+                            className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                            onClick={() => setActiveDropdown(null)}
                           >
-                            <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[#3B5FD4] shrink-0 group-hover:bg-[#7B4DB5] transition-colors" />
-                            <div>
-                              <p className="text-sm font-semibold text-[#1E2A7A] group-hover:text-[#3B5FD4] transition-colors">
-                                {child.label}
-                              </p>
-                              {"desc" in child && (
-                                <p className="text-xs text-slate-400 mt-0.5">{child.desc}</p>
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                              {subItem.desc && (
+                                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
                               )}
                             </div>
-                          </motion.a>
+                          </a>
                         ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </li>
-              ))}
-            </ul>
 
-            {/* Right CTAs */}
-            <div className="hidden lg:flex items-center gap-3">
-              <a
-                href="#"
-                className={`text-sm font-medium transition-colors ${
-                  atTop ? "text-white/80 hover:text-white" : "text-slate-600 hover:text-[#1E2A7A]"
-                }`}
-              >
-                Log in
-              </a>
-              <motion.a
-                href="#contact"
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.97 }}
-                className="relative px-5 py-2 bg-[#7B4DB5] text-white text-sm font-bold rounded-xl overflow-hidden shadow-lg shadow-purple-600/25 transition-colors hover:bg-[#6A3BA0]"
-              >
-                {/* Shimmer sweep */}
-                <motion.span
-                  className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -skew-x-12"
-                  initial={{ x: "-150%" }}
-                  whileHover={{ x: "150%" }}
-                  transition={{ duration: 0.55, ease: "easeInOut" }}
-                />
-                <span className="relative z-10">Get Started →</span>
-              </motion.a>
-            </div>
-
-            {/* Mobile burger */}
-            <button
-              className={`lg:hidden p-2 rounded-xl transition-colors ${atTop ? "text-white hover:bg-white/10" : "text-slate-700 hover:bg-slate-100"}`}
-              onClick={() => setMobileOpen(!mobileOpen)}
-              aria-label="Toggle menu"
-            >
-              <motion.svg
-                className="w-5 h-5"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                animate={mobileOpen ? "open" : "closed"}
-              >
-                <motion.path
-                  strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  variants={{
-                    closed: { d: "M4 6h16M4 12h16M4 18h16" },
-                    open:   { d: "M6 18L18 6M6 6l12 12" },
-                  }}
-                  transition={{ duration: 0.2 }}
-                />
-              </motion.svg>
-            </button>
-          </nav>
-        </div>
-      </motion.header>
-
-      {/* ── Mobile menu ────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="fixed inset-x-4 top-20 z-40 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
-          >
-            {/* Top gradient bar */}
-            <div className="h-1 bg-linear-to-r from-[#1E2A7A] via-[#6BA3E8] to-[#7B4DB5]" />
-
-            <div className="p-5">
-              <Image src="/images/indypay-logo.png" alt="IndyPay" width={100} height={34} className="mb-5" />
-
-              <div className="space-y-4">
-                {NAV.map((item) => (
-                  <div key={item.label}>
-                    <p className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                      <span>{item.icon}</span>
-                      {item.label}
-                    </p>
-                    {item.children.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-1">
-                        {item.children.map((c) => (
-                          <a
-                            key={c.label}
-                            href="#"
-                            className="px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-[#3B5FD4]/8 hover:text-[#3B5FD4] transition-colors font-medium"
+                        {/* Make Payments Section */}
+                        <div className="col-span-4 mb-0.5 mt-2.5">
+                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Make Payments</h3>
+                        </div>
+                        {BUSINESS_MENU.makePayments.map((subItem) => (
+                          <a 
+                            key={subItem.label}
+                            href={subItem.href} 
+                            className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                            onClick={() => setActiveDropdown(null)}
                           >
-                            {c.label}
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                              {subItem.desc && (
+                                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
+                              )}
+                            </div>
+                          </a>
+                        ))}
+
+                        {/* Manage Your Business Section */}
+                        <div className="col-span-4 mb-0.5 mt-2.5">
+                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Manage Your Business</h3>
+                        </div>
+                        {BUSINESS_MENU.manageYourBusiness.map((subItem) => (
+                          <a 
+                            key={subItem.label}
+                            href={subItem.href} 
+                            className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                              </svg>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                              {subItem.desc && (
+                                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
+                              )}
+                            </div>
                           </a>
                         ))}
                       </div>
-                    ) : (
-                      <a href="#" className="block px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-[#3B5FD4]/8 hover:text-[#3B5FD4] transition-colors font-medium">
-                        {item.label}
-                      </a>
-                    )}
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {/* Solutions Dropdown */}
+                {item.label === "Solutions" && activeDropdown === "Solutions" && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-[860px]">
+                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+                      <div className="grid grid-cols-12">
+                        <div className="col-span-8 p-6">
+                          <div className="grid grid-cols-2 gap-x-10 gap-y-8">
+                            <div>
+                              <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-4">Quick starts</h3>
+                              <div className="space-y-3">
+                                {SOLUTIONS_MENU.quickStarts.map((subItem) => (
+                                  isHashHref(subItem.href) ? (
+                                    <a
+                                      key={subItem.label}
+                                      href={subItem.href}
+                                      className="group flex items-start gap-3 rounded-lg p-2 -m-2 hover:bg-slate-50 transition-colors"
+                                      onClick={() => setActiveDropdown(null)}
+                                    >
+                                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                                      <MenuIcon name={subItem.label} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-semibold text-slate-900 group-hover:text-[#7B4DB5] transition-colors">
+                                        {subItem.label}
+                                      </div>
+                                      {subItem.desc && (
+                                        <div className="text-xs text-slate-500 leading-snug mt-0.5">{subItem.desc}</div>
+                                      )}
+                                    </div>
+                                    </a>
+                                  ) : (
+                                    <Link
+                                      key={subItem.label}
+                                      href={subItem.href}
+                                      className="group flex items-start gap-3 rounded-lg p-2 -m-2 hover:bg-slate-50 transition-colors"
+                                      onClick={() => setActiveDropdown(null)}
+                                    >
+                                      <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                                        <MenuIcon name={subItem.label} />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="text-sm font-semibold text-slate-900 group-hover:text-[#7B4DB5] transition-colors">
+                                          {subItem.label}
+                                        </div>
+                                        {subItem.desc && (
+                                          <div className="text-xs text-slate-500 leading-snug mt-0.5">{subItem.desc}</div>
+                                        )}
+                                      </div>
+                                    </Link>
+                                  )
+                                ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-4">Industry solutions</h3>
+                              <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                                {SOLUTIONS_MENU.industries.map((subItem) => (
+                                  <Link
+                                    key={subItem.label}
+                                    href={subItem.href}
+                                    className="group flex items-start gap-3 rounded-lg p-2 -m-2 hover:bg-slate-50 transition-colors"
+                                    onClick={() => setActiveDropdown(null)}
+                                  >
+                                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                                      <MenuIcon name={subItem.label} />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-semibold text-slate-900 group-hover:text-[#7B4DB5] transition-colors">
+                                        {subItem.label}
+                                      </div>
+                                      {subItem.desc && (
+                                        <div className="text-xs text-slate-500 leading-snug mt-0.5">{subItem.desc}</div>
+                                      )}
+                                    </div>
+                                  </Link>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="col-span-4 bg-slate-50 border-l border-slate-200 p-6">
+                          <div>
+                            <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">More</p>
+                            <div className="space-y-2">
+                              {SOLUTIONS_MENU.more.map((subItem) => (
+                                <a
+                                  key={subItem.label}
+                                  href={subItem.href}
+                                  className="block rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-[#7B4DB5] transition-colors"
+                                  onClick={() => setActiveDropdown(null)}
+                                >
+                                  <div className="text-sm font-semibold text-slate-900">{subItem.label}</div>
+                                  {subItem.desc && <div className="text-xs text-slate-500 mt-0.5">{subItem.desc}</div>}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Platform Dropdown */}
+                {item.label === "Platform" && activeDropdown === "Platform" && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-[820px]">
+                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+                      <div className="grid grid-cols-12">
+                        <div className="col-span-7 p-6">
+                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-4">Platform</h3>
+                          <div className="space-y-3">
+                            {PLATFORM_MENU.map((subItem) => (
+                              <Link
+                                key={subItem.label}
+                                href={subItem.href}
+                                className="group flex items-start gap-3 rounded-lg p-2 -m-2 hover:bg-slate-50 transition-colors"
+                                onClick={() => setActiveDropdown(null)}
+                              >
+                                <div
+                                  className={`w-9 h-9 rounded-full bg-linear-to-br ${subItem.accent} flex items-center justify-center shrink-0`}
+                                >
+                                  <MenuIcon name={subItem.label} />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-slate-900 group-hover:text-[#7B4DB5] transition-colors">
+                                    {subItem.label}
+                                  </div>
+                                  <div className="text-xs text-slate-500 leading-snug mt-0.5">{subItem.desc}</div>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="col-span-5 bg-slate-50 border-l border-slate-200 p-6">
+                          <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Highlights</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+                                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <div className="text-sm font-black text-slate-900">Launch faster</div>
+                                  <div className="text-xs text-slate-600 mt-0.5">Prebuilt flows and configs to go live quickly.</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-emerald-600 to-teal-600 flex items-center justify-center">
+                                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12h6l3-9 6 18 3-9h3" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <div className="text-sm font-black text-slate-900">Operate with clarity</div>
+                                  <div className="text-xs text-slate-600 mt-0.5">Dashboards, reports, and controls built-in.</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-fuchsia-600 to-pink-600 flex items-center justify-center">
+                                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <div className="text-sm font-black text-slate-900">Scale securely</div>
+                                  <div className="text-xs text-slate-600 mt-0.5">Policy, limits, and compliance-ready tooling.</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* About Us Dropdown */}
+                {item.label === "About Us" && activeDropdown === "About Us" && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-[820px]">
+                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+                      <div className="grid grid-cols-12">
+                        <div className="col-span-7 p-6">
+                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-4">About</h3>
+                          <div className="space-y-3">
+                            {ABOUT_MENU.map((subItem) => (
+                              <Link
+                                key={subItem.label}
+                                href={subItem.href}
+                                className="group flex items-start gap-3 rounded-lg p-2 -m-2 hover:bg-slate-50 transition-colors"
+                                onClick={() => setActiveDropdown(null)}
+                              >
+                                <div className="w-9 h-9 rounded-full bg-linear-to-br from-[#7B4DB5] to-[#3B5FD4] flex items-center justify-center shrink-0">
+                                  <MenuIcon name={subItem.label} />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-slate-900 group-hover:text-[#7B4DB5] transition-colors">
+                                    {subItem.label}
+                                  </div>
+                                  {subItem.desc && <div className="text-xs text-slate-500 leading-snug mt-0.5">{subItem.desc}</div>}
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="col-span-5 bg-slate-50 border-l border-slate-200 p-6">
+                          <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Inside IndyPay</p>
+                          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                            <div className="p-5">
+                              <div className="text-sm font-black text-slate-900">Vision • Mission • Values</div>
+                              <div className="text-xs text-slate-600 mt-1">
+                                What we optimise for and how we build trust at scale.
+                              </div>
+                            </div>
+                            <div className="px-5 pb-5">
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
+                                <Image
+                                  src="/images/about/about-3.png"
+                                  alt="IndyPay vision and mission illustration"
+                                  width={900}
+                                  height={600}
+                                  className="w-full h-auto"
+                                  style={{ filter: "hue-rotate(250deg) saturate(1.25) contrast(1.05)" }}
+                                />
+                              </div>
+                              <Link
+                                href="/about"
+                                className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-[#7B4DB5] hover:gap-3 transition-all"
+                                onClick={() => setActiveDropdown(null)}
+                              >
+                                Explore About IndyPay
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* International Dropdown */}
+                {item.label === "International" && activeDropdown === "International" && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-[400px]">
+                    <div className="bg-white rounded-lg shadow-2xl border border-slate-200 p-6">
+                      <div className="space-y-3">
+                      {INTERNATIONAL_MENU.map((subItem) => (
+                        <a 
+                          key={subItem.label}
+                          href={subItem.href} 
+                          className="flex items-center gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                          onClick={() => setActiveDropdown(null)}
+                        >
+                          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <span className="font-medium text-sm">{subItem.label}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          {/* Right CTAs */}
+          <div className="hidden lg:flex items-center gap-4">
+            <a
+              href="#"
+              className="text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors"
+            >
+              Log In
+            </a>
+            <a
+              href="#contact"
+              className="px-6 py-2.5 bg-[#7B4DB5] text-white text-sm font-bold rounded-lg hover:bg-[#6A3BA0] transition-all"
+            >
+              Get Started →
+            </a>
+          </div>
+
+          {/* Mobile burger */}
+          <button
+            className="lg:hidden p-2 text-slate-700"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Toggle menu"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {mobileOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+        </nav>
+
+        {/* Mobile menu */}
+        {mobileOpen && (
+          <div className="lg:hidden border-t border-slate-200 bg-white">
+            <div className="px-6 py-4 space-y-4">
+              {/* Business Section */}
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Business</p>
+                <div className="space-y-2 pl-4">
+                  <p className="text-xs font-semibold text-slate-500 mb-1">Accept Payments</p>
+                  {BUSINESS_MENU.acceptPayments.map((item) => (
+                    <a key={item.label} href="#" className="block text-sm text-slate-700 py-1">
+                      {item.label}
+                    </a>
+                  ))}
+                  <p className="text-xs font-semibold text-slate-500 mb-1 mt-3">Make Payments</p>
+                  {BUSINESS_MENU.makePayments.map((item) => (
+                    <a key={item.label} href="#" className="block text-sm text-slate-700 py-1">
+                      {item.label}
+                    </a>
+                  ))}
+                  <p className="text-xs font-semibold text-slate-500 mb-1 mt-3">Manage Your Business</p>
+                  {BUSINESS_MENU.manageYourBusiness.map((item) => (
+                    <a key={item.label} href="#" className="block text-sm text-slate-700 py-1">
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
               </div>
 
-              <div className="mt-5 pt-5 border-t border-slate-100 flex gap-3">
-                <a href="#" className="flex-1 text-center py-2.5 rounded-xl border-2 border-[#3B5FD4] text-[#3B5FD4] text-sm font-bold hover:bg-blue-50 transition-colors">
-                  Log in
+              {/* Solutions */}
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Solutions</p>
+                <div className="space-y-2 pl-4">
+                  {[...SOLUTIONS_MENU.quickStarts, ...SOLUTIONS_MENU.industries, ...SOLUTIONS_MENU.more].map((item) => (
+                    isHashHref(item.href) ? (
+                      <a key={item.label} href={item.href} className="block text-sm text-slate-700 py-1">
+                        {item.label}
+                      </a>
+                    ) : (
+                      <Link key={item.label} href={item.href} className="block text-sm text-slate-700 py-1">
+                        {item.label}
+                      </Link>
+                    )
+                  ))}
+                </div>
+              </div>
+
+              {/* Platform */}
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Platform</p>
+                <div className="space-y-2 pl-4">
+                  {PLATFORM_MENU.map((item) => (
+                    <a key={item.label} href="#" className="block text-sm text-slate-700 py-1">
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Developer Hub */}
+              <a href="#" className="block text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] py-2">
+                Developer Hub
+              </a>
+
+              {/* About Us */}
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">About Us</p>
+                <div className="space-y-2 pl-4">
+                  {ABOUT_MENU.map((item) => (
+                    <Link key={item.label} href={item.href} className="block text-sm text-slate-700 py-1">
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              {/* International */}
+              <div>
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">International</p>
+                <div className="space-y-2 pl-4">
+                  {INTERNATIONAL_MENU.map((item) => (
+                    <a key={item.label} href="#" className="block text-sm text-slate-700 py-1">
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-200 flex flex-col gap-3">
+                <a href="#" className="text-center py-2.5 text-sm font-semibold text-slate-700">
+                  Log In
                 </a>
-                <a href="#contact" className="flex-1 text-center py-2.5 rounded-xl bg-[#7B4DB5] text-white text-sm font-bold hover:bg-[#6A3BA0] transition-colors">
+                <a href="#contact" className="text-center py-2.5 bg-[#7B4DB5] text-white text-sm font-bold rounded-lg">
                   Get Started →
                 </a>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
-
-      {/* Click-outside overlay for mobile */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      </header>
     </>
   );
 }

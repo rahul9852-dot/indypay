@@ -1,65 +1,59 @@
 const SOLUTIONS = [
   {
-    icon: '🎓',
-    tag: 'Education',
-    title: 'SchoolPay — Cashless Campus Payments',
-    body: 'Streamline tuition, hostel, and canteen fee collection across institutions. Automated receipts, real-time reconciliation, and parent-friendly UPI links that reduce admin overhead by 80%.',
-    cta: 'Explore EduPay',
+    tag: 'Online Payments',
+    title: 'Payment Gateway',
+    body: 'Accept payments online with our secure and reliable payment gateway. Support for all major payment methods including cards, UPI, wallets, and net banking.',
+    cta: 'Learn More',
     color: 'from-[#3B5FD4] to-[#1E2A7A]',
   },
   {
-    icon: '🛒',
-    tag: 'Retail',
-    title: 'OmniPay — In-store & Online Unified',
-    body: 'Give your customers one seamless checkout experience whether they shop in your store or on your app. Tap-to-pay, QR, card swipe, and BNPL — all reconciled in one dashboard.',
-    cta: 'Explore RetailPay',
+    tag: 'Point of Sale',
+    title: 'POS Solutions',
+    body: 'Transform your physical store with smart POS terminals. Accept contactless payments, cards, and UPI with instant settlement and real-time reporting.',
+    cta: 'Learn More',
     color: 'from-[#6BA3E8] to-[#3B5FD4]',
   },
   {
-    icon: '🏨',
-    tag: 'Hospitality',
-    title: 'HotelPay — Frictionless Guest Checkout',
-    body: 'From pre-arrival deposits to dining, spa, and late checkout — IndyPay embeds into your PMS so every touchpoint is a revenue opportunity, never a friction point.',
-    cta: 'Explore HotelPay',
+    tag: 'Recurring',
+    title: 'Subscription Management',
+    body: 'Automate recurring billing and subscription management. Handle trials, upgrades, downgrades, and cancellations with intelligent retry logic.',
+    cta: 'Learn More',
     color: 'from-[#7B4DB5] to-[#3B5FD4]',
   },
   {
-    icon: '🏦',
-    tag: 'BFSI',
-    title: 'LenderPay — Collections & Disbursals',
-    body: 'Automate EMI collection, loan disbursals, and insurance premium payments across 22 banking partners. API-first, RBI-compliant, and built for massive scale.',
-    cta: 'Explore LenderPay',
+    tag: 'Payouts',
+    title: 'Bulk Payouts',
+    body: 'Send money to multiple beneficiaries instantly. Perfect for vendor payments, refunds, cashbacks, and salary disbursements with full compliance.',
+    cta: 'Learn More',
     color: 'from-[#1E2A7A] to-[#7B4DB5]',
   },
   {
-    icon: '🚚',
-    tag: 'Logistics',
-    title: 'FleetPay — COD & Vendor Settlements',
-    body: 'Collect cash-on-delivery digitally, pay delivery partners instantly via UPI, and settle vendor invoices in bulk — all from one operations console.',
-    cta: 'Explore FleetPay',
+    tag: 'QR Code',
+    title: 'Dynamic QR Payments',
+    body: 'Generate dynamic QR codes for instant payments. Perfect for retail stores, restaurants, and service businesses with zero hardware cost.',
+    cta: 'Learn More',
     color: 'from-[#3B5FD4] to-[#6BA3E8]',
   },
   {
-    icon: '🏥',
-    tag: 'Healthcare',
-    title: 'MediPay — Patient-First Billing',
-    body: 'Enable insurance pre-auth, OPD payments, and pharmacy billing under one roof. Integrate with HMS systems for zero-friction patient discharge and claims processing.',
-    cta: 'Explore MediPay',
+    tag: 'Payment Links',
+    title: 'Payment Links',
+    body: 'Create and share payment links via SMS, email, or WhatsApp. No website needed - start accepting payments in minutes with zero integration.',
+    cta: 'Learn More',
     color: 'from-[#6BA3E8] to-[#7B4DB5]',
   },
 ];
 
 export default function Solutions() {
   return (
-    <section id="solutions" className="py-24 bg-white">
+    <section id="solutions" className="py-24 bg-slate-50">
       <div className="max-w-7xl mx-auto px-6">
         <div data-aos="fade-up" className="text-center mb-16">
-          <p className="text-[#3B5FD4] text-sm font-semibold tracking-widest uppercase mb-3">Industry Solutions</p>
-          <h2 className="text-4xl md:text-5xl font-black text-[#1E2A7A] mb-4">
-            Built for every vertical
+          <p className="text-[#7B4DB5] text-sm font-bold tracking-widest uppercase mb-3">Our Solutions</p>
+          <h2 className="text-4xl md:text-5xl font-black text-black mb-4">
+            Complete Payment Solutions
           </h2>
-          <p className="text-slate-500 text-lg max-w-2xl mx-auto">
-            Purpose-built payment stacks for the industries that power India's economy.
+          <p className="text-slate-600 text-lg max-w-2xl mx-auto font-medium">
+            Everything you need to accept, manage, and optimize payments for your business.
           </p>
         </div>
 
@@ -69,25 +63,32 @@ export default function Solutions() {
               key={s.title}
               data-aos="fade-up"
               data-aos-delay={i * 80}
-              className="group relative rounded-2xl border border-slate-100 bg-slate-50 p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+              className="group relative rounded-2xl border border-slate-100 bg-white p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden"
             >
               <div className={`absolute top-0 inset-x-0 h-1 bg-linear-to-r ${s.color}`} />
 
-              <div className="flex items-start gap-4 mb-4">
-                <span className="text-3xl">{s.icon}</span>
-                <div>
-                  <span className={`text-xs font-bold uppercase tracking-wider bg-linear-to-r ${s.color} bg-clip-text text-transparent`}>
-                    {s.tag}
-                  </span>
-                  <h3 className="text-[#1E2A7A] font-black text-lg leading-tight mt-0.5">{s.title}</h3>
+              {/* Image Placeholder */}
+              <div className="mb-5 aspect-video rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center border border-slate-200">
+                <div className="text-center">
+                  <svg className="w-12 h-12 mx-auto text-slate-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-slate-400 text-xs">Image Placeholder</p>
                 </div>
               </div>
 
-              <p className="text-slate-500 text-sm leading-relaxed mb-6">{s.body}</p>
+              <div className="mb-4">
+                <span className={`text-xs font-bold uppercase tracking-wider text-[#7B4DB5]`}>
+                  {s.tag}
+                </span>
+                <h3 className="text-black font-black text-xl leading-tight mt-1">{s.title}</h3>
+              </div>
+
+              <p className="text-slate-600 text-sm leading-relaxed mb-6 font-medium">{s.body}</p>
 
               <a
                 href="#"
-                className="inline-flex items-center gap-1 text-[#3B5FD4] text-sm font-semibold hover:gap-2 transition-all"
+                className="inline-flex items-center gap-1 text-[#7B4DB5] text-sm font-bold hover:gap-2 transition-all"
               >
                 {s.cta}
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

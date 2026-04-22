@@ -4,41 +4,35 @@ export default function CTA() {
       <div className="max-w-4xl mx-auto px-6 text-center">
         <div
           data-aos="zoom-in"
-          className="relative rounded-3xl bg-[#0F1A4A] px-8 py-16 overflow-hidden"
+          className="relative rounded-3xl bg-slate-50 border-2 border-slate-200 px-8 py-16 overflow-hidden"
         >
-          {/* Glow orbs — logo colours */}
-          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-[#3B5FD4]/25 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-[#7B4DB5]/25 blur-3xl pointer-events-none" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 rounded-full bg-[#6BA3E8]/10 blur-2xl pointer-events-none" />
-
           <div className="relative z-10">
-            <p className="text-[#6BA3E8] text-sm font-semibold tracking-widest uppercase mb-4">Get Started Today</p>
-            <h2 className="text-4xl md:text-5xl font-black text-white mb-5 leading-tight">
-              Ready to power your <br className="hidden md:block" />
-              payments with IndyPay?
+            <p className="text-[#7B4DB5] text-sm font-bold tracking-widest uppercase mb-4">Start Today</p>
+            <h2 className="text-4xl md:text-5xl font-black text-black mb-5 leading-tight">
+              Ready to transform <br className="hidden md:block" />
+              your payment experience?
             </h2>
-            <p className="text-slate-400 text-lg mb-10 max-w-xl mx-auto">
-              Join 500,000+ businesses across India. No setup fees, no lock-in contracts —
-              just powerful payments from day one.
+            <p className="text-slate-600 text-lg mb-10 max-w-xl mx-auto font-medium">
+              Join thousands of businesses already using our platform. Get started in minutes with no setup fees or hidden charges.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a
                 href="#"
-                className="px-8 py-4 bg-[#7B4DB5] text-white text-base font-bold rounded-xl hover:bg-[#6A3BA0] transition-all shadow-xl shadow-purple-500/30"
+                className="px-8 py-4 bg-[#7B4DB5] text-white text-base font-bold rounded-lg hover:bg-[#6A3BA0] transition-all shadow-lg"
               >
-                Create Free Account →
+                Create Your Account →
               </a>
               <a
                 href="#"
-                className="px-8 py-4 border-2 border-white/20 text-white text-base font-semibold rounded-xl hover:bg-white/10 transition-all"
+                className="px-8 py-4 border-2 border-slate-300 text-black text-base font-bold rounded-lg hover:bg-white transition-all"
               >
-                Talk to Sales
+                Contact Sales
               </a>
             </div>
 
-            <p className="mt-6 text-slate-500 text-xs">
-              No credit card required · RBI regulated · SOC 2 certified
+            <p className="mt-6 text-slate-500 text-xs font-medium">
+              No credit card required · Secure & Compliant · 24/7 Support
             </p>
           </div>
         </div>

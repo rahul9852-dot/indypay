@@ -20,6 +20,10 @@
   --color-brand-purple:   var(--brand-purple);
   --color-brand-dark:     var(--brand-dark);
   --font-sans: var(--font-geist-sans);
+  
+  /* Override blue-600 and blue-700 with purple colors */
+  --color-blue-600: var(--brand-purple);
+  --color-blue-700: #6a3fa0;
 }
 
 html { scroll-behavior: smooth; }
@@ -36,3 +40,35 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #f1f5f9; }
 ::-webkit-scrollbar-thumb { background: var(--brand-blue); border-radius: 999px; }
+
+/* Universal Button Styles - Purple Theme */
+.btn-primary,
+a[class*="bg-blue-600"],
+button[class*="bg-blue-600"] {
+  background-color: var(--brand-purple) !important;
+  color: white !important;
+}
+
+.btn-primary:hover,
+a[class*="bg-blue-600"]:hover,
+button[class*="bg-blue-600"]:hover {
+  background-color: #6a3fa0 !important;
+}
+
+/* Standard button class for consistent styling */
+.btn-primary {
+  display: inline-block;
+  padding: 0.75rem 1.75rem;
+  background-color: var(--brand-purple);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.btn-primary:hover {
+  background-color: #6a3fa0;
+  transform: translateY(-1px);
+}
