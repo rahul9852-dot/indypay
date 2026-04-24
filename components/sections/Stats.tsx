@@ -12,8 +12,8 @@ export default function Stats() {
     <section className="py-24 bg-white">
       <div className="max-w-6xl mx-auto px-6">
         <div data-aos="fade-up" className="text-center mb-16">
-          <p className="text-[#7B4DB5] text-sm font-bold tracking-widest uppercase mb-3">Our Impact</p>
-          <h2 className="text-4xl md:text-5xl font-black text-black">
+          <p className="text-[#7B4DB5] text-5xl md:text-6xl font-bold tracking-widest uppercase mb-3">Our Impact</p>
+          <h2 className="text-xl md:text-2xl font-black text-black">
             Numbers that matter
           </h2>
         </div>

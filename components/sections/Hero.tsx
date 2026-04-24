@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const BADGES = ['UPI', 'Cards', 'Net Banking', 'Wallets', 'EMI', 'BNPL'];
 
 export default function Hero() {
@@ -59,20 +61,18 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Right - Hero Image Placeholder */}
+          {/* Right - Hero Image */}
           <div data-aos="fade-left" data-aos-delay="200" className="relative">
-            <div className="relative aspect-square max-w-lg mx-auto">
-              {/* Placeholder for hero image */}
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 flex items-center justify-center">
-                <div className="text-center p-8">
-                  <div className="w-24 h-24 mx-auto mb-4 rounded-2xl bg-slate-200 flex items-center justify-center">
-                    <svg className="w-12 h-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                  </div>
-                  <p className="text-slate-500 text-sm font-semibold">Hero Image Placeholder</p>
-                  <p className="text-slate-400 text-xs mt-2">Replace with your image</p>
-                </div>
+            <div className="relative w-full max-w-4xl mx-auto">
+              {/* Hero Image */}
+              <div className="relative w-full aspect-[4/3]">
+                <Image
+                  src="/herosection/Accept Payments Anywhere, Anytime.png"
+                  alt="Accept Payments Anywhere, Anytime"
+                  fill
+                  className="object-contain"
+                  priority
+                />
               </div>
               
               {/* Floating elements */}
@@ -81,14 +81,6 @@ export default function Hero() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-slate-400 text-xs animate-bounce">
-        <span>scroll</span>
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
       </div>
     </section>
   );

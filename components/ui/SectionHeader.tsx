@@ -18,11 +18,11 @@ export default function SectionHeader({
   return (
     <div data-aos="fade-up" className={`mb-16 ${alignmentClass}`}>
       {label && (
-        <p className={`${labelColor} text-xl md:text-2xl font-bold tracking-wider uppercase mb-6`}>
+        <p className={`${labelColor} text-5xl md:text-6xl font-bold tracking-wider uppercase mb-8`}>
           {label}
         </p>
       )}
-      <h2 className="text-6xl md:text-7xl font-black text-black mb-6 leading-tight">
+      <h2 className="text-2xl md:text-3xl font-black text-black mb-6 leading-tight">
         {title}
       </h2>
       {description && (

@@ -53,9 +53,9 @@ const FOOTER_LINKS = {
     { label: 'Customer Grievances', href: '#' },
     { label: 'Merchant Onboarding', href: '#' },
     { label: 'Fraud Alert', href: '#' },
-    { label: 'Terms & Conditions', href: '#' },
-    { label: 'Privacy Policy', href: '#' },
-    { label: 'Prevention & Safety', href: '#' },
+    { label: 'Terms & Conditions', href: '/policies/terms' },
+    { label: 'Privacy Policy', href: '/policies/cookies' },
+    { label: 'Refund Policy', href: '/policies/refund' },
   ],
   'Contact Us': [
     { label: 'Customer Care Number:', href: '#', isHeading: true },

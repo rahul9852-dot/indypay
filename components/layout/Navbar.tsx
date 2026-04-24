@@ -474,104 +474,96 @@ export default function Navbar() {
 
                 {/* Solutions Dropdown */}
                 {item.label === "Solutions" && activeDropdown === "Solutions" && (
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-[860px]">
-                    <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-                      <div className="grid grid-cols-12">
-                        <div className="col-span-8 p-6">
-                          <div className="grid grid-cols-2 gap-x-10 gap-y-8">
-                            <div>
-                              <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-4">Quick starts</h3>
-                              <div className="space-y-3">
-                                {SOLUTIONS_MENU.quickStarts.map((subItem) => (
-                                  isHashHref(subItem.href) ? (
-                                    <a
-                                      key={subItem.label}
-                                      href={subItem.href}
-                                      className="group flex items-start gap-3 rounded-lg p-2 -m-2 hover:bg-slate-50 transition-colors"
-                                      onClick={() => setActiveDropdown(null)}
-                                    >
-                                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
-                                      <MenuIcon name={subItem.label} />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-semibold text-slate-900 group-hover:text-[#7B4DB5] transition-colors">
-                                        {subItem.label}
-                                      </div>
-                                      {subItem.desc && (
-                                        <div className="text-xs text-slate-500 leading-snug mt-0.5">{subItem.desc}</div>
-                                      )}
-                                    </div>
-                                    </a>
-                                  ) : (
-                                    <Link
-                                      key={subItem.label}
-                                      href={subItem.href}
-                                      className="group flex items-start gap-3 rounded-lg p-2 -m-2 hover:bg-slate-50 transition-colors"
-                                      onClick={() => setActiveDropdown(null)}
-                                    >
-                                      <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
-                                        <MenuIcon name={subItem.label} />
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="text-sm font-semibold text-slate-900 group-hover:text-[#7B4DB5] transition-colors">
-                                          {subItem.label}
-                                        </div>
-                                        {subItem.desc && (
-                                          <div className="text-xs text-slate-500 leading-snug mt-0.5">{subItem.desc}</div>
-                                        )}
-                                      </div>
-                                    </Link>
-                                  )
-                                ))}
-                              </div>
-                            </div>
-
-                            <div>
-                              <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-4">Industry solutions</h3>
-                              <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                                {SOLUTIONS_MENU.industries.map((subItem) => (
-                                  <Link
-                                    key={subItem.label}
-                                    href={subItem.href}
-                                    className="group flex items-start gap-3 rounded-lg p-2 -m-2 hover:bg-slate-50 transition-colors"
-                                    onClick={() => setActiveDropdown(null)}
-                                  >
-                                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
-                                      <MenuIcon name={subItem.label} />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-semibold text-slate-900 group-hover:text-[#7B4DB5] transition-colors">
-                                        {subItem.label}
-                                      </div>
-                                      {subItem.desc && (
-                                        <div className="text-xs text-slate-500 leading-snug mt-0.5">{subItem.desc}</div>
-                                      )}
-                                    </div>
-                                  </Link>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
+                  <div className="absolute top-full left-0 pt-2 w-[750px]">
+                    <div className="bg-white rounded-lg shadow-2xl border border-slate-200 p-5">
+                      <div className="grid grid-cols-4 gap-x-6 gap-y-3">
+                        {/* Quick Starts Section */}
+                        <div className="col-span-4 mb-0.5">
+                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Quick Starts</h3>
                         </div>
+                        {SOLUTIONS_MENU.quickStarts.map((subItem) => (
+                          isHashHref(subItem.href) ? (
+                            <a
+                              key={subItem.label}
+                              href={subItem.href}
+                              className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                              onClick={() => setActiveDropdown(null)}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                                <MenuIcon name={subItem.label} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                                {subItem.desc && (
+                                  <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
+                                )}
+                              </div>
+                            </a>
+                          ) : (
+                            <Link
+                              key={subItem.label}
+                              href={subItem.href}
+                              className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                              onClick={() => setActiveDropdown(null)}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                                <MenuIcon name={subItem.label} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                                {subItem.desc && (
+                                  <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
+                                )}
+                              </div>
+                            </Link>
+                          )
+                        ))}
 
-                        <div className="col-span-4 bg-slate-50 border-l border-slate-200 p-6">
-                          <div>
-                            <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">More</p>
-                            <div className="space-y-2">
-                              {SOLUTIONS_MENU.more.map((subItem) => (
-                                <a
-                                  key={subItem.label}
-                                  href={subItem.href}
-                                  className="block rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-[#7B4DB5] transition-colors"
-                                  onClick={() => setActiveDropdown(null)}
-                                >
-                                  <div className="text-sm font-semibold text-slate-900">{subItem.label}</div>
-                                  {subItem.desc && <div className="text-xs text-slate-500 mt-0.5">{subItem.desc}</div>}
-                                </a>
-                              ))}
-                            </div>
-                          </div>
+                        {/* Industry Solutions Section */}
+                        <div className="col-span-4 mb-0.5 mt-2.5">
+                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Industry Solutions</h3>
                         </div>
+                        {SOLUTIONS_MENU.industries.map((subItem) => (
+                          <Link
+                            key={subItem.label}
+                            href={subItem.href}
+                            className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                              <MenuIcon name={subItem.label} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                              {subItem.desc && (
+                                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
+                              )}
+                            </div>
+                          </Link>
+                        ))}
+
+                        {/* More Section */}
+                        <div className="col-span-4 mb-0.5 mt-2.5">
+                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">More</h3>
+                        </div>
+                        {SOLUTIONS_MENU.more.map((subItem) => (
+                          <a
+                            key={subItem.label}
+                            href={subItem.href}
+                            className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                              <MenuIcon name={subItem.label} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                              {subItem.desc && (
+                                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
+                              )}
+                            </div>
+                          </a>
+                        ))}
                       </div>
                     </div>
                   </div>
