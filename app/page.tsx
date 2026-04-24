@@ -11,8 +11,8 @@ import CTA from "@/components/sections/CTA";
 export default function Home() {
   return (
     <>
-      <Navbar />
-      <main className="flex-1">
+        <Navbar />
+        <main className="flex-1">
         <Hero />
         <Industries />
         <Stats />
@@ -20,8 +20,8 @@ export default function Home() {
         <HowItWorks />
         <Testimonials />
         <CTA />
-      </main>
-      <Footer />
+        </main>
+        <Footer />
  
     </>
   );
