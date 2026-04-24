@@ -319,76 +319,154 @@ export default function Navbar() {
                         <div className="col-span-4 mb-0.5">
                           <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Accept Payments</h3>
                         </div>
-                        {BUSINESS_MENU.acceptPayments.map((subItem) => (
-                          <a 
-                            key={subItem.label}
-                            href={subItem.href} 
-                            className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
-                            onClick={() => setActiveDropdown(null)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
-                              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                              </svg>
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
-                              {subItem.desc && (
-                                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
-                              )}
-                            </div>
-                          </a>
-                        ))}
+                        {BUSINESS_MENU.acceptPayments.map((subItem, idx) => {
+                          const icons = [
+                            // Omni Channel
+                            <svg key="omni" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                            </svg>,
+                            // In Store
+                            <svg key="store" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>,
+                            // Online
+                            <svg key="online" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>,
+                            // Pay Later
+                            <svg key="paylater" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>,
+                            // Global Collections
+                            <svg key="global" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          ];
+                          return (
+                            <a 
+                              key={subItem.label}
+                              href={subItem.href} 
+                              className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                              onClick={() => setActiveDropdown(null)}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                                {icons[idx]}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                                {subItem.desc && (
+                                  <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
+                                )}
+                              </div>
+                            </a>
+                          );
+                        })}
 
                         {/* Make Payments Section */}
                         <div className="col-span-4 mb-0.5 mt-2.5">
                           <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Make Payments</h3>
                         </div>
-                        {BUSINESS_MENU.makePayments.map((subItem) => (
-                          <a 
-                            key={subItem.label}
-                            href={subItem.href} 
-                            className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
-                            onClick={() => setActiveDropdown(null)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
-                              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
-                              {subItem.desc && (
-                                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
-                              )}
-                            </div>
-                          </a>
-                        ))}
+                        {BUSINESS_MENU.makePayments.map((subItem, idx) => {
+                          const icons = [
+                            // Payouts
+                            <svg key="payouts" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>,
+                            // Utility Bill Payments
+                            <svg key="utility" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>,
+                            // Cards
+                            <svg key="cards" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            </svg>,
+                            // Expense Management
+                            <svg key="expense" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>,
+                            // Tax Management
+                            <svg key="tax" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                            </svg>
+                          ];
+                          return (
+                            <a 
+                              key={subItem.label}
+                              href={subItem.href} 
+                              className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                              onClick={() => setActiveDropdown(null)}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                                {icons[idx]}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                                {subItem.desc && (
+                                  <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
+                                )}
+                              </div>
+                            </a>
+                          );
+                        })}
 
                         {/* Manage Your Business Section */}
                         <div className="col-span-4 mb-0.5 mt-2.5">
                           <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Manage Your Business</h3>
                         </div>
-                        {BUSINESS_MENU.manageYourBusiness.map((subItem) => (
-                          <a 
-                            key={subItem.label}
-                            href={subItem.href} 
-                            className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
-                            onClick={() => setActiveDropdown(null)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
-                              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                              </svg>
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
-                              {subItem.desc && (
-                                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
-                              )}
-                            </div>
-                          </a>
-                        ))}
+                        {BUSINESS_MENU.manageYourBusiness.map((subItem, idx) => {
+                          const icons = [
+                            // Business Dashboard
+                            <svg key="dashboard" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>,
+                            // Business Khata
+                            <svg key="khata" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>,
+                            // Business Loans
+                            <svg key="loans" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>,
+                            // Business Insights
+                            <svg key="insights" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                            </svg>,
+                            // Loyalty
+                            <svg key="loyalty" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                            </svg>,
+                            // Risk & AML
+                            <svg key="risk" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>,
+                            // Reconciliation & Settlement
+                            <svg key="reconciliation" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>,
+                            // Cards
+                            <svg key="cards2" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            </svg>
+                          ];
+                          return (
+                            <a 
+                              key={subItem.label}
+                              href={subItem.href} 
+                              className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
+                              onClick={() => setActiveDropdown(null)}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
+                                {icons[idx]}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
+                                {subItem.desc && (
+                                  <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
+                                )}
+                              </div>
+                            </a>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
