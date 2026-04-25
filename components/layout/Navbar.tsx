@@ -250,15 +250,9 @@ const PLATFORM_MENU: PlatformMenuItem[] = [
 
 const ABOUT_MENU = [
   { label: "About IndyPay", href: "/about", desc: "Who we are, what we build, and why it matters." },
-  { label: "Challenge Yourself", href: "/about/challenge-yourself", desc: "Careers, growth, and ownership mindset." },
   { label: "Culture", href: "/about/culture", desc: "How we work—principles, practices, and people." },
   { label: "Partner with Us", href: "/about/partner-with-us", desc: "Build together with APIs, programs, and support." },
   { label: "Media Centre", href: "/about/media-centre", desc: "News, updates, brand kit, and announcements." },
-];
-
-const INTERNATIONAL_MENU = [
-  { label: "Global Payments", href: "#" },
-  { label: "Cross-Border Solutions", href: "#" },
 ];
 
 const NAV = [
@@ -267,7 +261,6 @@ const NAV = [
   { label: "Platform", hasDropdown: true },
   { label: "Developer Hub", hasDropdown: false },
   { label: "About Us", hasDropdown: true },
-  { label: "International", hasDropdown: true },
 ];
 
 /* ─── Simple Navbar ───────────────────────────────────────────────────── */
@@ -719,30 +712,7 @@ export default function Navbar() {
                   </div>
                 )}
 
-                {/* International Dropdown */}
-                {item.label === "International" && activeDropdown === "International" && (
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-[400px]">
-                    <div className="bg-white rounded-lg shadow-2xl border border-slate-200 p-6">
-                      <div className="space-y-3">
-                      {INTERNATIONAL_MENU.map((subItem) => (
-                        <a 
-                          key={subItem.label}
-                          href={subItem.href} 
-                          className="flex items-center gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
-                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </div>
-                          <span className="font-medium text-sm">{subItem.label}</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                  </div>
-                )}
+
               </li>
             ))}
           </ul>
@@ -855,17 +825,6 @@ export default function Navbar() {
                 </div>
               </div>
 
-              {/* International */}
-              <div>
-                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">International</p>
-                <div className="space-y-2 pl-4">
-                  {INTERNATIONAL_MENU.map((item) => (
-                    <a key={item.label} href="#" className="block text-sm text-slate-700 py-1">
-                      {item.label}
-                    </a>
-                  ))}
-                </div>
-              </div>
               <div className="pt-4 border-t border-slate-200 flex flex-col gap-3">
                 <a href="#" className="text-center py-2.5 text-sm font-semibold text-slate-700">
                   Log In

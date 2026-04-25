@@ -37,14 +37,12 @@ const FOOTER_LINKS = {
   ],
   'Developer Hub': [
     { label: 'About indypay', href: '/about' },
-    { label: 'Challenge Yourself', href: '/about/challenge-yourself' },
     { label: 'Culture', href: '/about/culture' },
     { label: 'Partner with us', href: '/about/partner-with-us' },
     { label: 'Media Centre', href: '/about/media-centre' },
   ],
   Company: [
     { label: 'About indypay', href: '/about' },
-    { label: 'Challenge Yourself', href: '/about/challenge-yourself' },
     { label: 'Culture', href: '/about/culture' },
     { label: 'Partner with us', href: '/about/partner-with-us' },
     { label: 'Media Centre', href: '/about/media-centre' },

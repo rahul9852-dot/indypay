@@ -1,5 +1,6 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import Image from "next/image";
 
 export default function InStorePage() {
   return (
@@ -13,14 +14,13 @@ export default function InStorePage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">QR Code Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with your image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl aspect-[3/2]">
+                  <Image
+                    src="/in store/one qr code .png"
+                    alt="One QR code for all payments"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
 
@@ -137,14 +137,13 @@ export default function InStorePage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">POS Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with your image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl aspect-[3/2]">
+                  <Image
+                    src="/in store/POS.png"
+                    alt="POS"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </div>
@@ -157,14 +156,13 @@ export default function InStorePage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Tap @ Phone Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with your image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl aspect-[3/2]">
+                  <Image
+                    src="/in store/Tap @ Phone.png"
+                    alt="Tap @ Phone"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
 
@@ -256,14 +254,13 @@ export default function InStorePage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Card EMI Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with your image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl aspect-[3/2]">
+                  <Image
+                    src="/in store/Card EMI.png"
+                    alt="Card EMI"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </div>

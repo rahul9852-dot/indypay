@@ -1,5 +1,6 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import Image from "next/image";
 
 export default function OnlinePage() {
   return (
@@ -29,14 +30,13 @@ export default function OnlinePage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Payment Gateway Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with your image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl aspect-[3/2]">
+                  <Image
+                    src="/online/Payment Gateway1.png"
+                    alt="Payment Gateway"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
 
@@ -147,14 +147,13 @@ export default function OnlinePage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Wallet Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with your image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl aspect-[3/2]">
+                  <Image
+                    src="/online/Wallet.png"
+                    alt="Wallet"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </div>
@@ -167,14 +166,13 @@ export default function OnlinePage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Forex Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with your image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl aspect-[3/2]">
+                  <Image
+                    src="/online/Forex.png"
+                    alt="Forex"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
 
@@ -183,7 +181,7 @@ export default function OnlinePage() {
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
                     <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 8h6m-5 0a3 3 0 110 6H9l3 3m-3-6h6m6 1a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <h2 className="text-3xl md:text-4xl font-black text-black">Forex</h2>
@@ -295,14 +293,13 @@ export default function OnlinePage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Remittance Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with your image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl aspect-[3/2]">
+                  <Image
+                    src="/online/Remittance.png"
+                    alt="Remittance"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </div>
@@ -348,14 +345,13 @@ export default function OnlinePage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">CMS Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with your image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl aspect-[3/2]">
+                  <Image
+                    src="/online/CMS.png"
+                    alt="CMS"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </div>

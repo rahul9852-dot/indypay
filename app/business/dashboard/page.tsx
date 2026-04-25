@@ -1,5 +1,6 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import Image from "next/image";
 
 export default function BusinessDashboardPage() {
   return (
@@ -40,13 +41,14 @@ export default function BusinessDashboardPage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[16/9] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Dashboard Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with dashboard screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/Manage yout business/ Business Dashboard.png"
+                      alt="Business Dashboard"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
@@ -60,13 +62,14 @@ export default function BusinessDashboardPage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Business Khata Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with Khata screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/Manage yout business/Business Khata.png"
+                      alt="Business Khata"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
@@ -128,9 +131,7 @@ export default function BusinessDashboardPage() {
               <div>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <span className="text-white text-2xl font-bold">₹</span>
                   </div>
                   <h2 className="text-3xl md:text-4xl font-black text-black">Business Loans</h2>
                 </div>
@@ -192,13 +193,14 @@ export default function BusinessDashboardPage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[3/4] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Business Loans Mobile Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with mobile app screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/Manage yout business/Business Loans.png"
+                      alt="Business Loans"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
@@ -212,13 +214,14 @@ export default function BusinessDashboardPage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Business Insights Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with insights screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/Manage yout business/Business Insights.png"
+                      alt="Business Insights"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
@@ -321,13 +324,14 @@ export default function BusinessDashboardPage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[3/4] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Loyalty Mobile Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with mobile app screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/Manage yout business/Loyalty.png"
+                      alt="Loyalty Program"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
@@ -342,13 +346,14 @@ export default function BusinessDashboardPage() {
               <div className="grid lg:grid-cols-2 gap-16 items-center">
                 {/* Left - Image */}
                 <div className="flex items-center justify-center">
-                  <div className="w-full max-w-lg aspect-[16/9] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                    <div className="text-center p-8">
-                      <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                      <p className="text-slate-400 text-base font-semibold">Risk & AML Dashboard Image Placeholder</p>
-                      <p className="text-slate-300 text-sm mt-2">Replace with dashboard screenshot</p>
+                  <div className="relative w-full max-w-4xl mx-auto">
+                    <div className="relative w-full aspect-[3/2]">
+                      <Image
+                        src="/Manage yout business/Risk and AML.png"
+                        alt="Risk and AML"
+                        fill
+                        className="object-contain"
+                      />
                     </div>
                   </div>
                 </div>
@@ -476,13 +481,14 @@ export default function BusinessDashboardPage() {
 
                 {/* Right - Image */}
                 <div className="flex items-center justify-center">
-                  <div className="w-full max-w-lg aspect-[16/9] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                    <div className="text-center p-8">
-                      <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                      </svg>
-                      <p className="text-slate-400 text-base font-semibold">Reconciliation Dashboard Image Placeholder</p>
-                      <p className="text-slate-300 text-sm mt-2">Replace with dashboard screenshot</p>
+                  <div className="relative w-full max-w-4xl mx-auto">
+                    <div className="relative w-full aspect-[3/2]">
+                      <Image
+                        src="/Manage yout business/Reconciliation and Settlement.png"
+                        alt="Reconciliation and Settlement"
+                        fill
+                        className="object-contain"
+                      />
                     </div>
                   </div>
                 </div>

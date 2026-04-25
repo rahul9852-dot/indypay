@@ -1,25 +1,7 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import Image from "next/image";
 import Link from "next/link";
-
-function PurpleImage(props: { src: string; alt: string; priority?: boolean }) {
-  const { src, alt, priority } = props;
-  return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
-      <Image
-        src={src}
-        alt={alt}
-        width={1400}
-        height={900}
-        className="w-full h-auto"
-        priority={priority}
-        style={{ filter: "hue-rotate(250deg) saturate(1.35) contrast(1.05)" }}
-      />
-      <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-[#7B4DB5]/15 to-[#3B5FD4]/10" />
-    </div>
-  );
-}
+import Image from "next/image";
 
 export default function AboutPage() {
   return (
@@ -34,12 +16,12 @@ export default function AboutPage() {
                 <h1 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight">
                   Payments infrastructure built for real-world businesses
                 </h1>
-                <p className="text-base text-slate-700 mt-6 leading-relaxed max-w-xl">
+                <p className="text-base text-slate-700 mt-6 leading-relaxed">
                   IndyPay helps businesses collect, pay, reconcile, and manage money movement with reliability and clear controls.
                   We focus on outcomes: higher success rates, faster operations, and better visibility.
                 </p>
 
-                <div className="mt-8 grid sm:grid-cols-3 gap-4 max-w-xl">
+                <div className="mt-8 grid sm:grid-cols-3 gap-4">
                   {[
                     { k: "Always-on", v: "24×7 payments" },
                     { k: "Control", v: "Risk & limits" },
@@ -68,7 +50,19 @@ export default function AboutPage() {
                 </div>
               </div>
 
-              <PurpleImage src="/images/about/about-1.png" alt="IndyPay story illustration" priority />
+              <div className="flex items-center justify-center">
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/about indypay/Payments infrastructure.png"
+                      alt="Payments infrastructure"
+                      fill
+                      className="object-contain"
+                      priority
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -78,20 +72,29 @@ export default function AboutPage() {
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div className="lg:order-2">
                 <h2 className="text-3xl md:text-4xl font-black text-slate-900">Our vision</h2>
-                <p className="text-base text-slate-700 mt-4 leading-relaxed max-w-xl">
+                <p className="text-base text-slate-700 mt-4 leading-relaxed">
                   Make digital payments simple and dependable for every business—so money movement becomes a growth lever, not an
                   operational burden.
                 </p>
 
                 <h3 className="text-2xl font-black text-slate-900 mt-10">Our mission</h3>
-                <p className="text-base text-slate-700 mt-4 leading-relaxed max-w-xl">
+                <p className="text-base text-slate-700 mt-4 leading-relaxed">
                   Build a secure, scalable payments stack that works across channels, supports teams with clear tooling, and helps
                   businesses operate with confidence.
                 </p>
               </div>
 
-              <div className="lg:order-1">
-                <PurpleImage src="/images/about/about-3.png" alt="Vision and mission illustration" />
+              <div className="lg:order-1 flex items-center justify-center">
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/about indypay/Our vision.png"
+                      alt="Our vision"
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -106,22 +109,28 @@ export default function AboutPage() {
               </p>
             </div>
 
-            <div className="mt-10 grid lg:grid-cols-2 gap-10 items-center">
-              <PurpleImage src="/images/about/about-4.png" alt="Values illustration" />
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                {[
-                  { t: "Reliability", d: "We optimise for uptime, success rates, and predictable operations." },
-                  { t: "Clarity", d: "We design for visibility—teams should always know what happened and why." },
-                  { t: "Security", d: "We treat trust as a feature and build with strong controls by default." },
-                  { t: "Customer-first", d: "We build with real merchant problems in mind, not just features." },
-                ].map((v) => (
-                  <div key={v.t} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                    <div className="text-sm font-black text-slate-900">{v.t}</div>
-                    <div className="text-sm text-slate-600 mt-2 leading-relaxed">{v.d}</div>
+            <div className="mt-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 max-w-6xl mx-auto">
+              {[
+                { t: "Transformational", d: "Lead change by empowering the world financially, one transaction at a time", img: "/about indypay/Transformational.png" },
+                { t: "Innovative", d: "Imaginative, futuristic, and unique, we bring original ideas to life", img: "/about indypay/Innovative.png" },
+                { t: "Experimental", d: "We are risk-takers who often challenge the status quo", img: "/about indypay/Experimental.png" },
+                { t: "Authentic", d: "We are relatable, simple, practical, and consistent", img: "/about indypay/Authentic.png" },
+                { t: "Empowering", d: "Enabling growth, self-belief, confidence, and independence", img: "/about indypay/Empowering.png" },
+              ].map((v) => (
+                <div key={v.t} className="flex flex-col items-center text-center">
+                  {/* Round image container */}
+                  <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center mb-4 overflow-hidden relative">
+                    <Image
+                      src={v.img}
+                      alt={v.t}
+                      fill
+                      className="object-cover"
+                    />
                   </div>
-                ))}
-              </div>
+                  <div className="text-lg font-black text-slate-900">{v.t}</div>
+                  <div className="text-sm text-slate-600 mt-2 leading-relaxed">{v.d}</div>
+                </div>
+              ))}
             </div>
           </div>
         </section>

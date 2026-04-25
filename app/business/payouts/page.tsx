@@ -1,5 +1,6 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import Image from "next/image";
 
 export default function PayoutsPage() {
   return (
@@ -13,13 +14,14 @@ export default function PayoutsPage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Dashboard Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Payouts Dashboard Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with dashboard screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/make payouts/Payouts.png"
+                      alt="Payouts Dashboard"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
@@ -131,13 +133,14 @@ export default function PayoutsPage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[3/4] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Utility Bills Mobile Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with mobile app screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/make payouts/Utility Bill Payments.png"
+                      alt="Utility Bill Payments"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
@@ -217,13 +220,14 @@ export default function PayoutsPage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[3/4] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Cards Mobile Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with mobile app screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/make payouts/Cards.png"
+                      alt="IndyPay Cards"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
@@ -237,13 +241,14 @@ export default function PayoutsPage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[3/4] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Expense Management Mobile Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with mobile app screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/make payouts/Employee Expense Management.png"
+                      alt="Employee Expense Management"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
@@ -341,13 +346,14 @@ export default function PayoutsPage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[3/4] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Tax Management Mobile Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with mobile app screenshot</p>
+                <div className="relative w-full max-w-4xl mx-auto">
+                  <div className="relative w-full aspect-[3/2]">
+                    <Image
+                      src="/make payouts/Tax Management.png"
+                      alt="Tax Management"
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
               </div>
