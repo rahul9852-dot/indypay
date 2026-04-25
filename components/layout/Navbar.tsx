@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useContactDrawer } from "@/components/ui/ContactDrawerContext";
 
 /* ─── nav data ─────────────────────────────────────────────────────────── */
 type BusinessMenuItem = { label: string; href: string; desc?: string };
@@ -220,7 +221,7 @@ function MenuIcon({ name }: { name: string }) {
 
 const SOLUTIONS_MENU = {
   quickStarts: [
-    { label: "no-code", href: "#", desc: "Start collecting payments without any integration." },
+    { label: "no-code", href: "/solutions/nocode", desc: "Start collecting payments without any integration." },
     { label: "pay later", href: "/business/pay-later", desc: "Offer EMI and deferred payment options." },
     { label: "invoicepay", href: "/solutions/invoices", desc: "Send invoices with built-in payment links." },
     { label: "nowpay", href: "/solutions/nowpay", desc: "Create instant links and get paid fast." },
@@ -256,17 +257,18 @@ const ABOUT_MENU = [
 ];
 
 const NAV = [
-  { label: "Business", hasDropdown: true },
-  { label: "Solutions", hasDropdown: true },
-  { label: "Platform", hasDropdown: true },
-  { label: "Developer Hub", hasDropdown: false },
-  { label: "About Us", hasDropdown: true },
+  { label: "Business", hasDropdown: true, href: undefined },
+  { label: "Solutions", hasDropdown: true, href: undefined },
+  { label: "Platform", hasDropdown: true, href: undefined },
+  { label: "Developer Hub", hasDropdown: false, href: "/developer-hub" },
+  { label: "About Us", hasDropdown: true, href: undefined },
 ];
 
 /* ─── Simple Navbar ───────────────────────────────────────────────────── */
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const { openDrawer } = useContactDrawer();
 
   return (
     <>
@@ -294,14 +296,20 @@ export default function Navbar() {
                 onMouseEnter={() => item.hasDropdown && setActiveDropdown(item.label)}
                 onMouseLeave={() => setActiveDropdown(null)}
               >
-                <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors py-6">
-                  {item.label}
-                  {item.hasDropdown && (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  )}
-                </button>
+                {item.href ? (
+                  <Link href={item.href} className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors py-6">
+                    {item.label}
+                  </Link>
+                ) : (
+                  <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors py-6">
+                    {item.label}
+                    {item.hasDropdown && (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    )}
+                  </button>
+                )}
 
                 {/* Business Dropdown */}
                 {item.label === "Business" && activeDropdown === "Business" && (
@@ -719,18 +727,18 @@ export default function Navbar() {
 
           {/* Right CTAs */}
           <div className="hidden lg:flex items-center gap-4">
-            <a
-              href="#"
+            <button
+              onClick={openDrawer}
               className="text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors"
             >
               Log In
-            </a>
-            <a
-              href="#contact"
+            </button>
+            <button
+              onClick={openDrawer}
               className="px-6 py-2.5 bg-[#7B4DB5] text-white text-sm font-bold rounded-lg hover:bg-[#6A3BA0] transition-all"
             >
               Get Started →
-            </a>
+            </button>
           </div>
 
           {/* Mobile burger */}
@@ -826,12 +834,12 @@ export default function Navbar() {
               </div>
 
               <div className="pt-4 border-t border-slate-200 flex flex-col gap-3">
-                <a href="#" className="text-center py-2.5 text-sm font-semibold text-slate-700">
+                <button onClick={openDrawer} className="text-center py-2.5 text-sm font-semibold text-slate-700">
                   Log In
-                </a>
-                <a href="#contact" className="text-center py-2.5 bg-[#7B4DB5] text-white text-sm font-bold rounded-lg">
+                </button>
+                <button onClick={openDrawer} className="text-center py-2.5 bg-[#7B4DB5] text-white text-sm font-bold rounded-lg">
                   Get Started →
-                </a>
+                </button>
               </div>
             </div>
           </div>
