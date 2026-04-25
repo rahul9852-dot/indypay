@@ -1,4 +1,5 @@
 import Image from "next/image";
+import RetailParticleCanvas from "./RetailParticleCanvas";
 
 const INDUSTRIES = [
   {
@@ -65,7 +66,7 @@ export default function Industries() {
               {/* Left Side - Content */}
               <div>
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center text-2xl shrink-0">
+                  <div className="w-24 h-24 rounded-[32px] bg-white flex items-center justify-center text-5xl shrink-0 shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
                     {industry.icon}
                   </div>
                   <h3 className="text-4xl font-black text-black">{industry.title}</h3>
@@ -87,18 +88,46 @@ export default function Industries() {
 
               {/* Right Side - Image */}
               <div className="flex items-center justify-center">
-                <div className={`relative w-full max-w-8xl ${
-                  industry.title === "BFSI" || industry.title === "Financial Institutions" 
-                    ? "aspect-[2/3]" 
-                    : "aspect-[3/2]"
-                }`}>
-                  <Image
-                    src={industry.image}
-                    alt={industry.title}
-                    fill
-                    className="object-contain"
-                  />
-                </div>
+
+                {industry.title === "Retail" ? (
+                  /* ── Retail: particle canvas card ────────────── */
+                  <div className="relative w-full rounded-3xl overflow-hidden
+                    bg-linear-to-br from-[#fdf4ff] via-[#fff0f8] to-[#fce8f3]
+                    border border-pink-100
+                    shadow-2xl shadow-pink-200/40
+                    min-h-90 sm:min-h-110">
+
+                    {/* Three.js pink particle field */}
+                    <RetailParticleCanvas />
+
+                    {/* Product image floats above canvas */}
+                    <div className="relative z-10 w-full h-full flex items-center justify-center p-6 sm:p-10">
+                      <Image
+                        src={industry.image}
+                        alt={industry.title}
+                        width={580}
+                        height={420}
+                        className="object-contain w-full drop-shadow-xl"
+                      />
+                    </div>
+                  </div>
+
+                ) : (
+                  /* ── All other industries: plain image ───────── */
+                  <div className={`relative w-full max-w-8xl ${
+                    industry.title === "BFSI" || industry.title === "Financial Institutions"
+                      ? "aspect-2/3"
+                      : "aspect-3/2"
+                  }`}>
+                    <Image
+                      src={industry.image}
+                      alt={industry.title}
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                )}
+
               </div>
             </div>
           </div>

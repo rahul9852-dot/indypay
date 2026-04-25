@@ -172,8 +172,8 @@ export default function InvoicesPage() {
               </div>
 
               <div>
-                <div className="bg-yellow-400 rounded-r-lg px-6 py-2 inline-block mb-4">
-                  <h4 className="font-bold text-yellow-900 uppercase tracking-wide">SOLUTIONS</h4>
+                <div className="bg-[#7B4DB5] rounded-r-lg px-6 py-2 inline-block mb-4">
+                  <h4 className="font-bold text-white uppercase tracking-wide">SOLUTIONS</h4>
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">
                   Go Contactless - The new normal
@@ -220,8 +220,8 @@ export default function InvoicesPage() {
               </div>
 
               <div>
-                <div className="bg-yellow-400 rounded-r-lg px-6 py-2 inline-block mb-4">
-                  <h4 className="font-bold text-yellow-900 uppercase tracking-wide">SOLUTIONS</h4>
+                <div className="bg-[#7B4DB5] rounded-r-lg px-6 py-2 inline-block mb-4">
+                  <h4 className="font-bold text-white uppercase tracking-wide">SOLUTIONS</h4>
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">
                   Enabling Digitalization
@@ -294,8 +294,8 @@ export default function InvoicesPage() {
               </div>
 
               <div>
-                <div className="bg-yellow-400 rounded-r-lg px-6 py-2 inline-block mb-4">
-                  <h4 className="font-bold text-yellow-900 uppercase tracking-wide">SOLUTIONS</h4>
+                <div className="bg-[#7B4DB5] rounded-r-lg px-6 py-2 inline-block mb-4">
+                  <h4 className="font-bold text-white uppercase tracking-wide">SOLUTIONS</h4>
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">
                   Spoil your customers with choices

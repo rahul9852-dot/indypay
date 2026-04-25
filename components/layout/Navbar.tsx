@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useContactDrawer } from "@/components/ui/ContactDrawerContext";
 
 /* ─── nav data ─────────────────────────────────────────────────────────── */
 type BusinessMenuItem = { label: string; href: string; desc?: string };
@@ -220,7 +221,7 @@ function MenuIcon({ name }: { name: string }) {
 
 const SOLUTIONS_MENU = {
   quickStarts: [
-    { label: "no-code", href: "#", desc: "Start collecting payments without any integration." },
+    { label: "no-code", href: "/solutions/nocode", desc: "Start collecting payments without any integration." },
     { label: "pay later", href: "/business/pay-later", desc: "Offer EMI and deferred payment options." },
     { label: "invoicepay", href: "/solutions/invoices", desc: "Send invoices with built-in payment links." },
     { label: "nowpay", href: "/solutions/nowpay", desc: "Create instant links and get paid fast." },
@@ -233,7 +234,6 @@ const SOLUTIONS_MENU = {
     { label: "societypay", href: "/solutions/societypay", desc: "Maintenance collections and member dues." },
     { label: "bfsipay", href: "/solutions/bfsipay", desc: "Payments tailored for BFSI workflows." },
   ] satisfies MenuItem[],
-  more: [{ label: "indypay vyaapaar", href: "#", desc: "Commerce tools for growing businesses." }] satisfies MenuItem[],
 };
 
 type PlatformMenuItem = { label: string; href: string; desc: string; accent: string };
@@ -256,17 +256,18 @@ const ABOUT_MENU = [
 ];
 
 const NAV = [
-  { label: "Business", hasDropdown: true },
-  { label: "Solutions", hasDropdown: true },
-  { label: "Platform", hasDropdown: true },
-  { label: "Developer Hub", hasDropdown: false },
-  { label: "About Us", hasDropdown: true },
+  { label: "Business", hasDropdown: true, href: undefined },
+  { label: "Solutions", hasDropdown: true, href: undefined },
+  { label: "Platform", hasDropdown: true, href: undefined },
+  { label: "Developer Hub", hasDropdown: false, href: "/developer-hub" },
+  { label: "About Us", hasDropdown: true, href: undefined },
 ];
 
 /* ─── Simple Navbar ───────────────────────────────────────────────────── */
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const { openDrawer } = useContactDrawer();
 
   return (
     <>
@@ -276,7 +277,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="shrink-0">
             <Image
-              src="/images/indypay-logo.png"
+              src="/indypay.svg"
               alt="IndyPay"
               width={110}
               height={36}
@@ -294,14 +295,20 @@ export default function Navbar() {
                 onMouseEnter={() => item.hasDropdown && setActiveDropdown(item.label)}
                 onMouseLeave={() => setActiveDropdown(null)}
               >
-                <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors py-6">
-                  {item.label}
-                  {item.hasDropdown && (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  )}
-                </button>
+                {item.href ? (
+                  <Link href={item.href} className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors py-6">
+                    {item.label}
+                  </Link>
+                ) : (
+                  <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors py-6">
+                    {item.label}
+                    {item.hasDropdown && (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    )}
+                  </button>
+                )}
 
                 {/* Business Dropdown */}
                 {item.label === "Business" && activeDropdown === "Business" && (
@@ -418,7 +425,7 @@ export default function Navbar() {
                             </svg>,
                             // Business Loans
                             <svg key="loans" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 8h10M9 12h10M9 16h6m-3-8V6a2 2 0 012-2h2" />
                             </svg>,
                             // Business Insights
                             <svg key="insights" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -533,29 +540,6 @@ export default function Navbar() {
                               )}
                             </div>
                           </Link>
-                        ))}
-
-                        {/* More Section */}
-                        <div className="col-span-4 mb-0.5 mt-2.5">
-                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">More</h3>
-                        </div>
-                        {SOLUTIONS_MENU.more.map((subItem) => (
-                          <a
-                            key={subItem.label}
-                            href={subItem.href}
-                            className="flex items-start gap-2.5 text-sm text-slate-800 hover:text-[#7B4DB5] transition-colors group"
-                            onClick={() => setActiveDropdown(null)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0 group-hover:bg-[#7B4DB5] transition-colors">
-                              <MenuIcon name={subItem.label} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-medium text-[13px] leading-tight">{subItem.label}</div>
-                              {subItem.desc && (
-                                <div className="text-[11px] text-slate-500 leading-tight mt-0.5">{subItem.desc}</div>
-                              )}
-                            </div>
-                          </a>
                         ))}
                       </div>
                     </div>
@@ -719,18 +703,12 @@ export default function Navbar() {
 
           {/* Right CTAs */}
           <div className="hidden lg:flex items-center gap-4">
-            <a
-              href="#"
-              className="text-sm font-semibold text-slate-700 hover:text-[#7B4DB5] transition-colors"
-            >
-              Log In
-            </a>
-            <a
-              href="#contact"
+            <button
+              onClick={openDrawer}
               className="px-6 py-2.5 bg-[#7B4DB5] text-white text-sm font-bold rounded-lg hover:bg-[#6A3BA0] transition-all"
             >
-              Get Started →
-            </a>
+              Get Started
+            </button>
           </div>
 
           {/* Mobile burger */}
@@ -782,7 +760,7 @@ export default function Navbar() {
               <div>
                 <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Solutions</p>
                 <div className="space-y-2 pl-4">
-                  {[...SOLUTIONS_MENU.quickStarts, ...SOLUTIONS_MENU.industries, ...SOLUTIONS_MENU.more].map((item) => (
+                  {[...SOLUTIONS_MENU.quickStarts, ...SOLUTIONS_MENU.industries].map((item) => (
                     isHashHref(item.href) ? (
                       <a key={item.label} href={item.href} className="block text-sm text-slate-700 py-1">
                         {item.label}
@@ -826,12 +804,9 @@ export default function Navbar() {
               </div>
 
               <div className="pt-4 border-t border-slate-200 flex flex-col gap-3">
-                <a href="#" className="text-center py-2.5 text-sm font-semibold text-slate-700">
-                  Log In
-                </a>
-                <a href="#contact" className="text-center py-2.5 bg-[#7B4DB5] text-white text-sm font-bold rounded-lg">
-                  Get Started →
-                </a>
+                <button onClick={openDrawer} className="text-center py-2.5 bg-[#7B4DB5] text-white text-sm font-bold rounded-lg">
+                  Get Started
+                </button>
               </div>
             </div>
           </div>

@@ -19,7 +19,8 @@
   --color-brand-sky:      var(--brand-sky);
   --color-brand-purple:   var(--brand-purple);
   --color-brand-dark:     var(--brand-dark);
-  --font-sans: var(--font-geist-sans);
+  --font-sans:    var(--font-geist-sans);
+  --font-display: var(--font-jakarta);
   
   /* Override blue-600 and blue-700 with purple colors */
   --color-blue-600: var(--brand-purple);

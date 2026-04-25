@@ -1,6 +1,7 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { MobileMockup, MobileLandscapeMockup } from "@/components/ui/DeviceMockup";
+import Image from "next/image";
 
 export default function HotelPayPage() {
   return (
@@ -39,16 +40,15 @@ export default function HotelPayPage() {
                 </a>
               </div>
 
-              {/* Right - Image Placeholder */}
+              {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full aspect-[16/10] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Hotel Dashboard Image</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with hotel reception dashboard image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl mx-auto aspect-[3/2]">
+                  <Image
+                    src="/hotel pay/Enriching Payment Experiences for Hotels & Restaurants.png"
+                    alt="Enriching Payment Experiences for Hotels & Restaurants"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </div>
@@ -68,16 +68,15 @@ export default function HotelPayPage() {
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-6">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
-              {/* Left - Image Placeholder */}
+              {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-md aspect-[3/4] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-20 h-20 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">QR Code Payment Image</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with QR code payment image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl mx-auto aspect-[3/2]">
+                  <Image
+                    src="/hotel pay/Go Contactless-The new normal.png"
+                    alt="Go Contactless - The new normal"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
 
@@ -102,7 +101,7 @@ export default function HotelPayPage() {
                   </li>
                 </ul>
 
-                <div className="inline-block px-4 py-2 bg-yellow-400 text-black text-xs font-bold uppercase tracking-wide rounded mb-4">
+                <div className="inline-block px-4 py-2 bg-[#7B4DB5] text-white text-xs font-bold uppercase tracking-wide rounded mb-4">
                   Solutions
                 </div>
 
@@ -133,16 +132,15 @@ export default function HotelPayPage() {
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-6">
             <div className="grid lg:grid-cols-2 gap-16 items-center">
-              {/* Left - Image Placeholder */}
+              {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-20 h-20 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Payment Terminal Image</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with payment terminal image</p>
-                  </div>
+                <div className="relative w-full max-w-4xl mx-auto aspect-[3/2]">
+                  <Image
+                    src="/hotel pay/Losing Customers due to lack of payment options.png"
+                    alt="Losing Customers due to lack of payment options"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
 
@@ -167,7 +165,7 @@ export default function HotelPayPage() {
                   </li>
                 </ul>
 
-                <div className="inline-block px-4 py-2 bg-yellow-400 text-black text-xs font-bold uppercase tracking-wide rounded mb-4">
+                <div className="inline-block px-4 py-2 bg-[#7B4DB5] text-white text-xs font-bold uppercase tracking-wide rounded mb-4">
                   Solutions
                 </div>
 
@@ -191,53 +189,6 @@ export default function HotelPayPage() {
                 </ul>
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* Challenge 4: Handling Split Payments */}
-        <section className="py-16 bg-slate-50">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="inline-block px-4 py-2 bg-slate-200 text-slate-700 text-xs font-bold uppercase tracking-wide rounded mb-4">
-              Your Challenges
-            </div>
-
-            <h2 className="text-2xl md:text-3xl font-black text-black mb-6">
-              Handling Split Payments
-            </h2>
-
-            <ul className="space-y-3 mb-8">
-              <li className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-black shrink-0 mt-2"></div>
-                <span className="text-base text-slate-700">Errors due to Manual Entry.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-black shrink-0 mt-2"></div>
-                <span className="text-base text-slate-700">Reconciling multiple transactions against a single invoice.</span>
-              </li>
-            </ul>
-
-            <div className="inline-block px-4 py-2 bg-yellow-400 text-black text-xs font-bold uppercase tracking-wide rounded mb-4">
-              Solutions
-            </div>
-
-            <h3 className="text-xl font-bold text-black mb-4">
-              Automated Split Payment Management
-            </h3>
-
-            <ul className="space-y-3">
-              <li className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-green-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-sm text-slate-700">Automatically calculate each transaction amount.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-green-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-sm text-slate-700">Payments through digital channels and POS.</span>
-              </li>
-            </ul>
           </div>
         </section>
 
@@ -293,7 +244,14 @@ export default function HotelPayPage() {
 
               {/* Center Phone Image */}
               <div className="flex justify-center">
-                <MobileMockup label="IndyPay Hotelpay App" />
+                <div className="relative w-full max-w-sm aspect-[9/19]">
+                  <Image
+                    src="/hotel pay/Features of IndyPay Hotelpay Payment Solutions.png"
+                    alt="IndyPay Hotelpay App Features"
+                    fill
+                    className="object-contain"
+                  />
+                </div>
               </div>
 
               {/* Right Features */}

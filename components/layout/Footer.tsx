@@ -33,7 +33,6 @@ const FOOTER_LINKS = {
     { label: 'Zoho', href: '#' },
     { label: 'Pay by Link', href: '/solutions/pay-by-link' },
     { label: 'invoicepay', href: '/solutions/invoices' },
-    { label: 'indypay vyaapaar', href: '#' },
   ],
   'Developer Hub': [
     { label: 'About indypay', href: '/about' },
@@ -106,7 +105,7 @@ export default function Footer() {
           </p>
           <div className="flex items-center gap-2">
             <Image
-              src="/images/indypay-logo.png"
+              src="/indypay.svg"
               alt="Made in India"
               width={100}
               height={30}

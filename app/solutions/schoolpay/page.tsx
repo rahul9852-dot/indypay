@@ -89,7 +89,7 @@ export default function SchoolPayPage() {
                   </li>
                 </ul>
 
-                <div className="inline-block px-4 py-2 bg-yellow-400 text-black text-xs font-bold uppercase tracking-wide rounded mb-4">
+                <div className="inline-block px-4 py-2 bg-[#7B4DB5] text-white text-xs font-bold uppercase tracking-wide rounded mb-4">
                   Solutions
                 </div>
 
@@ -141,7 +141,7 @@ export default function SchoolPayPage() {
                   </li>
                 </ul>
 
-                <div className="inline-block px-4 py-2 bg-yellow-400 text-black text-xs font-bold uppercase tracking-wide rounded mb-4">
+                <div className="inline-block px-4 py-2 bg-[#7B4DB5] text-white text-xs font-bold uppercase tracking-wide rounded mb-4">
                   Solutions
                 </div>
 
@@ -217,7 +217,7 @@ export default function SchoolPayPage() {
                   </li>
                 </ul>
 
-                <div className="inline-block px-4 py-2 bg-yellow-400 text-black text-xs font-bold uppercase tracking-wide rounded mb-4">
+                <div className="inline-block px-4 py-2 bg-[#7B4DB5] text-white text-xs font-bold uppercase tracking-wide rounded mb-4">
                   Solutions
                 </div>
 
@@ -269,7 +269,7 @@ export default function SchoolPayPage() {
                   </li>
                 </ul>
 
-                <div className="inline-block px-4 py-2 bg-yellow-400 text-black text-xs font-bold uppercase tracking-wide rounded mb-4">
+                <div className="inline-block px-4 py-2 bg-[#7B4DB5] text-white text-xs font-bold uppercase tracking-wide rounded mb-4">
                   Solutions
                 </div>
 
