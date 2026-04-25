@@ -1,5 +1,6 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import Image from "next/image";
 
 export default function SchoolPayPage() {
   return (
@@ -29,14 +30,13 @@ export default function SchoolPayPage() {
 
               {/* Right - Image with Icons */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center relative">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">School Dashboard Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with dashboard screenshot showing UPI, Mobile Banking, Debit & Credit Cards, View Payment Status, Invoice Details</p>
-                  </div>
+                <div className="relative w-full max-w-4xl mx-auto aspect-[3/2]">
+                  <Image
+                    src="/school pay/Payment Solutions for Schools.png"
+                    alt="Payment Solutions for Schools"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </div>
@@ -58,14 +58,13 @@ export default function SchoolPayPage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Dashboard Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Collect Fees, Manage Fee Structure, Manage Vendor Expenses</p>
-                  </div>
+                <div className="relative w-full max-w-4xl mx-auto aspect-[3/2]">
+                  <Image
+                    src="/school pay/Go Contactless-The new normal.png"
+                    alt="Go Contactless - The new normal"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
 
@@ -168,14 +167,13 @@ export default function SchoolPayPage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Payment Interface Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with payment interface screenshot</p>
-                  </div>
+                <div className="relative w-full max-w-4xl mx-auto aspect-[3/2]">
+                  <Image
+                    src="/school pay/Digitalizing front-line administrative tasks.png"
+                    alt="Digitalizing front-line administrative tasks"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </div>
@@ -188,14 +186,13 @@ export default function SchoolPayPage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               {/* Left - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[4/3] rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Analytics Dashboard Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Received Payment, Pending Payment</p>
-                  </div>
+                <div className="relative w-full max-w-4xl mx-auto aspect-[3/2]">
+                  <Image
+                    src="/school pay/High Cost of Payment Collection.png"
+                    alt="High Cost of Payment Collection"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
 
@@ -298,128 +295,13 @@ export default function SchoolPayPage() {
 
               {/* Right - Image */}
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-lg aspect-[16/9] rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <svg className="w-24 h-24 mx-auto text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-slate-400 text-base font-semibold">Vendor Payout Dashboard Image Placeholder</p>
-                    <p className="text-slate-300 text-sm mt-2">Replace with vendor payout screenshot</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section className="py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-6">
-            <h2 className="text-3xl md:text-4xl font-black text-black text-center mb-4">
-              Features of IndyPay Schoolpay Payment Solutions
-            </h2>
-            <p className="text-center text-base text-slate-700 leading-relaxed max-w-4xl mx-auto mb-16">
-              schoolpay is a transaction ecosystem enabler allowing parents and institutes to transact seamlessly with the highest security standards. We are on the mission to ease fees payment for educational institutes and parents and make it less complicated.
-            </p>
-
-            <div className="grid lg:grid-cols-[1fr_auto_1fr] gap-12 items-center max-w-6xl mx-auto">
-              {/* Left Features */}
-              <div className="space-y-10 lg:text-right">
-                {/* Feature 1 */}
-                <div className="flex lg:flex-row-reverse items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl border-2 border-blue-600 flex items-center justify-center shrink-0 bg-white">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-black mb-1">Automated Task Management</h3>
-                    <p className="text-sm text-slate-600 leading-snug">Automated invoicing, settlement, payment reminder and reconciliation.</p>
-                  </div>
-                </div>
-
-                {/* Feature 2 */}
-                <div className="flex lg:flex-row-reverse items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl border-2 border-blue-600 flex items-center justify-center shrink-0 bg-white">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-black mb-1">Admission Management System</h3>
-                    <p className="text-sm text-slate-600 leading-snug">Manage admissions with Schoolpay's integrated platform. Maintain digital records of all students for easier and secure access.</p>
-                  </div>
-                </div>
-
-                {/* Feature 3 */}
-                <div className="flex lg:flex-row-reverse items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl border-2 border-blue-600 flex items-center justify-center shrink-0 bg-white">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-black mb-1">Digitalize IT</h3>
-                    <p className="text-sm text-slate-600 leading-snug">Maintain all records digitally and get easy access to Settlement reports, MIS reports, defaulters list, activity reports etc.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Center Phone Image */}
-              <div className="flex justify-center">
-                <div className="w-64 h-[520px] bg-slate-900 rounded-[45px] p-2 shadow-2xl">
-                  <div className="w-full h-full bg-white rounded-[38px] flex items-center justify-center overflow-hidden">
-                    <div className="text-center p-4">
-                      <svg className="w-16 h-16 mx-auto text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
-                      <p className="text-slate-400 text-sm font-semibold">Mobile App Screenshot</p>
-                      <p className="text-slate-300 text-xs mt-1">Replace with app image</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Features */}
-              <div className="space-y-10">
-                {/* Feature 4 */}
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl border-2 border-blue-600 flex items-center justify-center shrink-0 bg-white">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-black mb-1">Quickly achieve ROI</h3>
-                    <p className="text-sm text-slate-600 leading-snug">Real-time tracking of transactions, reconciliation with minimum investments. Reduced expenses on non-teaching activities and reduced human error.</p>
-                  </div>
-                </div>
-
-                {/* Feature 5 */}
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl border-2 border-blue-600 flex items-center justify-center shrink-0 bg-white">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-black mb-1">High level of Customization</h3>
-                    <p className="text-sm text-slate-600 leading-snug">Easily customizable dashboard as per your requirement Create activities, fees structure, class, division as per your requirement with our easy-to-use portal.</p>
-                  </div>
-                </div>
-
-                {/* Feature 6 */}
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl border-2 border-blue-600 flex items-center justify-center shrink-0 bg-white">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-black mb-1">Your data tells a story</h3>
-                    <p className="text-sm text-slate-600 leading-snug">Real-time data tracking, with in-depth analysis of your data, to help you take intelligent decisions and enhance your operational efficiency.</p>
-                  </div>
+                <div className="relative w-full max-w-4xl mx-auto aspect-[3/2]">
+                  <Image
+                    src="/school pay/Vendor Payment Management.png"
+                    alt="Vendor Payment Management"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
               </div>
             </div>

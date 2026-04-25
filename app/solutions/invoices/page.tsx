@@ -135,93 +135,186 @@ export default function InvoicesPage() {
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-16 items-center mb-16">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-8">
-                YOUR CHALLENGES
-              </h3>
-              
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-xl font-semibold text-gray-900 mb-4">
-                    Physical Payment Collection
-                  </h4>
-                  <ul className="space-y-3">
-                    <li className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full mt-2"></div>
-                      <span className="text-slate-600">Be COVID-19 safe and follow government regulations.</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full mt-2"></div>
-                      <span className="text-slate-600">Physical interaction with Customers for payment collection.</span>
-                    </li>
-                  </ul>
+          {/* Challenge 1: Physical Payment Collection */}
+          <div className="grid lg:grid-cols-2 gap-12 items-center mb-16">
+            {/* Image Placeholder */}
+            <div className="bg-slate-100 rounded-2xl aspect-[4/3] flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-24 h-24 bg-slate-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
                 </div>
+                <p className="text-slate-400 font-medium">Image Placeholder</p>
+                <p className="text-xs text-slate-400 mt-1">Physical Payment Collection</p>
               </div>
             </div>
-            
-            <div className="bg-yellow-50 rounded-2xl p-8">
-              <div className="bg-yellow-200 rounded-lg px-4 py-2 inline-block mb-4">
-                <h4 className="font-bold text-yellow-800">SOLUTIONS</h4>
+
+            {/* Content */}
+            <div>
+              <div className="mb-8">
+                <div className="bg-slate-200 rounded-r-lg px-6 py-2 inline-block mb-4">
+                  <h4 className="font-bold text-slate-700 uppercase tracking-wide">YOUR CHALLENGES</h4>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Physical Payment Collection
+                </h3>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-gray-900 rounded-full mt-2 shrink-0"></div>
+                    <span className="text-slate-700">Be COVID-19 safe and follow government regulations.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-gray-900 rounded-full mt-2 shrink-0"></div>
+                    <span className="text-slate-700">Physical interaction with Customers for payment collection.</span>
+                  </li>
+                </ul>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                Go Contactless - The new normal
-              </h3>
-              <ul className="space-y-4">
-                <li className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-green-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-slate-700">Online payment - easy & safe, avoid multiple touchpoints.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-green-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-slate-700">Customers pay online through any digital payment method.</span>
-                </li>
-              </ul>
+
+              <div>
+                <div className="bg-yellow-400 rounded-r-lg px-6 py-2 inline-block mb-4">
+                  <h4 className="font-bold text-yellow-900 uppercase tracking-wide">SOLUTIONS</h4>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Go Contactless - The new normal
+                </h3>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-green-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-slate-700">Online payment - easy & safe, avoid multiple touchpoints.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-green-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-slate-700">Customers pay online through any digital payment method.</span>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="p-6 bg-slate-50 rounded-xl">
-              <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+          {/* Challenge 2: Efficiency in Administrative tasks */}
+          <div className="grid lg:grid-cols-2 gap-12 items-center mb-16">
+            {/* Content */}
+            <div className="order-2 lg:order-1">
+              <div className="mb-8">
+                <div className="bg-slate-200 rounded-r-lg px-6 py-2 inline-block mb-4">
+                  <h4 className="font-bold text-slate-700 uppercase tracking-wide">YOUR CHALLENGES</h4>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Efficiency in Administrative tasks
+                </h3>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-gray-900 rounded-full mt-2 shrink-0"></div>
+                    <span className="text-slate-700">Human Errors & Delay in reconciliation of bills.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-gray-900 rounded-full mt-2 shrink-0"></div>
+                    <span className="text-slate-700">Lots of paperwork involved - Hassle for staff to process.</span>
+                  </li>
+                </ul>
               </div>
-              <h3 className="text-xl font-bold text-black mb-2">Quick Setup</h3>
-              <p className="text-sm text-slate-600">
-                Get started in minutes with our simple invoice creation and payment link generation.
-              </p>
+
+              <div>
+                <div className="bg-yellow-400 rounded-r-lg px-6 py-2 inline-block mb-4">
+                  <h4 className="font-bold text-yellow-900 uppercase tracking-wide">SOLUTIONS</h4>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Enabling Digitalization
+                </h3>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-green-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-slate-700">Easy integration with existing system for real time reconciliation.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-green-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-slate-700">Go Green & Paperless - Avoid multiple invoices for multiple procedures.</span>
+                  </li>
+                </ul>
+              </div>
             </div>
 
-            {/* Feature 2 */}
-            <div className="p-6 bg-slate-50 rounded-xl">
-              <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            {/* Image Placeholder */}
+            <div className="bg-slate-100 rounded-2xl aspect-[4/3] flex items-center justify-center order-1 lg:order-2">
+              <div className="text-center">
+                <div className="w-24 h-24 bg-slate-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p className="text-slate-400 font-medium">Image Placeholder</p>
+                <p className="text-xs text-slate-400 mt-1">Administrative Efficiency</p>
               </div>
-              <h3 className="text-xl font-bold text-black mb-2">Secure Payments</h3>
-              <p className="text-sm text-slate-600">
-                Bank-grade security ensures all transactions are safe and compliant with industry standards.
-              </p>
+            </div>
+          </div>
+
+          {/* Challenge 3: Omni-Channel Payment Acceptance */}
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Image Placeholder */}
+            <div className="bg-slate-100 rounded-2xl aspect-[4/3] flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-24 h-24 bg-slate-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p className="text-slate-400 font-medium">Image Placeholder</p>
+                <p className="text-xs text-slate-400 mt-1">Omni-Channel Payments</p>
+              </div>
             </div>
 
-            {/* Feature 3 */}
-            <div className="p-6 bg-slate-50 rounded-xl">
-              <div className="w-12 h-12 rounded-full bg-purple-600 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
+            {/* Content */}
+            <div>
+              <div className="mb-8">
+                <div className="bg-slate-200 rounded-r-lg px-6 py-2 inline-block mb-4">
+                  <h4 className="font-bold text-slate-700 uppercase tracking-wide">YOUR CHALLENGES</h4>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Omni-Channel Payment Acceptance
+                </h3>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-gray-900 rounded-full mt-2 shrink-0"></div>
+                    <span className="text-slate-700">Multi-channel payment acceptance and reconciliation</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-gray-900 rounded-full mt-2 shrink-0"></div>
+                    <span className="text-slate-700">Hassle for Finance & Accounts team to provide updated information on overdue bills.</span>
+                  </li>
+                </ul>
               </div>
-              <h3 className="text-xl font-bold text-black mb-2">Real-time Tracking</h3>
-              <p className="text-sm text-slate-600">
-                Monitor payment status, send reminders, and track all your invoices from one dashboard.
-              </p>
+
+              <div>
+                <div className="bg-yellow-400 rounded-r-lg px-6 py-2 inline-block mb-4">
+                  <h4 className="font-bold text-yellow-900 uppercase tracking-wide">SOLUTIONS</h4>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Spoil your customers with choices
+                </h3>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-green-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-slate-700">Options to choose from debit cards to credit cards, internet banking to UPI from 45+ partner banks</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-green-600 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-slate-700">360° View of all operations across multiple locations.</span>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
