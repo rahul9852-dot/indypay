@@ -69,8 +69,8 @@ export default function AboutPage() {
 
         <section className="py-16 bg-slate-50">
           <div className="max-w-7xl mx-auto px-6">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="lg:order-2">
+            <div className="grid lg:grid-cols-1 gap-12">
+              <div>
                 <h2 className="text-3xl md:text-4xl font-black text-slate-900">Our vision</h2>
                 <p className="text-base text-slate-700 mt-4 leading-relaxed">
                   Make digital payments simple and dependable for every business—so money movement becomes a growth lever, not an
@@ -82,19 +82,6 @@ export default function AboutPage() {
                   Build a secure, scalable payments stack that works across channels, supports teams with clear tooling, and helps
                   businesses operate with confidence.
                 </p>
-              </div>
-
-              <div className="lg:order-1 flex items-center justify-center">
-                <div className="relative w-full max-w-4xl mx-auto">
-                  <div className="relative w-full aspect-[3/2]">
-                    <Image
-                      src="/about indypay/Our vision.png"
-                      alt="Our vision"
-                      fill
-                      className="object-contain"
-                    />
-                  </div>
-                </div>
               </div>
             </div>
           </div>

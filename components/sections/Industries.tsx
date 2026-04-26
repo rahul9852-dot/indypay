@@ -66,8 +66,14 @@ export default function Industries() {
               {/* Left Side - Content */}
               <div>
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-24 h-24 rounded-[32px] bg-white flex items-center justify-center text-5xl shrink-0 shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
-                    {industry.icon}
+                  <div className="w-24 h-24 flex items-center justify-center shrink-0">
+                    <Image
+                      src={`/hero section icon/${industry.title === 'BFSI' ? 'bfsii' : industry.title === 'Financial Institutions' ? 'financial' : industry.title === 'Retail' ? 'retails' : industry.title === 'Hospitality' ? 'hospility' : industry.title === 'Logistics' ? 'logisticss' : 'Education'}.png`}
+                      alt={industry.title}
+                      width={96}
+                      height={96}
+                      className="object-contain"
+                    />
                   </div>
                   <h3 className="text-4xl font-black text-black">{industry.title}</h3>
                 </div>

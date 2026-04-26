@@ -98,6 +98,16 @@ export default function Footer() {
           ))}
         </div>
 
+        {/* Address Section */}
+        <div className="border-t border-gray-100 pt-8 pb-8">
+          <div className="text-gray-600 text-sm leading-relaxed">
+            <p className="font-semibold text-[#6B46C1] mb-2">Registered Office Address:</p>
+            <p>BHIVE Platinum Church Street, 48, Church St, Haridevpur,</p>
+            <p>Shanthala Nagar, Bengaluru, Karnataka 560001, India</p>
+            <p className="mt-2">Certificate No. IN-KA85327722319802W</p>
+          </div>
+        </div>
+
         {/* Bottom Bar */}
         <div className="border-t border-gray-100 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-gray-500">
